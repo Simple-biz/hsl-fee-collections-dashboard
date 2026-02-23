@@ -249,11 +249,11 @@ export const Sidebar = ({
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${t.avatarBg}`}
             >
-              T
+              U
             </div>
             <div className="flex-1 min-w-0">
               <div className={`text-[12px] font-semibold ${t.text} truncate`}>
-                Thomas
+                User
               </div>
               <div className={`text-[10px] ${t.textMuted} truncate`}>
                 admin@hogansmith.com
