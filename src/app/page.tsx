@@ -7,19 +7,21 @@ import { CollectionsPanel } from "@/components/cases/CollectionsPanel";
 import { RevenuePanel } from "@/components/cases/RevenuePanel";
 import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
 import { Scoreboard } from "@/components/scoreboard/Scoreboard";
+import { ChroniclePull } from "@/components/chronicle/ChroniclePull";
 import { useDashboard } from "@/hooks/useDashboard";
 import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
 
 const DashboardPage = () => {
-  const { cases, summary, monthlyData, team, loading, error, refresh } =
+  // const { cases, summary, monthlyData, team, loading, error, refresh } =
+  const { cases, summary, monthlyData, loading, error, refresh } =
     useDashboard();
   const { resolvedTheme } = useTheme();
   const t = themeClasses(resolvedTheme === "dark");
 
   return (
     <DashboardLayout>
-      {(activeTab) => (
+      {(activeTab, dateRange) => (
         <>
           {/* Error state */}
           {error && (
@@ -59,12 +61,15 @@ const DashboardPage = () => {
                     <RevenuePanel stats={summary} cases={cases} />
                   </div>
 
-                  <FeeRecordsTable cases={cases} />
+                  <FeeRecordsTable cases={cases} dateRange={dateRange} />
                 </>
               )}
 
               {/* ANALYTICS TAB */}
               {activeTab === "analytics" && <Scoreboard />}
+
+              {/* CHRONICLE TAB */}
+              {activeTab === "chronicle" && <ChroniclePull />}
 
               {/* REPORTS TAB */}
               {activeTab === "reports" && (

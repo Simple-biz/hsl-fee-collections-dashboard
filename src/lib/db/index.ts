@@ -5,9 +5,8 @@ import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL!;
 
-const client = postgres(connectionString, {
-  prepare: false,
-  ssl: { rejectUnauthorized: false },
-});
+// Connection for Supabase Transaction mode (port 6543)
+// prepare: false is required for transaction pooler
+const client = postgres(connectionString, { prepare: false });
 
 export const db = drizzle(client, { schema });

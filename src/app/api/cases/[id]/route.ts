@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
+// import { eq, desc, sql } from "drizzle-orm";
 
 // GET /api/cases/[id] — Full case detail with fee record + activity history
 export const GET = async (

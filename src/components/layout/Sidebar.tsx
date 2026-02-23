@@ -2,12 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import {
   Home,
-  // FolderOpen,
   Users,
   Trophy,
-  // BarChart3,
   Settings,
   DollarSign,
   PanelLeft,
@@ -16,8 +15,10 @@ import {
   Bell,
   FileText,
   X,
+  Database,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { fmtClaim } from "@/lib/formatters";
 
 interface SidebarProps {
   open: boolean;
@@ -28,8 +29,16 @@ interface SidebarProps {
 
 interface NavItem {
   tab: string;
-  icon: typeof Home;
+  icon: React.ElementType;
   label: string;
+}
+
+interface SearchResult {
+  id: number;
+  name: string;
+  claim: string;
+  status: string;
+  assigned: string;
 }
 
 const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
@@ -38,6 +47,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
     items: [
       { tab: "overview", icon: Home, label: "Overview" },
       { tab: "analytics", icon: Trophy, label: "Scoreboard" },
+      { tab: "chronicle", icon: Database, label: "Chronicle Sync" },
       { tab: "reports", icon: FileText, label: "Reports" },
       { tab: "notifications", icon: Bell, label: "Notifications" },
     ],
@@ -60,12 +70,16 @@ export const Sidebar = ({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+  const router = useRouter();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Keyboard shortcut ⌘K / Ctrl+K
+  // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -75,6 +89,7 @@ export const Sidebar = ({
       if (e.key === "Escape") {
         setSearchOpen(false);
         setSearchQuery("");
+        setSearchResults([]);
       }
     };
     window.addEventListener("keydown", handler);
@@ -86,6 +101,42 @@ export const Sidebar = ({
       searchInputRef.current.focus();
     }
   }, [searchOpen]);
+
+  // Debounced search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      requestAnimationFrame(() => setSearchResults([]));
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/cases?search=${encodeURIComponent(searchQuery.trim())}&limit=8`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.data || []);
+        }
+      } catch {}
+      setSearching(false);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  const goToCase = (id: number) => {
+    closeSearch();
+    router.push(`/cases/${id}`);
+  };
 
   return (
     <>
@@ -133,11 +184,11 @@ export const Sidebar = ({
               className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs ${t.searchBox} transition-colors`}
             >
               <Search className="h-3.5 w-3.5" />
-              <span>Search</span>
+              <span>Search cases</span>
               <span
                 className={`ml-auto text-[10px] px-1 py-0.5 rounded border ${t.kbdBg}`}
               >
-                ⌘K
+                \u2318K
               </span>
             </button>
           </div>
@@ -217,10 +268,7 @@ export const Sidebar = ({
       {searchOpen && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-          onClick={() => {
-            setSearchOpen(false);
-            setSearchQuery("");
-          }}
+          onClick={closeSearch}
         >
           <div
             className={`absolute inset-0 ${dark ? "bg-black/60" : "bg-black/30"} backdrop-blur-sm`}
@@ -229,32 +277,86 @@ export const Sidebar = ({
             className={`relative w-full max-w-lg rounded-xl border shadow-2xl ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Input */}
             <div className="flex items-center gap-3 px-4 py-3">
               <Search className={`h-4 w-4 shrink-0 ${t.textMuted}`} />
               <input
                 ref={searchInputRef}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search cases, agents, or commands..."
+                placeholder="Search cases by name or ID..."
                 className={`flex-1 text-sm outline-none ${dark ? "bg-transparent text-neutral-100 placeholder:text-neutral-500" : "bg-transparent text-neutral-900 placeholder:text-neutral-400"}`}
               />
-              <button
-                onClick={() => {
-                  setSearchOpen(false);
-                  setSearchQuery("");
-                }}
-                className={`${t.textMuted}`}
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchResults([]);
+                  }}
+                  className={t.textMuted}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             <div
-              className={`border-t ${t.borderLight} px-2 py-2 max-h-75 overflow-y-auto`}
+              className={`border-t ${t.borderLight} max-h-87.5 overflow-y-auto`}
             >
-              {/* Quick nav */}
+              {/* Search results */}
+              {searchQuery && searchResults.length > 0 && (
+                <div className="px-2 py-2">
+                  <p
+                    className={`px-3 py-1.5 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                  >
+                    Cases ({searchResults.length})
+                  </p>
+                  {searchResults.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => goToCase(c.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left transition-colors ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm font-semibold ${t.text}`}>
+                          {c.name}
+                        </span>
+                        <span className={`ml-2 text-[10px] ${t.textMuted}`}>
+                          #{c.id}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                      >
+                        {fmtClaim(c.claim)}
+                      </span>
+                      <span className={`text-[10px] ${t.textMuted}`}>
+                        {c.assigned}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* No results */}
+              {searchQuery && !searching && searchResults.length === 0 && (
+                <div className={`px-3 py-8 text-center`}>
+                  <p className={`text-sm ${t.textMuted}`}>
+                    No cases found for &quot;{searchQuery}&quot;
+                  </p>
+                </div>
+              )}
+
+              {/* Searching */}
+              {searching && (
+                <div className={`px-3 py-6 text-center`}>
+                  <p className={`text-sm ${t.textMuted}`}>Searching...</p>
+                </div>
+              )}
+
+              {/* Quick nav when empty */}
               {!searchQuery && (
-                <div>
+                <div className="px-2 py-2">
                   <p
                     className={`px-3 py-1.5 text-[10px] font-semibold uppercase ${t.textMuted}`}
                   >
@@ -263,19 +365,18 @@ export const Sidebar = ({
                   {[
                     { tab: "overview", icon: Home, label: "Overview" },
                     { tab: "analytics", icon: Trophy, label: "Scoreboard" },
-                    { tab: "reports", icon: FileText, label: "Reports" },
                     {
-                      tab: "notifications",
-                      icon: Bell,
-                      label: "Notifications",
+                      tab: "chronicle",
+                      icon: Database,
+                      label: "Chronicle Sync",
                     },
+                    { tab: "reports", icon: FileText, label: "Reports" },
                   ].map((item) => (
                     <button
                       key={item.tab}
                       onClick={() => {
                         onTabChange?.(item.tab);
-                        setSearchOpen(false);
-                        setSearchQuery("");
+                        closeSearch();
                       }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm ${t.textSub} ${t.hover} transition-colors`}
                     >
@@ -285,25 +386,17 @@ export const Sidebar = ({
                   ))}
                 </div>
               )}
-
-              {/* Search hint */}
-              {searchQuery && (
-                <div className={`px-3 py-6 text-center`}>
-                  <p className={`text-sm ${t.textMuted}`}>
-                    Search for &quot;{searchQuery}&quot;
-                  </p>
-                  <p className={`text-xs ${t.textMuted} mt-1`}>
-                    Case search coming soon — use the table filter for now.
-                  </p>
-                </div>
-              )}
             </div>
 
             <div
               className={`border-t ${t.borderLight} px-4 py-2 flex items-center gap-4`}
             >
-              <span className={`text-[10px] ${t.textMuted}`}>↑↓ Navigate</span>
-              <span className={`text-[10px] ${t.textMuted}`}>↵ Select</span>
+              <span className={`text-[10px] ${t.textMuted}`}>
+                \u2191\u2193 Navigate
+              </span>
+              <span className={`text-[10px] ${t.textMuted}`}>
+                \u21B5 Select
+              </span>
               <span className={`text-[10px] ${t.textMuted}`}>esc Close</span>
             </div>
           </div>
