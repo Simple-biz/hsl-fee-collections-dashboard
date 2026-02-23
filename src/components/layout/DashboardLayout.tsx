@@ -7,8 +7,13 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { themeClasses } from "@/lib/theme-classes";
 
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
 interface DashboardLayoutProps {
-  children: (activeTab: string) => ReactNode;
+  children: (activeTab: string, dateRange: DateRange | null) => ReactNode;
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
@@ -19,6 +24,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
 
   return (
     <div
@@ -69,9 +75,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <h1 className={`text-base font-bold ${t.text}`}>Fee Collections</h1>
         </div>
 
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <Header
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+        />
         <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4 md:space-y-6">
-          {children(activeTab)}
+          {children(activeTab, dateRange)}
         </main>
       </div>
     </div>

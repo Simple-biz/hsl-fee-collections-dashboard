@@ -23,7 +23,7 @@ const RootLayout = ({
       <body className={`${outfit.variable} font-sans min-h-svh antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
         >
