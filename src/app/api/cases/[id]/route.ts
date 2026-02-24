@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
-// import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
+
+const resolveParams = async (context: {
+  params: { id: string } | Promise<{ id: string }>;
+}) => {
+  const p =
+    context.params instanceof Promise ? await context.params : context.params;
+  return parseInt(p.id);
+};
 
 // GET /api/cases/[id] — Full case detail with fee record + activity history
 export const GET = async (
@@ -10,9 +17,7 @@ export const GET = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
-    const resolvedParams =
-      context.params instanceof Promise ? await context.params : context.params;
-    const caseId = parseInt(resolvedParams.id);
+    const caseId = await resolveParams(context);
 
     if (isNaN(caseId)) {
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
@@ -180,6 +185,166 @@ export const GET = async (
     return NextResponse.json({ data });
   } catch (error) {
     console.error("GET /api/cases/[id] error:", error);
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 },
+    );
+  }
+};
+
+// ============================================================================
+// PATCH /api/cases/[id] — Update case + fee record fields
+// ============================================================================
+
+export const PATCH = async (
+  req: NextRequest,
+  context: { params: { id: string } | Promise<{ id: string }> },
+) => {
+  try {
+    const caseId = await resolveParams(context);
+    if (isNaN(caseId)) {
+      return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
+    }
+
+    const body = await req.json();
+    const { caseFields, feeFields, logMessage, logAuthor } = body;
+
+    // Update case fields if provided
+    if (caseFields && Object.keys(caseFields).length > 0) {
+      const CASE_FIELD_MAP: Record<string, string> = {
+        firstName: "first_name",
+        lastName: "last_name",
+        claimTypeLabel: "claim_type_label",
+        levelWon: "level_won",
+        t2Decision: "t2_decision",
+        t16Decision: "t16_decision",
+        approvalDate: "approval_date",
+        officeWithJurisdiction: "office_with_jurisdiction",
+      };
+
+      const updates = Object.entries(caseFields)
+        .filter(([k]) => CASE_FIELD_MAP[k])
+        .map(([k, v]) => {
+          const col = CASE_FIELD_MAP[k];
+          if (v === null) return `${col} = NULL`;
+          return `${col} = '${String(v).replace(/'/g, "''")}'`;
+        });
+
+      if (updates.length > 0) {
+        await db.execute(
+          sql`UPDATE cases SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE client_id = ${caseId}`,
+        );
+      }
+    }
+
+    // Update fee record fields if provided
+    if (feeFields && Object.keys(feeFields).length > 0) {
+      const FEE_FIELD_MAP: Record<string, string> = {
+        assignedTo: "assigned_to",
+        winSheetStatus: "win_sheet_status",
+        t16Retro: "t16_retro",
+        t16FeeDue: "t16_fee_due",
+        t16FeeReceived: "t16_fee_received",
+        t16Pending: "t16_pending",
+        t16FeeReceivedDate: "t16_fee_received_date",
+        t2Retro: "t2_retro",
+        t2FeeDue: "t2_fee_due",
+        t2FeeReceived: "t2_fee_received",
+        t2Pending: "t2_pending",
+        t2FeeReceivedDate: "t2_fee_received_date",
+        auxRetro: "aux_retro",
+        auxFeeDue: "aux_fee_due",
+        auxFeeReceived: "aux_fee_received",
+        auxPending: "aux_pending",
+        auxFeeReceivedDate: "aux_fee_received_date",
+        totalRetroDue: "total_retro_due",
+        totalFeesExpected: "total_fees_expected",
+        totalFeesPaid: "total_fees_paid",
+        pifReadyToClose: "pif_ready_to_close",
+        approvedBy: "approved_by",
+        feeMethod: "fee_method",
+        feeComputed: "fee_computed",
+      };
+
+      const updates = Object.entries(feeFields)
+        .filter(([k]) => FEE_FIELD_MAP[k])
+        .map(([k, v]) => {
+          const col = FEE_FIELD_MAP[k];
+          if (v === null) return `${col} = NULL`;
+          if (typeof v === "boolean") return `${col} = ${v}`;
+          if (typeof v === "number") return `${col} = ${v}`;
+          return `${col} = '${String(v).replace(/'/g, "''")}'`;
+        });
+
+      if (updates.length > 0) {
+        await db.execute(
+          sql`UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
+        );
+      }
+    }
+
+    // Log activity if message provided
+    if (logMessage) {
+      await db.insert(activityLog).values({
+        caseId,
+        message: logMessage,
+        createdBy: logAuthor || "System",
+      });
+    }
+
+    return NextResponse.json({ status: "ok", updated: caseId });
+  } catch (error) {
+    console.error("PATCH /api/cases/[id] error:", error);
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 },
+    );
+  }
+};
+
+// ============================================================================
+// POST /api/cases/[id] — Add activity log entry only
+// ============================================================================
+
+export const POST = async (
+  req: NextRequest,
+  context: { params: { id: string } | Promise<{ id: string }> },
+) => {
+  try {
+    const caseId = await resolveParams(context);
+    if (isNaN(caseId)) {
+      return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
+    }
+
+    const { message, createdBy } = await req.json();
+
+    if (!message?.trim()) {
+      return NextResponse.json(
+        { error: "Message is required" },
+        { status: 400 },
+      );
+    }
+
+    const [entry] = await db
+      .insert(activityLog)
+      .values({
+        caseId,
+        message: message.trim(),
+        createdBy: createdBy || "System",
+      })
+      .returning({ id: activityLog.id, createdAt: activityLog.createdAt });
+
+    return NextResponse.json({
+      status: "ok",
+      activity: {
+        id: entry.id,
+        message: message.trim(),
+        createdBy: createdBy || "System",
+        createdAt: entry.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("POST /api/cases/[id] error:", error);
     return NextResponse.json(
       { error: (error as Error).message },
       { status: 500 },
