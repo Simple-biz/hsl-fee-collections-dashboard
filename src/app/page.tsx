@@ -11,6 +11,7 @@ import { ChroniclePull } from "@/components/chronicle/ChroniclePull";
 import { useDashboard } from "@/hooks/useDashboard";
 import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
+import { Reports } from "@/components/reports/Reports";
 
 const DashboardPage = () => {
   // const { cases, summary, monthlyData, team, loading, error, refresh } =
@@ -72,13 +73,14 @@ const DashboardPage = () => {
               {activeTab === "chronicle" && <ChroniclePull />}
 
               {/* REPORTS TAB */}
-              {activeTab === "reports" && (
+              {/* {activeTab === "reports" && (
                 <div className={`rounded-xl border p-8 text-center ${t.card}`}>
                   <p className={`text-sm ${t.textMuted}`}>
                     Reports coming soon.
                   </p>
                 </div>
-              )}
+              )} */}
+              {activeTab === "reports" && <Reports />}
 
               {/* NOTIFICATIONS TAB */}
               {activeTab === "notifications" && (
