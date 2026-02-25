@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   Home,
   Users,
@@ -23,14 +24,7 @@ import { fmtClaim } from "@/lib/formatters";
 interface SidebarProps {
   open: boolean;
   onToggle: () => void;
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
-}
-
-interface NavItem {
-  tab: string;
-  icon: React.ElementType;
-  label: string;
+  onMobileClose?: () => void;
 }
 
 interface SearchResult {
@@ -41,36 +35,35 @@ interface SearchResult {
   assigned: string;
 }
 
-const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
+const NAV_ITEMS: {
+  section: string;
+  items: { path: string; icon: React.ElementType; label: string }[];
+}[] = [
   {
     section: "General",
     items: [
-      { tab: "overview", icon: Home, label: "Overview" },
-      { tab: "analytics", icon: Trophy, label: "Scoreboard" },
-      { tab: "chronicle", icon: Database, label: "Chronicle Sync" },
-      { tab: "reports", icon: FileText, label: "Reports" },
-      { tab: "notifications", icon: Bell, label: "Notifications" },
+      { path: "/", icon: Home, label: "Overview" },
+      { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
+      { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
+      { path: "/reports", icon: FileText, label: "Reports" },
+      { path: "/notifications", icon: Bell, label: "Notifications" },
     ],
   },
   {
     section: "Management",
     items: [
-      { tab: "team", icon: Users, label: "Team" },
-      { tab: "settings", icon: Settings, label: "Settings" },
+      { path: "/team", icon: Users, label: "Team" },
+      { path: "/settings", icon: Settings, label: "Settings" },
     ],
   },
 ];
 
-export const Sidebar = ({
-  open,
-  onToggle,
-  activeTab,
-  onTabChange,
-}: SidebarProps) => {
+export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
   const router = useRouter();
+  const pathname = usePathname();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,7 +72,6 @@ export const Sidebar = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -97,9 +89,7 @@ export const Sidebar = ({
   }, []);
 
   useEffect(() => {
-    if (searchOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
+    if (searchOpen && searchInputRef.current) searchInputRef.current.focus();
   }, [searchOpen]);
 
   // Debounced search
@@ -132,11 +122,12 @@ export const Sidebar = ({
     setSearchQuery("");
     setSearchResults([]);
   };
-
   const goToCase = (id: number) => {
     closeSearch();
     router.push(`/cases/${id}`);
   };
+  const isActive = (path: string) =>
+    path === "/" ? pathname === "/" : pathname.startsWith(path);
 
   return (
     <>
@@ -176,8 +167,8 @@ export const Sidebar = ({
           )}
         </div>
 
-        {/* Search trigger */}
-        {open && (
+        {/* Search */}
+        {open ? (
           <div className="px-3 py-2">
             <button
               onClick={() => setSearchOpen(true)}
@@ -188,12 +179,11 @@ export const Sidebar = ({
               <span
                 className={`ml-auto text-[10px] px-1 py-0.5 rounded border ${t.kbdBg}`}
               >
-                \u2318K
+                {"\u2318"}K
               </span>
             </button>
           </div>
-        )}
-        {!open && (
+        ) : (
           <div className="px-2 py-2">
             <button
               onClick={() => {
@@ -219,22 +209,19 @@ export const Sidebar = ({
                 </div>
               )}
               {group.items.map((item) => {
-                const active = activeTab === item.tab;
+                const active = isActive(item.path);
                 return (
-                  <button
-                    key={item.tab}
-                    onClick={() => onTabChange?.(item.tab)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${open ? "" : "justify-center"} ${
-                      active
-                        ? `${t.activeNav} font-semibold`
-                        : `${t.textSub} ${t.hover}`
-                    }`}
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    onClick={() => onMobileClose?.()}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${open ? "" : "justify-center"} ${active ? `${t.activeNav} font-semibold` : `${t.textSub} ${t.hover}`}`}
                   >
                     <item.icon
                       className={`h-4 w-4 shrink-0 ${active ? "" : t.textMuted}`}
                     />
                     {open && <span>{item.label}</span>}
-                  </button>
+                  </Link>
                 );
               })}
             </div>
@@ -277,7 +264,6 @@ export const Sidebar = ({
             className={`relative w-full max-w-lg rounded-xl border shadow-2xl ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Input */}
             <div className="flex items-center gap-3 px-4 py-3">
               <Search className={`h-4 w-4 shrink-0 ${t.textMuted}`} />
               <input
@@ -299,11 +285,9 @@ export const Sidebar = ({
                 </button>
               )}
             </div>
-
             <div
               className={`border-t ${t.borderLight} max-h-87.5 overflow-y-auto`}
             >
-              {/* Search results */}
               {searchQuery && searchResults.length > 0 && (
                 <div className="px-2 py-2">
                   <p
@@ -337,24 +321,18 @@ export const Sidebar = ({
                   ))}
                 </div>
               )}
-
-              {/* No results */}
               {searchQuery && !searching && searchResults.length === 0 && (
-                <div className={`px-3 py-8 text-center`}>
+                <div className="px-3 py-8 text-center">
                   <p className={`text-sm ${t.textMuted}`}>
                     No cases found for &quot;{searchQuery}&quot;
                   </p>
                 </div>
               )}
-
-              {/* Searching */}
               {searching && (
-                <div className={`px-3 py-6 text-center`}>
+                <div className="px-3 py-6 text-center">
                   <p className={`text-sm ${t.textMuted}`}>Searching...</p>
                 </div>
               )}
-
-              {/* Quick nav when empty */}
               {!searchQuery && (
                 <div className="px-2 py-2">
                   <p
@@ -363,39 +341,36 @@ export const Sidebar = ({
                     Quick Navigation
                   </p>
                   {[
-                    { tab: "overview", icon: Home, label: "Overview" },
-                    { tab: "analytics", icon: Trophy, label: "Scoreboard" },
+                    { path: "/", icon: Home, label: "Overview" },
+                    { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
                     {
-                      tab: "chronicle",
+                      path: "/chronicle",
                       icon: Database,
                       label: "Chronicle Sync",
                     },
-                    { tab: "reports", icon: FileText, label: "Reports" },
+                    { path: "/reports", icon: FileText, label: "Reports" },
                   ].map((item) => (
-                    <button
-                      key={item.tab}
-                      onClick={() => {
-                        onTabChange?.(item.tab);
-                        closeSearch();
-                      }}
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      onClick={closeSearch}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm ${t.textSub} ${t.hover} transition-colors`}
                     >
                       <item.icon className={`h-4 w-4 ${t.textMuted}`} />
                       {item.label}
-                    </button>
+                    </Link>
                   ))}
                 </div>
               )}
             </div>
-
             <div
               className={`border-t ${t.borderLight} px-4 py-2 flex items-center gap-4`}
             >
               <span className={`text-[10px] ${t.textMuted}`}>
-                \u2191\u2193 Navigate
+                {"\u2191\u2193"} Navigate
               </span>
               <span className={`text-[10px] ${t.textMuted}`}>
-                \u21B5 Select
+                {"\u21B5"} Select
               </span>
               <span className={`text-[10px] ${t.textMuted}`}>esc Close</span>
             </div>
