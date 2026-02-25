@@ -182,15 +182,6 @@ export const Scoreboard = () => {
     }
   }, [entryOpen]);
 
-  useEffect(() => {
-    if (!data) return;
-
-    console.log("FULL SCOREBOARD DATA:", data);
-    console.log("Agents:", data.agents);
-    console.log("Daily:", data.daily);
-    console.log("Summary:", data.summary);
-  }, [data]);
-
   // Cell accessors
   const getCell = (agent: string, date: string): CellValues => {
     return (
