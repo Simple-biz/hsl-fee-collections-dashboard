@@ -382,6 +382,49 @@ export const dailyMetrics = pgTable(
 );
 
 // ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+export const notificationTypeEnum = pgEnum("notification_type_enum", [
+  "case_aging",
+  "fee_payment",
+  "call_target_missed",
+  "case_assigned",
+]);
+
+export const notificationSeverityEnum = pgEnum("notification_severity_enum", [
+  "info",
+  "warning",
+  "critical",
+]);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: notificationTypeEnum("type").notNull(),
+    severity: notificationSeverityEnum("severity").notNull().default("info"),
+    title: varchar("title", { length: 300 }).notNull(),
+    message: text("message").notNull(),
+    caseId: integer("case_id").references(() => cases.clientId, {
+      onDelete: "cascade",
+    }),
+    agentName: varchar("agent_name", { length: 100 }),
+    isRead: boolean("is_read").notNull().default(false),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_notifications_type").on(table.type),
+    index("idx_notifications_is_read").on(table.isRead),
+    index("idx_notifications_created_at").on(table.createdAt),
+    index("idx_notifications_agent").on(table.agentName),
+  ],
+);
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 

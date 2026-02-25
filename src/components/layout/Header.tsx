@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -35,7 +35,12 @@ const toISO = (d: Date) => d.toISOString().split("T")[0];
 
 export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
   const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
   const pathname = usePathname();
 
@@ -43,6 +48,25 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const dropRef = useRef<HTMLDivElement>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/notifications?unread=true&limit=1");
+        if (res.ok) {
+          const json = await res.json();
+          setUnreadCount(json.unreadCount || 0);
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000); // poll every 60s
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -53,12 +77,17 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // useEffect(() => {
-  //   if (dateRange) {
-  //     setFromDate(dateRange.from);
-  //     setToDate(dateRange.to);
-  //   }
-  // }, [dateRange]);
+  const dateRangeRef = useRef(dateRange);
+  useEffect(() => {
+    dateRangeRef.current = dateRange;
+    if (dateRange) {
+      const t = setTimeout(() => {
+        setFromDate(dateRange.from);
+        setToDate(dateRange.to);
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [dateRange]);
 
   const isActive = (path: string) =>
     path === "/" ? pathname === "/" : pathname.startsWith(path);
@@ -134,9 +163,14 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
                   : dark
                     ? "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
                     : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"
-              } flex items-center`}
+              } flex items-center gap-1.5`}
             >
               {tab.label}
+              {tab.path === "/notifications" && unreadCount > 0 && (
+                <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           );
         })}
