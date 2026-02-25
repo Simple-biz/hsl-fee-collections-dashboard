@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -60,7 +60,12 @@ const NAV_ITEMS: {
 
 export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
   const router = useRouter();
   const pathname = usePathname();
@@ -71,6 +76,25 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const [searching, setSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [notifCount, setNotifCount] = useState(0);
+
+  // Poll notification unread count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/notifications?unread=true&limit=1");
+        if (res.ok) {
+          const json = await res.json();
+          setNotifCount(json.unreadCount || 0);
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -92,13 +116,14 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
     if (searchOpen && searchInputRef.current) searchInputRef.current.focus();
   }, [searchOpen]);
 
-  // Debounced search
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      requestAnimationFrame(() => setSearchResults([]));
-      return;
-    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!searchQuery.trim()) {
+      debounceRef.current = setTimeout(() => setSearchResults([]), 0);
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      };
+    }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
@@ -217,10 +242,26 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                     onClick={() => onMobileClose?.()}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${open ? "" : "justify-center"} ${active ? `${t.activeNav} font-semibold` : `${t.textSub} ${t.hover}`}`}
                   >
-                    <item.icon
-                      className={`h-4 w-4 shrink-0 ${active ? "" : t.textMuted}`}
-                    />
-                    {open && <span>{item.label}</span>}
+                    <div className="relative shrink-0">
+                      <item.icon
+                        className={`h-4 w-4 ${active ? "" : t.textMuted}`}
+                      />
+                      {item.path === "/notifications" &&
+                        notifCount > 0 &&
+                        !open && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-neutral-900" />
+                        )}
+                    </div>
+                    {open && (
+                      <span className="flex items-center gap-2 flex-1">
+                        {item.label}
+                        {item.path === "/notifications" && notifCount > 0 && (
+                          <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                            {notifCount > 99 ? "99+" : notifCount}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

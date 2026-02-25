@@ -263,45 +263,97 @@ export const Reports = () => {
       ),
       1,
     );
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxVal * f));
     return (
-      <div className="flex items-end gap-1 h-32">
-        {data.dailyBreakdown.map((d, i) => {
-          const total = d.ssa_calls + d.client_calls_ib + d.client_calls_ob;
-          const pct = (total / maxVal) * 100;
-          const ssaPct = total > 0 ? (d.ssa_calls / total) * pct : 0;
-          const ibPct = total > 0 ? (d.client_calls_ib / total) * pct : 0;
-          const obPct = total > 0 ? (d.client_calls_ob / total) * pct : 0;
-          const dayLabel = new Date(d.date + "T12:00:00").toLocaleDateString(
-            "en-US",
-            { weekday: "short" },
-          );
-          return (
-            <div
+      <div className="flex gap-2 flex-1 min-h-0">
+        {/* Y-axis labels */}
+        <div className="flex flex-col justify-between py-0.5 shrink-0">
+          {[...ticks].reverse().map((v, i) => (
+            <span
               key={i}
-              className="flex-1 flex flex-col items-center gap-1"
-              title={`${d.date}: ${total} calls`}
+              className={`text-[9px] tabular-nums ${t.textMuted} text-right w-6`}
             >
+              {v}
+            </span>
+          ))}
+        </div>
+        {/* Bars area */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="relative flex items-end gap-1.5 flex-1 min-h-0">
+            {/* Grid lines */}
+            {[0.25, 0.5, 0.75, 1].map((f) => (
               <div
-                className="w-full flex flex-col-reverse rounded-t overflow-hidden"
-                style={{ height: `${Math.max(pct, 2)}%` }}
-              >
+                key={f}
+                className={`absolute left-0 right-0 border-t ${dark ? "border-neutral-800/40" : "border-neutral-100"}`}
+                style={{ bottom: `${f * 100}%` }}
+              />
+            ))}
+            {data.dailyBreakdown.map((d, i) => {
+              const total = d.ssa_calls + d.client_calls_ib + d.client_calls_ob;
+              const pct = total > 0 ? Math.max((total / maxVal) * 100, 2) : 0;
+              const ssaPct = total > 0 ? (d.ssa_calls / total) * 100 : 0;
+              const ibPct = total > 0 ? (d.client_calls_ib / total) * 100 : 0;
+              const obPct = total > 0 ? (d.client_calls_ob / total) * 100 : 0;
+              return (
                 <div
-                  className="bg-indigo-500"
-                  style={{ height: `${ssaPct}%` }}
-                />
-                <div
-                  className={dark ? "bg-blue-500" : "bg-blue-400"}
-                  style={{ height: `${ibPct}%` }}
-                />
-                <div
-                  className={dark ? "bg-violet-500" : "bg-violet-400"}
-                  style={{ height: `${obPct}%` }}
-                />
-              </div>
-              <span className={`text-[9px] ${t.textMuted}`}>{dayLabel}</span>
-            </div>
-          );
-        })}
+                  key={i}
+                  className="flex-1 h-full flex flex-col justify-end relative z-10"
+                >
+                  {/* Number above bar */}
+                  {total > 0 && (
+                    <div
+                      className={`text-center text-[9px] font-bold ${t.text} mb-0.5`}
+                    >
+                      {total}
+                    </div>
+                  )}
+                  <div
+                    className="w-full flex flex-col-reverse rounded-t overflow-hidden"
+                    style={{ height: `${pct}%` }}
+                  >
+                    <div
+                      className="bg-indigo-500 w-full"
+                      style={{ height: `${ssaPct}%` }}
+                    />
+                    <div
+                      className={`${dark ? "bg-blue-500" : "bg-blue-400"} w-full`}
+                      style={{ height: `${ibPct}%` }}
+                    />
+                    <div
+                      className={`${dark ? "bg-violet-500" : "bg-violet-400"} w-full`}
+                      style={{ height: `${obPct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* X-axis labels */}
+          <div
+            className={`flex gap-1.5 border-t ${dark ? "border-neutral-800/40" : "border-neutral-100"} pt-1 shrink-0`}
+          >
+            {data.dailyBreakdown.map((d, i) => {
+              const dayLabel = new Date(
+                d.date + "T12:00:00",
+              ).toLocaleDateString("en-US", { weekday: "short" });
+              const dateLabel = new Date(
+                d.date + "T12:00:00",
+              ).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <div key={i} className="flex-1 text-center">
+                  <span className={`text-[9px] font-medium ${t.textSub} block`}>
+                    {dayLabel}
+                  </span>
+                  <span
+                    className={`text-[8px] ${t.textMuted} block leading-none`}
+                  >
+                    {dateLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   };
@@ -469,7 +521,9 @@ export const Reports = () => {
           {/* Chart + Recent Activity side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Daily calls chart */}
-            <div className={`${sectionCard} p-4 lg:col-span-2`}>
+            <div
+              className={`${sectionCard} px-4 pt-4 pb-3 lg:col-span-2 flex flex-col`}
+            >
               <div className="flex items-center justify-between mb-3">
                 <h4
                   className={`text-xs font-bold ${t.text} flex items-center gap-2`}

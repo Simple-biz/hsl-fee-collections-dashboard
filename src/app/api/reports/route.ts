@@ -88,17 +88,17 @@ export const GET = async (req: NextRequest) => {
       ORDER BY total_assigned DESC
     `);
 
-    // 6. Daily breakdown for chart (calls per day)
+    // 6. Daily breakdown for chart (calls per day — generates all dates in range)
     const dailyBreakdown = await db.execute(sql`
       SELECT
-        dm.metric_date::text AS date,
-        SUM(dm.ssa_calls)::int AS ssa_calls,
-        SUM(dm.client_calls_ib)::int AS client_calls_ib,
-        SUM(dm.client_calls_ob)::int AS client_calls_ob
-      FROM daily_metrics dm
-      WHERE dm.metric_date >= ${from} AND dm.metric_date <= ${to}
-      GROUP BY dm.metric_date
-      ORDER BY dm.metric_date
+        d.dt::date::text AS date,
+        COALESCE(SUM(dm.ssa_calls), 0)::int AS ssa_calls,
+        COALESCE(SUM(dm.client_calls_ib), 0)::int AS client_calls_ib,
+        COALESCE(SUM(dm.client_calls_ob), 0)::int AS client_calls_ob
+      FROM generate_series(${from}::date, ${to}::date, '1 day'::interval) AS d(dt)
+      LEFT JOIN daily_metrics dm ON dm.metric_date = d.dt::date
+      GROUP BY d.dt::date
+      ORDER BY d.dt::date
     `);
 
     // 7. Recent activity entries (for the feed)
@@ -250,7 +250,19 @@ export const GET = async (req: NextRequest) => {
         to,
         agents,
         totals,
-        dailyBreakdown,
+        dailyBreakdown: (
+          dailyBreakdown as unknown as {
+            date: string;
+            ssa_calls: number;
+            client_calls_ib: number;
+            client_calls_ob: number;
+          }[]
+        ).map((r) => ({
+          date: r.date,
+          ssa_calls: Number(r.ssa_calls) || 0,
+          client_calls_ib: Number(r.client_calls_ib) || 0,
+          client_calls_ob: Number(r.client_calls_ob) || 0,
+        })),
         recentActivity: (
           recentActivity as unknown as {
             id: string;
