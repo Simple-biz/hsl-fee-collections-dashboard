@@ -138,7 +138,7 @@ export default function FeeEditModal({
         body: JSON.stringify({
           feeFields,
           logMessage: "Fee update: " + changes.join("; ") + ".",
-          logAuthor: "Thomas",
+          logAuthor: "UserTest",
         }),
       });
       if (!res.ok) throw new Error("Failed");

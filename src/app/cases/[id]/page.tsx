@@ -207,7 +207,7 @@ const FeeSection = memo(
           body: JSON.stringify({
             feeFields,
             logMessage: changes.join("; ") + ".",
-            logAuthor: "Thomas",
+            logAuthor: "UserTest",
           }),
         });
         setInlineEdit(false);
@@ -391,7 +391,7 @@ const CaseDetailPage = () => {
 
   // Activity
   const [newNote, setNewNote] = useState("");
-  const [noteAuthor, setNoteAuthor] = useState("Thomas");
+  const [noteAuthor, setNoteAuthor] = useState("UserTest");
   const [postingNote, setPostingNote] = useState(false);
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
@@ -520,7 +520,7 @@ const CaseDetailPage = () => {
             Object.keys(caseFields).length > 0 ? caseFields : undefined,
           feeFields: Object.keys(feeFields).length > 0 ? feeFields : undefined,
           logMessage: changes.join(". ") + ".",
-          logAuthor: "Thomas",
+          logAuthor: "UserTest",
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -552,7 +552,7 @@ const CaseDetailPage = () => {
         body: JSON.stringify({
           feeFields: { pifReadyToClose: true, winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
-          logAuthor: "Thomas",
+          logAuthor: "UserTest",
         }),
       });
       await fetchCase();
@@ -1123,7 +1123,7 @@ const CaseDetailPage = () => {
                     onChange={(e) => setNoteAuthor(e.target.value)}
                     className={`h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
                   >
-                    <option value="Thomas">Thomas</option>
+                    <option value="UserTest">UserTest</option>
                     {teamMembers.map((m) => (
                       <option key={m} value={m}>
                         {m}
