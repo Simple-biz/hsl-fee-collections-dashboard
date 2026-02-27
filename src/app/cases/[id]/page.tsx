@@ -9,7 +9,7 @@ import {
   AlertCircle,
   Clock,
   User,
-  // MapPin,
+  MapPin,
   FileText,
   DollarSign,
   CheckCircle2,
@@ -19,6 +19,14 @@ import {
   Save,
   X,
   Send,
+  Shield,
+  Mail,
+  Phone,
+  Stethoscope,
+  Building2,
+  Gavel,
+  XCircle,
+  Trash2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import {
@@ -56,6 +64,31 @@ interface CaseDetail {
   office: string;
   assigned: string;
   status: string;
+
+  // PDF-extracted fields
+  fullSsn: string | null;
+  dob: string | null;
+  email: string | null;
+  phone: string | null;
+  primaryDiagnosis: string | null;
+  primaryDiagnosisCode: string | null;
+  secondaryDiagnosis: string | null;
+  secondaryDiagnosisCode: string | null;
+  allegations: string | null;
+  blindDli: string | null;
+  lastInsured: string | null;
+  firmName: string | null;
+  firmEin: string | null;
+  hearingOffice: string | null;
+  representatives: { name: string; repId: string | null }[] | null;
+  decisionHistory:
+    | {
+        level: string;
+        claimType: string;
+        result: string;
+        date: string | null;
+      }[]
+    | null;
 
   t16Retro: number;
   t16FeeDue: number;
@@ -207,7 +240,7 @@ const FeeSection = memo(
           body: JSON.stringify({
             feeFields,
             logMessage: changes.join("; ") + ".",
-            logAuthor: "UserTest",
+            logAuthor: "Thomas",
           }),
         });
         setInlineEdit(false);
@@ -389,9 +422,27 @@ const CaseDetailPage = () => {
   // Fee modal
   const [feeModalOpen, setFeeModalOpen] = useState(false);
 
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      router.push("/");
+    } catch (err) {
+      setError((err as Error).message);
+      setDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Activity
   const [newNote, setNewNote] = useState("");
-  const [noteAuthor, setNoteAuthor] = useState("UserTest");
+  const [noteAuthor, setNoteAuthor] = useState("Thomas");
   const [postingNote, setPostingNote] = useState(false);
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
@@ -520,7 +571,7 @@ const CaseDetailPage = () => {
             Object.keys(caseFields).length > 0 ? caseFields : undefined,
           feeFields: Object.keys(feeFields).length > 0 ? feeFields : undefined,
           logMessage: changes.join(". ") + ".",
-          logAuthor: "UserTest",
+          logAuthor: "Thomas",
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -552,7 +603,7 @@ const CaseDetailPage = () => {
         body: JSON.stringify({
           feeFields: { pifReadyToClose: true, winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
-          logAuthor: "UserTest",
+          logAuthor: "Thomas",
         }),
       });
       await fetchCase();
@@ -629,6 +680,61 @@ const CaseDetailPage = () => {
         />
       )}
 
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => !deleting && setDeleteConfirm(false)}
+          />
+          <div
+            className={`relative rounded-xl border p-6 w-full max-w-sm mx-4 ${t.card}`}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center ${dark ? "bg-red-900/40" : "bg-red-50"}`}
+              >
+                <Trash2
+                  className={`h-5 w-5 ${dark ? "text-red-400" : "text-red-600"}`}
+                />
+              </div>
+              <div>
+                <h3 className={`text-sm font-bold ${t.text}`}>Delete Case</h3>
+                <p className={`text-[11px] ${t.textMuted}`}>
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+            <p className={`text-xs ${t.textSub} mb-4`}>
+              Are you sure you want to delete <strong>{caseData?.name}</strong>{" "}
+              (#{caseData?.id})? This will permanently remove the case, fee
+              records, and all activity history.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                disabled={deleting}
+                className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} disabled:opacity-50`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="h-8 px-4 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deleting ? (
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
+                )}
+                {deleting ? "Deleting..." : "Delete Case"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sticky top bar */}
       <div className={`sticky top-0 z-30 ${t.bg} border-b ${t.border}`}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 flex items-center gap-3">
@@ -681,6 +787,12 @@ const CaseDetailPage = () => {
                       className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
                     >
                       <DollarSign className="h-3 w-3" /> Edit Fees
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(true)}
+                      className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-red-800 text-red-400 hover:bg-red-900/30" : "border-red-200 text-red-600 hover:bg-red-50"}`}
+                    >
+                      <Trash2 className="h-3 w-3" /> Delete
                     </button>
                   </>
                 ) : (
@@ -788,6 +900,32 @@ const CaseDetailPage = () => {
                     ) : (
                       <p className={val}>{caseData.lastName || "—"}</p>
                     )}
+                  </div>
+                  <div>
+                    <p className={lbl}>
+                      <Shield className="h-3 w-3 inline mr-1" />
+                      SSN
+                    </p>
+                    <p className={val}>
+                      {caseData.fullSsn ||
+                        (caseData.id
+                          ? `XXX-XX-${String(caseData.id).slice(-4).padStart(4, "0")}`
+                          : "—")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={lbl}>
+                      <Phone className="h-3 w-3 inline mr-1" />
+                      Phone
+                    </p>
+                    <p className={val}>{caseData.phone || "—"}</p>
+                  </div>
+                  <div>
+                    <p className={lbl}>
+                      <Mail className="h-3 w-3 inline mr-1" />
+                      Email
+                    </p>
+                    <p className={val}>{caseData.email || "—"}</p>
                   </div>
                   <div>
                     <p className={lbl}>Assigned To</p>
@@ -1057,6 +1195,174 @@ const CaseDetailPage = () => {
               </div>
             </div>
 
+            {/* PDF-Extracted Data (only shows if any fields populated) */}
+            {(caseData.dob ||
+              caseData.primaryDiagnosis ||
+              caseData.lastInsured ||
+              caseData.firmName ||
+              caseData.representatives?.length ||
+              caseData.decisionHistory?.length ||
+              caseData.allegations ||
+              caseData.blindDli) && (
+              <div className={sectionCard}>
+                <h4
+                  className={`text-xs font-bold ${t.text} mb-3 flex items-center gap-2`}
+                >
+                  <Shield className="h-3.5 w-3.5" /> PDF-Extracted Data
+                  <span className={`text-[9px] font-normal ${t.textMuted}`}>
+                    (from Chronicle file)
+                  </span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {caseData.dob && (
+                    <div>
+                      <p className={lbl}>Date of Birth</p>
+                      <p className={val}>{caseData.dob}</p>
+                    </div>
+                  )}
+                  {caseData.primaryDiagnosis && (
+                    <div>
+                      <p className={lbl}>
+                        <Stethoscope className="h-3 w-3 inline mr-1" />
+                        Primary Dx
+                      </p>
+                      <p className={val}>
+                        {caseData.primaryDiagnosis}
+                        {caseData.primaryDiagnosisCode
+                          ? ` (${caseData.primaryDiagnosisCode})`
+                          : ""}
+                      </p>
+                    </div>
+                  )}
+                  {caseData.secondaryDiagnosis && (
+                    <div>
+                      <p className={lbl}>
+                        <Stethoscope className="h-3 w-3 inline mr-1" />
+                        Secondary Dx
+                      </p>
+                      <p className={val}>
+                        {caseData.secondaryDiagnosis}
+                        {caseData.secondaryDiagnosisCode
+                          ? ` (${caseData.secondaryDiagnosisCode})`
+                          : ""}
+                      </p>
+                    </div>
+                  )}
+                  {caseData.lastInsured && (
+                    <div>
+                      <p className={lbl}>
+                        <CalendarDays className="h-3 w-3 inline mr-1" />
+                        DLI
+                      </p>
+                      <p className={val}>{caseData.lastInsured}</p>
+                    </div>
+                  )}
+                  {caseData.blindDli && (
+                    <div>
+                      <p className={lbl}>
+                        <CalendarDays className="h-3 w-3 inline mr-1" />
+                        Blind DLI
+                      </p>
+                      <p className={val}>{caseData.blindDli}</p>
+                    </div>
+                  )}
+                  {caseData.firmName && (
+                    <div>
+                      <p className={lbl}>
+                        <Building2 className="h-3 w-3 inline mr-1" />
+                        Firm
+                      </p>
+                      <p className={val}>{caseData.firmName}</p>
+                    </div>
+                  )}
+                  {caseData.firmEin && (
+                    <div>
+                      <p className={lbl}>
+                        <Building2 className="h-3 w-3 inline mr-1" />
+                        Firm EIN
+                      </p>
+                      <p className={val}>{caseData.firmEin}</p>
+                    </div>
+                  )}
+                  {caseData.hearingOffice && (
+                    <div>
+                      <p className={lbl}>
+                        <MapPin className="h-3 w-3 inline mr-1" />
+                        Hearing Office
+                      </p>
+                      <p className={val}>{caseData.hearingOffice}</p>
+                    </div>
+                  )}
+                </div>
+
+                {caseData.allegations && (
+                  <div className="mt-3">
+                    <p className={lbl}>Allegations</p>
+                    <p
+                      className={`text-[12px] ${t.textSub} mt-1 leading-relaxed`}
+                    >
+                      {caseData.allegations}
+                    </p>
+                  </div>
+                )}
+
+                {caseData.representatives &&
+                  caseData.representatives.length > 0 && (
+                    <div className="mt-3">
+                      <p className={`${lbl} mb-1.5`}>Representatives</p>
+                      <div className="flex flex-wrap gap-2">
+                        {caseData.representatives.map((rep, i) => (
+                          <span
+                            key={i}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium ${dark ? "bg-neutral-800/60 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
+                          >
+                            <User className="h-3 w-3" /> {rep.name}
+                            {rep.repId ? ` (${rep.repId})` : ""}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                {caseData.decisionHistory &&
+                  caseData.decisionHistory.length > 0 && (
+                    <div className="mt-3">
+                      <p className={`${lbl} mb-1.5`}>
+                        <Gavel className="h-3 w-3 inline mr-1" />
+                        Decision History
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {caseData.decisionHistory.map((dec, i) => {
+                          const denied = dec.result === "Not Disabled";
+                          return (
+                            <span
+                              key={i}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium ${
+                                denied
+                                  ? dark
+                                    ? "bg-red-900/30 text-red-400"
+                                    : "bg-red-50 text-red-700"
+                                  : dark
+                                    ? "bg-emerald-900/30 text-emerald-400"
+                                    : "bg-emerald-50 text-emerald-700"
+                              }`}
+                            >
+                              {denied ? (
+                                <XCircle className="h-3 w-3" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              {dec.level} • {dec.claimType} • {dec.result}
+                              {dec.date ? ` (${dec.date})` : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+              </div>
+            )}
+
             {/* Fee Breakdown — inline editable */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FeeSection
@@ -1123,7 +1429,7 @@ const CaseDetailPage = () => {
                     onChange={(e) => setNoteAuthor(e.target.value)}
                     className={`h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
                   >
-                    <option value="UserTest">UserTest</option>
+                    <option value="Thomas">Thomas</option>
                     {teamMembers.map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -1161,13 +1467,13 @@ const CaseDetailPage = () => {
               ) : (
                 <div className="relative">
                   <div
-                    className={`absolute left-2.75 top-2 bottom-2 w-px ${dark ? "bg-neutral-800" : "bg-neutral-200"}`}
+                    className={`absolute left-[11px] top-2 bottom-2 w-px ${dark ? "bg-neutral-800" : "bg-neutral-200"}`}
                   />
                   <div className="space-y-4">
                     {caseData.activities.map((a) => (
                       <div key={a.id} className="flex gap-3 relative">
                         <div
-                          className={`w-5.75 h-5.75 rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-300"}`}
+                          className={`w-[23px] h-[23px] rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-300"}`}
                         >
                           <div
                             className={`w-2 h-2 rounded-full ${dark ? "bg-neutral-500" : "bg-neutral-400"}`}

@@ -113,6 +113,9 @@ export interface ChronicleParsedCase {
 
   // Level
   caseLevel: "INITIAL" | "RECON" | "HEARING" | "AC" | "FEDERAL_COURT";
+
+  // PDF links
+  allFileLink: string | null;
 }
 
 // ============================================================================
@@ -260,6 +263,10 @@ export const parseChronicleResponse = (
 
     feeMethod: null, // Not in API response, will be set during import
     caseLevel: inferCaseLevel(data.report_type, data.status_of_case),
+    allFileLink:
+      data.all_file_link && data.all_file_link !== "string"
+        ? data.all_file_link
+        : null,
   };
 };
 
