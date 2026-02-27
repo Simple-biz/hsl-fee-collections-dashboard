@@ -10,7 +10,6 @@ import {
 // ============================================================================
 // MOCK DATA — 4 sample clients for development
 // ============================================================================
-// comment uo mock if needed
 
 const MOCK: Record<string, ChronicleApiResponse> = {
   "112221": {
@@ -242,7 +241,8 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const apiUrl = process.env.CHRONICLE_API_URL || "";
+    const apiUrl =
+      process.env.CHRONICLE_API_URL || process.env.CHRONICLE_BASE_URL || "";
     const apiKey = process.env.CHRONICLE_API_KEY || "";
     let usingMock = false;
     let raw: ChronicleApiResponse;
