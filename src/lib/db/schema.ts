@@ -12,7 +12,7 @@ import {
   uuid,
   jsonb,
   index,
-  // uniqueIndex,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -380,6 +380,21 @@ export const dailyMetrics = pgTable(
     index("idx_daily_metrics_date").on(table.metricDate),
   ],
 );
+
+// ============================================================================
+// APP_SETTINGS — Key-value configuration store
+// ============================================================================
+
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  label: varchar("label", { length: 200 }),
+  category: varchar("category", { length: 50 }).notNull().default("general"),
+  isSecret: boolean("is_secret").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // ============================================================================
 // NOTIFICATIONS
