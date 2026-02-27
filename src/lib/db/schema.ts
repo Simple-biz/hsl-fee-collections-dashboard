@@ -12,7 +12,7 @@ import {
   uuid,
   jsonb,
   index,
-  uniqueIndex,
+  // uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -111,6 +111,22 @@ export const cases = pgTable(
       withTimezone: true,
     }),
 
+    // PDF-extracted fields (from Chronicle all_file parse)
+    fullSsn: varchar("full_ssn", { length: 11 }),
+    email: varchar("email", { length: 200 }),
+    phone: varchar("phone", { length: 30 }),
+    primaryDiagnosis: varchar("primary_diagnosis", { length: 200 }),
+    primaryDiagnosisCode: varchar("primary_diagnosis_code", { length: 10 }),
+    secondaryDiagnosis: varchar("secondary_diagnosis", { length: 200 }),
+    secondaryDiagnosisCode: varchar("secondary_diagnosis_code", { length: 10 }),
+    allegations: text("allegations"),
+    blindDli: date("blind_dli"),
+    firmName: varchar("firm_name", { length: 200 }),
+    firmEin: varchar("firm_ein", { length: 12 }),
+    hearingOffice: varchar("hearing_office", { length: 200 }),
+    representatives: jsonb("representatives"),
+    decisionHistory: jsonb("decision_history"),
+
     // Chronicle Legal metadata
     reportType: varchar("report_type", { length: 100 }),
     expeditedCase: varchar("expedited_case", { length: 50 }),
@@ -135,6 +151,8 @@ export const cases = pgTable(
       withTimezone: true,
     }),
     invalidSsn: boolean("invalid_ssn").default(false),
+    // Encrypted SSN
+    ssnEncrypted: text("ssn_encrypted"),
 
     // Internal timestamps
     createdAt: timestamp("created_at", { withTimezone: true })

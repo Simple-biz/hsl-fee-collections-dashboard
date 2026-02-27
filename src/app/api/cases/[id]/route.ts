@@ -39,6 +39,24 @@ export const GET = async (
         officeWithJurisdiction: cases.officeWithJurisdiction,
         caseCreatedAt: cases.createdAt,
 
+        // PDF-extracted fields
+        fullSsn: cases.fullSsn,
+        dob: cases.dob,
+        email: cases.email,
+        phone: cases.phone,
+        primaryDiagnosis: cases.primaryDiagnosis,
+        primaryDiagnosisCode: cases.primaryDiagnosisCode,
+        secondaryDiagnosis: cases.secondaryDiagnosis,
+        secondaryDiagnosisCode: cases.secondaryDiagnosisCode,
+        allegations: cases.allegations,
+        blindDli: cases.blindDli,
+        lastInsured: cases.lastInsured,
+        firmName: cases.firmName,
+        firmEin: cases.firmEin,
+        hearingOffice: cases.hearingOffice,
+        representatives: cases.representatives,
+        decisionHistory: cases.decisionHistory,
+
         // Fee record fields
         feeRecordId: feeRecords.id,
         assignedTo: feeRecords.assignedTo,
@@ -119,6 +137,24 @@ export const GET = async (
       office: row.officeWithJurisdiction || "—",
       assigned: row.assignedTo || "—",
       status: row.winSheetStatus || "not_started",
+
+      // PDF-extracted fields
+      fullSsn: row.fullSsn || null,
+      dob: row.dob || null,
+      email: row.email || null,
+      phone: row.phone || null,
+      primaryDiagnosis: row.primaryDiagnosis || null,
+      primaryDiagnosisCode: row.primaryDiagnosisCode || null,
+      secondaryDiagnosis: row.secondaryDiagnosis || null,
+      secondaryDiagnosisCode: row.secondaryDiagnosisCode || null,
+      allegations: row.allegations || null,
+      blindDli: row.blindDli || null,
+      lastInsured: row.lastInsured || null,
+      firmName: row.firmName || null,
+      firmEin: row.firmEin || null,
+      hearingOffice: row.hearingOffice || null,
+      representatives: row.representatives || null,
+      decisionHistory: row.decisionHistory || null,
 
       // T16
       t16Retro: Number(row.t16Retro) || 0,
@@ -345,6 +381,36 @@ export const POST = async (
     });
   } catch (error) {
     console.error("POST /api/cases/[id] error:", error);
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 },
+    );
+  }
+};
+
+// ============================================================================
+// DELETE /api/cases/[id] — Delete case + fee record + activity log
+// ============================================================================
+
+export const DELETE = async (
+  req: NextRequest,
+  context: { params: { id: string } | Promise<{ id: string }> },
+) => {
+  try {
+    const caseId = await resolveParams(context);
+    if (isNaN(caseId)) {
+      return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
+    }
+
+    // Delete in order: activity_log → fee_records → cases (foreign key deps)
+    await db.execute(sql`DELETE FROM activity_log WHERE case_id = ${caseId}`);
+    await db.execute(sql`DELETE FROM notifications WHERE case_id = ${caseId}`);
+    await db.execute(sql`DELETE FROM fee_records WHERE case_id = ${caseId}`);
+    await db.execute(sql`DELETE FROM cases WHERE client_id = ${caseId}`);
+
+    return NextResponse.json({ status: "ok", deleted: caseId });
+  } catch (error) {
+    console.error("DELETE /api/cases/[id] error:", error);
     return NextResponse.json(
       { error: (error as Error).message },
       { status: 500 },
