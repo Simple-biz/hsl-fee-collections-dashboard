@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────
+# Chocobo: GitHub Issue → Monday.com PROJECTS board
+# Trigger: new issue opened in any Simple-biz repo
+#
+# Setup per repo:
+#   1. Copy this file to .github/workflows/issue-to-monday.yml
+#   2. Add org secret: MONDAY_API_TOKEN (simple.biz PAT)
+#   Board: PROJECTS (18399957775) — https://simple920423.monday.com/boards/18399957775
+# ─────────────────────────────────────────────────────────────────
+
+name: Issue → Monday.com
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  sync-to-monday:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Monday.com card
+        env:
+          MONDAY_API_TOKEN: ${{ secrets.MONDAY_API_TOKEN }}
+        run: |
+          ITEM_NAME="${{ github.event.issue.title }}"
+          ISSUE_URL="${{ github.event.issue.html_url }}"
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          REPO="${{ github.repository }}"
+
+          # Escape item name for JSON
+          ITEM_NAME_ESCAPED=$(echo "$ITEM_NAME" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))")
+
+          # Column values: set Github Issue link
+          COLUMN_VALUES="{\"link_mm0z27nn\": {\"url\": \"$ISSUE_URL\", \"text\": \"$REPO#$ISSUE_NUMBER\"}}"
+          COLUMN_VALUES_ESCAPED=$(echo "$COLUMN_VALUES" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))")
+
+          MUTATION="mutation {
+            create_item(
+              board_id: 18399957775,
+              group_id: \"group_mm0zwme1\",
+              item_name: $ITEM_NAME_ESCAPED,
+              column_values: $COLUMN_VALUES_ESCAPED
+            ) { id }
+          }"
+
+          RESPONSE=$(curl -s -X POST "https://api.monday.com/v2" \
+            -H "Authorization: Bearer $MONDAY_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$(echo "{\"query\": $(echo "$MUTATION" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}")")
+
+          echo "Monday.com response: $RESPONSE"
+
+          # Fail if error in response
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "ERROR: Monday.com API returned errors"
+            exit 1
+          fi
+
+          ITEM_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['create_item']['id'])")
+          echo "Created Monday card ID: $ITEM_ID for $REPO#$ISSUE_NUMBER"
