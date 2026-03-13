@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────────
+# Bowser: Claude Code PR Auto-Review
+# Trigger: PR opened, or @claude mentioned in PR comment
+#
+# Setup per repo:
+#   1. Copy this file to .github/workflows/pr-review.yml
+#   2. Add org secret: ANTHROPIC_API_KEY
+#   3. Install Claude Code GitHub App on the repo:
+#      https://github.com/apps/claude
+# ─────────────────────────────────────────────────────────────────
+
+name: Bowser — PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr-review:
+    # Only run on PRs (not issue comments on regular issues)
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are Bowser, QA engineer and code reviewer for the Simple-biz agency.
+            Review this pull request thoroughly:
+            - Check for bugs, security vulnerabilities, and edge cases
+            - Verify code quality and adherence to project conventions
+            - Flag any OWASP top-10 issues
+            - Check for performance concerns
+            - Summarize: what changed, what looks good, what needs fixing
+            - Use clear severity labels: CRITICAL / HIGH / MEDIUM / LOW / SUGGESTION
+            Post your review as a PR comment. Sign off with "Nothing escapes my review. — Bowser 🛡️"
