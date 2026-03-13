@@ -44,8 +44,9 @@ jobs:
           }"
 
           RESPONSE=$(curl -s -X POST "https://api.monday.com/v2" \
-            -H "Authorization: Bearer $MONDAY_API_TOKEN" \
+            -H "Authorization: $MONDAY_API_TOKEN" \
             -H "Content-Type: application/json" \
+            -H "API-Version: 2024-01" \
             --data "$(echo "{\"query\": $(echo "$MUTATION" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}")")
 
           echo "Monday.com response: $RESPONSE"
