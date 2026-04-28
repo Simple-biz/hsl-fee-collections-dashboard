@@ -46,7 +46,13 @@ export const GET = async () => {
       ORDER BY sort_key ASC
     `);
 
-    const monthlyData = monthly.map((row: any) => ({
+    const monthlyData = (
+      monthly as unknown as {
+        month: string;
+        expected: string;
+        collected: string;
+      }[]
+    ).map((row) => ({
       month: row.month,
       expected: Number(row.expected),
       collected: Number(row.collected),

@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 // import { Search, ChevronDown, MoreHorizontal, ArrowUpDown } from "lucide-react";
 import { Search, ArrowUpDown } from "lucide-react";
+
 import { themeClasses } from "@/lib/theme-classes";
 import {
   fmtFull,
@@ -17,6 +18,7 @@ import type { CaseRow } from "@/types";
 
 interface FeeRecordsTableProps {
   cases: CaseRow[];
+  dateRange?: { from: string; to: string } | null;
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
@@ -47,7 +49,7 @@ const AGING_COLORS = (cat: string | null, dark: boolean) => {
 type SortKey = "name" | "date" | "expected" | "paid" | "daysAfterApproval";
 type SortDir = "asc" | "desc";
 
-export const FeeRecordsTable = ({ cases }: FeeRecordsTableProps) => {
+export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
@@ -67,6 +69,13 @@ export const FeeRecordsTable = ({ cases }: FeeRecordsTableProps) => {
 
   const filtered = useMemo(() => {
     let d = [...cases];
+    // Date range filter (approval date)
+    if (dateRange) {
+      d = d.filter((c) => {
+        if (!c.date) return false;
+        return c.date >= dateRange.from && c.date <= dateRange.to;
+      });
+    }
     if (search) {
       const q = search.toLowerCase();
       d = d.filter(
@@ -119,7 +128,15 @@ export const FeeRecordsTable = ({ cases }: FeeRecordsTableProps) => {
     });
 
     return d;
-  }, [cases, search, statusFilter, assignedFilter, sortKey, sortDir]);
+  }, [
+    cases,
+    search,
+    statusFilter,
+    assignedFilter,
+    sortKey,
+    sortDir,
+    dateRange,
+  ]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");

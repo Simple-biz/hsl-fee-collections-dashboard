@@ -5,20 +5,17 @@ import { useTheme } from "next-themes";
 import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { DateRangeProvider, useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
 
-interface DashboardLayoutProps {
-  children: (activeTab: string) => ReactNode;
-}
-
-export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+function DashboardShell({ children }: { children: ReactNode }) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+  const { dateRange, setDateRange } = useDateRange();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <div
@@ -29,8 +26,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         <Sidebar
           open={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
         />
       </div>
 
@@ -45,18 +40,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <Sidebar
               open={true}
               onToggle={() => setMobileSidebarOpen(false)}
-              activeTab={activeTab}
-              onTabChange={(tab) => {
-                setActiveTab(tab);
-                setMobileSidebarOpen(false);
-              }}
+              onMobileClose={() => setMobileSidebarOpen(false)}
             />
           </div>
         </>
       )}
 
       <div className={`flex-1 flex flex-col overflow-hidden ${t.bgSub}`}>
-        {/* Mobile top bar with hamburger */}
+        {/* Mobile top bar */}
         <div
           className={`flex md:hidden items-center gap-3 h-14 px-4 ${t.bg} border-b ${t.border} shrink-0`}
         >
@@ -69,11 +60,19 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <h1 className={`text-base font-bold ${t.text}`}>Fee Collections</h1>
         </div>
 
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <Header dateRange={dateRange} onDateRangeChange={setDateRange} />
         <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4 md:space-y-6">
-          {children(activeTab)}
+          {children}
         </main>
       </div>
     </div>
   );
-};
+}
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  return (
+    <DateRangeProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </DateRangeProvider>
+  );
+}

@@ -111,6 +111,22 @@ export const cases = pgTable(
       withTimezone: true,
     }),
 
+    // PDF-extracted fields (from Chronicle all_file parse)
+    fullSsn: varchar("full_ssn", { length: 11 }),
+    email: varchar("email", { length: 200 }),
+    phone: varchar("phone", { length: 30 }),
+    primaryDiagnosis: varchar("primary_diagnosis", { length: 200 }),
+    primaryDiagnosisCode: varchar("primary_diagnosis_code", { length: 10 }),
+    secondaryDiagnosis: varchar("secondary_diagnosis", { length: 200 }),
+    secondaryDiagnosisCode: varchar("secondary_diagnosis_code", { length: 10 }),
+    allegations: text("allegations"),
+    blindDli: date("blind_dli"),
+    firmName: varchar("firm_name", { length: 200 }),
+    firmEin: varchar("firm_ein", { length: 12 }),
+    hearingOffice: varchar("hearing_office", { length: 200 }),
+    representatives: jsonb("representatives"),
+    decisionHistory: jsonb("decision_history"),
+
     // Chronicle Legal metadata
     reportType: varchar("report_type", { length: 100 }),
     expeditedCase: varchar("expedited_case", { length: 50 }),
@@ -135,6 +151,8 @@ export const cases = pgTable(
       withTimezone: true,
     }),
     invalidSsn: boolean("invalid_ssn").default(false),
+    // Encrypted SSN
+    ssnEncrypted: text("ssn_encrypted"),
 
     // Internal timestamps
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -378,6 +396,64 @@ export const dailyMetrics = pgTable(
   (table) => [
     index("idx_daily_metrics_agent").on(table.agentName),
     index("idx_daily_metrics_date").on(table.metricDate),
+  ],
+);
+
+// ============================================================================
+// APP_SETTINGS — Key-value configuration store
+// ============================================================================
+
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  label: varchar("label", { length: 200 }),
+  category: varchar("category", { length: 50 }).notNull().default("general"),
+  isSecret: boolean("is_secret").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+export const notificationTypeEnum = pgEnum("notification_type_enum", [
+  "case_aging",
+  "fee_payment",
+  "call_target_missed",
+  "case_assigned",
+]);
+
+export const notificationSeverityEnum = pgEnum("notification_severity_enum", [
+  "info",
+  "warning",
+  "critical",
+]);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: notificationTypeEnum("type").notNull(),
+    severity: notificationSeverityEnum("severity").notNull().default("info"),
+    title: varchar("title", { length: 300 }).notNull(),
+    message: text("message").notNull(),
+    caseId: integer("case_id").references(() => cases.clientId, {
+      onDelete: "cascade",
+    }),
+    agentName: varchar("agent_name", { length: 100 }),
+    isRead: boolean("is_read").notNull().default(false),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_notifications_type").on(table.type),
+    index("idx_notifications_is_read").on(table.isRead),
+    index("idx_notifications_created_at").on(table.createdAt),
+    index("idx_notifications_agent").on(table.agentName),
   ],
 );
 

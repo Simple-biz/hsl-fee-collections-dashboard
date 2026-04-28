@@ -1,91 +1,268 @@
 "use client";
 
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import {
-  Home,
-  BarChart3,
-  FileText,
-  Bell,
-  Download,
-  CalendarDays,
-} from "lucide-react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { CalendarDays } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { themeClasses } from "@/lib/theme-classes";
+import type { DateRange } from "@/lib/date-range-context";
 
 interface HeaderProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
+  dateRange: DateRange | null;
+  onDateRangeChange: (range: DateRange | null) => void;
 }
 
 const TABS = [
-  { id: "overview", label: "Overview", icon: Home },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "reports", label: "Reports", icon: FileText },
-  { id: "notifications", label: "Notifications", icon: Bell },
+  { path: "/", label: "Overview" },
+  { path: "/scoreboard", label: "Scoreboard" },
+  { path: "/chronicle", label: "Chronicle Sync" },
+  { path: "/reports", label: "Reports" },
+  { path: "/notifications", label: "Notifications" },
 ];
 
-export const Header = ({ activeTab, onTabChange }: HeaderProps) => {
+const PRESETS = [
+  { label: "Today", days: 0 },
+  { label: "Last 7 days", days: 7 },
+  { label: "Last 30 days", days: 30 },
+  { label: "Last 90 days", days: 90 },
+  { label: "This year", days: -1 },
+  { label: "All time", days: -2 },
+];
+
+const toISO = (d: Date) => d.toISOString().split("T")[0];
+
+export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
   const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+  const pathname = usePathname();
+
+  const [open, setOpen] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const dropRef = useRef<HTMLDivElement>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/notifications?unread=true&limit=1");
+        if (res.ok) {
+          const json = await res.json();
+          setUnreadCount(json.unreadCount || 0);
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000); // poll every 60s
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const dateRangeRef = useRef(dateRange);
+  useEffect(() => {
+    dateRangeRef.current = dateRange;
+    if (dateRange) {
+      const t = setTimeout(() => {
+        setFromDate(dateRange.from);
+        setToDate(dateRange.to);
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [dateRange]);
+
+  const isActive = (path: string) =>
+    path === "/" ? pathname === "/" : pathname.startsWith(path);
+
+  const applyPreset = (days: number) => {
+    const now = new Date();
+    if (days === -2) {
+      onDateRangeChange(null);
+      setFromDate("");
+      setToDate("");
+      setOpen(false);
+      return;
+    }
+    if (days === -1) {
+      const from = `${now.getFullYear()}-01-01`;
+      const to = toISO(now);
+      onDateRangeChange({ from, to });
+      setFromDate(from);
+      setToDate(to);
+      setOpen(false);
+      return;
+    }
+    if (days === 0) {
+      const today = toISO(now);
+      onDateRangeChange({ from: today, to: today });
+      setFromDate(today);
+      setToDate(today);
+      setOpen(false);
+      return;
+    }
+    const from = new Date(now);
+    from.setDate(from.getDate() - days);
+    onDateRangeChange({ from: toISO(from), to: toISO(now) });
+    setFromDate(toISO(from));
+    setToDate(toISO(now));
+    setOpen(false);
+  };
+
+  const applyCustom = () => {
+    if (fromDate && toDate) {
+      onDateRangeChange({ from: fromDate, to: toDate });
+      setOpen(false);
+    }
+  };
+  const clearRange = () => {
+    onDateRangeChange(null);
+    setFromDate("");
+    setToDate("");
+    setOpen(false);
+  };
+
+  const dateLabel = dateRange
+    ? `${new Date(dateRange.from + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(dateRange.to + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : "All time";
 
   return (
-    <>
-      <header
-        className={`hidden md:flex h-14 ${t.bg} border-b ${t.border} items-center justify-between px-6 shrink-0`}
-      >
-        <h1 className={`text-lg font-bold ${t.text}`}>Dashboard</h1>
-        <div className="flex items-center gap-2.5">
-          <button
-            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors ${t.ctaBtn}`}
-          >
-            <Download className="h-3.5 w-3.5" />{" "}
-            <span className="hidden lg:inline">Download</span>
-          </button>
-          <button
-            className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />{" "}
-            <span className="hidden lg:inline">Pick a date</span>
-          </button>
-          <ThemeToggle />
-        </div>
-      </header>
+    <header
+      className={`hidden md:flex h-14 ${t.bg} border-b ${t.border} items-center justify-between px-6 shrink-0`}
+    >
+      {/* Tab links */}
+      <div className="flex items-center gap-1">
+        {TABS.map((tab) => {
+          const active = isActive(tab.path);
+          return (
+            <Link
+              key={tab.path}
+              href={tab.path}
+              className={`h-8 px-3 rounded-md text-xs font-medium transition-colors ${
+                active
+                  ? dark
+                    ? "bg-neutral-800 text-neutral-100 font-semibold"
+                    : "bg-neutral-100 text-neutral-900 font-semibold"
+                  : dark
+                    ? "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
+                    : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"
+              } flex items-center gap-1.5`}
+            >
+              {tab.label}
+              {tab.path === "/notifications" && unreadCount > 0 && (
+                <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
 
-      {/* Mobile action bar */}
-      <div
-        className={`flex md:hidden items-center justify-end gap-2 px-4 py-2 ${t.bg} border-b ${t.border} shrink-0`}
-      >
-        <button
-          className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors ${t.ctaBtn}`}
-        >
-          <Download className="h-3.5 w-3.5" />
-        </button>
+      {/* Right actions */}
+      <div className="flex items-center gap-2.5">
+        <div className="relative" ref={dropRef}>
+          <button
+            onClick={() => setOpen(!open)}
+            className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${
+              dateRange
+                ? dark
+                  ? "border-indigo-700 bg-indigo-900/30 text-indigo-300"
+                  : "border-indigo-300 bg-indigo-50 text-indigo-700"
+                : t.outlineBtn
+            }`}
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">{dateLabel}</span>
+          </button>
+          {open && (
+            <div
+              className={`absolute right-0 top-10 z-50 w-72 rounded-xl border shadow-xl ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}
+            >
+              <div className="p-2">
+                <p
+                  className={`px-2 py-1 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                >
+                  Quick Select
+                </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      onClick={() => applyPreset(p.days)}
+                      className={`px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${dark ? "hover:bg-neutral-800 text-neutral-300" : "hover:bg-neutral-50 text-neutral-700"}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={`border-t ${t.borderLight} p-2`}>
+                <p
+                  className={`px-2 py-1 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                >
+                  Custom Range
+                </p>
+                <div className="flex gap-2 px-2">
+                  <div className="flex-1">
+                    <label className={`text-[10px] ${t.textMuted}`}>From</label>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className={`w-full h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className={`text-[10px] ${t.textMuted}`}>To</label>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className={`w-full h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 px-2 mt-2">
+                  <button
+                    onClick={applyCustom}
+                    disabled={!fromDate || !toDate}
+                    className={`flex-1 h-7 rounded text-[11px] font-semibold ${t.ctaBtn} disabled:opacity-40`}
+                  >
+                    Apply
+                  </button>
+                  {dateRange && (
+                    <button
+                      onClick={clearRange}
+                      className={`h-7 px-3 rounded text-[11px] border ${t.outlineBtn}`}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         <ThemeToggle />
       </div>
-
-      <div className={`px-4 md:px-6 pt-3 md:pt-4 ${t.bg} border-b ${t.border}`}>
-        <div className="flex gap-1 overflow-x-auto scrollbar-none">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? dark
-                    ? "bg-neutral-800 text-neutral-100"
-                    : "bg-neutral-100 text-neutral-900"
-                  : dark
-                    ? "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
-                    : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"
-              }`}
-            >
-              <tab.icon className="h-3.5 w-3.5" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
+    </header>
   );
 };

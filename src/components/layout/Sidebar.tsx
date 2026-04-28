@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   Home,
-  // FolderOpen,
   Users,
   Trophy,
-  // BarChart3,
   Settings,
   DollarSign,
   PanelLeft,
@@ -16,56 +16,86 @@ import {
   Bell,
   FileText,
   X,
+  Database,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { fmtClaim } from "@/lib/formatters";
 
 interface SidebarProps {
   open: boolean;
   onToggle: () => void;
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
+  onMobileClose?: () => void;
 }
 
-interface NavItem {
-  tab: string;
-  icon: typeof Home;
-  label: string;
+interface SearchResult {
+  id: number;
+  name: string;
+  claim: string;
+  status: string;
+  assigned: string;
 }
 
-const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
+const NAV_ITEMS: {
+  section: string;
+  items: { path: string; icon: React.ElementType; label: string }[];
+}[] = [
   {
     section: "General",
     items: [
-      { tab: "overview", icon: Home, label: "Overview" },
-      { tab: "analytics", icon: Trophy, label: "Scoreboard" },
-      { tab: "reports", icon: FileText, label: "Reports" },
-      { tab: "notifications", icon: Bell, label: "Notifications" },
+      { path: "/", icon: Home, label: "Overview" },
+      { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
+      { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
+      { path: "/reports", icon: FileText, label: "Reports" },
+      { path: "/notifications", icon: Bell, label: "Notifications" },
     ],
   },
   {
     section: "Management",
     items: [
-      { tab: "team", icon: Users, label: "Team" },
-      { tab: "settings", icon: Settings, label: "Settings" },
+      { path: "/team", icon: Users, label: "Team" },
+      { path: "/settings", icon: Settings, label: "Settings" },
     ],
   },
 ];
 
-export const Sidebar = ({
-  open,
-  onToggle,
-  activeTab,
-  onTabChange,
-}: SidebarProps) => {
+export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [notifCount, setNotifCount] = useState(0);
 
-  // Keyboard shortcut ⌘K / Ctrl+K
+  // Poll notification unread count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/notifications?unread=true&limit=1");
+        if (res.ok) {
+          const json = await res.json();
+          setNotifCount(json.unreadCount || 0);
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -75,6 +105,7 @@ export const Sidebar = ({
       if (e.key === "Escape") {
         setSearchOpen(false);
         setSearchQuery("");
+        setSearchResults([]);
       }
     };
     window.addEventListener("keydown", handler);
@@ -82,10 +113,46 @@ export const Sidebar = ({
   }, []);
 
   useEffect(() => {
-    if (searchOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
+    if (searchOpen && searchInputRef.current) searchInputRef.current.focus();
   }, [searchOpen]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!searchQuery.trim()) {
+      debounceRef.current = setTimeout(() => setSearchResults([]), 0);
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      };
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/cases?search=${encodeURIComponent(searchQuery.trim())}&limit=8`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.data || []);
+        }
+      } catch {}
+      setSearching(false);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+  const goToCase = (id: number) => {
+    closeSearch();
+    router.push(`/cases/${id}`);
+  };
+  const isActive = (path: string) =>
+    path === "/" ? pathname === "/" : pathname.startsWith(path);
 
   return (
     <>
@@ -125,24 +192,23 @@ export const Sidebar = ({
           )}
         </div>
 
-        {/* Search trigger */}
-        {open && (
+        {/* Search */}
+        {open ? (
           <div className="px-3 py-2">
             <button
               onClick={() => setSearchOpen(true)}
               className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs ${t.searchBox} transition-colors`}
             >
               <Search className="h-3.5 w-3.5" />
-              <span>Search</span>
+              <span>Search cases</span>
               <span
                 className={`ml-auto text-[10px] px-1 py-0.5 rounded border ${t.kbdBg}`}
               >
-                ⌘K
+                {"\u2318"}K
               </span>
             </button>
           </div>
-        )}
-        {!open && (
+        ) : (
           <div className="px-2 py-2">
             <button
               onClick={() => {
@@ -168,22 +234,35 @@ export const Sidebar = ({
                 </div>
               )}
               {group.items.map((item) => {
-                const active = activeTab === item.tab;
+                const active = isActive(item.path);
                 return (
-                  <button
-                    key={item.tab}
-                    onClick={() => onTabChange?.(item.tab)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${open ? "" : "justify-center"} ${
-                      active
-                        ? `${t.activeNav} font-semibold`
-                        : `${t.textSub} ${t.hover}`
-                    }`}
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    onClick={() => onMobileClose?.()}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${open ? "" : "justify-center"} ${active ? `${t.activeNav} font-semibold` : `${t.textSub} ${t.hover}`}`}
                   >
-                    <item.icon
-                      className={`h-4 w-4 shrink-0 ${active ? "" : t.textMuted}`}
-                    />
-                    {open && <span>{item.label}</span>}
-                  </button>
+                    <div className="relative shrink-0">
+                      <item.icon
+                        className={`h-4 w-4 ${active ? "" : t.textMuted}`}
+                      />
+                      {item.path === "/notifications" &&
+                        notifCount > 0 &&
+                        !open && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-neutral-900" />
+                        )}
+                    </div>
+                    {open && (
+                      <span className="flex items-center gap-2 flex-1">
+                        {item.label}
+                        {item.path === "/notifications" && notifCount > 0 && (
+                          <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                            {notifCount > 99 ? "99+" : notifCount}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </Link>
                 );
               })}
             </div>
@@ -198,11 +277,11 @@ export const Sidebar = ({
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${t.avatarBg}`}
             >
-              T
+              U
             </div>
             <div className="flex-1 min-w-0">
               <div className={`text-[12px] font-semibold ${t.text} truncate`}>
-                Thomas
+                User
               </div>
               <div className={`text-[10px] ${t.textMuted} truncate`}>
                 admin@hogansmith.com
@@ -217,10 +296,7 @@ export const Sidebar = ({
       {searchOpen && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-          onClick={() => {
-            setSearchOpen(false);
-            setSearchQuery("");
-          }}
+          onClick={closeSearch}
         >
           <div
             className={`absolute inset-0 ${dark ? "bg-black/60" : "bg-black/30"} backdrop-blur-sm`}
@@ -235,75 +311,108 @@ export const Sidebar = ({
                 ref={searchInputRef}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search cases, agents, or commands..."
+                placeholder="Search cases by name or ID..."
                 className={`flex-1 text-sm outline-none ${dark ? "bg-transparent text-neutral-100 placeholder:text-neutral-500" : "bg-transparent text-neutral-900 placeholder:text-neutral-400"}`}
               />
-              <button
-                onClick={() => {
-                  setSearchOpen(false);
-                  setSearchQuery("");
-                }}
-                className={`${t.textMuted}`}
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchResults([]);
+                  }}
+                  className={t.textMuted}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
-
             <div
-              className={`border-t ${t.borderLight} px-2 py-2 max-h-75 overflow-y-auto`}
+              className={`border-t ${t.borderLight} max-h-87.5 overflow-y-auto`}
             >
-              {/* Quick nav */}
+              {searchQuery && searchResults.length > 0 && (
+                <div className="px-2 py-2">
+                  <p
+                    className={`px-3 py-1.5 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                  >
+                    Cases ({searchResults.length})
+                  </p>
+                  {searchResults.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => goToCase(c.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left transition-colors ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm font-semibold ${t.text}`}>
+                          {c.name}
+                        </span>
+                        <span className={`ml-2 text-[10px] ${t.textMuted}`}>
+                          #{c.id}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                      >
+                        {fmtClaim(c.claim)}
+                      </span>
+                      <span className={`text-[10px] ${t.textMuted}`}>
+                        {c.assigned}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchQuery && !searching && searchResults.length === 0 && (
+                <div className="px-3 py-8 text-center">
+                  <p className={`text-sm ${t.textMuted}`}>
+                    No cases found for &quot;{searchQuery}&quot;
+                  </p>
+                </div>
+              )}
+              {searching && (
+                <div className="px-3 py-6 text-center">
+                  <p className={`text-sm ${t.textMuted}`}>Searching...</p>
+                </div>
+              )}
               {!searchQuery && (
-                <div>
+                <div className="px-2 py-2">
                   <p
                     className={`px-3 py-1.5 text-[10px] font-semibold uppercase ${t.textMuted}`}
                   >
                     Quick Navigation
                   </p>
                   {[
-                    { tab: "overview", icon: Home, label: "Overview" },
-                    { tab: "analytics", icon: Trophy, label: "Scoreboard" },
-                    { tab: "reports", icon: FileText, label: "Reports" },
+                    { path: "/", icon: Home, label: "Overview" },
+                    { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
                     {
-                      tab: "notifications",
-                      icon: Bell,
-                      label: "Notifications",
+                      path: "/chronicle",
+                      icon: Database,
+                      label: "Chronicle Sync",
                     },
+                    { path: "/reports", icon: FileText, label: "Reports" },
                   ].map((item) => (
-                    <button
-                      key={item.tab}
-                      onClick={() => {
-                        onTabChange?.(item.tab);
-                        setSearchOpen(false);
-                        setSearchQuery("");
-                      }}
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      onClick={closeSearch}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm ${t.textSub} ${t.hover} transition-colors`}
                     >
                       <item.icon className={`h-4 w-4 ${t.textMuted}`} />
                       {item.label}
-                    </button>
+                    </Link>
                   ))}
                 </div>
               )}
-
-              {/* Search hint */}
-              {searchQuery && (
-                <div className={`px-3 py-6 text-center`}>
-                  <p className={`text-sm ${t.textMuted}`}>
-                    Search for &quot;{searchQuery}&quot;
-                  </p>
-                  <p className={`text-xs ${t.textMuted} mt-1`}>
-                    Case search coming soon — use the table filter for now.
-                  </p>
-                </div>
-              )}
             </div>
-
             <div
               className={`border-t ${t.borderLight} px-4 py-2 flex items-center gap-4`}
             >
-              <span className={`text-[10px] ${t.textMuted}`}>↑↓ Navigate</span>
-              <span className={`text-[10px] ${t.textMuted}`}>↵ Select</span>
+              <span className={`text-[10px] ${t.textMuted}`}>
+                {"\u2191\u2193"} Navigate
+              </span>
+              <span className={`text-[10px] ${t.textMuted}`}>
+                {"\u21B5"} Select
+              </span>
               <span className={`text-[10px] ${t.textMuted}`}>esc Close</span>
             </div>
           </div>
