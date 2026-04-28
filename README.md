@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## HSL Fee Collection Dashboard
 
-## Getting Started
+This is a [Next.js](https://nextjs.org) dashboard for HSL Fee Collection, using TypeScript, Tailwind CSS, Drizzle ORM, and PostgreSQL.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 Getting Started
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Clone the repository & install dependencies:**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+   ```bash
+   npm install
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Configure environment variables:**
 
-## Learn More
+   Create a `.env.local` file in the project root with:
 
-To learn more about Next.js, take a look at the following resources:
+   ```env
+   DATABASE_URL=your_postgres_connection_string
+   CHRONICLE_API_URL=https://api.chroniclelegal.com
+   CHRONICLE_API_KEY=your_chronicle_api_key
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   _Do not commit secrets!_
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Run the development server:**
 
-## Deploy on Vercel
+   ```bash
+   npm run dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🗄️ Database & Migrations
+
+- Uses [Drizzle ORM](https://orm.drizzle.team/) for database access.
+- Configure your database connection in `.env.local` (`DATABASE_URL`).
+- Migration config: `src/drizzle.config.ts` (schema in `src/lib/db/schema.ts`).
+- To run migrations (if using drizzle-kit):
+
+  ```bash
+  npx drizzle-kit push
+  ```
+
+---
+
+## 🛠️ Scripts
+
+- **Start dev server:** `npm run dev`
+- **Build for production:** `npm run build`
+- **Start production server:** `npm start`
+- **Lint:** `npm run lint`
+
+---
+
+## 📦 Main Tech Stack
+
+- Next.js (App Router, TypeScript)
+- Tailwind CSS
+- Drizzle ORM (PostgreSQL)
+- React, Radix UI, React Hook Form, Zod, Recharts, etc.
+
+---
+
+## 📝 Project Structure
+
+- `src/app/` — App routes and pages
+- `src/components/` — UI and dashboard components
+- `src/lib/` — Utilities, context, API clients, and DB schema
+- `src/services/api.ts` — API request helpers
+
+---
+
+## 🧑‍💻 Notes
+
+- For custom theming, see `src/components/theme-provider.tsx` and `src/lib/theme-classes.ts`.
+- API endpoints and data fetching are handled in `src/services/api.ts`.
+- Make sure your database is running and accessible.
+
+---
+
+## 📚 Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Drizzle ORM Docs](https://orm.drizzle.team/docs)
+- [Tailwind CSS Docs](https://tailwindcss.com/docs)
+
+---
+
+## ⚡ Deploy
+
+Deploy easily on [Vercel](https://vercel.com/) or your preferred platform. See [Next.js deployment docs](https://nextjs.org/docs/app/building-your-application/deploying).
