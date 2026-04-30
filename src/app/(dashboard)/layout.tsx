@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -10,18 +10,36 @@ import { themeClasses } from "@/lib/theme-classes";
 
 function DashboardShell({ children }: { children: ReactNode }) {
   const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
-  const t = themeClasses(dark);
+  // const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
+
   const { dateRange, setDateRange } = useDateRange();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  function useMounted() {
+    return useSyncExternalStore(
+      () => () => {},
+      () => true,
+      () => false,
+    );
+  }
+
+  if (!mounted) {
+    return null;
+  }
+
+  const dark = resolvedTheme === "dark";
+  const t = themeClasses(dark);
+  console.log("resolvedTheme:", resolvedTheme);
+
   return (
     <div
-      className={`flex h-screen ${dark ? "bg-neutral-950 text-neutral-100" : "bg-white text-neutral-900"}`}
+      className={`flex h-screen ${
+        dark ? "bg-neutral-950 text-neutral-100" : "bg-white text-neutral-900"
+      }`}
     >
-      {/* Desktop sidebar */}
       <div className="hidden md:flex">
         <Sidebar
           open={sidebarOpen}
@@ -29,7 +47,6 @@ function DashboardShell({ children }: { children: ReactNode }) {
         />
       </div>
 
-      {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (
         <>
           <div
@@ -47,7 +64,6 @@ function DashboardShell({ children }: { children: ReactNode }) {
       )}
 
       <div className={`flex-1 flex flex-col overflow-hidden ${t.bgSub}`}>
-        {/* Mobile top bar */}
         <div
           className={`flex md:hidden items-center gap-3 h-14 px-4 ${t.bg} border-b ${t.border} shrink-0`}
         >
@@ -57,11 +73,12 @@ function DashboardShell({ children }: { children: ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
+
           <h1 className={`text-base font-bold ${t.text}`}>Fee Collections</h1>
         </div>
 
-        {/* Header */}
         <Header dateRange={dateRange} onDateRangeChange={setDateRange} />
+
         <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4 md:space-y-6">
           {children}
         </main>
