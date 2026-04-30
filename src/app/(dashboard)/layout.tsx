@@ -60,6 +60,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           <h1 className={`text-base font-bold ${t.text}`}>Fee Collections</h1>
         </div>
 
+        {/* Header */}
         <Header dateRange={dateRange} onDateRangeChange={setDateRange} />
         <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4 md:space-y-6">
           {children}
