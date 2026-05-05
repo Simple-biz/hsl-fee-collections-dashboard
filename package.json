@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "dotenv -e .env.local -- drizzle-kit generate --config=./src/drizzle.config.ts",
+    "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate --config=./src/drizzle.config.ts",
+    "db:studio": "dotenv -e .env.local -- drizzle-kit studio --config=./src/drizzle.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
