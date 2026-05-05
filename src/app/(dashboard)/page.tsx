@@ -53,7 +53,11 @@ export default function OverviewPage() {
         <CollectionsPanel data={monthlyData} />
         <RevenuePanel stats={summary} cases={cases} />
       </div>
-      <FeeRecordsTable cases={cases} dateRange={dateRange} />
+      <FeeRecordsTable
+        cases={cases}
+        dateRange={dateRange}
+        onImported={refresh}
+      />
     </>
   );
 }
