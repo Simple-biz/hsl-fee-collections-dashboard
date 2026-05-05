@@ -60,11 +60,13 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
 });
 
 // POST /api/import/cases
-//   Body: multipart with field "file" = .xlsx
+//   Body (multipart):
+//     file               — .xlsx file (required)
+//     selectedClientIds  — optional JSON array of clientIds; restricts which rows are imported
 //   Query:
-//     mode=preview  → analyze only, no writes (default)
-//     mode=append   → insert rows whose clientId is not in DB
-//     mode=replace  → TRUNCATE cases then insert everything
+//     mode=preview  → analyze + return per-row preview data, no writes (default)
+//     mode=append   → insert rows whose clientId is not in DB (subject to selectedClientIds filter)
+//     mode=replace  → TRUNCATE cases then insert everything (subject to selectedClientIds filter)
 export const POST = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
@@ -82,40 +84,73 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    let selectedSet: Set<number> | null = null;
+    const sel = form.get("selectedClientIds");
+    if (typeof sel === "string" && sel.length > 0) {
+      try {
+        const arr = JSON.parse(sel);
+        if (Array.isArray(arr)) selectedSet = new Set(arr.map(Number));
+      } catch {
+        return NextResponse.json(
+          { error: "selectedClientIds must be JSON array" },
+          { status: 400 },
+        );
+      }
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const parsed = parseWorksheet(buffer);
 
-    if (parsed.rows.length === 0) {
+    // Look up which clientIds already exist
+    const incomingIds = parsed.rows.map((r) => r.clientId);
+    let existingSet = new Set<number>();
+    if (incomingIds.length > 0) {
+      const existing = await db
+        .select({ clientId: cases.clientId })
+        .from(cases)
+        .where(inArray(cases.clientId, incomingIds));
+      existingSet = new Set(existing.map((e) => e.clientId));
+    }
+
+    const newRows = parsed.rows.filter((r) => !existingSet.has(r.clientId));
+    const summary = {
+      parsed: parsed.rows.length,
+      new: newRows.length,
+      duplicates: parsed.rows.length - newRows.length,
+      warnings: parsed.warnings,
+    };
+
+    if (mode === "preview") {
+      const previewRows = parsed.rows.map((r) => ({
+        clientId: r.clientId,
+        caseName: `${r.lastName}, ${r.firstName}`,
+        caseLink: r.caseLink,
+        externalUrl: r.externalId,
+        approvalDate: r.approvalDate,
+        assignedTo: r.assignedTo,
+        winSheetStatus: r.winSheetStatus,
+        winSheetLink: r.winSheetLink,
+        winSheetLinkText: r.winSheetLinkText,
+        levelWon: r.levelWon,
+        claimType: r.claimTypeLabel,
+        totalExpected:
+          (Number(r.t16FeeDue) || 0) +
+          (Number(r.t2FeeDue) || 0) +
+          (Number(r.auxFeeDue) || 0),
+        hasNotes: !!r.notes && r.notes.length > 0,
+        isDuplicate: existingSet.has(r.clientId),
+      }));
       return NextResponse.json({
         mode,
-        parsed: 0,
-        new: 0,
-        duplicates: 0,
-        inserted: 0,
-        warnings: parsed.warnings,
+        summary,
+        rows: previewRows,
       });
     }
 
-    // Look up which clientIds already exist
-    const incomingIds = parsed.rows.map((r) => r.clientId);
-    const existing = await db
-      .select({ clientId: cases.clientId })
-      .from(cases)
-      .where(inArray(cases.clientId, incomingIds));
-    const existingSet = new Set(existing.map((e) => e.clientId));
-
-    const newRows = parsed.rows.filter((r) => !existingSet.has(r.clientId));
-    const duplicateCount = parsed.rows.length - newRows.length;
-
-    if (mode === "preview") {
-      return NextResponse.json({
-        mode,
-        parsed: parsed.rows.length,
-        new: newRows.length,
-        duplicates: duplicateCount,
-        inserted: 0,
-        warnings: parsed.warnings,
-      });
+    // For write modes, filter by selectedClientIds if provided
+    let candidates = mode === "replace" ? parsed.rows : newRows;
+    if (selectedSet) {
+      candidates = candidates.filter((r) => selectedSet!.has(r.clientId));
     }
 
     let inserted = 0;
@@ -128,10 +163,9 @@ export const POST = async (req: NextRequest) => {
         );
       }
 
-      const rowsToInsert = mode === "replace" ? parsed.rows : newRows;
-      if (rowsToInsert.length === 0) return;
+      if (candidates.length === 0) return;
 
-      for (const batch of chunked(rowsToInsert, CHUNK)) {
+      for (const batch of chunked(candidates, CHUNK)) {
         await tx.insert(cases).values(batch.map(toCaseInsert));
         await tx.insert(feeRecords).values(batch.map(toFeeInsert));
 
@@ -153,12 +187,9 @@ export const POST = async (req: NextRequest) => {
 
     return NextResponse.json({
       mode,
-      parsed: parsed.rows.length,
-      new: newRows.length,
-      duplicates: duplicateCount,
+      summary,
       inserted,
       activityLogEntries: activityInserted,
-      warnings: parsed.warnings,
     });
   } catch (error) {
     console.error("POST /api/import/cases error:", error);

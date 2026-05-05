@@ -30,7 +30,8 @@ export interface ParsedCaseRow {
     | "partially_paid"
     | "paid_in_full"
     | "closed";
-  winSheetLink: string | null;
+  winSheetLink: string | null; // URL if cell is hyperlinked, else the visible text
+  winSheetLinkText: string | null; // visible text shown in the cell
   caseStatus: string | null;
   feesConfirmation: string | null;
   dateAssignedToAgent: string | null;
@@ -238,13 +239,18 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
     dateAssigned: idx("DATE ASSIGNED TO AGENT"),
   };
 
-  // Pull hyperlinks for the CASE LINK column directly from the worksheet
-  const hyperlinks = new Map<number, string>();
-  if (C.caseLink >= 0) {
-    const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-    for (let r = range.s.r + 1; r <= range.e.r; r++) {
+  // Pull hyperlinks for CASE LINK and WIN SHEET LINK columns
+  const caseLinkUrls = new Map<number, string>();
+  const winSheetLinkUrls = new Map<number, string>();
+  const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
+    if (C.caseLink >= 0) {
       const cell = ws[XLSX.utils.encode_cell({ r, c: C.caseLink })];
-      if (cell?.l?.Target) hyperlinks.set(r, cell.l.Target);
+      if (cell?.l?.Target) caseLinkUrls.set(r, cell.l.Target);
+    }
+    if (C.winSheetLink >= 0) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: C.winSheetLink })];
+      if (cell?.l?.Target) winSheetLinkUrls.set(r, cell.l.Target);
     }
   }
 
@@ -258,7 +264,7 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
     const linkText = String(row[C.caseLink] ?? "").trim();
     if (!linkText) continue; // skip blank rows
 
-    const link = hyperlinks.get(r) ?? null;
+    const link = caseLinkUrls.get(r) ?? null;
     const myCaseMatch = link?.match(MYCASE_URL_RE);
     const myCaseId = myCaseMatch ? Number(myCaseMatch[1]) : null;
 
@@ -295,7 +301,10 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
 
       assignedTo: row[C.assignedTo] ? String(row[C.assignedTo]).trim() : null,
       winSheetStatus: mapWinSheetStatus(row[C.winSheetStatus]),
-      winSheetLink: row[C.winSheetLink]
+      winSheetLink:
+        winSheetLinkUrls.get(r) ??
+        (row[C.winSheetLink] ? String(row[C.winSheetLink]).trim() : null),
+      winSheetLinkText: row[C.winSheetLink]
         ? String(row[C.winSheetLink]).trim()
         : null,
       caseStatus: row[C.caseStatus] ? String(row[C.caseStatus]).trim() : null,
