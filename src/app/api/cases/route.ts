@@ -73,6 +73,7 @@ export const GET = async (req: NextRequest) => {
     const caseIds = rows.map((r) => r.clientId);
 
     let activities: { caseId: number; message: string }[] = [];
+    let notesCounts: { caseId: number; count: number }[] = [];
     if (caseIds.length > 0) {
       activities = await db
         .selectDistinctOn([activityLog.caseId], {
@@ -87,9 +88,25 @@ export const GET = async (req: NextRequest) => {
           )})`,
         )
         .orderBy(activityLog.caseId, desc(activityLog.createdAt));
+
+      const counts = await db
+        .select({
+          caseId: activityLog.caseId,
+          count: sql<number>`COUNT(*)::int`,
+        })
+        .from(activityLog)
+        .where(
+          sql`${activityLog.caseId} IN (${sql.join(
+            caseIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        )
+        .groupBy(activityLog.caseId);
+      notesCounts = counts;
     }
 
     const activityMap = new Map(activities.map((a) => [a.caseId, a.message]));
+    const notesCountMap = new Map(notesCounts.map((n) => [n.caseId, n.count]));
 
     // Shape response
     const data = rows.map((r) => {
@@ -162,6 +179,7 @@ export const GET = async (req: NextRequest) => {
             : null,
 
         office: r.officeWithJurisdiction || "—",
+        notesCount: notesCountMap.get(r.clientId) ?? 0,
       };
     });
 

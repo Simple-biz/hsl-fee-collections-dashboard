@@ -34,6 +34,12 @@ yarn-error.log*
 .env*
 .env.local*
 
+# Spreadsheets (may contain PHI/PII — keep out of git)
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+
 # vercel
 .vercel
 
