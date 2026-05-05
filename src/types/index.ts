@@ -1,5 +1,11 @@
 export type ClaimTypeLabel = "T2" | "T16" | "T2_T16";
-export type LevelWon = "INITIAL" | "RECON" | "HEARING" | "AC" | "FEDERAL_COURT";
+export type LevelWon =
+  | "INITIAL"
+  | "RECON"
+  | "HEARING"
+  | "AC"
+  | "FEDERAL_COURT"
+  | "FEE_PETITION";
 export type DecisionOutcome =
   | "fully_favorable"
   | "partially_favorable"
@@ -66,6 +72,9 @@ export interface CaseRow {
 
   // Context
   office: string;
+
+  // Notes
+  notesCount: number;
 }
 
 export interface DashboardSummary {

@@ -27,6 +27,7 @@ export const levelWonEnum = pgEnum("level_won_enum", [
   "HEARING",
   "AC",
   "FEDERAL_COURT",
+  "FEE_PETITION",
 ]);
 export const decisionOutcomeEnum = pgEnum("decision_outcome_enum", [
   "fully_favorable",
@@ -154,6 +155,9 @@ export const cases = pgTable(
     // Encrypted SSN
     ssnEncrypted: text("ssn_encrypted"),
 
+    // Original case title from imported worksheet (e.g. "2026.03.24 Coronel, Angelica v. ALJ ...")
+    caseLink: text("case_link"),
+
     // Internal timestamps
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -189,6 +193,10 @@ export const feeRecords = pgTable(
     assignedTo: varchar("assigned_to", { length: 100 }),
     winSheetStatus:
       winSheetStatusEnum("win_sheet_status").default("not_started"),
+    winSheetLink: text("win_sheet_link"),
+    caseStatus: varchar("case_status", { length: 100 }),
+    feesConfirmation: varchar("fees_confirmation", { length: 50 }),
+    dateAssignedToAgent: date("date_assigned_to_agent"),
 
     // T16
     t16Retro: decimal("t16_retro", { precision: 12, scale: 2 }).default("0"),
