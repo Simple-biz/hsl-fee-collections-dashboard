@@ -13,6 +13,9 @@ import {
   Shield,
   ChevronRight,
   ExternalLink,
+  User,
+  MapPin,
+  Phone,
 } from "lucide-react";
 import {
   Sheet,
@@ -29,7 +32,7 @@ import {
   STATUS_LABELS_DETAIL,
   getStatusColor,
 } from "@/lib/formatters";
-import type { WinSheetStatus, CaseDetailData } from "@/types";
+import type { WinSheetStatus, CaseDetailData, UserDetails } from "@/types";
 
 interface CaseDetailSheetProps {
   caseId: number;
@@ -39,6 +42,102 @@ interface CaseDetailSheetProps {
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
+
+function ClientDetailsSection({
+  ud,
+  dark,
+  t,
+  lbl,
+  val,
+  sectionCls,
+}: {
+  ud: UserDetails;
+  dark: boolean;
+  t: ReturnType<typeof import("@/lib/theme-classes").themeClasses>;
+  lbl: string;
+  val: string;
+  sectionCls: string;
+}) {
+  const addressParts = [ud.addressLine1, ud.addressLine2, ud.city, ud.state, ud.zipCode, ud.country].filter(Boolean);
+  const address = addressParts.length > 0 ? addressParts.join(", ") : null;
+
+  const hasAny = ud.fullName || address || ud.cellPhone || ud.email || ud.ssn ||
+    ud.dateOfBirth || ud.ageAtApproval || ud.placeOfBirth || ud.mothersName || ud.fathersName;
+
+  if (!hasAny) return null;
+
+  return (
+    <div className={sectionCls}>
+      <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+        <User className="h-3 w-3" /> Client Details
+      </h4>
+      <div className="space-y-3">
+        {ud.fullName && (
+          <div>
+            <p className={lbl}>Full Name</p>
+            <p className={val}>{ud.fullName}</p>
+          </div>
+        )}
+        {address && (
+          <div>
+            <p className={`${lbl} flex items-center gap-1`}><MapPin className="h-3 w-3" /> Address</p>
+            <p className={`${val} text-wrap leading-snug`}>{address}</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-4">
+          {ud.cellPhone && (
+            <div>
+              <p className={`${lbl} flex items-center gap-1`}><Phone className="h-3 w-3" /> Cell Phone</p>
+              <p className={val}>{ud.cellPhone}</p>
+            </div>
+          )}
+          {ud.email && (
+            <div>
+              <p className={lbl}>Email</p>
+              <p className={`${val} truncate`} title={ud.email}>{ud.email}</p>
+            </div>
+          )}
+          {ud.ssn && (
+            <div>
+              <p className={lbl}>SSN</p>
+              <p className={val}>{ud.ssn}</p>
+            </div>
+          )}
+          {ud.dateOfBirth && (
+            <div>
+              <p className={lbl}>Date of Birth</p>
+              <p className={val}>{ud.dateOfBirth}</p>
+            </div>
+          )}
+          {ud.ageAtApproval !== null && (
+            <div>
+              <p className={lbl}>Age at Approval</p>
+              <p className={val}>{ud.ageAtApproval}</p>
+            </div>
+          )}
+          {ud.placeOfBirth && (
+            <div>
+              <p className={lbl}>Place of Birth</p>
+              <p className={val}>{ud.placeOfBirth}</p>
+            </div>
+          )}
+        </div>
+        {ud.mothersName && (
+          <div>
+            <p className={lbl}>Mother&apos;s First & Maiden Name</p>
+            <p className={val}>{ud.mothersName}</p>
+          </div>
+        )}
+        {ud.fathersName && (
+          <div>
+            <p className={lbl}>Father&apos;s First & Last Name</p>
+            <p className={val}>{ud.fathersName}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function CaseDetailSheet({
   caseId,
@@ -195,6 +294,11 @@ export default function CaseDetailSheet({
                 </div>
               </div>
             </div>
+
+            {/* Client Details */}
+            {data.userDetails && (
+              <ClientDetailsSection ud={data.userDetails} dark={dark} t={t} lbl={lbl} val={val} sectionCls={sectionCls} />
+            )}
 
             {/* Decisions */}
             <div className={sectionCls}>

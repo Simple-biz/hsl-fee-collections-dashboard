@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
 const resolveParams = async (context: {
@@ -89,9 +89,27 @@ export const GET = async (
         syncStatus: feeRecords.syncStatus,
         syncedAt: feeRecords.syncedAt,
         feeRecordUpdatedAt: feeRecords.updatedAt,
+
+        // user_details fields
+        udFullName: userDetails.fullName,
+        udAddressLine1: userDetails.addressLine1,
+        udAddressLine2: userDetails.addressLine2,
+        udCity: userDetails.city,
+        udState: userDetails.state,
+        udZipCode: userDetails.zipCode,
+        udCountry: userDetails.country,
+        udCellPhone: userDetails.cellPhone,
+        udEmail: userDetails.email,
+        udSsn: userDetails.ssn,
+        udDateOfBirth: userDetails.dateOfBirth,
+        udAgeAtApproval: userDetails.ageAtApproval,
+        udPlaceOfBirth: userDetails.placeOfBirth,
+        udMothersName: userDetails.mothersFirstNameAndMaidenName,
+        udFathersName: userDetails.fathersFirstAndLastName,
       })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
+      .leftJoin(userDetails, eq(userDetails.caseId, cases.clientId))
       .where(eq(cases.clientId, caseId));
 
     if (!row) {
@@ -208,6 +226,25 @@ export const GET = async (
             ? ">60"
             : "≤60"
           : null,
+
+      // User details
+      userDetails: {
+        fullName: row.udFullName || null,
+        addressLine1: row.udAddressLine1 || null,
+        addressLine2: row.udAddressLine2 || null,
+        city: row.udCity || null,
+        state: row.udState || null,
+        zipCode: row.udZipCode || null,
+        country: row.udCountry || null,
+        cellPhone: row.udCellPhone || null,
+        email: row.udEmail || null,
+        ssn: row.udSsn || null,
+        dateOfBirth: row.udDateOfBirth || null,
+        ageAtApproval: row.udAgeAtApproval || null,
+        placeOfBirth: row.udPlaceOfBirth || null,
+        mothersName: row.udMothersName || null,
+        fathersName: row.udFathersName || null,
+      },
 
       // Activity log
       activities: activities.map((a) => ({

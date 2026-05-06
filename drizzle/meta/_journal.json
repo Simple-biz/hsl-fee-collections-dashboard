@@ -15,6 +15,13 @@
       "when": 1777980821581,
       "tag": "0001_import_xlsx_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778078912006,
+      "tag": "0002_brave_miracleman",
+      "breakpoints": true
     }
   ]
 }

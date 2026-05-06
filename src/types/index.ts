@@ -100,6 +100,24 @@ export interface TeamMember {
   collected: string;
 }
 
+export interface UserDetails {
+  fullName: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  country: string | null;
+  cellPhone: string | null;
+  email: string | null;
+  ssn: string | null;
+  dateOfBirth: string | null;
+  ageAtApproval: number | null;
+  placeOfBirth: string | null;
+  mothersName: string | null;
+  fathersName: string | null;
+}
+
 export interface ActivityLogEntry {
   id: string;
   message: string;
@@ -176,6 +194,9 @@ export interface CaseDetailData {
   // Aging
   daysAfterApproval: number | null;
   approvalCategory: string | null;
+
+  // User details
+  userDetails: UserDetails | null;
 
   // Activity log
   activities: ActivityLogEntry[];
