@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
-// import { Search, ChevronDown, MoreHorizontal, ArrowUpDown } from "lucide-react";
-import { Search, ArrowUpDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, ArrowUpDown, Upload, MessageSquare } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
 import {
@@ -15,10 +15,13 @@ import {
 } from "@/lib/formatters";
 import type { CaseRow } from "@/types";
 import CaseDetailSheet from "./CaseDetailSheet";
+import ImportCasesModal from "@/components/modals/ImportCasesModal";
+import NotesModal from "@/components/modals/NotesModal";
 
 interface FeeRecordsTableProps {
   cases: CaseRow[];
   dateRange?: { from: string; to: string } | null;
+  onImported?: () => Promise<void> | void;
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
@@ -49,7 +52,11 @@ const AGING_COLORS = (cat: string | null, dark: boolean) => {
 type SortKey = "name" | "date" | "expected" | "paid" | "daysAfterApproval";
 type SortDir = "asc" | "desc";
 
-export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
+export const FeeRecordsTable = ({
+  cases,
+  dateRange,
+  onImported,
+}: FeeRecordsTableProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
@@ -60,6 +67,10 @@ export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
+    null,
+  );
 
   // Unique assignees for filter dropdown
   const assignees = useMemo(() => {
@@ -212,6 +223,12 @@ export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
               </option>
             ))}
           </select>
+          <button
+            onClick={() => setImportOpen(true)}
+            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
+          >
+            <Upload className="h-3.5 w-3.5" /> Import
+          </button>
         </div>
       </div>
 
@@ -249,7 +266,7 @@ export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
                 Totals
               </th>
               <th
-                colSpan={4}
+                colSpan={5}
                 className={`${thBase} text-center ${groupBorder} ${t.textSub}`}
               >
                 Workflow
@@ -359,6 +376,7 @@ export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
               <th className={`${thBase} ${t.textSub} text-left`}>
                 Recent Update
               </th>
+              <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
               <th
                 className={`${thBase} ${t.textSub} text-right cursor-pointer`}
                 onClick={() => toggleSort("daysAfterApproval")}
@@ -514,6 +532,31 @@ export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
                 >
                   {c.update}
                 </td>
+                <td className={`${tdBase} text-center`}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNotesFor({ id: c.id, name: c.name });
+                    }}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                      c.notesCount > 0
+                        ? dark
+                          ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
+                          : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        : dark
+                          ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
+                          : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
+                    }`}
+                    title={
+                      c.notesCount > 0
+                        ? `View ${c.notesCount} note${c.notesCount === 1 ? "" : "s"}`
+                        : "No notes yet"
+                    }
+                  >
+                    <MessageSquare className="h-3 w-3" />
+                    {c.notesCount}
+                  </button>
+                </td>
                 <td
                   className={`${tdBase} text-right tabular-nums font-medium ${AGING_COLORS(c.approvalCategory, dark)}`}
                 >
@@ -538,6 +581,25 @@ export const FeeRecordsTable = ({ cases, dateRange }: FeeRecordsTableProps) => {
         <div className={`py-12 text-center text-sm ${t.textMuted}`}>
           No cases match your filters.
         </div>
+      )}
+
+      {importOpen && (
+        <ImportCasesModal
+          dark={dark}
+          onClose={() => setImportOpen(false)}
+          onImported={async () => {
+            if (onImported) await onImported();
+          }}
+        />
+      )}
+
+      {notesFor && (
+        <NotesModal
+          dark={dark}
+          caseId={notesFor.id}
+          caseName={notesFor.name}
+          onClose={() => setNotesFor(null)}
+        />
       )}
     </div>
   );

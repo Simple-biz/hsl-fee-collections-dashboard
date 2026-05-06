@@ -62,6 +62,7 @@ export const LEVEL_LABELS: Record<string, string> = {
   HEARING: "Hearing",
   AC: "AC",
   FEDERAL_COURT: "Fed Court",
+  FEE_PETITION: "Fee Petition",
 };
 
 const STATUS_FALLBACK: [string, string] = [
