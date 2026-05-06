@@ -90,3 +90,84 @@ export interface TeamMember {
   cases: number;
   collected: string;
 }
+
+export interface ActivityLogEntry {
+  id: string;
+  message: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CaseDetailData {
+  id: number;
+  externalId: string | null;
+  name: string;
+  firstName: string;
+  lastName: string;
+  claim: string;
+  level: string;
+  t2Decision: string | null;
+  t16Decision: string | null;
+  approvalDate: string | null;
+  office: string;
+  assigned: string;
+  status: string;
+
+  // PDF-extracted fields
+  fullSsn: string | null;
+  dob: string | null;
+  email: string | null;
+  phone: string | null;
+  primaryDiagnosis: string | null;
+  primaryDiagnosisCode: string | null;
+  secondaryDiagnosis: string | null;
+  secondaryDiagnosisCode: string | null;
+  allegations: string | null;
+  blindDli: string | null;
+  lastInsured: string | null;
+  firmName: string | null;
+  firmEin: string | null;
+  hearingOffice: string | null;
+  representatives: string | null;
+  decisionHistory: string | null;
+
+  // Financials
+  t16Retro: number;
+  t16FeeDue: number;
+  t16FeeReceived: number;
+  t16Pending: number;
+  t16FeeReceivedDate: string | null;
+  t2Retro: number;
+  t2FeeDue: number;
+  t2FeeReceived: number;
+  t2Pending: number;
+  t2FeeReceivedDate: string | null;
+  auxRetro: number;
+  auxFeeDue: number;
+  auxFeeReceived: number;
+  auxPending: number;
+  auxFeeReceivedDate: string | null;
+
+  totalRetroDue: number;
+  expected: number;
+  paid: number;
+  outstanding: number;
+
+  // Workflow
+  pif: PifStatus;
+  approvedBy: string | null;
+  feeMethod: string | null;
+  applicableFeeCap: number;
+  feeCapApplied: boolean;
+  feeComputed: boolean;
+  feeComputedAt: string | null;
+  syncStatus: string;
+  syncedAt: string | null;
+
+  // Aging
+  daysAfterApproval: number | null;
+  approvalCategory: string | null;
+
+  // Activity log
+  activities: ActivityLogEntry[];
+}
