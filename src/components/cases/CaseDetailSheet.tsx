@@ -273,14 +273,6 @@ export default function CaseDetailSheet({
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className={lbl}>SSN</p>
-                  <p className={val}>{data.fullSsn || "—"}</p>
-                </div>
-                <div>
-                  <p className={lbl}>Date of Birth</p>
-                  <p className={val}>{data.dob || "—"}</p>
-                </div>
-                <div>
                   <p className={lbl}>Approval Date</p>
                   <p className={`${val} flex items-center gap-1`}>
                     <CalendarDays className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate)}
