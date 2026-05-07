@@ -60,7 +60,7 @@ function ClientDetailsSection({
   const address = addressParts.length > 0 ? addressParts.join(", ") : null;
 
   const hasAny = ud.fullName || address || ud.cellPhone || ud.email || ud.ssn ||
-    ud.dateOfBirth || ud.ageAtApproval || ud.placeOfBirth || ud.mothersName || ud.fathersName;
+    ud.dateOfBirth || ud.ageAtApproval != null || ud.placeOfBirth || ud.mothersName || ud.fathersName;
 
   if (!hasAny) return null;
 
@@ -107,7 +107,7 @@ function ClientDetailsSection({
               <p className={val}>{ud.dateOfBirth}</p>
             </div>
           )}
-          {ud.ageAtApproval !== null && (
+          {ud.ageAtApproval != null && (
             <div>
               <p className={lbl}>Age at Approval</p>
               <p className={val}>{ud.ageAtApproval}</p>
