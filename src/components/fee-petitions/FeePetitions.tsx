@@ -205,6 +205,15 @@ export const FeePetitions = () => {
   >({});
   const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
+  // Clear all "saved"-fade timers on unmount to avoid setState-after-unmount
+  useEffect(() => {
+    const timers = savedTimerRef.current;
+    return () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
