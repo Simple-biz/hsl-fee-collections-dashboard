@@ -231,7 +231,7 @@ export default function CaseDetailSheet({
           </div>
         ) : error ? (
           <div className="p-8 text-center">
-            <p className="text-sm text-red-500 mb-4">{error}</p>
+            <p role="alert" className="text-sm text-red-500 mb-4">{error}</p>
             <button
               onClick={fetchCase}
               className={`h-8 px-4 rounded-md border text-xs font-medium ${t.outlineBtn}`}
