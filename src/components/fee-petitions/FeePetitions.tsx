@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDate } from "@/lib/formatters";
+import { upsertFeePetition } from "@/app/(dashboard)/fee-petitions/actions";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -73,12 +74,8 @@ const patchPetition = async (
   caseId: number,
   body: Partial<Omit<FeePetitionRow, "id" | "claimant">>,
 ) => {
-  const res = await fetch(`/api/fee-petitions/${caseId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("Failed to save petition");
+  const result = await upsertFeePetition({ caseId, fields: body });
+  if (!result.ok) throw new Error(result.error);
 };
 
 // ---------- component ----------
