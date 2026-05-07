@@ -45,15 +45,13 @@ const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
 function ClientDetailsSection({
   ud,
-  dark,
-  t,
+  textMuted,
   lbl,
   val,
   sectionCls,
 }: {
   ud: UserDetails;
-  dark: boolean;
-  t: ReturnType<typeof import("@/lib/theme-classes").themeClasses>;
+  textMuted: string;
   lbl: string;
   val: string;
   sectionCls: string;
@@ -68,7 +66,7 @@ function ClientDetailsSection({
 
   return (
     <div className={sectionCls}>
-      <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+      <h4 className={`text-[10px] font-bold uppercase tracking-widest ${textMuted} mb-3 flex items-center gap-1.5`}>
         <User className="h-3 w-3" /> Client Details
       </h4>
       <div className="space-y-3">
@@ -303,7 +301,7 @@ export default function CaseDetailSheet({
 
             {/* Client Details */}
             {data.userDetails && (
-              <ClientDetailsSection ud={data.userDetails} dark={dark} t={t} lbl={lbl} val={val} sectionCls={sectionCls} />
+              <ClientDetailsSection ud={data.userDetails} textMuted={t.textMuted} lbl={lbl} val={val} sectionCls={sectionCls} />
             )}
 
             {/* Decisions */}
