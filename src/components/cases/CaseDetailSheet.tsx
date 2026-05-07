@@ -267,12 +267,6 @@ export default function CaseDetailSheet({
                     <p className={lbl}>Case ID</p>
                     <p className={`${val} text-indigo-500`}>#{data.id}</p>
                   </div>
-                  {data.externalId && (
-                    <div>
-                      <p className={lbl}>External ID</p>
-                      <p className={`${val} text-indigo-500`}>{data.externalId}</p>
-                    </div>
-                  )}
                   <a
                     href={`https://rgdr.mycase.com/court_cases/${data.id}`}
                     target="_blank"
