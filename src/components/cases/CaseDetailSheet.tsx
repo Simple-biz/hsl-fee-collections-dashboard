@@ -293,7 +293,7 @@ export default function CaseDetailSheet({
                 <div>
                   <p className={lbl}>Aging</p>
                   <p className={`${val} ${data.approvalCategory === ">60" ? "text-red-500" : "text-emerald-500"}`}>
-                    {data.daysAfterApproval ? `${data.daysAfterApproval} days` : "—"}
+                    {data.daysAfterApproval != null ? `${data.daysAfterApproval} days` : "—"}
                   </p>
                 </div>
               </div>
