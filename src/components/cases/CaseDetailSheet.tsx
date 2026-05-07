@@ -276,7 +276,7 @@ export default function CaseDetailSheet({
                     href={`https://rgdr.mycase.com/court_cases/${data.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
                   >
                     MyCase <ExternalLink className="h-3 w-3" />
                   </a>
@@ -427,7 +427,7 @@ export default function CaseDetailSheet({
             <div className="p-4 mt-auto">
               <button
                 onClick={() => router.push(`/cases/${data.id}`)}
-                className={`w-full h-10 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${t.ctaBtn} shadow-lg shadow-indigo-500/20`}
+                className={`w-full h-10 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-colors ${t.ctaBtn} shadow-lg shadow-indigo-500/20`}
               >
                 Go to Case Page <ChevronRight className="h-4 w-4" />
               </button>
