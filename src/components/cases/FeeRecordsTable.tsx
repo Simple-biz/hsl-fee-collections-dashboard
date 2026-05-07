@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
 import { Search, ArrowUpDown, Upload, MessageSquare } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -14,6 +13,7 @@ import {
   getStatusColor,
 } from "@/lib/formatters";
 import type { CaseRow } from "@/types";
+import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
 import NotesModal from "@/components/modals/NotesModal";
 
@@ -59,13 +59,13 @@ export const FeeRecordsTable = ({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
-  const router = useRouter();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
@@ -168,6 +168,15 @@ export const FeeRecordsTable = ({
 
   return (
     <div className={`rounded-xl border ${t.card}`}>
+      {/* Case Detail Side Panel */}
+      {selectedCaseId && (
+        <CaseDetailSheet 
+          caseId={selectedCaseId} 
+          isOpen={true} 
+          onClose={() => setSelectedCaseId(null)} 
+        />
+      )}
+
       {/* Header */}
       <div
         className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight}`}
@@ -381,7 +390,7 @@ export const FeeRecordsTable = ({
             {filtered.map((c) => (
               <tr
                 key={c.id}
-                onClick={() => router.push(`/cases/${c.id}`)}
+                onClick={() => setSelectedCaseId(c.id)}
                 className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group`}
               >
                 {/* Case Info */}
