@@ -204,7 +204,7 @@ export default function CaseDetailSheet({
         side="right"
         showCloseButton={false}
         overlayClassName="bg-black/0 backdrop-blur-none"
-        className={`w-full sm:max-w-md p-0 overflow-y-auto ${t.bg} border-l ${t.border} shadow-2xl transition-all duration-300 ease-in-out scrollbar-none`}
+        className={`w-full sm:max-w-md p-0 overflow-y-auto ${t.bg} border-l ${t.border} shadow-2xl transition-[transform,opacity] duration-300 ease-in-out scrollbar-none select-text`}
       >
         <SheetHeader className={`sticky top-0 p-4 border-b ${t.borderLight} ${t.bg} z-10`}>
           <div className="flex items-center justify-between">
