@@ -202,7 +202,7 @@ export default function CaseDetailSheet({
         overlayClassName="bg-black/0 backdrop-blur-none"
         className={`w-full sm:max-w-md p-0 overflow-y-auto ${t.bg} border-l ${t.border} shadow-2xl transition-all duration-300 ease-in-out scrollbar-none`}
       >
-        <SheetHeader className={`p-4 border-b ${t.borderLight} ${t.bg} z-10`}>
+        <SheetHeader className={`sticky top-0 p-4 border-b ${t.borderLight} ${t.bg} z-10`}>
           <div className="flex items-center justify-between">
             <SheetTitle className={`text-sm font-bold ${t.text}`}>
               Win Sheet Quick Look
