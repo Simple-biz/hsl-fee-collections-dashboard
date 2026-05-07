@@ -272,11 +272,11 @@ export const FeePetitions = () => {
   };
 
   const sortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <ArrowUpDown className="h-3 w-3" />;
+    if (sortKey !== key) return <ArrowUpDown aria-hidden="true" className="h-3 w-3" />;
     return sortDir === "asc" ? (
-      <ArrowUp className="h-3 w-3" />
+      <ArrowUp aria-hidden="true" className="h-3 w-3" />
     ) : (
-      <ArrowDown className="h-3 w-3" />
+      <ArrowDown aria-hidden="true" className="h-3 w-3" />
     );
   };
 
@@ -361,6 +361,7 @@ export const FeePetitions = () => {
             className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-indigo-900/40" : "bg-indigo-50"}`}
           >
             <Gavel
+              aria-hidden="true"
               className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-600"}`}
             />
           </div>
@@ -406,10 +407,12 @@ export const FeePetitions = () => {
             <div className="relative flex-1 sm:flex-none">
               {search.trim() !== appliedSearch ? (
                 <Loader2
+                  aria-hidden="true"
                   className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin ${t.textMuted}`}
                 />
               ) : (
                 <Search
+                  aria-hidden="true"
                   className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
                 />
               )}
@@ -504,7 +507,7 @@ export const FeePetitions = () => {
                     className={`${tdBase} text-center py-8 ${t.textMuted}`}
                   >
                     <span className="inline-flex items-center gap-2">
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                       Loading petitions...
                     </span>
                   </td>
@@ -601,11 +604,13 @@ export const FeePetitions = () => {
                         />
                         {noteState[row.id] === "saving" && (
                           <Loader2
+                            aria-hidden="true"
                             className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`}
                           />
                         )}
                         {noteState[row.id] === "saved" && (
                           <Check
+                            aria-hidden="true"
                             className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
                           />
                         )}
@@ -635,7 +640,7 @@ export const FeePetitions = () => {
               disabled={page <= 1 || loading}
               className={`h-8 px-2 rounded-md border text-xs font-medium flex items-center gap-1 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
-              <ChevronLeft className="h-3.5 w-3.5" /> Prev
+              <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" /> Prev
             </button>
             <div className="flex items-center gap-1 px-1">
               <input
@@ -670,7 +675,7 @@ export const FeePetitions = () => {
               disabled={page >= totalPages || loading}
               className={`h-8 px-2 rounded-md border text-xs font-medium flex items-center gap-1 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
-              Next <ChevronRight className="h-3.5 w-3.5" />
+              Next <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
