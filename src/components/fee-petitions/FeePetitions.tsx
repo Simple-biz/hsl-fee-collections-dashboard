@@ -271,6 +271,20 @@ export const FeePetitions = () => {
     setPage(1);
   };
 
+  const onSortKeyDown = (e: React.KeyboardEvent, key: SortKey) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleSort(key);
+    }
+  };
+
+  const ariaSortFor = (
+    key: SortKey,
+  ): "ascending" | "descending" | "none" => {
+    if (sortKey !== key) return "none";
+    return sortDir === "asc" ? "ascending" : "descending";
+  };
+
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <ArrowUpDown aria-hidden="true" className="h-3 w-3" />;
     return sortDir === "asc" ? (
@@ -461,24 +475,36 @@ export const FeePetitions = () => {
             <thead>
               <tr className={`border-b ${t.borderLight}`}>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-0 top-0 z-30 ${stickyHeaderBg}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-sort={ariaSortFor("claimant")}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-0 top-0 z-30 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
                   onClick={() => toggleSort("claimant")}
+                  onKeyDown={(e) => onSortKeyDown(e, "claimant")}
                 >
                   <span className="flex items-center gap-1">
                     Claimant {sortIcon("claimant")}
                   </span>
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-sort={ariaSortFor("approvalDate")}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
                   onClick={() => toggleSort("approvalDate")}
+                  onKeyDown={(e) => onSortKeyDown(e, "approvalDate")}
                 >
                   <span className="flex items-center gap-1">
                     Approved {sortIcon("approvalDate")}
                   </span>
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-sort={ariaSortFor("updatedAt")}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
                   onClick={() => toggleSort("updatedAt")}
+                  onKeyDown={(e) => onSortKeyDown(e, "updatedAt")}
                 >
                   <span className="flex items-center gap-1">
                     Updated {sortIcon("updatedAt")}
