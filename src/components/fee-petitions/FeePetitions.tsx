@@ -133,7 +133,11 @@ export const FeePetitions = () => {
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
-  // Mirror state into URL (omit defaults to keep URLs short)
+  // Whether the next URL write should create a history entry.
+  // Set to "push" before a state change that the user should be able to back/forward through.
+  const urlMethodRef = useRef<"push" | "replace">("replace");
+
+  // Mirror state into URL (omit defaults; skip if URL already matches to avoid feedback loops)
   useEffect(() => {
     const params = new URLSearchParams();
     if (appliedSearch) params.set("q", appliedSearch);
@@ -142,8 +146,16 @@ export const FeePetitions = () => {
     if (sortDir !== DEFAULTS.dir) params.set("dir", sortDir);
     if (page !== DEFAULTS.page) params.set("page", String(page));
     if (pageSize !== DEFAULTS.pageSize) params.set("size", String(pageSize));
-    const qs = params.toString();
-    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    const target = params.toString();
+    if (target === urlParams.toString()) {
+      urlMethodRef.current = "replace";
+      return;
+    }
+    router[urlMethodRef.current](
+      `${pathname}${target ? `?${target}` : ""}`,
+      { scroll: false },
+    );
+    urlMethodRef.current = "replace";
   }, [
     appliedSearch,
     statusFilter,
@@ -153,7 +165,39 @@ export const FeePetitions = () => {
     pageSize,
     pathname,
     router,
+    urlParams,
   ]);
+
+  // Sync URL → state (handles back/forward). Equality checks make this a no-op
+  // when state already matches the URL, preventing ping-pong with the mirror effect.
+  useEffect(() => {
+    const urlSearch = urlParams.get("q") ?? DEFAULTS.search;
+    const urlStatusRaw = urlParams.get("status") as StatusFilter | null;
+    const urlStatus = STATUS_VALUES.includes(urlStatusRaw as StatusFilter)
+      ? (urlStatusRaw as StatusFilter)
+      : DEFAULTS.status;
+    const urlSortRaw = urlParams.get("sort") as SortKey | null;
+    const urlSort = SORT_KEYS.includes(urlSortRaw as SortKey)
+      ? (urlSortRaw as SortKey)
+      : DEFAULTS.sort;
+    const urlDir: SortDir = urlParams.get("dir") === "asc" ? "asc" : "desc";
+    const urlPage = Math.max(1, parseInt(urlParams.get("page") || "1") || 1);
+    const sizeNum = parseInt(urlParams.get("size") || "0");
+    const urlSize = PAGE_SIZE_OPTIONS.includes(sizeNum)
+      ? sizeNum
+      : DEFAULTS.pageSize;
+
+    if (urlSearch !== appliedSearch) {
+      setSearch(urlSearch);
+      setAppliedSearch(urlSearch);
+    }
+    if (urlStatus !== statusFilter) setStatusFilter(urlStatus);
+    if (urlSort !== sortKey) setSortKey(urlSort);
+    if (urlDir !== sortDir) setSortDir(urlDir);
+    if (urlPage !== page) setPage(urlPage);
+    if (urlSize !== pageSize) setPageSize(urlSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlParams]);
 
   // Track last-persisted note value per row to skip no-op writes on blur
   const noteSnapshot = useRef<Map<number, string>>(new Map());
@@ -206,6 +250,7 @@ export const FeePetitions = () => {
   }, [fetchPetitions]);
 
   const toggleSort = (key: SortKey) => {
+    urlMethodRef.current = "push";
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
@@ -360,6 +405,7 @@ export const FeePetitions = () => {
             <select
               value={statusFilter}
               onChange={(e) => {
+                urlMethodRef.current = "push";
                 setStatusFilter(e.target.value as StatusFilter);
                 setPage(1);
               }}
@@ -372,6 +418,7 @@ export const FeePetitions = () => {
             <select
               value={pageSize}
               onChange={(e) => {
+                urlMethodRef.current = "push";
                 setPageSize(parseInt(e.target.value));
                 setPage(1);
               }}
@@ -549,14 +596,20 @@ export const FeePetitions = () => {
           </p>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => {
+                urlMethodRef.current = "push";
+                setPage((p) => Math.max(1, p - 1));
+              }}
               disabled={page <= 1 || loading}
               className={`h-8 px-2 rounded-md border text-xs font-medium flex items-center gap-1 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               <ChevronLeft className="h-3.5 w-3.5" /> Prev
             </button>
             <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => {
+                urlMethodRef.current = "push";
+                setPage((p) => Math.min(totalPages, p + 1));
+              }}
               disabled={page >= totalPages || loading}
               className={`h-8 px-2 rounded-md border text-xs font-medium flex items-center gap-1 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
