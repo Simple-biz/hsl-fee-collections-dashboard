@@ -393,9 +393,15 @@ export const FeePetitions = () => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 sm:flex-none">
-              <Search
-                className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
-              />
+              {search.trim() !== appliedSearch ? (
+                <Loader2
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin ${t.textMuted}`}
+                />
+              ) : (
+                <Search
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
+                />
+              )}
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
