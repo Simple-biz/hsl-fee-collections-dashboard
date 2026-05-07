@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import {
@@ -152,20 +152,30 @@ export default function CaseDetailSheet({
   const [data, setData] = useState<CaseDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchCase = useCallback(async () => {
     if (!caseId) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/cases/${caseId}`);
+      const res = await fetch(`/api/cases/${caseId}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error("Failed to load case details");
       const json = await res.json();
       setData(json.data);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) {
+        setLoading(false);
+      }
     }
   }, [caseId]);
 
@@ -175,6 +185,9 @@ export default function CaseDetailSheet({
     } else {
       setData(null);
     }
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [isOpen, fetchCase]);
 
   const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
