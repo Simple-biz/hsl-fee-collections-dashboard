@@ -67,7 +67,7 @@ function ClientDetailsSection({
   return (
     <div className={sectionCls}>
       <h4 className={`text-[10px] font-bold uppercase tracking-widest ${textMuted} mb-3 flex items-center gap-1.5`}>
-        <User className="h-3 w-3" /> Client Details
+        <User aria-hidden="true" className="h-3 w-3" /> Client Details
       </h4>
       <div className="space-y-3">
         {ud.fullName && (
@@ -78,14 +78,14 @@ function ClientDetailsSection({
         )}
         {address && (
           <div>
-            <p className={`${lbl} flex items-center gap-1`}><MapPin className="h-3 w-3" /> Address</p>
+            <p className={`${lbl} flex items-center gap-1`}><MapPin aria-hidden="true" className="h-3 w-3" /> Address</p>
             <p className={`${val} text-wrap leading-snug`}>{address}</p>
           </div>
         )}
         <div className="grid grid-cols-2 gap-4">
           {ud.cellPhone && (
             <div>
-              <p className={`${lbl} flex items-center gap-1`}><Phone className="h-3 w-3" /> Cell Phone</p>
+              <p className={`${lbl} flex items-center gap-1`}><Phone aria-hidden="true" className="h-3 w-3" /> Cell Phone</p>
               <p className={val}>{ud.cellPhone}</p>
             </div>
           )}
@@ -213,9 +213,10 @@ export default function CaseDetailSheet({
             </SheetTitle>
             <button
               onClick={onClose}
+              aria-label="Close"
               className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
             >
-              <X className="h-4 w-4" />
+              <X aria-hidden="true" className="h-4 w-4" />
             </button>
           </div>
           <SheetDescription className={`text-[11px] ${t.textMuted}`}>
@@ -225,7 +226,7 @@ export default function CaseDetailSheet({
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} />
+            <RefreshCw aria-hidden="true" className={`h-6 w-6 animate-spin ${t.textMuted}`} />
             <span className={`text-xs ${t.textSub}`}>Loading case details...</span>
           </div>
         ) : error ? (
@@ -278,7 +279,7 @@ export default function CaseDetailSheet({
                     rel="noopener noreferrer"
                     className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
                   >
-                    MyCase <ExternalLink className="h-3 w-3" />
+                    MyCase <ExternalLink aria-hidden="true" className="h-3 w-3" />
                   </a>
                 </div>
               </div>
@@ -287,13 +288,13 @@ export default function CaseDetailSheet({
             {/* Core Identification */}
             <div className={sectionCls}>
               <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
-                <Shield className="h-3 w-3" /> Identity & Verification
+                <Shield aria-hidden="true" className="h-3 w-3" /> Identity & Verification
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className={lbl}>Approval Date</p>
                   <p className={`${val} flex items-center gap-1`}>
-                    <CalendarDays className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate)}
+                    <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate)}
                   </p>
                 </div>
                 <div>
@@ -313,7 +314,7 @@ export default function CaseDetailSheet({
             {/* Decisions */}
             <div className={sectionCls}>
               <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
-                <FileText className="h-3 w-3" /> Decisions
+                <FileText aria-hidden="true" className="h-3 w-3" /> Decisions
               </h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -334,7 +335,7 @@ export default function CaseDetailSheet({
             {/* Financial Totals */}
             <div className={sectionCls}>
               <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
-                <DollarSign className="h-3 w-3" /> Financial Summary
+                <DollarSign aria-hidden="true" className="h-3 w-3" /> Financial Summary
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -353,7 +354,7 @@ export default function CaseDetailSheet({
                           : dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-700"
                       }`}
                     >
-                      {data.pif === "YES" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {data.pif === "YES" && <CheckCircle2 aria-hidden="true" className="h-3 w-3 mr-1" />}
                       {data.pif || "NO"}
                     </span>
                   </div>
@@ -429,7 +430,7 @@ export default function CaseDetailSheet({
                 onClick={() => router.push(`/cases/${data.id}`)}
                 className={`w-full h-10 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-colors ${t.ctaBtn} shadow-lg shadow-indigo-500/20`}
               >
-                Go to Case Page <ChevronRight className="h-4 w-4" />
+                Go to Case Page <ChevronRight aria-hidden="true" className="h-4 w-4" />
               </button>
             </div>
           </div>
