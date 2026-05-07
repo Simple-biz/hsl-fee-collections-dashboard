@@ -41,7 +41,7 @@ interface CaseDetailSheetProps {
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
-const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
+const dateStr = (d: string | null | undefined) => (d ? fmtDate(d) : "—");
 
 function ClientDetailsSection({
   ud,
