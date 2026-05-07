@@ -284,6 +284,44 @@ export const feeRecords = pgTable(
 );
 
 // ============================================================================
+// FEE_PETITIONS — Workflow checklist for cases at FEE_PETITION level
+// ============================================================================
+
+export const feePetitions = pgTable(
+  "fee_petitions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" })
+      .unique(),
+
+    // Filing checklist
+    noa: boolean("noa").notNull().default(false),
+    timeDelineation: boolean("time_delineation").notNull().default(false),
+    feePetitionDoc: boolean("fee_petition_doc").notNull().default(false),
+    ltrToClmt: boolean("ltr_to_clmt").notNull().default(false),
+    ltrToClmtWithSignature: boolean("ltr_to_clmt_with_signature")
+      .notNull()
+      .default(false),
+    ltrToAlj: boolean("ltr_to_alj").notNull().default(false),
+    faxConfFeePet: boolean("fax_conf_fee_pet").notNull().default(false),
+
+    // Inline note
+    updateNote: text("update_note").notNull().default(""),
+
+    // Timestamps
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_fee_petitions_case_id").on(table.caseId)],
+);
+
+// ============================================================================
 // ACTIVITY_LOG
 // ============================================================================
 
@@ -474,7 +512,18 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
     fields: [cases.clientId],
     references: [feeRecords.caseId],
   }),
+  feePetition: one(feePetitions, {
+    fields: [cases.clientId],
+    references: [feePetitions.caseId],
+  }),
   activityLogs: many(activityLog),
+}));
+
+export const feePetitionsRelations = relations(feePetitions, ({ one }) => ({
+  case: one(cases, {
+    fields: [feePetitions.caseId],
+    references: [cases.clientId],
+  }),
 }));
 
 export const feeRecordsRelations = relations(feeRecords, ({ one, many }) => ({
