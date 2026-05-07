@@ -620,6 +620,31 @@ export const FeePetitions = () => {
             >
               <ChevronLeft className="h-3.5 w-3.5" /> Prev
             </button>
+            <div className="flex items-center gap-1 px-1">
+              <input
+                key={page}
+                type="number"
+                min={1}
+                max={totalPages}
+                defaultValue={page}
+                disabled={loading || totalPages <= 1}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const n = parseInt((e.target as HTMLInputElement).value);
+                  if (Number.isFinite(n) && n >= 1 && n <= totalPages && n !== page) {
+                    urlMethodRef.current = "push";
+                    setPage(n);
+                  } else {
+                    (e.target as HTMLInputElement).value = String(page);
+                  }
+                }}
+                onBlur={(e) => {
+                  e.target.value = String(page);
+                }}
+                className={`h-8 w-12 px-1 rounded-md border text-xs text-center outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 disabled:opacity-40 ${t.inputBg}`}
+              />
+              <span className={`text-[11px] ${t.textMuted}`}>/ {totalPages}</span>
+            </div>
             <button
               onClick={() => {
                 urlMethodRef.current = "push";
