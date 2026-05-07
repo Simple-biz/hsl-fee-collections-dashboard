@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import {
   Search,
+  ArrowUp,
+  ArrowDown,
   ArrowUpDown,
   Gavel,
   RefreshCw,
@@ -11,11 +13,14 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { fmtDate } from "@/lib/formatters";
 
 // ---------- types ----------
 interface FeePetitionRow {
   id: number;
   claimant: string;
+  approvalDate: string | null;
+  updatedAt: string | null;
   noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
@@ -34,7 +39,7 @@ type CheckboxKey =
   | "ltrToClmtWithSignature"
   | "ltrToAlj"
   | "faxConfFeePet";
-type SortKey = "claimant";
+type SortKey = "claimant" | "approvalDate" | "updatedAt";
 type SortDir = "asc" | "desc";
 type StatusFilter = "all" | "complete" | "incomplete";
 
@@ -88,9 +93,9 @@ export const FeePetitions = () => {
   // Completion filter
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  // Sort (only affects current page)
-  const [sortKey, setSortKey] = useState<SortKey>("claimant");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // Sort (server-side)
+  const [sortKey, setSortKey] = useState<SortKey>("approvalDate");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   // Track last-persisted note value per row to skip no-op writes on blur
   const noteSnapshot = useRef<Map<number, string>>(new Map());
@@ -116,6 +121,8 @@ export const FeePetitions = () => {
       });
       if (appliedSearch) params.set("search", appliedSearch);
       if (statusFilter !== "all") params.set("status", statusFilter);
+      params.set("sort", sortKey);
+      params.set("dir", sortDir);
       const res = await fetch(`/api/fee-petitions?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load fee petitions");
       const json = await res.json();
@@ -128,30 +135,29 @@ export const FeePetitions = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, statusFilter]);
+  }, [page, pageSize, appliedSearch, statusFilter, sortKey, sortDir]);
 
   useEffect(() => {
     fetchPetitions();
   }, [fetchPetitions]);
 
-  const sorted = useMemo(() => {
-    const d = [...rows];
-    d.sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-    return d;
-  }, [rows, sortKey, sortDir]);
-
   const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
       setSortKey(key);
-      setSortDir("asc");
+      setSortDir(key === "claimant" ? "asc" : "desc");
     }
+    setPage(1);
+  };
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowUpDown className="h-3 w-3" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="h-3 w-3" />
+    ) : (
+      <ArrowDown className="h-3 w-3" />
+    );
   };
 
   // Optimistic update + persist; revert on failure
@@ -166,6 +172,10 @@ export const FeePetitions = () => {
 
     try {
       await patchPetition(id, { [key]: next });
+      const today = new Date().toISOString().slice(0, 10);
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)),
+      );
       // After save, drop row if it no longer matches the active status filter
       if (statusFilter !== "all") {
         const updated = { ...prevRow, [key]: next };
@@ -312,7 +322,23 @@ export const FeePetitions = () => {
                   onClick={() => toggleSort("claimant")}
                 >
                   <span className="flex items-center gap-1">
-                    Claimant <ArrowUpDown className="h-3 w-3" />
+                    Claimant {sortIcon("claimant")}
+                  </span>
+                </th>
+                <th
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                  onClick={() => toggleSort("approvalDate")}
+                >
+                  <span className="flex items-center gap-1">
+                    Approved {sortIcon("approvalDate")}
+                  </span>
+                </th>
+                <th
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                  onClick={() => toggleSort("updatedAt")}
+                >
+                  <span className="flex items-center gap-1">
+                    Updated {sortIcon("updatedAt")}
                   </span>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-center`}>
@@ -335,7 +361,7 @@ export const FeePetitions = () => {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={CHECKBOX_COLUMNS.length + 3}
+                    colSpan={CHECKBOX_COLUMNS.length + 5}
                     className={`${tdBase} text-center py-8 ${t.textMuted}`}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -344,17 +370,17 @@ export const FeePetitions = () => {
                     </span>
                   </td>
                 </tr>
-              ) : sorted.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={CHECKBOX_COLUMNS.length + 3}
+                    colSpan={CHECKBOX_COLUMNS.length + 5}
                     className={`${tdBase} text-center py-8 ${t.textMuted}`}
                   >
                     No fee petitions found.
                   </td>
                 </tr>
               ) : (
-                sorted.map((row) => {
+                rows.map((row) => {
                   const completedCount = CHECKBOX_COLUMNS.reduce(
                     (acc, c) => acc + (row[c.key] ? 1 : 0),
                     0,
@@ -375,6 +401,12 @@ export const FeePetitions = () => {
                       title={row.claimant}
                     >
                       {row.claimant}
+                    </td>
+                    <td className={`${tdBase} ${t.textMuted}`}>
+                      {fmtDate(row.approvalDate)}
+                    </td>
+                    <td className={`${tdBase} ${t.textMuted}`}>
+                      {fmtDate(row.updatedAt)}
                     </td>
                     <td className={`${tdBase} text-center`}>
                       <span

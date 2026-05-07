@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feePetitions } from "@/lib/db/schema";
-import { eq, ilike, sql, desc } from "drizzle-orm";
+import { eq, ilike, sql } from "drizzle-orm";
 
-// GET /api/fee-petitions?page=&limit=&search= — List cases at FEE_PETITION level with checklist state
+const SORT_KEYS = ["claimant", "approvalDate", "updatedAt"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+
+// GET /api/fee-petitions?page=&limit=&search=&sort=&dir= — List cases at FEE_PETITION level with checklist state
 export const GET = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status"); // "complete" | "incomplete" | null
+    const sortParam = searchParams.get("sort");
+    const sort: SortKey = SORT_KEYS.includes(sortParam as SortKey)
+      ? (sortParam as SortKey)
+      : "approvalDate";
+    const dir = searchParams.get("dir") === "asc" ? sql`asc` : sql`desc`;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = (page - 1) * limit;
@@ -44,6 +52,13 @@ export const GET = async (req: NextRequest) => {
       .where(whereClause);
     const total = totalRows[0]?.count ?? 0;
 
+    const orderClause =
+      sort === "claimant"
+        ? sql`${cases.lastName} ${dir} NULLS LAST, ${cases.firstName} ${dir} NULLS LAST`
+        : sort === "updatedAt"
+          ? sql`${feePetitions.updatedAt} ${dir} NULLS LAST`
+          : sql`${cases.approvalDate} ${dir} NULLS LAST`;
+
     // Page rows: cases left-joined with fee_petitions
     const rows = await db
       .select({
@@ -60,17 +75,20 @@ export const GET = async (req: NextRequest) => {
         ltrToAlj: feePetitions.ltrToAlj,
         faxConfFeePet: feePetitions.faxConfFeePet,
         updateNote: feePetitions.updateNote,
+        updatedAt: feePetitions.updatedAt,
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
       .where(whereClause)
-      .orderBy(desc(cases.approvalDate))
+      .orderBy(orderClause)
       .limit(limit)
       .offset(offset);
 
     const data = rows.map((r) => ({
       id: r.clientId,
       claimant: `${r.lastName}, ${r.firstName}`,
+      approvalDate: r.approvalDate ?? null,
+      updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
       noa: r.noa ?? false,
       timeDelineation: r.timeDelineation ?? false,
       feePetitionDoc: r.feePetitionDoc ?? false,
