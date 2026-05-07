@@ -216,7 +216,13 @@ export const FeePetitions = () => {
     };
   }, [search]);
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchPetitions = useCallback(async () => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
@@ -228,7 +234,9 @@ export const FeePetitions = () => {
       if (statusFilter !== "all") params.set("status", statusFilter);
       params.set("sort", sortKey);
       params.set("dir", sortDir);
-      const res = await fetch(`/api/fee-petitions?${params.toString()}`);
+      const res = await fetch(`/api/fee-petitions?${params.toString()}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error("Failed to load fee petitions");
       const json = await res.json();
       const data: FeePetitionRow[] = json.data || [];
@@ -236,14 +244,20 @@ export const FeePetitions = () => {
       setTotal(typeof json.total === "number" ? json.total : data.length);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (fetchAbortRef.current === controller) {
+        setLoading(false);
+      }
     }
   }, [page, pageSize, appliedSearch, statusFilter, sortKey, sortDir]);
 
   useEffect(() => {
     fetchPetitions();
+    return () => {
+      fetchAbortRef.current?.abort();
+    };
   }, [fetchPetitions]);
 
   const toggleSort = (key: SortKey) => {
