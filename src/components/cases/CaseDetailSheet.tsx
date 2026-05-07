@@ -170,7 +170,7 @@ export default function CaseDetailSheet({
       const res = await fetch(`/api/cases/${caseId}`, {
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error("Failed to load case details");
+      if (!res.ok) throw new Error(`Failed to load case details (${res.status})`);
       const json = await res.json();
       setData(json.data);
     } catch (err) {
