@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   Search,
@@ -47,6 +48,16 @@ type StatusFilter = "all" | "complete" | "incomplete";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt"];
+const STATUS_VALUES: StatusFilter[] = ["all", "complete", "incomplete"];
+const DEFAULTS = {
+  search: "",
+  status: "all" as StatusFilter,
+  sort: "approvalDate" as SortKey,
+  dir: "desc" as SortDir,
+  page: 1,
+  pageSize: 50,
+};
 
 const CHECKBOX_COLUMNS: { key: CheckboxKey; label: string }[] = [
   { key: "noa", label: "NOA" },
@@ -78,26 +89,71 @@ export const FeePetitions = () => {
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
 
+  // URL hydration — read initial values once
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlParams = useSearchParams();
+  const initialState = useRef({
+    search: urlParams.get("q") ?? DEFAULTS.search,
+    status: (STATUS_VALUES.includes(urlParams.get("status") as StatusFilter)
+      ? (urlParams.get("status") as StatusFilter)
+      : DEFAULTS.status) as StatusFilter,
+    sort: (SORT_KEYS.includes(urlParams.get("sort") as SortKey)
+      ? (urlParams.get("sort") as SortKey)
+      : DEFAULTS.sort) as SortKey,
+    dir: (urlParams.get("dir") === "asc" ? "asc" : "desc") as SortDir,
+    page: Math.max(1, parseInt(urlParams.get("page") || "1") || 1),
+    pageSize: PAGE_SIZE_OPTIONS.includes(
+      parseInt(urlParams.get("size") || "0"),
+    )
+      ? parseInt(urlParams.get("size") || "0")
+      : DEFAULTS.pageSize,
+  }).current;
+
   const [rows, setRows] = useState<FeePetitionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Search (debounced -> appliedSearch drives the fetch)
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  // Search (debounced -> appliedSearch drives the fetch + URL)
+  const [search, setSearch] = useState(initialState.search);
+  const [appliedSearch, setAppliedSearch] = useState(initialState.search);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pagination
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [page, setPage] = useState(initialState.page);
+  const [pageSize, setPageSize] = useState(initialState.pageSize);
   const [total, setTotal] = useState(0);
 
   // Completion filter
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    initialState.status,
+  );
 
   // Sort (server-side)
-  const [sortKey, setSortKey] = useState<SortKey>("approvalDate");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
+  const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
+
+  // Mirror state into URL (omit defaults to keep URLs short)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (appliedSearch) params.set("q", appliedSearch);
+    if (statusFilter !== DEFAULTS.status) params.set("status", statusFilter);
+    if (sortKey !== DEFAULTS.sort) params.set("sort", sortKey);
+    if (sortDir !== DEFAULTS.dir) params.set("dir", sortDir);
+    if (page !== DEFAULTS.page) params.set("page", String(page));
+    if (pageSize !== DEFAULTS.pageSize) params.set("size", String(pageSize));
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [
+    appliedSearch,
+    statusFilter,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+    pathname,
+    router,
+  ]);
 
   // Track last-persisted note value per row to skip no-op writes on blur
   const noteSnapshot = useRef<Map<number, string>>(new Map());
