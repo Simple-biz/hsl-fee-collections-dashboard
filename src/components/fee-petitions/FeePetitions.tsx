@@ -7,7 +7,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Check,
   Gavel,
+  Loader2,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -99,6 +101,12 @@ export const FeePetitions = () => {
 
   // Track last-persisted note value per row to skip no-op writes on blur
   const noteSnapshot = useRef<Map<number, string>>(new Map());
+
+  // Per-row note save state: "saving" while in flight, "saved" briefly after success
+  const [noteState, setNoteState] = useState<
+    Record<number, "saving" | "saved" | undefined>
+  >({});
+  const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -203,10 +211,20 @@ export const FeePetitions = () => {
 
   const persistUpdateNote = async (row: FeePetitionRow) => {
     if (noteSnapshot.current.get(row.id) === row.updateNote) return;
+    const existingTimer = savedTimerRef.current.get(row.id);
+    if (existingTimer) clearTimeout(existingTimer);
+    setNoteState((s) => ({ ...s, [row.id]: "saving" }));
     try {
       await patchPetition(row.id, { updateNote: row.updateNote });
       noteSnapshot.current.set(row.id, row.updateNote);
+      setNoteState((s) => ({ ...s, [row.id]: "saved" }));
+      const timer = setTimeout(() => {
+        setNoteState((s) => ({ ...s, [row.id]: undefined }));
+        savedTimerRef.current.delete(row.id);
+      }, 1500);
+      savedTimerRef.current.set(row.id, timer);
     } catch (err) {
+      setNoteState((s) => ({ ...s, [row.id]: undefined }));
       setError((err as Error).message);
     }
   };
@@ -435,16 +453,28 @@ export const FeePetitions = () => {
                       </td>
                     ))}
                     <td className={`${tdBase}`}>
-                      <input
-                        type="text"
-                        value={row.updateNote}
-                        onChange={(e) =>
-                          setUpdateNoteLocal(row.id, e.target.value)
-                        }
-                        onBlur={() => persistUpdateNote(row)}
-                        placeholder="Add a note..."
-                        className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={row.updateNote}
+                          onChange={(e) =>
+                            setUpdateNoteLocal(row.id, e.target.value)
+                          }
+                          onBlur={() => persistUpdateNote(row)}
+                          placeholder="Add a note..."
+                          className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                        />
+                        {noteState[row.id] === "saving" && (
+                          <Loader2
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`}
+                          />
+                        )}
+                        {noteState[row.id] === "saved" && (
+                          <Check
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
+                          />
+                        )}
+                      </div>
                     </td>
                   </tr>
                   );
