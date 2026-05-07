@@ -377,6 +377,7 @@ export const FeePetitions = () => {
       {/* Error */}
       {error && (
         <div
+          role="alert"
           className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
           <span className="text-sm">{error}</span>
