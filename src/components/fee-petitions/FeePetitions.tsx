@@ -237,7 +237,7 @@ export const FeePetitions = () => {
       const res = await fetch(`/api/fee-petitions?${params.toString()}`, {
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error("Failed to load fee petitions");
+      if (!res.ok) throw new Error(`Failed to load fee petitions (${res.status})`);
       const json = await res.json();
       const data: FeePetitionRow[] = json.data || [];
       setRows(data);
