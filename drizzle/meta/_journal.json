@@ -19,8 +19,22 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1778159985917,
-      "tag": "0002_workable_namor",
+      "when": 1778078912006,
+      "tag": "0002_user_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778174969198,
+      "tag": "0003_user_details_chronicle_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778178974829,
+      "tag": "0004_fee_petitions_table",
       "breakpoints": true
     }
   ]

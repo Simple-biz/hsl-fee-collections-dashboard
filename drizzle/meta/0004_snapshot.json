@@ -1,6 +1,6 @@
 {
-  "id": "dfa6868d-d84c-4371-b60b-eddbf4cf0090",
-  "prevId": "ba4566cd-bee9-4a02-bb49-d18b1297df5d",
+  "id": "0d53781d-e309-44bb-a92e-7d97a604902c",
+  "prevId": "99fed985-3729-4d36-b415-e1167b9a7a27",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -845,6 +845,140 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.fee_petitions": {
+      "name": "fee_petitions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "noa": {
+          "name": "noa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "time_delineation": {
+          "name": "time_delineation",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "fee_petition_doc": {
+          "name": "fee_petition_doc",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ltr_to_clmt": {
+          "name": "ltr_to_clmt",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ltr_to_clmt_with_signature": {
+          "name": "ltr_to_clmt_with_signature",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ltr_to_alj": {
+          "name": "ltr_to_alj",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "fax_conf_fee_pet": {
+          "name": "fax_conf_fee_pet",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "update_note": {
+          "name": "update_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_fee_petitions_case_id": {
+          "name": "idx_fee_petitions_case_id",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fee_petitions_case_id_cases_client_id_fk": {
+          "name": "fee_petitions_case_id_cases_client_id_fk",
+          "tableFrom": "fee_petitions",
+          "tableTo": "cases",
+          "columnsFrom": [
+            "case_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fee_petitions_case_id_unique": {
+          "name": "fee_petitions_case_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.fee_records": {
       "name": "fee_records",
       "schema": "",
@@ -1610,6 +1744,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "chronicle_id": {
+          "name": "chronicle_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "full_name": {
           "name": "full_name",
           "type": "varchar(255)",
@@ -1748,7 +1888,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "user_details_chronicle_id_unique": {
+          "name": "user_details_chronicle_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "chronicle_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

@@ -504,6 +504,45 @@ export const notifications = pgTable(
 );
 
 // ============================================================================
+// USER_DETAILS
+// ============================================================================
+
+export const userDetails = pgTable(
+  "user_details",
+  {
+    id: serial("id").primaryKey(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    chronicleId: integer("chronicle_id").unique(),
+
+    fullName: varchar("full_name", { length: 255 }),
+    addressLine1: varchar("address_line_1", { length: 255 }),
+    addressLine2: varchar("address_line_2", { length: 255 }),
+    city: varchar("city", { length: 255 }),
+    state: varchar("state", { length: 100 }),
+    zipCode: varchar("zip_code", { length: 50 }),
+    country: varchar("country", { length: 100 }),
+
+    cellPhone: varchar("cell_phone", { length: 100 }),
+    email: varchar("email", { length: 255 }),
+    ssn: varchar("ssn", { length: 50 }),
+
+    dateOfBirth: date("date_of_birth"),
+    ageAtApproval: integer("age_at_approval"),
+    placeOfBirth: varchar("place_of_birth", { length: 255 }),
+    mothersFirstNameAndMaidenName: varchar("mothers_first_name_and_maiden_name", { length: 255 }),
+    fathersFirstAndLastName: varchar("fathers_first_and_last_name", { length: 255 }),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_user_details_case_id").on(table.caseId),
+  ],
+);
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 
@@ -517,6 +556,17 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
     references: [feePetitions.caseId],
   }),
   activityLogs: many(activityLog),
+  userDetails: one(userDetails, {
+    fields: [cases.clientId],
+    references: [userDetails.caseId],
+  }),
+}));
+
+export const userDetailsRelations = relations(userDetails, ({ one }) => ({
+  case: one(cases, {
+    fields: [userDetails.caseId],
+    references: [cases.clientId],
+  }),
 }));
 
 export const feePetitionsRelations = relations(feePetitions, ({ one }) => ({
