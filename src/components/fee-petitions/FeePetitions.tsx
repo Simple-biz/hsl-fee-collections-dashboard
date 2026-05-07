@@ -444,6 +444,7 @@ export const FeePetitions = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search claimants..."
+                aria-label="Search claimants"
                 className={`h-8 pl-8 pr-3 w-full sm:w-48 rounded-md border text-xs outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
               />
             </div>
@@ -454,6 +455,7 @@ export const FeePetitions = () => {
                 setStatusFilter(e.target.value as StatusFilter);
                 setPage(1);
               }}
+              aria-label="Filter by completion status"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
               <option value="all">All</option>
@@ -467,6 +469,7 @@ export const FeePetitions = () => {
                 setPageSize(parseInt(e.target.value));
                 setPage(1);
               }}
+              aria-label="Rows per page"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
               {PAGE_SIZE_OPTIONS.map((n) => (
@@ -686,6 +689,7 @@ export const FeePetitions = () => {
                 max={totalPages}
                 defaultValue={page}
                 disabled={loading || totalPages <= 1}
+                aria-label="Jump to page"
                 onKeyDown={(e) => {
                   if (e.key !== "Enter") return;
                   const n = parseInt((e.target as HTMLInputElement).value);
