@@ -339,6 +339,7 @@ export const FeePetitions = () => {
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
+  const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
 
   return (
     <div className="space-y-4">
@@ -434,12 +435,12 @@ export const FeePetitions = () => {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
           <table className="w-full min-w-250">
             <thead>
               <tr className={`border-b ${t.borderLight}`}>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-0 top-0 z-30 ${stickyHeaderBg}`}
                   onClick={() => toggleSort("claimant")}
                 >
                   <span className="flex items-center gap-1">
@@ -447,7 +448,7 @@ export const FeePetitions = () => {
                   </span>
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg}`}
                   onClick={() => toggleSort("approvalDate")}
                 >
                   <span className="flex items-center gap-1">
@@ -455,25 +456,25 @@ export const FeePetitions = () => {
                   </span>
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg}`}
                   onClick={() => toggleSort("updatedAt")}
                 >
                   <span className="flex items-center gap-1">
                     Updated {sortIcon("updatedAt")}
                   </span>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-center`}>
+                <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
                   Progress
                 </th>
                 {CHECKBOX_COLUMNS.map((col) => (
                   <th
                     key={col.key}
-                    className={`${thBase} ${t.textSub} text-center`}
+                    className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}
                   >
                     {col.label}
                   </th>
                 ))}
-                <th className={`${thBase} ${t.textSub} text-left min-w-50`}>
+                <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
                   Update
                 </th>
               </tr>
@@ -512,13 +513,27 @@ export const FeePetitions = () => {
                       ? "bg-emerald-900/40"
                       : "bg-emerald-100/80"
                     : "";
+                  const stickyBg = isComplete
+                    ? dark
+                      ? "bg-emerald-900"
+                      : "bg-emerald-100"
+                    : dark
+                      ? "bg-neutral-900"
+                      : "bg-white";
+                  const stickyHover = isComplete
+                    ? dark
+                      ? "group-hover/row:bg-emerald-800"
+                      : "group-hover/row:bg-emerald-200"
+                    : dark
+                      ? "group-hover/row:bg-neutral-800"
+                      : "group-hover/row:bg-neutral-50";
                   return (
                   <tr
                     key={row.id}
-                    className={`border-b ${rowBorder} ${completeBg} ${rowHover} transition-colors`}
+                    className={`group/row border-b ${rowBorder} ${completeBg} ${rowHover} transition-colors`}
                   >
                     <td
-                      className={`${tdBase} ${t.text} font-semibold max-w-45 truncate`}
+                      className={`${tdBase} ${t.text} font-semibold max-w-45 truncate sticky left-0 z-10 ${stickyBg} ${stickyHover}`}
                       title={row.claimant}
                     >
                       {row.claimant}
