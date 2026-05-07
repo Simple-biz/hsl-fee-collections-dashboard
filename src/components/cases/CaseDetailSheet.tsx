@@ -371,57 +371,49 @@ export default function CaseDetailSheet({
                 Fee Breakdown
               </h4>
               <div className="space-y-4">
-                {/* T16 */}
-                <div className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[11px] font-bold text-indigo-500 uppercase">T16 (SSI)</p>
-                    <p className="text-[10px] font-medium text-emerald-500">Rec: {currency(data.t16FeeReceived)}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className={lbl}>Retro</p>
-                      <p className="text-xs font-semibold">{currency(data.t16Retro)}</p>
+                {[
+                  {
+                    key: "t16",
+                    label: "T16 (SSI)",
+                    titleColor: "text-indigo-500",
+                    received: data.t16FeeReceived,
+                    retro: data.t16Retro,
+                    pending: data.t16Pending,
+                  },
+                  {
+                    key: "t2",
+                    label: "T2 (SSDI)",
+                    titleColor: "text-blue-500",
+                    received: data.t2FeeReceived,
+                    retro: data.t2Retro,
+                    pending: data.t2Pending,
+                  },
+                  {
+                    key: "aux",
+                    label: "AUX (Auxiliary)",
+                    titleColor: "text-violet-500",
+                    received: data.auxFeeReceived,
+                    retro: data.auxRetro,
+                    pending: data.auxPending,
+                  },
+                ].map((b) => (
+                  <div key={b.key} className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className={`text-[11px] font-bold uppercase ${b.titleColor}`}>{b.label}</p>
+                      <p className="text-[10px] font-medium text-emerald-500">Rec: {currency(b.received)}</p>
                     </div>
-                    <div>
-                      <p className={lbl}>Pending</p>
-                      <p className={`text-xs font-semibold ${data.t16Pending > 0 ? "text-amber-500" : ""}`}>{currency(data.t16Pending)}</p>
-                    </div>
-                  </div>
-                </div>
-                {/* T2 */}
-                <div className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[11px] font-bold text-blue-500 uppercase">T2 (SSDI)</p>
-                    <p className="text-[10px] font-medium text-emerald-500">Rec: {currency(data.t2FeeReceived)}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className={lbl}>Retro</p>
-                      <p className="text-xs font-semibold">{currency(data.t2Retro)}</p>
-                    </div>
-                    <div>
-                      <p className={lbl}>Pending</p>
-                      <p className={`text-xs font-semibold ${data.t2Pending > 0 ? "text-amber-500" : ""}`}>{currency(data.t2Pending)}</p>
-                    </div>
-                  </div>
-                </div>
-                {/* AUX */}
-                <div className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[11px] font-bold text-violet-500 uppercase">AUX (Auxiliary)</p>
-                    <p className="text-[10px] font-medium text-emerald-500">Rec: {currency(data.auxFeeReceived)}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className={lbl}>Retro</p>
-                      <p className="text-xs font-semibold">{currency(data.auxRetro)}</p>
-                    </div>
-                    <div>
-                      <p className={lbl}>Pending</p>
-                      <p className={`text-xs font-semibold ${data.auxPending > 0 ? "text-amber-500" : ""}`}>{currency(data.auxPending)}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className={lbl}>Retro</p>
+                        <p className="text-xs font-semibold">{currency(b.retro)}</p>
+                      </div>
+                      <div>
+                        <p className={lbl}>Pending</p>
+                        <p className={`text-xs font-semibold ${b.pending > 0 ? "text-amber-500" : ""}`}>{currency(b.pending)}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
 
