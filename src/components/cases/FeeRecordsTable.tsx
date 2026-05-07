@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
 import { Search, ArrowUpDown, Upload, MessageSquare } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";

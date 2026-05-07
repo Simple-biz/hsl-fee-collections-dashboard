@@ -91,6 +91,7 @@ export const GET = async (
         feeRecordUpdatedAt: feeRecords.updatedAt,
 
         // user_details fields
+        udChronicleId: userDetails.chronicleId,
         udFullName: userDetails.fullName,
         udAddressLine1: userDetails.addressLine1,
         udAddressLine2: userDetails.addressLine2,
@@ -229,6 +230,7 @@ export const GET = async (
 
       // User details
       userDetails: {
+        chronicleId: row.udChronicleId ?? null,
         fullName: row.udFullName || null,
         addressLine1: row.udAddressLine1 || null,
         addressLine2: row.udAddressLine2 || null,

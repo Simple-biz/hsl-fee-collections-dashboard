@@ -476,6 +476,7 @@ export const userDetails = pgTable(
     caseId: integer("case_id")
       .notNull()
       .references(() => cases.clientId, { onDelete: "cascade" }),
+    chronicleId: integer("chronicle_id").unique(),
 
     fullName: varchar("full_name", { length: 255 }),
     addressLine1: varchar("address_line_1", { length: 255 }),

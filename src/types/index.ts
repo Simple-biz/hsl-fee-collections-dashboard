@@ -101,6 +101,7 @@ export interface TeamMember {
 }
 
 export interface UserDetails {
+  chronicleId: number | null;
   fullName: string | null;
   addressLine1: string | null;
   addressLine2: string | null;

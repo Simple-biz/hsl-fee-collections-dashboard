@@ -275,6 +275,16 @@ export default function CaseDetailSheet({
                   >
                     MyCase <ExternalLink aria-hidden="true" className="h-3 w-3" />
                   </a>
+                  {data.userDetails?.chronicleId != null && (
+                    <a
+                      href={`https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-sky-900/30 text-sky-400 hover:bg-sky-900/50" : "bg-sky-50 text-sky-600 hover:bg-sky-100"}`}
+                    >
+                      Chronicle <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
