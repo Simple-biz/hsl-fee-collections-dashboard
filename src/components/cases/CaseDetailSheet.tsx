@@ -198,6 +198,7 @@ export default function CaseDetailSheet({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         overlayClassName="bg-black/0 backdrop-blur-none"
         className={`w-full sm:max-w-md p-0 overflow-y-auto ${t.bg} border-l ${t.border} shadow-2xl transition-all duration-300 ease-in-out scrollbar-none`}
       >
