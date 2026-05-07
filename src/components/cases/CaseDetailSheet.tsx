@@ -92,7 +92,13 @@ function ClientDetailsSection({
           {ud.email && (
             <div>
               <p className={lbl}>Email</p>
-              <p className={`${val} truncate`} title={ud.email}>{ud.email}</p>
+              <a
+                href={`mailto:${ud.email}`}
+                className={`${val} truncate hover:underline block`}
+                title={ud.email}
+              >
+                {ud.email}
+              </a>
             </div>
           )}
           {ud.ssn && (
