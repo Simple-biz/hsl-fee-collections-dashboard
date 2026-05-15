@@ -3,15 +3,31 @@ import { db } from "@/lib/db";
 import { cases, feePetitions } from "@/lib/db/schema";
 import { eq, ilike, sql } from "drizzle-orm";
 
-const SORT_KEYS = ["claimant", "approvalDate", "updatedAt"] as const;
+const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 
-// GET /api/fee-petitions?page=&limit=&search=&sort=&dir= — List cases at FEE_PETITION level with checklist state
+const getMissingClause = (key: string | null) => {
+  switch (key) {
+    case "noa": return sql`AND COALESCE(${feePetitions.noa}, false) = false`;
+    case "timeDelineation": return sql`AND COALESCE(${feePetitions.timeDelineation}, false) = false`;
+    case "feePetitionDoc": return sql`AND COALESCE(${feePetitions.feePetitionDoc}, false) = false`;
+    case "ltrToClmt": return sql`AND COALESCE(${feePetitions.ltrToClmt}, false) = false`;
+    case "ltrToClmtWithSignature": return sql`AND COALESCE(${feePetitions.ltrToClmtWithSignature}, false) = false`;
+    case "ltrToAlj": return sql`AND COALESCE(${feePetitions.ltrToAlj}, false) = false`;
+    case "faxConfFeePet": return sql`AND COALESCE(${feePetitions.faxConfFeePet}, false) = false`;
+    default: return sql``;
+  }
+};
+
+// GET /api/fee-petitions?page=&limit=&search=&sort=&dir=&status=&touched=&missing=
+// Lists cases at FEE_PETITION level with checklist state and aggregate stats
 export const GET = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
-    const status = searchParams.get("status"); // "complete" | "incomplete" | null
+    const status = searchParams.get("status"); // "complete" | "incomplete"
+    const touched = searchParams.get("touched"); // "none" = no fee_petitions row yet
+    const missing = searchParams.get("missing"); // checkbox key to filter by
     const sortParam = searchParams.get("sort");
     const sort: SortKey = SORT_KEYS.includes(sortParam as SortKey)
       ? (sortParam as SortKey)
@@ -32,6 +48,17 @@ export const GET = async (req: NextRequest) => {
       AND COALESCE(${feePetitions.faxConfFeePet}, false)
     )`;
 
+    // Sum of checked boxes — used for progress sort
+    const progressExpr = sql`(
+      COALESCE(${feePetitions.noa}, false)::int +
+      COALESCE(${feePetitions.timeDelineation}, false)::int +
+      COALESCE(${feePetitions.feePetitionDoc}, false)::int +
+      COALESCE(${feePetitions.ltrToClmt}, false)::int +
+      COALESCE(${feePetitions.ltrToClmtWithSignature}, false)::int +
+      COALESCE(${feePetitions.ltrToAlj}, false)::int +
+      COALESCE(${feePetitions.faxConfFeePet}, false)::int
+    )`;
+
     const statusClause =
       status === "complete"
         ? sql`AND ${allChecked}`
@@ -39,34 +66,51 @@ export const GET = async (req: NextRequest) => {
           ? sql`AND NOT ${allChecked}`
           : sql``;
 
+    const searchClause = search
+      ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})`
+      : sql``;
+
+    const touchedClause = touched === "none" ? sql`AND ${feePetitions.updatedAt} IS NULL` : sql``;
+    const missingClause = getMissingClause(missing);
+
     const whereClause = sql`${cases.levelWon} = 'FEE_PETITION'
-      ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
+      ${searchClause}
       ${statusClause}
+      ${touchedClause}
+      ${missingClause}
     `;
 
-    // Total count (respecting filter) — must left-join to evaluate status
-    const totalRows = await db
-      .select({ count: sql<number>`COUNT(*)::int` })
+    // Single aggregate for stats + count
+    const [agg] = await db
+      .select({
+        total: sql<number>`COUNT(*)::int`,
+        completeCount: sql<number>`COUNT(*) FILTER (WHERE ${allChecked})::int`,
+        neverTouchedCount: sql<number>`COUNT(*) FILTER (WHERE ${feePetitions.updatedAt} IS NULL)::int`,
+      })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
       .where(whereClause);
-    const total = totalRows[0]?.count ?? 0;
+
+    const total = agg?.total ?? 0;
+    const completeCount = agg?.completeCount ?? 0;
+    const incompleteCount = total - completeCount;
+    const neverTouchedCount = agg?.neverTouchedCount ?? 0;
 
     const orderClause =
       sort === "claimant"
         ? sql`${cases.lastName} ${dir} NULLS LAST, ${cases.firstName} ${dir} NULLS LAST`
         : sort === "updatedAt"
           ? sql`${feePetitions.updatedAt} ${dir} NULLS LAST`
-          : sql`${cases.approvalDate} ${dir} NULLS LAST`;
+          : sort === "progress"
+            ? sql`${progressExpr} ${dir} NULLS LAST`
+            : sql`${cases.approvalDate} ${dir} NULLS LAST`;
 
-    // Page rows: cases left-joined with fee_petitions
     const rows = await db
       .select({
         clientId: cases.clientId,
         firstName: cases.firstName,
         lastName: cases.lastName,
         approvalDate: cases.approvalDate,
-
         noa: feePetitions.noa,
         timeDelineation: feePetitions.timeDelineation,
         feePetitionDoc: feePetitions.feePetitionDoc,
@@ -99,7 +143,7 @@ export const GET = async (req: NextRequest) => {
       updateNote: r.updateNote ?? "",
     }));
 
-    return NextResponse.json({ data, page, limit, total });
+    return NextResponse.json({ data, page, limit, total, completeCount, incompleteCount, neverTouchedCount });
   } catch (error) {
     console.error("GET /api/fee-petitions error:", error);
     return NextResponse.json(

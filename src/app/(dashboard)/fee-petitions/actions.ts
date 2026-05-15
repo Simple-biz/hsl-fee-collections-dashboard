@@ -18,7 +18,9 @@ const FIELD_KEYS = [
 type FieldKey = (typeof FIELD_KEYS)[number];
 type Updates = Partial<Pick<typeof feePetitions.$inferInsert, FieldKey>>;
 
-type Result<T = void> = ({ ok: true } & T) | { ok: false; error: string };
+type Result<T = void> = T extends void
+  ? { ok: true } | { ok: false; error: string }
+  : ({ ok: true } & T) | { ok: false; error: string };
 
 export async function upsertFeePetition(input: {
   caseId: number;
@@ -53,6 +55,35 @@ export async function upsertFeePetition(input: {
     return { ok: true, data: row };
   } catch (error) {
     console.error("upsertFeePetition error:", error);
+    return { ok: false, error: (error as Error).message };
+  }
+}
+
+export async function bulkMarkComplete(input: {
+  caseIds: number[];
+}): Promise<Result> {
+  try {
+    if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
+    const allTrue = {
+      noa: true,
+      timeDelineation: true,
+      feePetitionDoc: true,
+      ltrToClmt: true,
+      ltrToClmtWithSignature: true,
+      ltrToAlj: true,
+      faxConfFeePet: true,
+    };
+    await db
+      .insert(feePetitions)
+      .values(input.caseIds.map((caseId) => ({ caseId, ...allTrue })))
+      .onConflictDoUpdate({
+        target: feePetitions.caseId,
+        set: { ...allTrue, updatedAt: new Date() },
+      });
+    revalidatePath("/fee-petitions");
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkMarkComplete error:", error);
     return { ok: false, error: (error as Error).message };
   }
 }
