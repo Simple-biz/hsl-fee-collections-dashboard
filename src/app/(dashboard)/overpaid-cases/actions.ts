@@ -53,6 +53,26 @@ export async function upsertOverpaidCase(input: {
   }
 }
 
+export async function bulkMarkCleared(input: {
+  caseIds: number[];
+}): Promise<Result> {
+  try {
+    if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
+    await db
+      .insert(overpaidCases)
+      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: true })))
+      .onConflictDoUpdate({
+        target: overpaidCases.caseId,
+        set: { checksCleared: true, updatedAt: new Date() },
+      });
+    revalidatePath("/overpaid-cases");
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkMarkCleared error:", error);
+    return { ok: false, error: (error as Error).message };
+  }
+}
+
 export async function updateFeesConfirmation(input: {
   caseId: number;
   feesConfirmation: string;

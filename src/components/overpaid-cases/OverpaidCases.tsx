@@ -16,10 +16,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  X,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull } from "@/lib/formatters";
-import { upsertOverpaidCase, updateFeesConfirmation } from "@/app/(dashboard)/overpaid-cases/actions";
+import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared } from "@/app/(dashboard)/overpaid-cases/actions";
 
 // ---------- types ----------
 interface OverpaidCaseRow {
@@ -92,7 +93,7 @@ export const OverpaidCases = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ totalOverpaid: 0, clearedCount: 0, ltrCount: 0 });
-  const [agents, setAgents] = useState<string[]>([]);
+  const [agents, setAgents] = useState<{ name: string; count: number }[]>([]);
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -106,6 +107,10 @@ export const OverpaidCases = () => {
   const [agentFilter, setAgentFilter] = useState(initialState.agent);
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkClearing, setBulkClearing] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const urlMethodRef = useRef<"push" | "replace">("replace");
 
@@ -209,6 +214,7 @@ export const OverpaidCases = () => {
       const json = await res.json();
       const data: OverpaidCaseRow[] = json.data || [];
       setRows(data);
+      setSelectedIds(new Set());
       setTotal(typeof json.total === "number" ? json.total : data.length);
       setStats({
         totalOverpaid: typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0,
@@ -231,6 +237,69 @@ export const OverpaidCases = () => {
     fetchCases();
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchCases]);
+
+  // Update select-all indeterminate state
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+    const someSelected = rows.some((r) => selectedIds.has(r.id));
+    selectAllRef.current.checked = allSelected;
+    selectAllRef.current.indeterminate = !allSelected && someSelected;
+  }, [selectedIds, rows]);
+
+  const hasFilters = appliedSearch !== DEFAULTS.search || statusFilter !== DEFAULTS.status || agentFilter !== DEFAULTS.agent;
+
+  const clearAllFilters = () => {
+    urlMethodRef.current = "push";
+    setSearch(DEFAULTS.search);
+    setAppliedSearch(DEFAULTS.search);
+    setStatusFilter(DEFAULTS.status);
+    setAgentFilter(DEFAULTS.agent);
+    setPage(1);
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(rows.map((r) => r.id)));
+    }
+  };
+
+  const toggleRowSelection = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkMarkCleared = async () => {
+    if (selectedIds.size === 0 || bulkClearing) return;
+    setBulkClearing(true);
+    const ids = Array.from(selectedIds);
+    const notYetCleared = rows.filter((r) => ids.includes(r.id) && !r.checksCleared).length;
+    try {
+      const result = await bulkMarkCleared({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
+      setRows((prev) => prev.map((r) => ids.includes(r.id) ? { ...r, checksCleared: true } : r));
+      setStats((s) => ({ ...s, clearedCount: s.clearedCount + notYetCleared }));
+      if (statusFilter === "pending") {
+        setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+        setTotal((tot) => Math.max(0, tot - ids.length));
+      }
+      setSelectedIds(new Set());
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBulkClearing(false);
+    }
+  };
 
   const toggleSort = (key: SortKey) => {
     urlMethodRef.current = "push";
@@ -416,6 +485,7 @@ export const OverpaidCases = () => {
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
+  const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
 
   return (
     <div className="space-y-4">
@@ -494,12 +564,38 @@ export const OverpaidCases = () => {
         {/* Toolbar */}
         <div className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight}`}>
           <div>
-            <h3 className={`text-sm font-bold ${t.text}`}>Cases</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-              {total === 0
-                ? "0 cases"
-                : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
-            </p>
+            {selectedIds.size > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-bold ${t.text}`}>{selectedIds.size} selected</span>
+                <button
+                  onClick={handleBulkMarkCleared}
+                  disabled={bulkClearing}
+                  aria-label="Mark selected cases as cleared"
+                  className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
+                >
+                  {bulkClearing
+                    ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                    : <Check aria-hidden="true" className="h-3 w-3" />}
+                  Mark Cleared
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  aria-label="Clear selection"
+                  className={`h-7 w-7 rounded-md border flex items-center justify-center ${t.outlineBtn}`}
+                >
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className={`text-sm font-bold ${t.text}`}>Cases</h3>
+                <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                  {total === 0
+                    ? "0 cases"
+                    : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
+                </p>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 sm:flex-none">
@@ -548,7 +644,7 @@ export const OverpaidCases = () => {
             >
               <option value="">All Agents</option>
               {agents.map((a) => (
-                <option key={a} value={a}>{a}</option>
+                <option key={a.name} value={a.name}>{a.name} ({a.count})</option>
               ))}
             </select>
             <select
@@ -579,16 +675,83 @@ export const OverpaidCases = () => {
           </div>
         </div>
 
+        {/* Active filter chips */}
+        {hasFilters && (
+          <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
+            {appliedSearch && (
+              <span className={chipBase}>
+                Search: {appliedSearch}
+                <button
+                  aria-label="Clear search filter"
+                  onClick={() => { setSearch(""); setAppliedSearch(""); setPage(1); }}
+                  className="ml-0.5 hover:opacity-70"
+                >
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {statusFilter !== "all" && (
+              <span className={chipBase}>
+                Status: {statusFilter === "cleared" ? "Checks Cleared" : "Pending"}
+                <button
+                  aria-label="Clear status filter"
+                  onClick={() => { urlMethodRef.current = "push"; setStatusFilter("all"); setPage(1); }}
+                  className="ml-0.5 hover:opacity-70"
+                >
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {agentFilter && (
+              <span className={chipBase}>
+                Agent: {agentFilter}
+                <button
+                  aria-label="Clear agent filter"
+                  onClick={() => { urlMethodRef.current = "push"; setAgentFilter(""); setPage(1); }}
+                  className="ml-0.5 hover:opacity-70"
+                >
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={clearAllFilters}
+              className={`text-[11px] font-medium underline ${t.textMuted} hover:opacity-70`}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className={`px-4 py-1.5 flex items-center gap-4 border-b ${t.borderLight}`}>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Key</span>
+          <span className="flex items-center gap-1.5">
+            <span className={`inline-block w-4 h-4 rounded-sm border-l-2 border-l-amber-500 ${dark ? "bg-neutral-800" : "bg-neutral-100"}`} />
+            <span className={`text-[11px] ${t.textMuted}`}>Overpaid amount ≥ $3,000</span>
+          </span>
+        </div>
+
         {/* Table */}
         <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
           <table className="w-full min-w-200">
             <thead>
               <tr className={`border-b ${t.borderLight}`}>
+                {/* Select-all checkbox */}
+                <th className={`${thBase} text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    onChange={toggleSelectAll}
+                    aria-label="Select all rows"
+                    className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                  />
+                </th>
                 <th
                   role="button"
                   tabIndex={0}
                   aria-sort={ariaSortFor("claimant")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-0 top-0 z-30 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-10 top-0 z-30 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
                   onClick={() => toggleSort("claimant")}
                   onKeyDown={(e) => onSortKeyDown(e, "claimant")}
                 >
@@ -648,7 +811,7 @@ export const OverpaidCases = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
+                  <td colSpan={9} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                     <span className="inline-flex items-center gap-2">
                       <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                       Loading cases...
@@ -657,13 +820,28 @@ export const OverpaidCases = () => {
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
-                    No overpaid cases found.
+                  <td colSpan={9} className={`${tdBase} text-center py-12 ${t.textMuted}`}>
+                    <div className="flex flex-col items-center gap-2">
+                      <TrendingDown aria-hidden="true" className="h-8 w-8 opacity-30" />
+                      <p className="text-sm font-medium">
+                        {hasFilters ? "No cases match your filters." : "No overpaid cases found."}
+                      </p>
+                      {hasFilters && (
+                        <button
+                          onClick={clearAllFilters}
+                          className={`text-xs font-medium underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                        >
+                          Clear filters
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
                 rows.map((row) => {
                   const isCleared = row.checksCleared;
+                  const isHighValue = row.overpaidAmount >= 3000;
+                  const isSelected = selectedIds.has(row.id);
                   const clearedBg = isCleared
                     ? dark ? "bg-emerald-900/40" : "bg-emerald-100/80"
                     : "";
@@ -676,10 +854,20 @@ export const OverpaidCases = () => {
                   return (
                     <tr
                       key={row.id}
-                      className={`group/row border-b ${rowBorder} ${clearedBg} ${rowHover} transition-colors`}
+                      className={`group/row border-b ${rowBorder} ${clearedBg} ${rowHover} transition-colors ${isHighValue ? "border-l-2 border-l-amber-500" : ""}`}
                     >
+                      {/* Row selection checkbox */}
+                      <td className={`${tdBase} text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRowSelection(row.id)}
+                          aria-label={`Select ${row.claimant}`}
+                          className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                        />
+                      </td>
                       <td
-                        className={`${tdBase} font-semibold max-w-45 truncate sticky left-0 z-10 ${stickyBg} ${stickyHover}`}
+                        className={`${tdBase} font-semibold max-w-45 truncate sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
                         <Link

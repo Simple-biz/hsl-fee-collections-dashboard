@@ -46,13 +46,19 @@ export const GET = async (req: NextRequest) => {
       ${statusClause}
     `;
     const agentRows = await db
-      .selectDistinct({ assignedTo: feeRecords.assignedTo })
+      .select({
+        assignedTo: feeRecords.assignedTo,
+        caseCount: sql<number>`COUNT(*)::int`,
+      })
       .from(cases)
       .innerJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
       .leftJoin(overpaidCases, eq(overpaidCases.caseId, cases.clientId))
       .where(agentBaseClause)
+      .groupBy(feeRecords.assignedTo)
       .orderBy(feeRecords.assignedTo);
-    const agents = agentRows.map((r) => r.assignedTo).filter((a): a is string => a != null);
+    const agents = agentRows
+      .filter((r): r is { assignedTo: string; caseCount: number } => r.assignedTo != null)
+      .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
 
     // Aggregate stats (count + totals, respects all active filters including agent)
     const [agg] = await db
