@@ -6,7 +6,7 @@ import { eq, ilike, sql } from "drizzle-orm";
 const SORT_KEYS = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 
-// GET /api/overpaid-cases?page=&limit=&search=&sort=&dir=&status=&agent=
+// GET /api/overpaid-cases?page=&limit=&search=&sort=&dir=&status=&agent=&ltr=&minAmount=&maxAmount=
 // Returns cases where total_fees_paid > total_fees_expected
 export const GET = async (req: NextRequest) => {
   try {
@@ -14,6 +14,9 @@ export const GET = async (req: NextRequest) => {
     const search = searchParams.get("search");
     const status = searchParams.get("status");
     const agent = searchParams.get("agent");
+    const ltr = searchParams.get("ltr"); // "none" = no LTR received yet
+    const minAmountRaw = searchParams.get("minAmount");
+    const maxAmountRaw = searchParams.get("maxAmount");
     const sortParam = searchParams.get("sort");
     const sort: SortKey = SORT_KEYS.includes(sortParam as SortKey)
       ? (sortParam as SortKey)
@@ -23,7 +26,11 @@ export const GET = async (req: NextRequest) => {
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = (page - 1) * limit;
 
+    const minAmount = minAmountRaw && Number.isFinite(Number(minAmountRaw)) ? Number(minAmountRaw) : null;
+    const maxAmount = maxAmountRaw && Number.isFinite(Number(maxAmountRaw)) ? Number(maxAmountRaw) : null;
+
     const overpaidCondition = sql`${feeRecords.totalFeesPaid}::numeric > ${feeRecords.totalFeesExpected}::numeric`;
+    const overpaidExpr = sql`(${feeRecords.totalFeesPaid}::numeric - ${feeRecords.totalFeesExpected}::numeric)`;
 
     const statusClause =
       status === "cleared"
@@ -32,18 +39,30 @@ export const GET = async (req: NextRequest) => {
           ? sql`AND COALESCE(${overpaidCases.checksCleared}, false) = false`
           : sql``;
 
+    const searchClause = search
+      ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})`
+      : sql``;
+
+    const ltrClause = ltr === "none" ? sql`AND ${overpaidCases.opLtrReceived} IS NULL` : sql``;
+    const minClause = minAmount != null ? sql`AND ${overpaidExpr} >= ${minAmount}` : sql``;
+    const maxClause = maxAmount != null ? sql`AND ${overpaidExpr} <= ${maxAmount}` : sql``;
+
     const whereClause = sql`${overpaidCondition}
-      ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
+      ${searchClause}
       ${statusClause}
       ${agent ? sql`AND ${feeRecords.assignedTo} = ${agent}` : sql``}
+      ${ltrClause}
+      ${minClause}
+      ${maxClause}
     `;
 
-    const overpaidExpr = sql`(${feeRecords.totalFeesPaid}::numeric - ${feeRecords.totalFeesExpected}::numeric)`;
-
-    // Distinct agent names for the filter dropdown — always unfiltered by agent
+    // Agent counts — respects all filters except agent itself
     const agentBaseClause = sql`${overpaidCondition}
-      ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
+      ${searchClause}
       ${statusClause}
+      ${ltrClause}
+      ${minClause}
+      ${maxClause}
     `;
     const agentRows = await db
       .select({
@@ -60,7 +79,7 @@ export const GET = async (req: NextRequest) => {
       .filter((r): r is { assignedTo: string; caseCount: number } => r.assignedTo != null)
       .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
 
-    // Aggregate stats (count + totals, respects all active filters including agent)
+    // Aggregate stats (respects all active filters including agent)
     const [agg] = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
@@ -101,6 +120,7 @@ export const GET = async (req: NextRequest) => {
         opLtrReceived: overpaidCases.opLtrReceived,
         checksCleared: overpaidCases.checksCleared,
         updateNote: overpaidCases.updateNote,
+        updatedAt: overpaidCases.updatedAt,
       })
       .from(cases)
       .innerJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -120,6 +140,7 @@ export const GET = async (req: NextRequest) => {
       opLtrReceived: r.opLtrReceived ?? null,
       checksCleared: r.checksCleared ?? false,
       updateNote: r.updateNote ?? "",
+      updatedAt: r.updatedAt ? (r.updatedAt as Date).toISOString() : null,
     }));
 
     return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedCount, ltrCount, agents });

@@ -33,12 +33,14 @@ interface OverpaidCaseRow {
   opLtrReceived: string | null;
   checksCleared: boolean;
   updateNote: string;
+  updatedAt: string | null;
 }
 
 type CheckboxKey = "checksCleared";
 type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo";
 type SortDir = "asc" | "desc";
 type StatusFilter = "all" | "cleared" | "pending";
+type LtrFilter = "" | "none";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -48,15 +50,28 @@ const DEFAULTS = {
   search: "",
   status: "all" as StatusFilter,
   agent: "",
+  ltr: "" as LtrFilter,
+  minAmount: "",
+  maxAmount: "",
   sort: "overpaidAmount" as SortKey,
   dir: "desc" as SortDir,
   page: 1,
   pageSize: 50,
 };
 
+const formatRelativeDate = (iso: string): string => {
+  const date = new Date(iso);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
 const patchCase = async (
   caseId: number,
-  body: Partial<Omit<OverpaidCaseRow, "id" | "claimant" | "feesReceived" | "overpaidAmount" | "feesConfirmation">>,
+  body: Partial<Omit<OverpaidCaseRow, "id" | "claimant" | "feesReceived" | "overpaidAmount" | "feesConfirmation" | "updatedAt">>,
 ) => {
   const result = await upsertOverpaidCase({ caseId, fields: body as Parameters<typeof upsertOverpaidCase>[0]["fields"] });
   if (!result.ok) throw new Error(result.error);
@@ -79,6 +94,9 @@ export const OverpaidCases = () => {
       ? (urlParams.get("status") as StatusFilter)
       : DEFAULTS.status) as StatusFilter,
     agent: urlParams.get("agent") ?? DEFAULTS.agent,
+    ltr: (urlParams.get("ltr") === "none" ? "none" : "") as LtrFilter,
+    minAmount: urlParams.get("minAmount") ?? DEFAULTS.minAmount,
+    maxAmount: urlParams.get("maxAmount") ?? DEFAULTS.maxAmount,
     sort: (SORT_KEYS.includes(urlParams.get("sort") as SortKey)
       ? (urlParams.get("sort") as SortKey)
       : DEFAULTS.sort) as SortKey,
@@ -105,11 +123,19 @@ export const OverpaidCases = () => {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialState.status);
   const [agentFilter, setAgentFilter] = useState(initialState.agent);
+  const [ltrFilter, setLtrFilter] = useState<LtrFilter>(initialState.ltr);
+  const [minAmount, setMinAmount] = useState(initialState.minAmount);
+  const [maxAmount, setMaxAmount] = useState(initialState.maxAmount);
+  const [appliedMinAmount, setAppliedMinAmount] = useState(initialState.minAmount);
+  const [appliedMaxAmount, setAppliedMaxAmount] = useState(initialState.maxAmount);
+  const amountDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkClearing, setBulkClearing] = useState(false);
+  const [bulkConfirming, setBulkConfirming] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const urlMethodRef = useRef<"push" | "replace">("replace");
@@ -120,6 +146,9 @@ export const OverpaidCases = () => {
     if (appliedSearch) params.set("q", appliedSearch);
     if (statusFilter !== DEFAULTS.status) params.set("status", statusFilter);
     if (agentFilter !== DEFAULTS.agent) params.set("agent", agentFilter);
+    if (ltrFilter) params.set("ltr", ltrFilter);
+    if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+    if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
     if (sortKey !== DEFAULTS.sort) params.set("sort", sortKey);
     if (sortDir !== DEFAULTS.dir) params.set("dir", sortDir);
     if (page !== DEFAULTS.page) params.set("page", String(page));
@@ -134,7 +163,7 @@ export const OverpaidCases = () => {
       { scroll: false },
     );
     urlMethodRef.current = "replace";
-  }, [appliedSearch, statusFilter, agentFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
+  }, [appliedSearch, statusFilter, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
 
   // Sync URL → state (back/forward)
   useEffect(() => {
@@ -151,11 +180,17 @@ export const OverpaidCases = () => {
     const urlPage = Math.max(1, parseInt(urlParams.get("page") || "1") || 1);
     const sizeNum = parseInt(urlParams.get("size") || "0");
     const urlSize = PAGE_SIZE_OPTIONS.includes(sizeNum) ? sizeNum : DEFAULTS.pageSize;
-
     const urlAgent = urlParams.get("agent") ?? DEFAULTS.agent;
+    const urlLtr = (urlParams.get("ltr") === "none" ? "none" : "") as LtrFilter;
+    const urlMin = urlParams.get("minAmount") ?? DEFAULTS.minAmount;
+    const urlMax = urlParams.get("maxAmount") ?? DEFAULTS.maxAmount;
+
     if (urlSearch !== appliedSearch) { setSearch(urlSearch); setAppliedSearch(urlSearch); }
     if (urlStatus !== statusFilter) setStatusFilter(urlStatus);
     if (urlAgent !== agentFilter) setAgentFilter(urlAgent);
+    if (urlLtr !== ltrFilter) setLtrFilter(urlLtr);
+    if (urlMin !== appliedMinAmount) { setMinAmount(urlMin); setAppliedMinAmount(urlMin); }
+    if (urlMax !== appliedMaxAmount) { setMaxAmount(urlMax); setAppliedMaxAmount(urlMax); }
     if (urlSort !== sortKey) setSortKey(urlSort);
     if (urlDir !== sortDir) setSortDir(urlDir);
     if (urlPage !== page) setPage(urlPage);
@@ -188,6 +223,16 @@ export const OverpaidCases = () => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
+  useEffect(() => {
+    if (amountDebounceRef.current) clearTimeout(amountDebounceRef.current);
+    amountDebounceRef.current = setTimeout(() => {
+      setAppliedMinAmount(minAmount.trim());
+      setAppliedMaxAmount(maxAmount.trim());
+      setPage(1);
+    }, 500);
+    return () => { if (amountDebounceRef.current) clearTimeout(amountDebounceRef.current); };
+  }, [minAmount, maxAmount]);
+
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   const fetchCases = useCallback(async () => {
@@ -205,6 +250,9 @@ export const OverpaidCases = () => {
       if (appliedSearch) params.set("search", appliedSearch);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (agentFilter) params.set("agent", agentFilter);
+      if (ltrFilter) params.set("ltr", ltrFilter);
+      if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+      if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
       params.set("sort", sortKey);
       params.set("dir", sortDir);
       const res = await fetch(`/api/overpaid-cases?${params.toString()}`, {
@@ -215,6 +263,7 @@ export const OverpaidCases = () => {
       const data: OverpaidCaseRow[] = json.data || [];
       setRows(data);
       setSelectedIds(new Set());
+      setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
       setStats({
         totalOverpaid: typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0,
@@ -231,7 +280,7 @@ export const OverpaidCases = () => {
     } finally {
       if (fetchAbortRef.current === controller) setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, statusFilter, agentFilter, sortKey, sortDir]);
+  }, [page, pageSize, appliedSearch, statusFilter, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir]);
 
   useEffect(() => {
     fetchCases();
@@ -247,7 +296,13 @@ export const OverpaidCases = () => {
     selectAllRef.current.indeterminate = !allSelected && someSelected;
   }, [selectedIds, rows]);
 
-  const hasFilters = appliedSearch !== DEFAULTS.search || statusFilter !== DEFAULTS.status || agentFilter !== DEFAULTS.agent;
+  const hasFilters =
+    appliedSearch !== DEFAULTS.search ||
+    statusFilter !== DEFAULTS.status ||
+    agentFilter !== DEFAULTS.agent ||
+    ltrFilter !== DEFAULTS.ltr ||
+    appliedMinAmount !== DEFAULTS.minAmount ||
+    appliedMaxAmount !== DEFAULTS.maxAmount;
 
   const clearAllFilters = () => {
     urlMethodRef.current = "push";
@@ -255,13 +310,23 @@ export const OverpaidCases = () => {
     setAppliedSearch(DEFAULTS.search);
     setStatusFilter(DEFAULTS.status);
     setAgentFilter(DEFAULTS.agent);
+    setLtrFilter(DEFAULTS.ltr);
+    setMinAmount(DEFAULTS.minAmount);
+    setMaxAmount(DEFAULTS.maxAmount);
+    setAppliedMinAmount(DEFAULTS.minAmount);
+    setAppliedMaxAmount(DEFAULTS.maxAmount);
     setPage(1);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setBulkConfirming(false);
   };
 
   const toggleSelectAll = () => {
     const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
     if (allSelected) {
-      setSelectedIds(new Set());
+      clearSelection();
     } else {
       setSelectedIds(new Set(rows.map((r) => r.id)));
     }
@@ -294,6 +359,7 @@ export const OverpaidCases = () => {
         setTotal((tot) => Math.max(0, tot - ids.length));
       }
       setSelectedIds(new Set());
+      setBulkConfirming(false);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -438,13 +504,16 @@ export const OverpaidCases = () => {
       if (appliedSearch) params.set("search", appliedSearch);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (agentFilter) params.set("agent", agentFilter);
+      if (ltrFilter) params.set("ltr", ltrFilter);
+      if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+      if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
       params.set("sort", sortKey);
       params.set("dir", sortDir);
       const res = await fetch(`/api/overpaid-cases?${params.toString()}`);
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const json = await res.json();
       const all: OverpaidCaseRow[] = json.data || [];
-      const headers = ["Case", "Assigned To", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P LTR Date Received", "Notes", "Checks Cleared"];
+      const headers = ["Case", "Assigned To", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
       const csvRows = [
         headers.join(","),
@@ -458,6 +527,7 @@ export const OverpaidCases = () => {
             r.opLtrReceived ?? "",
             escape(r.updateNote),
             r.checksCleared ? "Yes" : "No",
+            r.updatedAt ? new Date(r.updatedAt).toLocaleDateString("en-US") : "",
           ].join(","),
         ),
       ].join("\n");
@@ -486,6 +556,10 @@ export const OverpaidCases = () => {
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
   const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
+  const presetActive = dark
+    ? "bg-indigo-700 border-indigo-600 text-white"
+    : "bg-indigo-100 border-indigo-400 text-indigo-800";
+  const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
 
   return (
     <div className="space-y-4">
@@ -512,32 +586,13 @@ export const OverpaidCases = () => {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          {
-            label: "Total Cases",
-            value: loading ? "—" : String(total),
-            sub: "with overpayment",
-          },
-          {
-            label: "Total Overpaid",
-            value: loading ? "—" : fmtFull(stats.totalOverpaid),
-            sub: "across filtered cases",
-            highlight: true,
-          },
-          {
-            label: "Checks Cleared",
-            value: loading ? "—" : `${stats.clearedCount} / ${total}`,
-            sub: "cases resolved",
-          },
-          {
-            label: "LTR Received",
-            value: loading ? "—" : `${stats.ltrCount} / ${total}`,
-            sub: "letters on file",
-          },
+          { label: "Total Cases", value: loading ? "—" : String(total), sub: "with overpayment" },
+          { label: "Total Overpaid", value: loading ? "—" : fmtFull(stats.totalOverpaid), sub: "across filtered cases", highlight: true },
+          { label: "Checks Cleared", value: loading ? "—" : `${stats.clearedCount} / ${total}`, sub: "cases resolved" },
+          { label: "LTR Received", value: loading ? "—" : `${stats.ltrCount} / ${total}`, sub: "letters on file" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>
-              {s.label}
-            </p>
+            <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
             <p className={`text-xl font-bold mt-1 ${s.highlight ? (dark ? "text-amber-400" : "text-amber-600") : t.text}`}>
               {s.value}
             </p>
@@ -553,9 +608,7 @@ export const OverpaidCases = () => {
           className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
           <span className="text-sm">{error}</span>
-          <button onClick={fetchCases} className="ml-auto text-xs font-medium underline">
-            Retry
-          </button>
+          <button onClick={fetchCases} className="ml-auto text-xs font-medium underline">Retry</button>
         </div>
       )}
 
@@ -565,34 +618,55 @@ export const OverpaidCases = () => {
         <div className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight}`}>
           <div>
             {selectedIds.size > 0 ? (
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-bold ${t.text}`}>{selectedIds.size} selected</span>
-                <button
-                  onClick={handleBulkMarkCleared}
-                  disabled={bulkClearing}
-                  aria-label="Mark selected cases as cleared"
-                  className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
-                >
-                  {bulkClearing
-                    ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                    : <Check aria-hidden="true" className="h-3 w-3" />}
-                  Mark Cleared
-                </button>
-                <button
-                  onClick={() => setSelectedIds(new Set())}
-                  aria-label="Clear selection"
-                  className={`h-7 w-7 rounded-md border flex items-center justify-center ${t.outlineBtn}`}
-                >
-                  <X aria-hidden="true" className="h-3 w-3" />
-                </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {bulkConfirming ? (
+                  <>
+                    <span className={`text-sm ${t.textMuted}`}>
+                      Mark {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} as cleared?
+                    </span>
+                    <button
+                      onClick={handleBulkMarkCleared}
+                      disabled={bulkClearing}
+                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
+                    >
+                      {bulkClearing
+                        ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                        : <Check aria-hidden="true" className="h-3 w-3" />}
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setBulkConfirming(false)}
+                      className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className={`text-sm font-bold ${t.text}`}>{selectedIds.size} selected</span>
+                    <button
+                      onClick={() => setBulkConfirming(true)}
+                      aria-label="Mark selected cases as cleared"
+                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
+                    >
+                      <Check aria-hidden="true" className="h-3 w-3" />
+                      Mark Cleared
+                    </button>
+                    <button
+                      onClick={clearSelection}
+                      aria-label="Clear selection"
+                      className={`h-7 w-7 rounded-md border flex items-center justify-center ${t.outlineBtn}`}
+                    >
+                      <X aria-hidden="true" className="h-3 w-3" />
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <>
                 <h3 className={`text-sm font-bold ${t.text}`}>Cases</h3>
                 <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-                  {total === 0
-                    ? "0 cases"
-                    : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
+                  {total === 0 ? "0 cases" : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
                 </p>
               </>
             )}
@@ -620,11 +694,7 @@ export const OverpaidCases = () => {
             </div>
             <select
               value={statusFilter}
-              onChange={(e) => {
-                urlMethodRef.current = "push";
-                setStatusFilter(e.target.value as StatusFilter);
-                setPage(1);
-              }}
+              onChange={(e) => { urlMethodRef.current = "push"; setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
               aria-label="Filter by status"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
@@ -634,11 +704,7 @@ export const OverpaidCases = () => {
             </select>
             <select
               value={agentFilter}
-              onChange={(e) => {
-                urlMethodRef.current = "push";
-                setAgentFilter(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => { urlMethodRef.current = "push"; setAgentFilter(e.target.value); setPage(1); }}
               aria-label="Filter by assigned agent"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
@@ -649,11 +715,7 @@ export const OverpaidCases = () => {
             </select>
             <select
               value={pageSize}
-              onChange={(e) => {
-                urlMethodRef.current = "push";
-                setPageSize(parseInt(e.target.value));
-                setPage(1);
-              }}
+              onChange={(e) => { urlMethodRef.current = "push"; setPageSize(parseInt(e.target.value)); setPage(1); }}
               aria-label="Rows per page"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
@@ -675,17 +737,74 @@ export const OverpaidCases = () => {
           </div>
         </div>
 
+        {/* Quick filter presets + amount range */}
+        <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
+          <button
+            onClick={() => {
+              urlMethodRef.current = "push";
+              const isActive = appliedMinAmount === "3000" && appliedMaxAmount === "";
+              setMinAmount(isActive ? "" : "3000");
+              setAppliedMinAmount(isActive ? "" : "3000");
+              setMaxAmount("");
+              setAppliedMaxAmount("");
+              setPage(1);
+            }}
+            className={`${presetBase} ${appliedMinAmount === "3000" && appliedMaxAmount === "" ? presetActive : t.outlineBtn}`}
+          >
+            High Value (≥$3k)
+          </button>
+          <button
+            onClick={() => {
+              urlMethodRef.current = "push";
+              setLtrFilter((v) => (v === "none" ? "" : "none"));
+              setPage(1);
+            }}
+            className={`${presetBase} ${ltrFilter === "none" ? presetActive : t.outlineBtn}`}
+          >
+            No LTR Sent
+          </button>
+          <button
+            onClick={() => {
+              urlMethodRef.current = "push";
+              setStatusFilter((v) => (v === "pending" ? "all" : "pending"));
+              setPage(1);
+            }}
+            className={`${presetBase} ${statusFilter === "pending" ? presetActive : t.outlineBtn}`}
+          >
+            Pending
+          </button>
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <span className={`text-[11px] ${t.textMuted}`}>$</span>
+            <input
+              type="number"
+              min={0}
+              value={minAmount}
+              onChange={(e) => setMinAmount(e.target.value)}
+              placeholder="Min"
+              aria-label="Minimum overpaid amount"
+              className={`h-7 w-20 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+            />
+            <span className={`text-[11px] ${t.textMuted}`}>–</span>
+            <input
+              type="number"
+              min={0}
+              value={maxAmount}
+              onChange={(e) => setMaxAmount(e.target.value)}
+              placeholder="Max"
+              aria-label="Maximum overpaid amount"
+              className={`h-7 w-20 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+            />
+          </div>
+        </div>
+
         {/* Active filter chips */}
         {hasFilters && (
           <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
             {appliedSearch && (
               <span className={chipBase}>
                 Search: {appliedSearch}
-                <button
-                  aria-label="Clear search filter"
-                  onClick={() => { setSearch(""); setAppliedSearch(""); setPage(1); }}
-                  className="ml-0.5 hover:opacity-70"
-                >
+                <button aria-label="Clear search filter" onClick={() => { setSearch(""); setAppliedSearch(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
@@ -693,11 +812,7 @@ export const OverpaidCases = () => {
             {statusFilter !== "all" && (
               <span className={chipBase}>
                 Status: {statusFilter === "cleared" ? "Checks Cleared" : "Pending"}
-                <button
-                  aria-label="Clear status filter"
-                  onClick={() => { urlMethodRef.current = "push"; setStatusFilter("all"); setPage(1); }}
-                  className="ml-0.5 hover:opacity-70"
-                >
+                <button aria-label="Clear status filter" onClick={() => { urlMethodRef.current = "push"; setStatusFilter("all"); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
@@ -705,19 +820,36 @@ export const OverpaidCases = () => {
             {agentFilter && (
               <span className={chipBase}>
                 Agent: {agentFilter}
-                <button
-                  aria-label="Clear agent filter"
-                  onClick={() => { urlMethodRef.current = "push"; setAgentFilter(""); setPage(1); }}
-                  className="ml-0.5 hover:opacity-70"
-                >
+                <button aria-label="Clear agent filter" onClick={() => { urlMethodRef.current = "push"; setAgentFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
             )}
-            <button
-              onClick={clearAllFilters}
-              className={`text-[11px] font-medium underline ${t.textMuted} hover:opacity-70`}
-            >
+            {ltrFilter === "none" && (
+              <span className={chipBase}>
+                No LTR Sent
+                <button aria-label="Clear LTR filter" onClick={() => { urlMethodRef.current = "push"; setLtrFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {appliedMinAmount && (
+              <span className={chipBase}>
+                Min: ${appliedMinAmount}
+                <button aria-label="Clear minimum amount filter" onClick={() => { setMinAmount(""); setAppliedMinAmount(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {appliedMaxAmount && (
+              <span className={chipBase}>
+                Max: ${appliedMaxAmount}
+                <button aria-label="Clear maximum amount filter" onClick={() => { setMaxAmount(""); setAppliedMaxAmount(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            <button onClick={clearAllFilters} className={`text-[11px] font-medium underline ${t.textMuted} hover:opacity-70`}>
               Clear all
             </button>
           </div>
@@ -737,7 +869,6 @@ export const OverpaidCases = () => {
           <table className="w-full min-w-200">
             <thead>
               <tr className={`border-b ${t.borderLight}`}>
-                {/* Select-all checkbox */}
                 <th className={`${thBase} text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
                   <input
                     ref={selectAllRef}
@@ -748,64 +879,43 @@ export const OverpaidCases = () => {
                   />
                 </th>
                 <th
-                  role="button"
-                  tabIndex={0}
-                  aria-sort={ariaSortFor("claimant")}
+                  role="button" tabIndex={0} aria-sort={ariaSortFor("claimant")}
                   className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-10 top-0 z-30 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("claimant")}
-                  onKeyDown={(e) => onSortKeyDown(e, "claimant")}
+                  onClick={() => toggleSort("claimant")} onKeyDown={(e) => onSortKeyDown(e, "claimant")}
                 >
                   <span className="flex items-center gap-1">Case {sortIcon("claimant")}</span>
                 </th>
                 <th
-                  role="button"
-                  tabIndex={0}
-                  aria-sort={ariaSortFor("assignedTo")}
+                  role="button" tabIndex={0} aria-sort={ariaSortFor("assignedTo")}
                   className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("assignedTo")}
-                  onKeyDown={(e) => onSortKeyDown(e, "assignedTo")}
+                  onClick={() => toggleSort("assignedTo")} onKeyDown={(e) => onSortKeyDown(e, "assignedTo")}
                 >
                   <span className="flex items-center gap-1">Assigned To {sortIcon("assignedTo")}</span>
                 </th>
                 <th
-                  role="button"
-                  tabIndex={0}
-                  aria-sort={ariaSortFor("feesReceived")}
+                  role="button" tabIndex={0} aria-sort={ariaSortFor("feesReceived")}
                   className={`${thBase} ${t.textSub} text-right cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("feesReceived")}
-                  onKeyDown={(e) => onSortKeyDown(e, "feesReceived")}
+                  onClick={() => toggleSort("feesReceived")} onKeyDown={(e) => onSortKeyDown(e, "feesReceived")}
                 >
                   <span className="flex items-center justify-end gap-1">Fees Received {sortIcon("feesReceived")}</span>
                 </th>
                 <th
-                  role="button"
-                  tabIndex={0}
-                  aria-sort={ariaSortFor("overpaidAmount")}
+                  role="button" tabIndex={0} aria-sort={ariaSortFor("overpaidAmount")}
                   className={`${thBase} ${t.textSub} text-right cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("overpaidAmount")}
-                  onKeyDown={(e) => onSortKeyDown(e, "overpaidAmount")}
+                  onClick={() => toggleSort("overpaidAmount")} onKeyDown={(e) => onSortKeyDown(e, "overpaidAmount")}
                 >
                   <span className="flex items-center justify-end gap-1">Overpaid Amount {sortIcon("overpaidAmount")}</span>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>
-                  Fees Confirmation
-                </th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
                 <th
-                  role="button"
-                  tabIndex={0}
-                  aria-sort={ariaSortFor("opLtrDate")}
+                  role="button" tabIndex={0} aria-sort={ariaSortFor("opLtrDate")}
                   className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("opLtrDate")}
-                  onKeyDown={(e) => onSortKeyDown(e, "opLtrDate")}
+                  onClick={() => toggleSort("opLtrDate")} onKeyDown={(e) => onSortKeyDown(e, "opLtrDate")}
                 >
                   <span className="flex items-center gap-1">O/P LTR Date Received {sortIcon("opLtrDate")}</span>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left min-w-48 sticky top-0 z-20 ${stickyHeaderBg}`}>
-                  Notes
-                </th>
-                <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
-                  Checks Cleared
-                </th>
+                <th className={`${thBase} ${t.textSub} text-left min-w-48 sticky top-0 z-20 ${stickyHeaderBg}`}>Notes</th>
+                <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>Checks Cleared</th>
               </tr>
             </thead>
             <tbody>
@@ -827,10 +937,7 @@ export const OverpaidCases = () => {
                         {hasFilters ? "No cases match your filters." : "No overpaid cases found."}
                       </p>
                       {hasFilters && (
-                        <button
-                          onClick={clearAllFilters}
-                          className={`text-xs font-medium underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                        >
+                        <button onClick={clearAllFilters} className={`text-xs font-medium underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
                           Clear filters
                         </button>
                       )}
@@ -856,7 +963,6 @@ export const OverpaidCases = () => {
                       key={row.id}
                       className={`group/row border-b ${rowBorder} ${clearedBg} ${rowHover} transition-colors ${isHighValue ? "border-l-2 border-l-amber-500" : ""}`}
                     >
-                      {/* Row selection checkbox */}
                       <td className={`${tdBase} text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
                         <input
                           type="checkbox"
@@ -866,23 +972,18 @@ export const OverpaidCases = () => {
                           className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                         />
                       </td>
-                      <td
-                        className={`${tdBase} font-semibold max-w-45 truncate sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
-                        title={row.claimant}
-                      >
-                        <Link
-                          href={`/cases/${row.id}`}
-                          className={`hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                        >
+                      <td className={`${tdBase} font-semibold max-w-45 truncate sticky left-10 z-10 ${stickyBg} ${stickyHover}`} title={row.claimant}>
+                        <Link href={`/cases/${row.id}`} className={`hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
                           {row.claimant}
                         </Link>
+                        {row.updatedAt && (
+                          <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                            Updated {formatRelativeDate(row.updatedAt)}
+                          </p>
+                        )}
                       </td>
-                      <td className={`${tdBase} ${t.textMuted}`}>
-                        {row.assignedTo ?? "—"}
-                      </td>
-                      <td className={`${tdBase} ${t.textMuted} text-right`}>
-                        {fmt(row.feesReceived)}
-                      </td>
+                      <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo ?? "—"}</td>
+                      <td className={`${tdBase} ${t.textMuted} text-right`}>{fmt(row.feesReceived)}</td>
                       <td className={`${tdBase} text-right font-semibold ${dark ? "text-amber-400" : "text-amber-600"}`}>
                         {fmt(row.overpaidAmount)}
                       </td>
@@ -897,16 +998,10 @@ export const OverpaidCases = () => {
                             className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {confirmationState[row.id] === "saving" && (
-                            <Loader2
-                              aria-hidden="true"
-                              className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`}
-                            />
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
                           )}
                           {confirmationState[row.id] === "saved" && (
-                            <Check
-                              aria-hidden="true"
-                              className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                            />
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
                           )}
                         </div>
                       </td>
@@ -921,16 +1016,10 @@ export const OverpaidCases = () => {
                             className={`w-36 h-7 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {ltrState[row.id] === "saving" && (
-                            <Loader2
-                              aria-hidden="true"
-                              className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`}
-                            />
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
                           )}
                           {ltrState[row.id] === "saved" && (
-                            <Check
-                              aria-hidden="true"
-                              className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                            />
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
                           )}
                         </div>
                       </td>
@@ -945,16 +1034,10 @@ export const OverpaidCases = () => {
                             className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {noteState[row.id] === "saving" && (
-                            <Loader2
-                              aria-hidden="true"
-                              className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`}
-                            />
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
                           )}
                           {noteState[row.id] === "saved" && (
-                            <Check
-                              aria-hidden="true"
-                              className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                            />
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
                           )}
                         </div>
                       </td>
@@ -977,9 +1060,7 @@ export const OverpaidCases = () => {
 
         {/* Pagination footer */}
         <div className={`px-4 py-3 flex items-center justify-between border-t ${t.borderLight}`}>
-          <p className={`text-[11px] ${t.textMuted}`}>
-            Page {page} of {totalPages}
-          </p>
+          <p className={`text-[11px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
           <div className="flex items-center gap-1">
             <button
               onClick={() => { urlMethodRef.current = "push"; setPage((p) => Math.max(1, p - 1)); }}
