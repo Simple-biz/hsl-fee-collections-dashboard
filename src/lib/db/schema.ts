@@ -596,6 +596,31 @@ export const mycaseNoticeDocuments = pgTable(
 );
 
 // ============================================================================
+// OVERPAID_CASES — Workflow tracking for cases where fees paid > fees expected
+// ============================================================================
+
+export const overpaidCases = pgTable(
+  "overpaid_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" })
+      .unique(),
+    opLtrReceived: date("op_ltr_received"),
+    checksCleared: boolean("checks_cleared").notNull().default(false),
+    updateNote: text("update_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_overpaid_cases_case_id").on(table.caseId)],
+);
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 

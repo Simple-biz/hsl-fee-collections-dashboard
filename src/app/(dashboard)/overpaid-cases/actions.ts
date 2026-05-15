@@ -1,0 +1,74 @@
+"use server";
+
+import { db } from "@/lib/db";
+import { feeRecords, overpaidCases } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+
+const FIELD_KEYS = ["opLtrReceived", "checksCleared", "updateNote"] as const;
+
+// opLtrReceived accepts a date string ("YYYY-MM-DD") or null to clear it
+
+type FieldKey = (typeof FIELD_KEYS)[number];
+type Updates = Partial<Pick<typeof overpaidCases.$inferInsert, FieldKey>>;
+
+type Result<T = void> = T extends void
+  ? { ok: true } | { ok: false; error: string }
+  : ({ ok: true } & T) | { ok: false; error: string };
+
+export async function upsertOverpaidCase(input: {
+  caseId: number;
+  fields: Updates;
+}): Promise<Result<{ data: typeof overpaidCases.$inferSelect }>> {
+  try {
+    if (!Number.isFinite(input.caseId)) {
+      return { ok: false, error: "Invalid case ID" };
+    }
+
+    const updates: Updates = {};
+    for (const key of FIELD_KEYS) {
+      if (key in input.fields) {
+        (updates as Record<string, unknown>)[key] = input.fields[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return { ok: false, error: "No valid fields to update" };
+    }
+
+    const [row] = await db
+      .insert(overpaidCases)
+      .values({ caseId: input.caseId, ...updates })
+      .onConflictDoUpdate({
+        target: overpaidCases.caseId,
+        set: { ...updates, updatedAt: new Date() },
+      })
+      .returning();
+
+    revalidatePath("/overpaid-cases");
+    return { ok: true, data: row };
+  } catch (error) {
+    console.error("upsertOverpaidCase error:", error);
+    return { ok: false, error: (error as Error).message };
+  }
+}
+
+export async function updateFeesConfirmation(input: {
+  caseId: number;
+  feesConfirmation: string;
+}): Promise<Result<void>> {
+  try {
+    if (!Number.isFinite(input.caseId)) {
+      return { ok: false, error: "Invalid case ID" };
+    }
+    await db
+      .update(feeRecords)
+      .set({ feesConfirmation: input.feesConfirmation || null })
+      .where(eq(feeRecords.caseId, input.caseId));
+    revalidatePath("/overpaid-cases");
+    return { ok: true };
+  } catch (error) {
+    console.error("updateFeesConfirmation error:", error);
+    return { ok: false, error: (error as Error).message };
+  }
+}
