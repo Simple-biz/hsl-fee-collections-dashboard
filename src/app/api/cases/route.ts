@@ -14,6 +14,20 @@ export const GET = async (req: NextRequest) => {
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = (page - 1) * limit;
 
+    // Total count (respecting filters, ignoring pagination)
+    const totalRows = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(cases)
+      .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
+      .where(
+        sql`TRUE
+          ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
+          ${status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
+          ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
+        `,
+      );
+    const total = totalRows[0]?.count ?? 0;
+
     // Base query: cases joined with fee_records
     const rows = await db
       .select({
@@ -183,7 +197,7 @@ export const GET = async (req: NextRequest) => {
       };
     });
 
-    return NextResponse.json({ data, page, limit, total: data.length });
+    return NextResponse.json({ data, page, limit, total });
   } catch (error) {
     console.error("GET /api/cases error:", error);
     return NextResponse.json(
