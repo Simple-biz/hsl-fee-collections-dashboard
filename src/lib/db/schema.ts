@@ -12,6 +12,7 @@ import {
   uuid,
   jsonb,
   index,
+  unique,
   // uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -513,6 +514,7 @@ export const userDetails = pgTable(
     id: serial("id").primaryKey(),
     caseId: integer("case_id")
       .notNull()
+      .unique()
       .references(() => cases.clientId, { onDelete: "cascade" }),
     chronicleId: integer("chronicle_id").unique(),
 
@@ -527,6 +529,7 @@ export const userDetails = pgTable(
     cellPhone: varchar("cell_phone", { length: 100 }),
     email: varchar("email", { length: 255 }),
     ssn: varchar("ssn", { length: 50 }),
+    ssnLast4: varchar("ssn_last4", { length: 4 }),
 
     dateOfBirth: date("date_of_birth"),
     ageAtApproval: integer("age_at_approval"),
@@ -539,6 +542,56 @@ export const userDetails = pgTable(
   },
   (table) => [
     index("idx_user_details_case_id").on(table.caseId),
+  ],
+);
+
+export const chronicleDocuments = pgTable(
+  "chronicle_documents",
+  {
+    id: serial("id").primaryKey(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    mycaseClientId: integer("mycase_client_id"),
+    chronicleClientId: integer("chronicle_client_id"),
+    chronicleDocumentId: integer("chronicle_document_id").notNull(),
+    documentName: varchar("document_name", { length: 500 }),
+    documentType: varchar("document_type", { length: 255 }),
+    documentCategory: varchar("document_category", { length: 255 }),
+    rawDocument: jsonb("raw_document"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("chronicle_documents_case_id_chronicle_document_id_unique").on(
+      table.caseId,
+      table.chronicleDocumentId,
+    ),
+    index("idx_chronicle_documents_case_id").on(table.caseId),
+  ],
+);
+
+export const mycaseNoticeDocuments = pgTable(
+  "mycase_notice_documents",
+  {
+    id: serial("id").primaryKey(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    mycaseClientId: integer("mycase_client_id"),
+    mycaseDocumentId: integer("mycase_document_id").notNull(),
+    documentName: varchar("document_name", { length: 500 }),
+    matchedPattern: varchar("matched_pattern", { length: 255 }),
+    rawDocument: jsonb("raw_document"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("mycase_notice_documents_case_id_mycase_document_id_unique").on(
+      table.caseId,
+      table.mycaseDocumentId,
+    ),
+    index("idx_mycase_notice_documents_case_id").on(table.caseId),
   ],
 );
 
