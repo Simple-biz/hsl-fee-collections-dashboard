@@ -111,6 +111,7 @@ export const OverpaidCases = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ totalOverpaid: 0, clearedCount: 0, ltrCount: 0 });
+  const [pageTotals, setPageTotals] = useState({ pageFeesReceived: 0, pageOverpaid: 0 });
   const [agents, setAgents] = useState<{ name: string; count: number }[]>([]);
 
   const [search, setSearch] = useState(initialState.search);
@@ -269,6 +270,10 @@ export const OverpaidCases = () => {
         totalOverpaid: typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0,
         clearedCount: typeof json.clearedCount === "number" ? json.clearedCount : 0,
         ltrCount: typeof json.ltrCount === "number" ? json.ltrCount : 0,
+      });
+      setPageTotals({
+        pageFeesReceived: typeof json.pageFeesReceived === "number" ? json.pageFeesReceived : 0,
+        pageOverpaid: typeof json.pageOverpaid === "number" ? json.pageOverpaid : 0,
       });
       if (Array.isArray(json.agents)) setAgents(json.agents);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
@@ -552,8 +557,7 @@ export const OverpaidCases = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
-  const pageFeesReceived = rows.reduce((s, r) => s + r.feesReceived, 0);
-  const pageOverpaid = rows.reduce((s, r) => s + r.overpaidAmount, 0);
+  const { pageFeesReceived, pageOverpaid } = pageTotals;
 
   const sectionCard = `rounded-xl border ${t.card}`;
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;

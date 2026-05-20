@@ -145,7 +145,13 @@ export const GET = async (req: NextRequest) => {
       updatedAt: r.updatedAt ? (r.updatedAt as Date).toISOString() : null,
     }));
 
-    return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedCount, ltrCount, agents });
+    // Sum as integer cents on the server so the footer never drifts from float math.
+    const pageFeesCents = rows.reduce((s, r) => s + Math.round(parseFloat(r.feesReceived) * 100), 0);
+    const pageOverpaidCents = rows.reduce((s, r) => s + Math.round(parseFloat(r.overpaidAmount) * 100), 0);
+    const pageFeesReceived = pageFeesCents / 100;
+    const pageOverpaid = pageOverpaidCents / 100;
+
+    return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedCount, ltrCount, agents, pageFeesReceived, pageOverpaid });
   } catch (error) {
     console.error("GET /api/overpaid-cases error:", error);
     return NextResponse.json(
