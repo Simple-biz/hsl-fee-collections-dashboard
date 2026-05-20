@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { feePetitions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const FIELD_KEYS = [
   "noa",
@@ -89,6 +90,39 @@ export async function bulkMarkComplete(input: {
     return { ok: true };
   } catch (error) {
     console.error("bulkMarkComplete error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
+type ChecklistFields = {
+  noa: boolean;
+  timeDelineation: boolean;
+  feePetitionDoc: boolean;
+  ltrToClmt: boolean;
+  ltrToClmtWithSignature: boolean;
+  ltrToAlj: boolean;
+  faxConfFeePet: boolean;
+};
+
+export async function bulkRestoreChecklists(input: {
+  rows: Array<{ caseId: number; fields: ChecklistFields }>;
+}): Promise<Result> {
+  try {
+    if (!input.rows.length) return { ok: false, error: "No cases to restore" };
+    if (input.rows.length > 500) return { ok: false, error: "Too many cases (max 500)" };
+    if (!input.rows.every((r) => Number.isFinite(r.caseId))) return { ok: false, error: "Invalid case IDs" };
+
+    await db.transaction(async (tx) => {
+      for (const r of input.rows) {
+        await tx
+          .update(feePetitions)
+          .set({ ...r.fields, updatedAt: new Date() })
+          .where(eq(feePetitions.caseId, r.caseId));
+      }
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkRestoreChecklists error:", error);
     return { ok: false, error: "Server error" };
   }
 }

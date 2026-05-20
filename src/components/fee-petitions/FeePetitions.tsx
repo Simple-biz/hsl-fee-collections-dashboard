@@ -17,10 +17,11 @@ import {
   ChevronRight,
   Download,
   X,
+  Undo2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDate } from "@/lib/formatters";
-import { upsertFeePetition, bulkMarkComplete } from "@/app/(dashboard)/fee-petitions/actions";
+import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists } from "@/app/(dashboard)/fee-petitions/actions";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -142,6 +143,11 @@ export const FeePetitions = () => {
   const [bulkClearing, setBulkClearing] = useState(false);
   const [bulkConfirming, setBulkConfirming] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [undoInfo, setUndoInfo] = useState<{
+    rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
+    expiresAt: number;
+  } | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const urlMethodRef = useRef<"push" | "replace">("replace");
@@ -324,9 +330,17 @@ export const FeePetitions = () => {
     if (selectedIds.size === 0 || bulkClearing) return;
     setBulkClearing(true);
     const ids = Array.from(selectedIds);
-    const notYetComplete = rows.filter(
+    const previouslyIncomplete = rows.filter(
       (r) => ids.includes(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
-    ).length;
+    );
+    const snapshot = previouslyIncomplete.map((r) => ({
+      caseId: r.id,
+      fields: CHECKBOX_KEYS.reduce(
+        (acc, k) => ({ ...acc, [k]: r[k] }),
+        {} as Record<CheckboxKey, boolean>,
+      ),
+    }));
+    const notYetComplete = previouslyIncomplete.length;
     try {
       const result = await bulkMarkComplete({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
@@ -353,12 +367,57 @@ export const FeePetitions = () => {
         setTotal((tot) => Math.max(0, tot - ids.length));
       }
       clearSelection();
+      if (snapshot.length > 0) {
+        setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBulkClearing(false);
     }
   };
+
+  const handleUndoBulk = async () => {
+    if (!undoInfo || undoing) return;
+    setUndoing(true);
+    const snapshot = undoInfo.rows;
+    try {
+      const result = await bulkRestoreChecklists({ rows: snapshot });
+      if (!result.ok) throw new Error(result.error);
+      setUndoInfo(null);
+      if (statusFilter === "incomplete") {
+        fetchPetitions();
+      } else {
+        const byId = new Map(snapshot.map((r) => [r.caseId, r.fields]));
+        setRows((prev) =>
+          prev.map((r) => {
+            const f = byId.get(r.id);
+            return f ? { ...r, ...f } : r;
+          }),
+        );
+        setStats((s) => ({
+          ...s,
+          completeCount: Math.max(0, s.completeCount - snapshot.length),
+          incompleteCount: s.incompleteCount + snapshot.length,
+        }));
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!undoInfo) return;
+    const remaining = undoInfo.expiresAt - Date.now();
+    if (remaining <= 0) {
+      setUndoInfo(null);
+      return;
+    }
+    const timer = setTimeout(() => setUndoInfo(null), remaining);
+    return () => clearTimeout(timer);
+  }, [undoInfo]);
 
   const toggleSort = (key: SortKey) => {
     urlMethodRef.current = "push";
@@ -496,6 +555,10 @@ export const FeePetitions = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
+  const selectedIncompleteCount = rows.filter(
+    (r) => selectedIds.has(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
+  ).length;
+
   const sectionCard = `rounded-xl border ${t.card}`;
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
@@ -561,6 +624,32 @@ export const FeePetitions = () => {
         </div>
       )}
 
+      {/* Undo banner */}
+      {undoInfo && (
+        <div
+          role="status"
+          className={`rounded-xl border p-3 flex items-center gap-3 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
+        >
+          <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <span className="text-sm">Marked {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"} as complete.</span>
+          <button
+            onClick={handleUndoBulk}
+            disabled={undoing}
+            className="ml-auto flex items-center gap-1 text-xs font-semibold underline hover:opacity-80 disabled:opacity-50"
+          >
+            {undoing ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" /> : <Undo2 aria-hidden="true" className="h-3 w-3" />}
+            Undo
+          </button>
+          <button
+            onClick={() => setUndoInfo(null)}
+            aria-label="Dismiss undo banner"
+            className="hover:opacity-70"
+          >
+            <X aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Table card */}
       <div className={sectionCard}>
         {/* Toolbar */}
@@ -571,11 +660,11 @@ export const FeePetitions = () => {
                 {bulkConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
-                      Mark {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} as complete?
+                      Mark {selectedIncompleteCount} case{selectedIncompleteCount !== 1 ? "s" : ""} as complete?
                     </span>
                     <button
                       onClick={handleBulkMarkComplete}
-                      disabled={bulkClearing}
+                      disabled={bulkClearing || selectedIncompleteCount === 0}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       {bulkClearing
@@ -592,11 +681,20 @@ export const FeePetitions = () => {
                   </>
                 ) : (
                   <>
-                    <span className={`text-sm font-bold ${t.text}`}>{selectedIds.size} selected</span>
+                    <span className={`text-sm font-bold ${t.text}`}>
+                      {selectedIds.size} selected
+                      {selectedIncompleteCount < selectedIds.size && (
+                        <span className={`ml-1.5 font-normal ${t.textMuted}`}>
+                          ({selectedIncompleteCount} to complete)
+                        </span>
+                      )}
+                    </span>
                     <button
                       onClick={() => setBulkConfirming(true)}
+                      disabled={selectedIncompleteCount === 0}
                       aria-label="Mark selected cases as complete"
-                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
+                      title={selectedIncompleteCount === 0 ? "All selected cases are already complete" : undefined}
+                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
                       Mark Complete
