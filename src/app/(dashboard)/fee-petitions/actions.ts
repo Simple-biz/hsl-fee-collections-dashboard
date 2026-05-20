@@ -2,7 +2,6 @@
 
 import { db } from "@/lib/db";
 import { feePetitions } from "@/lib/db/schema";
-import { revalidatePath } from "next/cache";
 
 const FIELD_KEYS = [
   "noa",
@@ -51,11 +50,10 @@ export async function upsertFeePetition(input: {
       })
       .returning();
 
-    revalidatePath("/fee-petitions");
     return { ok: true, data: row };
   } catch (error) {
     console.error("upsertFeePetition error:", error);
-    return { ok: false, error: (error as Error).message };
+    return { ok: false, error: "Server error" };
   }
 }
 
@@ -82,10 +80,9 @@ export async function bulkMarkComplete(input: {
         target: feePetitions.caseId,
         set: { ...allTrue, updatedAt: new Date() },
       });
-    revalidatePath("/fee-petitions");
     return { ok: true };
   } catch (error) {
     console.error("bulkMarkComplete error:", error);
-    return { ok: false, error: (error as Error).message };
+    return { ok: false, error: "Server error" };
   }
 }

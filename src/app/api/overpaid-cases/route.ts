@@ -149,7 +149,7 @@ export const GET = async (req: NextRequest) => {
   } catch (error) {
     console.error("GET /api/overpaid-cases error:", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Server error" },
       { status: 500 },
     );
   }

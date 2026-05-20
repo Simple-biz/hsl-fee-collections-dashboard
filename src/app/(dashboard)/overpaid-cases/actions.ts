@@ -3,7 +3,6 @@
 import { db } from "@/lib/db";
 import { feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 const FIELD_KEYS = ["opLtrReceived", "checksCleared", "updateNote"] as const;
 
@@ -45,11 +44,10 @@ export async function upsertOverpaidCase(input: {
       })
       .returning();
 
-    revalidatePath("/overpaid-cases");
     return { ok: true, data: row };
   } catch (error) {
     console.error("upsertOverpaidCase error:", error);
-    return { ok: false, error: (error as Error).message };
+    return { ok: false, error: "Server error" };
   }
 }
 
@@ -67,11 +65,10 @@ export async function bulkMarkCleared(input: {
         target: overpaidCases.caseId,
         set: { checksCleared: true, updatedAt: new Date() },
       });
-    revalidatePath("/overpaid-cases");
     return { ok: true };
   } catch (error) {
     console.error("bulkMarkCleared error:", error);
-    return { ok: false, error: (error as Error).message };
+    return { ok: false, error: "Server error" };
   }
 }
 
@@ -87,10 +84,9 @@ export async function updateFeesConfirmation(input: {
       .update(feeRecords)
       .set({ feesConfirmation: input.feesConfirmation || null })
       .where(eq(feeRecords.caseId, input.caseId));
-    revalidatePath("/overpaid-cases");
     return { ok: true };
   } catch (error) {
     console.error("updateFeesConfirmation error:", error);
-    return { ok: false, error: (error as Error).message };
+    return { ok: false, error: "Server error" };
   }
 }
