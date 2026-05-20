@@ -1092,6 +1092,7 @@ export const OverpaidCases = () => {
                             onChange={(e) => setUpdateNoteLocal(row.id, e.target.value)}
                             onBlur={() => persistUpdateNote(row)}
                             placeholder="Add a note..."
+                            maxLength={5000}
                             className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {noteState[row.id] === "saving" && (

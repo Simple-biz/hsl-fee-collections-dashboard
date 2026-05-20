@@ -14,6 +14,8 @@ const FIELD_KEYS = [
   "updateNote",
 ] as const;
 
+const NOTE_MAX_LENGTH = 5000;
+
 type FieldKey = (typeof FIELD_KEYS)[number];
 type Updates = Partial<Pick<typeof feePetitions.$inferInsert, FieldKey>>;
 
@@ -39,6 +41,10 @@ export async function upsertFeePetition(input: {
 
     if (Object.keys(updates).length === 0) {
       return { ok: false, error: "No valid fields to update" };
+    }
+
+    if (typeof updates.updateNote === "string" && updates.updateNote.length > NOTE_MAX_LENGTH) {
+      return { ok: false, error: `Note too long (max ${NOTE_MAX_LENGTH} characters)` };
     }
 
     const [row] = await db

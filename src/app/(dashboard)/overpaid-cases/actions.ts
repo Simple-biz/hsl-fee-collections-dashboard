@@ -6,6 +6,9 @@ import { eq } from "drizzle-orm";
 
 const FIELD_KEYS = ["opLtrReceived", "checksCleared", "updateNote"] as const;
 
+const NOTE_MAX_LENGTH = 5000;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 // opLtrReceived accepts a date string ("YYYY-MM-DD") or null to clear it
 
 type FieldKey = (typeof FIELD_KEYS)[number];
@@ -33,6 +36,14 @@ export async function upsertOverpaidCase(input: {
 
     if (Object.keys(updates).length === 0) {
       return { ok: false, error: "No valid fields to update" };
+    }
+
+    if (typeof updates.updateNote === "string" && updates.updateNote.length > NOTE_MAX_LENGTH) {
+      return { ok: false, error: `Note too long (max ${NOTE_MAX_LENGTH} characters)` };
+    }
+
+    if ("opLtrReceived" in updates && updates.opLtrReceived != null && !DATE_RE.test(updates.opLtrReceived)) {
+      return { ok: false, error: "Invalid date (expected YYYY-MM-DD)" };
     }
 
     const [row] = await db
