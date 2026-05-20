@@ -62,6 +62,15 @@ const daysSince = (dateStr: string | null): number | null => {
   if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 };
+
+const formatRelativeDate = (dateStr: string): string => {
+  const diffDays = daysSince(dateStr) ?? 0;
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
 const STATUS_VALUES: StatusFilter[] = ["all", "complete", "incomplete"];
 const DEFAULTS = {
   search: "",
@@ -207,6 +216,7 @@ export const FeePetitions = () => {
 
   const noteSnapshot = useRef<Map<number, string>>(new Map());
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [liveMessage, setLiveMessage] = useState("");
   const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
@@ -455,6 +465,8 @@ export const FeePetitions = () => {
       await patchPetition(id, { [key]: next });
       const today = new Date().toISOString().slice(0, 10);
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
+      const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
+      setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
       if (statusFilter !== "all") {
         const updated = { ...prevRow, [key]: next };
         const isComplete = CHECKBOX_COLUMNS.every((c) => updated[c.key]);
@@ -466,6 +478,7 @@ export const FeePetitions = () => {
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
+      setLiveMessage("Save failed");
       setError((err as Error).message);
     }
   };
@@ -483,6 +496,7 @@ export const FeePetitions = () => {
       await patchPetition(row.id, { updateNote: row.updateNote });
       noteSnapshot.current.set(row.id, row.updateNote);
       setNoteState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Note saved");
       const timer = setTimeout(() => {
         setNoteState((s) => ({ ...s, [row.id]: undefined }));
         savedTimerRef.current.delete(row.id);
@@ -490,6 +504,7 @@ export const FeePetitions = () => {
       savedTimerRef.current.set(row.id, timer);
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Note save failed");
       setError((err as Error).message);
     }
   };
@@ -497,17 +512,22 @@ export const FeePetitions = () => {
   const downloadCsv = async () => {
     setExporting(true);
     try {
-      const params = new URLSearchParams({ page: "1", limit: "10000" });
-      if (appliedSearch) params.set("search", appliedSearch);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (touchedFilter) params.set("touched", touchedFilter);
-      if (missingFilter) params.set("missing", missingFilter);
-      params.set("sort", sortKey);
-      params.set("dir", sortDir);
-      const res = await fetch(`/api/fee-petitions?${params.toString()}`);
-      if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      const json = await res.json();
-      const all: FeePetitionRow[] = json.data || [];
+      let all: FeePetitionRow[];
+      if (selectedIds.size > 0) {
+        all = rows.filter((r) => selectedIds.has(r.id));
+      } else {
+        const params = new URLSearchParams({ page: "1", limit: "10000" });
+        if (appliedSearch) params.set("search", appliedSearch);
+        if (statusFilter !== "all") params.set("status", statusFilter);
+        if (touchedFilter) params.set("touched", touchedFilter);
+        if (missingFilter) params.set("missing", missingFilter);
+        params.set("sort", sortKey);
+        params.set("dir", sortDir);
+        const res = await fetch(`/api/fee-petitions?${params.toString()}`);
+        if (!res.ok) throw new Error(`Export failed (${res.status})`);
+        const json = await res.json();
+        all = json.data || [];
+      }
       const headers = [
         "Case", "Approval Date", "Last Updated", "Progress",
         "NOA", "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
@@ -577,6 +597,9 @@ export const FeePetitions = () => {
 
   return (
     <div className="space-y-4">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveMessage}
+      </div>
       {/* Page header */}
       <div className={`${sectionCard} p-4 md:p-5`}>
         <div className="flex items-center gap-3">
@@ -775,13 +798,15 @@ export const FeePetitions = () => {
             <button
               onClick={downloadCsv}
               disabled={exporting || total === 0}
-              aria-label="Export to CSV"
+              aria-label={selectedIds.size > 0 ? `Export ${selectedIds.size} selected to CSV` : "Export filtered to CSV"}
               className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {exporting
                 ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                 : <Download aria-hidden="true" className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">
+                {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
+              </span>
             </button>
           </div>
         </div>
@@ -956,15 +981,20 @@ export const FeePetitions = () => {
                         />
                       </td>
                       <td
-                        className={`${tdBase} ${t.text} font-semibold max-w-45 truncate sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
+                        className={`${tdBase} ${t.text} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
                         <Link
                           href={`/cases/${row.id}`}
-                          className={`hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                          className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}
                         >
                           {row.claimant}
                         </Link>
+                        {row.updatedAt && (
+                          <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                            Updated {formatRelativeDate(row.updatedAt)}
+                          </p>
+                        )}
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
                         <div className="flex items-center gap-1.5">

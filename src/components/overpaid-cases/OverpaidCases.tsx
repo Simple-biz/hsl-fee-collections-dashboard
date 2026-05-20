@@ -208,6 +208,7 @@ export const OverpaidCases = () => {
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [ltrState, setLtrState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [confirmationState, setConfirmationState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [liveMessage, setLiveMessage] = useState("");
   const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
@@ -484,6 +485,7 @@ export const OverpaidCases = () => {
       if (!result.ok) throw new Error(result.error);
       confirmationSnapshot.current.set(row.id, current);
       setConfirmationState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Confirmation saved");
       const timer = setTimeout(() => {
         setConfirmationState((s) => ({ ...s, [row.id]: undefined }));
         savedTimerRef.current.delete(row.id);
@@ -491,6 +493,7 @@ export const OverpaidCases = () => {
       savedTimerRef.current.set(row.id, timer);
     } catch (err) {
       setConfirmationState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Confirmation save failed");
       setError((err as Error).message);
     }
   };
@@ -504,6 +507,7 @@ export const OverpaidCases = () => {
       await patchCase(row.id, { updateNote: row.updateNote });
       noteSnapshot.current.set(row.id, row.updateNote);
       setNoteState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Note saved");
       const timer = setTimeout(() => {
         setNoteState((s) => ({ ...s, [row.id]: undefined }));
         savedTimerRef.current.delete(row.id);
@@ -511,6 +515,7 @@ export const OverpaidCases = () => {
       savedTimerRef.current.set(row.id, timer);
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Note save failed");
       setError((err as Error).message);
     }
   };
@@ -527,6 +532,7 @@ export const OverpaidCases = () => {
       if (wasSet && !nowSet) setStats((s) => ({ ...s, ltrCount: Math.max(0, s.ltrCount - 1) }));
       ltrSnapshot.current.set(row.id, row.opLtrReceived);
       setLtrState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage(row.opLtrReceived ? "LTR date saved" : "LTR date cleared");
       const timer = setTimeout(() => {
         setLtrState((s) => ({ ...s, [row.id]: undefined }));
         savedTimerRef.current.delete(row.id);
@@ -534,6 +540,7 @@ export const OverpaidCases = () => {
       savedTimerRef.current.set(row.id, timer);
     } catch (err) {
       setLtrState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("LTR date save failed");
       setError((err as Error).message);
     }
   };
@@ -543,19 +550,24 @@ export const OverpaidCases = () => {
   const downloadCsv = async () => {
     setExporting(true);
     try {
-      const params = new URLSearchParams({ page: "1", limit: "10000" });
-      if (appliedSearch) params.set("search", appliedSearch);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (agentFilter) params.set("agent", agentFilter);
-      if (ltrFilter) params.set("ltr", ltrFilter);
-      if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
-      if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
-      params.set("sort", sortKey);
-      params.set("dir", sortDir);
-      const res = await fetch(`/api/overpaid-cases?${params.toString()}`);
-      if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      const json = await res.json();
-      const all: OverpaidCaseRow[] = json.data || [];
+      let all: OverpaidCaseRow[];
+      if (selectedIds.size > 0) {
+        all = rows.filter((r) => selectedIds.has(r.id));
+      } else {
+        const params = new URLSearchParams({ page: "1", limit: "10000" });
+        if (appliedSearch) params.set("search", appliedSearch);
+        if (statusFilter !== "all") params.set("status", statusFilter);
+        if (agentFilter) params.set("agent", agentFilter);
+        if (ltrFilter) params.set("ltr", ltrFilter);
+        if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+        if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
+        params.set("sort", sortKey);
+        params.set("dir", sortDir);
+        const res = await fetch(`/api/overpaid-cases?${params.toString()}`);
+        if (!res.ok) throw new Error(`Export failed (${res.status})`);
+        const json = await res.json();
+        all = json.data || [];
+      }
       const headers = ["Case", "Assigned To", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
@@ -616,6 +628,9 @@ export const OverpaidCases = () => {
 
   return (
     <div className="space-y-4">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveMessage}
+      </div>
       {/* Page header */}
       <div className={`${sectionCard} p-4 md:p-5`}>
         <div className="flex items-center gap-3">
@@ -845,13 +860,15 @@ export const OverpaidCases = () => {
             <button
               onClick={downloadCsv}
               disabled={exporting || total === 0}
-              aria-label="Export to CSV"
+              aria-label={selectedIds.size > 0 ? `Export ${selectedIds.size} selected to CSV` : "Export filtered to CSV"}
               className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {exporting
                 ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                 : <Download aria-hidden="true" className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">
+                {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
+              </span>
             </button>
           </div>
         </div>
