@@ -83,6 +83,27 @@ export async function bulkMarkCleared(input: {
   }
 }
 
+export async function bulkRestoreCleared(input: {
+  caseIds: number[];
+}): Promise<Result> {
+  try {
+    if (!input.caseIds.length) return { ok: false, error: "No cases to restore" };
+    if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
+    if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
+    await db
+      .insert(overpaidCases)
+      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: false })))
+      .onConflictDoUpdate({
+        target: overpaidCases.caseId,
+        set: { checksCleared: false, updatedAt: new Date() },
+      });
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkRestoreCleared error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
 export async function updateFeesConfirmation(input: {
   caseId: number;
   feesConfirmation: string;
