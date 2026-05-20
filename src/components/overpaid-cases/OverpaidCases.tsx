@@ -514,7 +514,10 @@ export const OverpaidCases = () => {
       const json = await res.json();
       const all: OverpaidCaseRow[] = json.data || [];
       const headers = ["Case", "Assigned To", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
-      const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const escape = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
       const csvRows = [
         headers.join(","),
         ...all.map((r) =>

@@ -22,8 +22,10 @@ export const GET = async (req: NextRequest) => {
       ? (sortParam as SortKey)
       : "overpaidAmount";
     const dir = searchParams.get("dir") === "asc" ? sql`asc` : sql`desc`;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const rawPage = parseInt(searchParams.get("page") || "1");
+    const rawLimit = parseInt(searchParams.get("limit") || "50");
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, rawLimit), 10000) : 50;
     const offset = (page - 1) * limit;
 
     const minAmount = minAmountRaw && Number.isFinite(Number(minAmountRaw)) ? Number(minAmountRaw) : null;

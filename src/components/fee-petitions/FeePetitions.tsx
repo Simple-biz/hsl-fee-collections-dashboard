@@ -454,7 +454,10 @@ export const FeePetitions = () => {
         "NOA", "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
         "Ltr to Clmt w/ Signature", "Ltr to ALJ", "Fax Conf Fee Pet", "Notes",
       ];
-      const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const escape = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
       const csvRows = [
         headers.join(","),
         ...all.map((r) => {

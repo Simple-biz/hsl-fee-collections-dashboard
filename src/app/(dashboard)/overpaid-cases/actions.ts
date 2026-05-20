@@ -58,6 +58,8 @@ export async function bulkMarkCleared(input: {
 }): Promise<Result> {
   try {
     if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
+    if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
+    if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
     await db
       .insert(overpaidCases)
       .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: true })))
