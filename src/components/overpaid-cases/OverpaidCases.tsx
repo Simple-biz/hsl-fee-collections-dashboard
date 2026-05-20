@@ -599,6 +599,9 @@ export const OverpaidCases = () => {
 
   const selectedUnclearedCount = rows.filter((r) => selectedIds.has(r.id) && !r.checksCleared).length;
 
+  const isInitialLoad = loading && rows.length === 0;
+  const isRefreshing = loading && rows.length > 0;
+
   const sectionCard = `rounded-xl border ${t.card}`;
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
@@ -637,18 +640,18 @@ export const OverpaidCases = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Cases</p>
-          <p className={`text-xl font-bold mt-1 ${t.text}`}>{loading ? "—" : String(total)}</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : String(total)}</p>
           <p className={`text-[10px] ${t.textMuted} mt-0.5`}>with overpayment</p>
         </div>
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
-          <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{loading ? "—" : fmtFull(stats.totalOverpaid)}</p>
+          <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{isInitialLoad ? "—" : fmtFull(stats.totalOverpaid)}</p>
           <p className={`text-[10px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
         </div>
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Checks Cleared</p>
-          <p className={`text-xl font-bold mt-1 ${t.text}`}>{loading ? "—" : `${stats.clearedCount} / ${total}`}</p>
-          {!loading && total > 0 && (
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : `${stats.clearedCount} / ${total}`}</p>
+          {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
               <div
                 className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
@@ -657,13 +660,13 @@ export const OverpaidCases = () => {
             </div>
           )}
           <p className={`text-[10px] ${t.textMuted} mt-1`}>
-            {!loading && total > 0 ? `${Math.round((stats.clearedCount / total) * 100)}% resolved` : "cases resolved"}
+            {!isInitialLoad && total > 0 ? `${Math.round((stats.clearedCount / total) * 100)}% resolved` : "cases resolved"}
           </p>
         </div>
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
-          <p className={`text-xl font-bold mt-1 ${t.text}`}>{loading ? "—" : `${stats.ltrCount} / ${total}`}</p>
-          {!loading && total > 0 && (
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : `${stats.ltrCount} / ${total}`}</p>
+          {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
               <div
                 className="h-1.5 rounded-full bg-indigo-500 transition-all duration-300"
@@ -672,7 +675,7 @@ export const OverpaidCases = () => {
             </div>
           )}
           <p className={`text-[10px] ${t.textMuted} mt-1`}>
-            {!loading && total > 0 ? `${Math.round((stats.ltrCount / total) * 100)}% on file` : "letters on file"}
+            {!isInitialLoad && total > 0 ? `${Math.round((stats.ltrCount / total) * 100)}% on file` : "letters on file"}
           </p>
         </div>
       </div>
@@ -775,7 +778,12 @@ export const OverpaidCases = () => {
               </div>
             ) : (
               <>
-                <h3 className={`text-sm font-bold ${t.text}`}>Cases</h3>
+                <h3 className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
+                  Cases
+                  {isRefreshing && (
+                    <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                  )}
+                </h3>
                 <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
                   {total === 0 ? "0 cases" : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
                 </p>
@@ -1034,7 +1042,7 @@ export const OverpaidCases = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isInitialLoad ? (
                 <tr>
                   <td colSpan={9} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                     <span className="inline-flex items-center gap-2">

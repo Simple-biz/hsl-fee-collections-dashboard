@@ -559,6 +559,9 @@ export const FeePetitions = () => {
     (r) => selectedIds.has(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
   ).length;
 
+  const isInitialLoad = loading && rows.length === 0;
+  const isRefreshing = loading && rows.length > 0;
+
   const sectionCard = `rounded-xl border ${t.card}`;
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
@@ -590,20 +593,20 @@ export const FeePetitions = () => {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Cases", value: loading ? "—" : String(total), sub: "at fee petition stage" },
+          { label: "Total Cases", value: isInitialLoad ? "—" : String(total), sub: "at fee petition stage" },
           {
             label: "Complete",
-            value: loading ? "—" : `${stats.completeCount} / ${total}`,
+            value: isInitialLoad ? "—" : `${stats.completeCount} / ${total}`,
             sub: "all steps done",
             color: dark ? "text-emerald-400" : "text-emerald-600",
           },
           {
             label: "Incomplete",
-            value: loading ? "—" : `${stats.incompleteCount} / ${total}`,
+            value: isInitialLoad ? "—" : `${stats.incompleteCount} / ${total}`,
             sub: "pending steps",
             color: dark ? "text-amber-400" : "text-amber-600",
           },
-          { label: "Never Touched", value: loading ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
+          { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
@@ -711,7 +714,12 @@ export const FeePetitions = () => {
               </div>
             ) : (
               <>
-                <h3 className={`text-sm font-bold ${t.text}`}>Petitions</h3>
+                <h3 className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
+                  Petitions
+                  {isRefreshing && (
+                    <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                  )}
+                </h3>
                 <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
                   {total === 0 ? "0 petitions" : `Showing ${rangeStart}–${rangeEnd} of ${total} petitions`}
                 </p>
@@ -894,7 +902,7 @@ export const FeePetitions = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isInitialLoad ? (
                 <tr>
                   <td colSpan={colSpan} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                     <span className="inline-flex items-center gap-2">
