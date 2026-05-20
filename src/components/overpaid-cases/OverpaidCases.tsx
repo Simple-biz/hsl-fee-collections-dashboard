@@ -549,6 +549,9 @@ export const OverpaidCases = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
+  const pageFeesReceived = rows.reduce((s, r) => s + r.feesReceived, 0);
+  const pageOverpaid = rows.reduce((s, r) => s + r.overpaidAmount, 0);
+
   const sectionCard = `rounded-xl border ${t.card}`;
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
@@ -585,20 +588,46 @@ export const OverpaidCases = () => {
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total Cases", value: loading ? "—" : String(total), sub: "with overpayment" },
-          { label: "Total Overpaid", value: loading ? "—" : fmtFull(stats.totalOverpaid), sub: "across filtered cases", highlight: true },
-          { label: "Checks Cleared", value: loading ? "—" : `${stats.clearedCount} / ${total}`, sub: "cases resolved" },
-          { label: "LTR Received", value: loading ? "—" : `${stats.ltrCount} / ${total}`, sub: "letters on file" },
-        ].map((s) => (
-          <div key={s.label} className={`${sectionCard} p-4`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
-            <p className={`text-xl font-bold mt-1 ${s.highlight ? (dark ? "text-amber-400" : "text-amber-600") : t.text}`}>
-              {s.value}
-            </p>
-            <p className={`text-[10px] ${t.textMuted} mt-0.5`}>{s.sub}</p>
-          </div>
-        ))}
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Cases</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{loading ? "—" : String(total)}</p>
+          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>with overpayment</p>
+        </div>
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
+          <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{loading ? "—" : fmtFull(stats.totalOverpaid)}</p>
+          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
+        </div>
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Checks Cleared</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{loading ? "—" : `${stats.clearedCount} / ${total}`}</p>
+          {!loading && total > 0 && (
+            <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
+              <div
+                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${Math.min(100, (stats.clearedCount / total) * 100)}%` }}
+              />
+            </div>
+          )}
+          <p className={`text-[10px] ${t.textMuted} mt-1`}>
+            {!loading && total > 0 ? `${Math.round((stats.clearedCount / total) * 100)}% resolved` : "cases resolved"}
+          </p>
+        </div>
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{loading ? "—" : `${stats.ltrCount} / ${total}`}</p>
+          {!loading && total > 0 && (
+            <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
+              <div
+                className="h-1.5 rounded-full bg-indigo-500 transition-all duration-300"
+                style={{ width: `${Math.min(100, (stats.ltrCount / total) * 100)}%` }}
+              />
+            </div>
+          )}
+          <p className={`text-[10px] ${t.textMuted} mt-1`}>
+            {!loading && total > 0 ? `${Math.round((stats.ltrCount / total) * 100)}% on file` : "letters on file"}
+          </p>
+        </div>
       </div>
 
       {/* Error */}
@@ -856,11 +885,15 @@ export const OverpaidCases = () => {
         )}
 
         {/* Legend */}
-        <div className={`px-4 py-1.5 flex items-center gap-4 border-b ${t.borderLight}`}>
+        <div className={`px-4 py-1.5 flex items-center gap-4 flex-wrap border-b ${t.borderLight}`}>
           <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Key</span>
           <span className="flex items-center gap-1.5">
             <span className={`inline-block w-4 h-4 rounded-sm border-l-2 border-l-amber-500 ${dark ? "bg-neutral-800" : "bg-neutral-100"}`} />
             <span className={`text-[11px] ${t.textMuted}`}>Overpaid amount ≥ $3,000</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${dark ? "bg-amber-400" : "bg-amber-500"}`} />
+            <span className={`text-[11px] ${t.textMuted}`}>No workflow data entered</span>
           </span>
         </div>
 
@@ -949,6 +982,7 @@ export const OverpaidCases = () => {
                   const isCleared = row.checksCleared;
                   const isHighValue = row.overpaidAmount >= 3000;
                   const isSelected = selectedIds.has(row.id);
+                  const needsAttention = !isCleared && !row.feesConfirmation && !row.opLtrReceived && !row.updateNote;
                   const clearedBg = isCleared
                     ? dark ? "bg-emerald-900/40" : "bg-emerald-100/80"
                     : "";
@@ -972,20 +1006,44 @@ export const OverpaidCases = () => {
                           className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                         />
                       </td>
-                      <td className={`${tdBase} font-semibold max-w-45 truncate sticky left-10 z-10 ${stickyBg} ${stickyHover}`} title={row.claimant}>
-                        <Link href={`/cases/${row.id}`} className={`hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
-                          {row.claimant}
-                        </Link>
-                        {row.updatedAt && (
-                          <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
-                            Updated {formatRelativeDate(row.updatedAt)}
-                          </p>
-                        )}
+                      <td className={`${tdBase} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`} title={row.claimant}>
+                        <div className="flex items-center gap-1.5 max-w-45">
+                          {needsAttention && (
+                            <span
+                              title="No workflow data entered"
+                              aria-label="Needs attention"
+                              className={`shrink-0 w-1.5 h-1.5 rounded-full ${dark ? "bg-amber-400" : "bg-amber-500"}`}
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <Link href={`/cases/${row.id}`} className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
+                              {row.claimant}
+                            </Link>
+                            {row.updatedAt && (
+                              <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                                Updated {formatRelativeDate(row.updatedAt)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo ?? "—"}</td>
                       <td className={`${tdBase} ${t.textMuted} text-right`}>{fmt(row.feesReceived)}</td>
                       <td className={`${tdBase} text-right font-semibold ${dark ? "text-amber-400" : "text-amber-600"}`}>
                         {fmt(row.overpaidAmount)}
+                        {row.feesReceived > 0 && (
+                          <div className="mt-0.5">
+                            <div className={`h-1 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"} w-full`}>
+                              <div
+                                className="h-1 rounded-full bg-amber-500"
+                                style={{ width: `${Math.min(100, (row.overpaidAmount / row.feesReceived) * 100)}%` }}
+                              />
+                            </div>
+                            <span className={`text-[9px] font-normal ${dark ? "text-amber-400/70" : "text-amber-600/70"}`}>
+                              {Math.round((row.overpaidAmount / row.feesReceived) * 100)}% of received
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className={`${tdBase}`}>
                         <div className="relative">
@@ -1055,6 +1113,18 @@ export const OverpaidCases = () => {
                 })
               )}
             </tbody>
+            {!loading && rows.length > 0 && (
+              <tfoot>
+                <tr className={`border-t-2 ${dark ? "border-neutral-700 bg-neutral-800/60" : "border-neutral-300 bg-neutral-50"}`}>
+                  <td colSpan={3} className={`${tdBase} font-semibold ${t.textSub}`}>
+                    Page Totals <span className={`font-normal ${t.textMuted}`}>({rows.length} rows)</span>
+                  </td>
+                  <td className={`${tdBase} text-right font-bold ${t.text}`}>{fmtFull(pageFeesReceived)}</td>
+                  <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{fmtFull(pageOverpaid)}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 
