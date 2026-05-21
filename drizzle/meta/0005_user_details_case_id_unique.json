@@ -1,6 +1,6 @@
 {
-  "id": "0d53781d-e309-44bb-a92e-7d97a604902c",
-  "prevId": "99fed985-3729-4d36-b415-e1167b9a7a27",
+  "id": "3e0d9599-8abb-47e1-8d81-af4154082633",
+  "prevId": "0d53781d-e309-44bb-a92e-7d97a604902c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1889,6 +1889,13 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "user_details_case_id_unique": {
+          "name": "user_details_case_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id"
+          ]
+        },
         "user_details_chronicle_id_unique": {
           "name": "user_details_chronicle_id_unique",
           "nullsNotDistinct": false,

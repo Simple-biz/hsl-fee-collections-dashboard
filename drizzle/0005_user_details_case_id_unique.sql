@@ -1,0 +1,1 @@
+ALTER TABLE "user_details" ADD CONSTRAINT "user_details_case_id_unique" UNIQUE("case_id");

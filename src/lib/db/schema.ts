@@ -12,6 +12,7 @@ import {
   uuid,
   jsonb,
   index,
+  unique,
   // uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -284,6 +285,44 @@ export const feeRecords = pgTable(
 );
 
 // ============================================================================
+// FEE_PETITIONS — Workflow checklist for cases at FEE_PETITION level
+// ============================================================================
+
+export const feePetitions = pgTable(
+  "fee_petitions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" })
+      .unique(),
+
+    // Filing checklist
+    noa: boolean("noa").notNull().default(false),
+    timeDelineation: boolean("time_delineation").notNull().default(false),
+    feePetitionDoc: boolean("fee_petition_doc").notNull().default(false),
+    ltrToClmt: boolean("ltr_to_clmt").notNull().default(false),
+    ltrToClmtWithSignature: boolean("ltr_to_clmt_with_signature")
+      .notNull()
+      .default(false),
+    ltrToAlj: boolean("ltr_to_alj").notNull().default(false),
+    faxConfFeePet: boolean("fax_conf_fee_pet").notNull().default(false),
+
+    // Inline note
+    updateNote: text("update_note").notNull().default(""),
+
+    // Timestamps
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_fee_petitions_case_id").on(table.caseId)],
+);
+
+// ============================================================================
 // ACTIVITY_LOG
 // ============================================================================
 
@@ -475,6 +514,7 @@ export const userDetails = pgTable(
     id: serial("id").primaryKey(),
     caseId: integer("case_id")
       .notNull()
+      .unique()
       .references(() => cases.clientId, { onDelete: "cascade" }),
     chronicleId: integer("chronicle_id").unique(),
 
@@ -489,6 +529,7 @@ export const userDetails = pgTable(
     cellPhone: varchar("cell_phone", { length: 100 }),
     email: varchar("email", { length: 255 }),
     ssn: varchar("ssn", { length: 50 }),
+    ssnLast4: varchar("ssn_last4", { length: 4 }),
 
     dateOfBirth: date("date_of_birth"),
     ageAtApproval: integer("age_at_approval"),
@@ -502,6 +543,81 @@ export const userDetails = pgTable(
   (table) => [
     index("idx_user_details_case_id").on(table.caseId),
   ],
+);
+
+export const chronicleDocuments = pgTable(
+  "chronicle_documents",
+  {
+    id: serial("id").primaryKey(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    mycaseClientId: integer("mycase_client_id"),
+    chronicleClientId: integer("chronicle_client_id"),
+    chronicleDocumentId: integer("chronicle_document_id").notNull(),
+    documentName: varchar("document_name", { length: 500 }),
+    documentType: varchar("document_type", { length: 255 }),
+    documentCategory: varchar("document_category", { length: 255 }),
+    rawDocument: jsonb("raw_document"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("chronicle_documents_case_id_chronicle_document_id_unique").on(
+      table.caseId,
+      table.chronicleDocumentId,
+    ),
+    index("idx_chronicle_documents_case_id").on(table.caseId),
+  ],
+);
+
+export const mycaseNoticeDocuments = pgTable(
+  "mycase_notice_documents",
+  {
+    id: serial("id").primaryKey(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    mycaseClientId: integer("mycase_client_id"),
+    mycaseDocumentId: integer("mycase_document_id").notNull(),
+    documentName: varchar("document_name", { length: 500 }),
+    matchedPattern: varchar("matched_pattern", { length: 255 }),
+    rawDocument: jsonb("raw_document"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("mycase_notice_documents_case_id_mycase_document_id_unique").on(
+      table.caseId,
+      table.mycaseDocumentId,
+    ),
+    index("idx_mycase_notice_documents_case_id").on(table.caseId),
+  ],
+);
+
+// ============================================================================
+// OVERPAID_CASES — Workflow tracking for cases where fees paid > fees expected
+// ============================================================================
+
+export const overpaidCases = pgTable(
+  "overpaid_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" })
+      .unique(),
+    opLtrReceived: date("op_ltr_received"),
+    checksCleared: boolean("checks_cleared").notNull().default(false),
+    updateNote: text("update_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_overpaid_cases_case_id").on(table.caseId)],
 );
 
 // ============================================================================
@@ -543,6 +659,10 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
     fields: [cases.clientId],
     references: [feeRecords.caseId],
   }),
+  feePetition: one(feePetitions, {
+    fields: [cases.clientId],
+    references: [feePetitions.caseId],
+  }),
   activityLogs: many(activityLog),
   userDetails: one(userDetails, {
     fields: [cases.clientId],
@@ -553,6 +673,13 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
 export const userDetailsRelations = relations(userDetails, ({ one }) => ({
   case: one(cases, {
     fields: [userDetails.caseId],
+    references: [cases.clientId],
+  }),
+}));
+
+export const feePetitionsRelations = relations(feePetitions, ({ one }) => ({
+  case: one(cases, {
+    fields: [feePetitions.caseId],
     references: [cases.clientId],
   }),
 }));

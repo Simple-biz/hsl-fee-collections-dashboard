@@ -1,6 +1,6 @@
 {
-  "id": "0d53781d-e309-44bb-a92e-7d97a604902c",
-  "prevId": "99fed985-3729-4d36-b415-e1167b9a7a27",
+  "id": "e07d39f5-be2a-4c55-8970-f6a2ba607468",
+  "prevId": "fa186fb4-3cb0-45fb-952c-8630c64148a6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -667,6 +667,126 @@
           "nullsNotDistinct": false,
           "columns": [
             "client_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.chronicle_documents": {
+      "name": "chronicle_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mycase_client_id": {
+          "name": "mycase_client_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chronicle_client_id": {
+          "name": "chronicle_client_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chronicle_document_id": {
+          "name": "chronicle_document_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_name": {
+          "name": "document_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_type": {
+          "name": "document_type",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_category": {
+          "name": "document_category",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_document": {
+          "name": "raw_document",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_chronicle_documents_case_id": {
+          "name": "idx_chronicle_documents_case_id",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "chronicle_documents_case_id_cases_client_id_fk": {
+          "name": "chronicle_documents_case_id_cases_client_id_fk",
+          "tableFrom": "chronicle_documents",
+          "tableTo": "cases",
+          "columnsFrom": [
+            "case_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "chronicle_documents_case_id_chronicle_document_id_unique": {
+          "name": "chronicle_documents_case_id_chronicle_document_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id",
+            "chronicle_document_id"
           ]
         }
       },
@@ -1352,6 +1472,114 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.mycase_notice_documents": {
+      "name": "mycase_notice_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mycase_client_id": {
+          "name": "mycase_client_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mycase_document_id": {
+          "name": "mycase_document_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_name": {
+          "name": "document_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matched_pattern": {
+          "name": "matched_pattern",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_document": {
+          "name": "raw_document",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_mycase_notice_documents_case_id": {
+          "name": "idx_mycase_notice_documents_case_id",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mycase_notice_documents_case_id_cases_client_id_fk": {
+          "name": "mycase_notice_documents_case_id_cases_client_id_fk",
+          "tableFrom": "mycase_notice_documents",
+          "tableTo": "cases",
+          "columnsFrom": [
+            "case_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "mycase_notice_documents_case_id_mycase_document_id_unique": {
+          "name": "mycase_notice_documents_case_id_mycase_document_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id",
+            "mycase_document_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.notifications": {
       "name": "notifications",
       "schema": "",
@@ -1502,6 +1730,104 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.overpaid_cases": {
+      "name": "overpaid_cases",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "op_ltr_received": {
+          "name": "op_ltr_received",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "checks_cleared": {
+          "name": "checks_cleared",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "update_note": {
+          "name": "update_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_overpaid_cases_case_id": {
+          "name": "idx_overpaid_cases_case_id",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "overpaid_cases_case_id_cases_client_id_fk": {
+          "name": "overpaid_cases_case_id_cases_client_id_fk",
+          "tableFrom": "overpaid_cases",
+          "tableTo": "cases",
+          "columnsFrom": [
+            "case_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "overpaid_cases_case_id_unique": {
+          "name": "overpaid_cases_case_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1810,6 +2136,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "ssn_last4": {
+          "name": "ssn_last4",
+          "type": "varchar(4)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "date_of_birth": {
           "name": "date_of_birth",
           "type": "date",
@@ -1889,6 +2221,13 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "user_details_case_id_unique": {
+          "name": "user_details_case_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id"
+          ]
+        },
         "user_details_chronicle_id_unique": {
           "name": "user_details_chronicle_id_unique",
           "nullsNotDistinct": false,

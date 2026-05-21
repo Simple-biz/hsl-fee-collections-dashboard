@@ -18,6 +18,8 @@ import {
   FileText,
   X,
   Database,
+  Gavel,
+  TrendingDown,
   LogOut,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -47,6 +49,8 @@ const NAV_ITEMS: {
       { path: "/", icon: Home, label: "Overview" },
       { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
+      { path: "/fee-petitions", icon: Gavel, label: "Fee Petitions" },
+      { path: "/overpaid-cases", icon: TrendingDown, label: "Overpaid Cases" },
       { path: "/reports", icon: FileText, label: "Reports" },
       { path: "/notifications", icon: Bell, label: "Notifications" },
     ],
