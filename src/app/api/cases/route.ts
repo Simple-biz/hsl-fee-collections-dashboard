@@ -15,7 +15,7 @@ export const GET = async (req: NextRequest) => {
     const offset = (page - 1) * limit;
 
     // Total count (respecting filters, ignoring pagination)
-    const totalRows = await db
+    const countQuery = db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -26,10 +26,9 @@ export const GET = async (req: NextRequest) => {
           ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
         `,
       );
-    const total = totalRows[0]?.count ?? 0;
 
     // Base query: cases joined with fee_records
-    const rows = await db
+    const rowsQuery = db
       .select({
         // Case fields
         id: cases.id,
@@ -83,40 +82,41 @@ export const GET = async (req: NextRequest) => {
       .limit(limit)
       .offset(offset);
 
-    // Get latest activity for each case
+    // Count and page query are independent — run them on separate pooled
+    // connections instead of back-to-back.
+    const [totalRows, rows] = await Promise.all([countQuery, rowsQuery]);
+    const total = totalRows[0]?.count ?? 0;
+
+    // Get latest activity + notes count for the page's cases
     const caseIds = rows.map((r) => r.clientId);
 
     let activities: { caseId: number; message: string }[] = [];
     let notesCounts: { caseId: number; count: number }[] = [];
     if (caseIds.length > 0) {
-      activities = await db
-        .selectDistinctOn([activityLog.caseId], {
-          caseId: activityLog.caseId,
-          message: activityLog.message,
-        })
-        .from(activityLog)
-        .where(
-          sql`${activityLog.caseId} IN (${sql.join(
-            caseIds.map((id) => sql`${id}`),
-            sql`, `,
-          )})`,
-        )
-        .orderBy(activityLog.caseId, desc(activityLog.createdAt));
+      const inClause = sql`${activityLog.caseId} IN (${sql.join(
+        caseIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`;
 
-      const counts = await db
-        .select({
-          caseId: activityLog.caseId,
-          count: sql<number>`COUNT(*)::int`,
-        })
-        .from(activityLog)
-        .where(
-          sql`${activityLog.caseId} IN (${sql.join(
-            caseIds.map((id) => sql`${id}`),
-            sql`, `,
-          )})`,
-        )
-        .groupBy(activityLog.caseId);
-      notesCounts = counts;
+      // Both depend only on caseIds, so fire them together.
+      [activities, notesCounts] = await Promise.all([
+        db
+          .selectDistinctOn([activityLog.caseId], {
+            caseId: activityLog.caseId,
+            message: activityLog.message,
+          })
+          .from(activityLog)
+          .where(inClause)
+          .orderBy(activityLog.caseId, desc(activityLog.createdAt)),
+        db
+          .select({
+            caseId: activityLog.caseId,
+            count: sql<number>`COUNT(*)::int`,
+          })
+          .from(activityLog)
+          .where(inClause)
+          .groupBy(activityLog.caseId),
+      ]);
     }
 
     const activityMap = new Map(activities.map((a) => [a.caseId, a.message]));

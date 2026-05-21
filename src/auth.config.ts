@@ -3,7 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 /**
  * Edge-safe Auth.js configuration.
  *
- * This file is imported by `middleware.ts`, which runs in the Edge runtime, so
+ * This file is imported by `proxy.ts`, which runs in the Edge runtime, so
  * it MUST NOT import the database client, bcrypt, or any Node-only modules.
  * The Credentials provider (which needs those) is added in `auth.ts`.
  */
