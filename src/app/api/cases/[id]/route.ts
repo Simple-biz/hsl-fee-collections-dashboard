@@ -88,6 +88,9 @@ export const GET = async (
         feeComputedAt: feeRecords.feeComputedAt,
         syncStatus: feeRecords.syncStatus,
         syncedAt: feeRecords.syncedAt,
+        feesStatus: feeRecords.feesStatus,
+        weekAssignedToAgent: feeRecords.weekAssignedToAgent,
+        monthAssignedToAgent: feeRecords.monthAssignedToAgent,
         feeRecordUpdatedAt: feeRecords.updatedAt,
 
         // user_details fields
@@ -227,6 +230,10 @@ export const GET = async (
             ? ">60"
             : "≤60"
           : null,
+
+      feesStatus: row.feesStatus ?? null,
+      weekAssignedToAgent: row.weekAssignedToAgent ?? null,
+      monthAssignedToAgent: row.monthAssignedToAgent ?? null,
 
       // User details
       userDetails: {

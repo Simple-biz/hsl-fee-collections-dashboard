@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
-import type { SheetRow } from "@/lib/import/sheets-mapper";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,50 +16,115 @@ const fmtNum = (v: string | null | undefined): string | null => {
   return Number.isFinite(n) ? String(n) : null;
 };
 
+const fmtHyperlink = (url: string | null | undefined, label = "Win Sheet"): string | null => {
+  if (!url) return null;
+  if (!url.startsWith("http")) return fmt(url);
+  return `=HYPERLINK("${url.replace(/"/g, '""')}", "${label}")`;
+};
+
+const daysSince = (dateStr: string | null | undefined): number | null => {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
+};
+
+const isoWeek = (dateStr: string | null | undefined): string | null => {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (isNaN(d.getTime())) return null;
+  const thu = new Date(d);
+  thu.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const year = thu.getFullYear();
+  const firstThu = new Date(year, 0, 1 + ((4 - new Date(year, 0, 1).getDay() + 7) % 7));
+  const week = 1 + Math.round((thu.getTime() - firstThu.getTime()) / 604_800_000);
+  return `${year}-W${String(week).padStart(2, "0")}`;
+};
+
+const yearMonth = (dateStr: string | null | undefined): string | null => {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
 const buildSheetRow = (
   row: Awaited<ReturnType<typeof queryAllCases>>[number],
   latestNote: string | null,
-  isNewToSheet: boolean,
-) => ({
-  "CASE LINK": fmt(row.caseLink) ?? "",
-  "ASSIGNED TO": fmt(row.assignedTo),
-  "CASE LEVEL": fmt(row.levelWon),
-  "CLAIM TYPE": row.claimTypeLabel === "T2_T16" ? "CONC" : fmt(row.claimTypeLabel),
-  "APPROVAL DATE": fmt(row.approvalDate),
-  "WIN SHEET STATUS": fmt(row.winSheetStatus) ?? "not_started",
-  // Only write WIN SHEET LINK for rows being appended — existing rows already
-  // have a hyperlinked cell in the sheet that we must not overwrite with plain text.
-  ...(isNewToSheet && row.winSheetLink
-    ? { "WIN SHEET LINK": fmt(row.winSheetLink) }
-    : {}),
-  "FEES CONFIRMATION": fmt(row.feesConfirmation),
-  "CASE STATUS": fmt(row.caseStatus),
-  "APPROVED BY (OK TO CLOSE)": fmt(row.approvedBy),
-  "T16 RETRO": fmtNum(row.t16Retro),
-  "T16 FEE DUE": fmtNum(row.t16FeeDue),
-  "T16 FEE $ REC'D": fmtNum(row.t16FeeReceived),
-  "T16 Pending": fmtNum(row.t16Pending),
-  // Trailing space is intentional — the actual sheet column header has a trailing space.
-  "DATE T16 FEE REC'D ": fmt(row.t16FeeReceivedDate),
-  "T2 RETRO": fmtNum(row.t2Retro),
-  "T2 FEE DUE": fmtNum(row.t2FeeDue),
-  "T2 FEE $ REC'D": fmtNum(row.t2FeeReceived),
-  "T2 Pending": fmtNum(row.t2Pending),
-  "DATE T2 FEE REC'D": fmt(row.t2FeeReceivedDate),
-  "RETRO AUX": fmtNum(row.auxRetro),
-  "AUX FEE DUE": fmtNum(row.auxFeeDue),
-  // Trailing space is intentional — the actual sheet column header has a trailing space.
-  "AUX FEE $ REC'D ": fmtNum(row.auxFeeReceived),
-  "AUX PENDING": fmtNum(row.auxPending),
-  "DATE AUX FEE REC'D": fmt(row.auxFeeReceivedDate),
-  "COLLECTION NOTES": latestNote,
-  "DATE ASSIGNED TO AGENT": fmt(row.dateAssignedToAgent),
-});
+) => {
+  const caseLinkValue = row.externalId
+    ? fmtHyperlink(row.externalId, row.caseLink ?? "") ?? (fmt(row.caseLink) ?? "")
+    : (fmt(row.caseLink) ?? "");
+
+  const full: Record<string, string> = {
+    "CLIENT_ID": String(row.clientId),
+    "CASE LINK": caseLinkValue,
+    "WIN SHEET STATUS": fmt(row.winSheetStatus) ?? "not_started",
+  };
+
+  // Formula columns: n8n returns these empty for formula cells; compute from source data.
+  const computedDays = row.daysAfterApproval ?? daysSince(row.approvalDate);
+  const computedCategory = computedDays != null ? (computedDays > 60 ? ">60" : "≤60") : null;
+  const computedWeek = row.weekAssignedToAgent ?? isoWeek(row.dateAssignedToAgent);
+  const computedMonth = row.monthAssignedToAgent ?? yearMonth(row.dateAssignedToAgent);
+
+  const optional: Record<string, string | null> = {
+    "WIN SHEET LINK": fmtHyperlink(row.winSheetLink, row.winSheetLinkText ?? "Win Sheet"),
+    "ASSIGNED TO": fmt(row.assignedTo),
+    "CASE LEVEL": fmt(row.levelWon),
+    "CLAIM TYPE": row.claimTypeLabel === "T2_T16" ? "CONC" : fmt(row.claimTypeLabel),
+    "APPROVAL DATE": fmt(row.approvalDate),
+    "FEES CONFIRMATION": fmt(row.feesConfirmation),
+    "CASE STATUS": fmt(row.caseStatus),
+    "APPROVED BY (OK TO CLOSE)": fmt(row.approvedBy),
+    "T16 RETRO": fmtNum(row.t16Retro),
+    "T16 FEE DUE": fmtNum(row.t16FeeDue),
+    "T16 FEE $ REC'D": fmtNum(row.t16FeeReceived),
+    "T16 Pending": fmtNum(row.t16Pending),
+    // Trailing space is intentional — the actual sheet column header has a trailing space.
+    "DATE T16 FEE REC'D ": fmt(row.t16FeeReceivedDate),
+    "T2 RETRO": fmtNum(row.t2Retro),
+    "T2 FEE DUE": fmtNum(row.t2FeeDue),
+    "T2 FEE $ REC'D": fmtNum(row.t2FeeReceived),
+    "T2 Pending": fmtNum(row.t2Pending),
+    "DATE T2 FEE REC'D": fmt(row.t2FeeReceivedDate),
+    "RETRO AUX": fmtNum(row.auxRetro),
+    "AUX FEE DUE": fmtNum(row.auxFeeDue),
+    // Trailing space is intentional — the actual sheet column header has a trailing space.
+    "AUX FEE $ REC'D ": fmtNum(row.auxFeeReceived),
+    "AUX PENDING": fmtNum(row.auxPending),
+    "DATE AUX FEE REC'D": fmt(row.auxFeeReceivedDate),
+    "TOTAL RETRO DUE": fmtNum(row.totalRetroDue),
+    "TOTAL FEES EXPECTED": fmtNum(row.totalFeesExpected),
+    "TOTAL FEES PAID": fmtNum(row.totalFeesPaid),
+    "COLLECTION NOTES": latestNote,
+    "DAYS AFTER APPROVAL": computedDays != null ? String(computedDays) : null,
+    "APPROVAL CATEGORY": computedCategory,
+    "FEES STATUS": fmt(row.feesStatus),
+    "DATE ASSIGNED TO AGENT": fmt(row.dateAssignedToAgent),
+    "WEEK ASSIGNED TO AGENT": computedWeek,
+    "MONTH ASSIGNED TO AGENT": computedMonth,
+    // Duplicate column IDs at positions 39-41 (all-caps / no trailing space variants)
+    "DATE T16 FEE REC'D": fmt(row.t16FeeReceivedDate),
+    "T16 PENDING": fmtNum(row.t16Pending),
+    "T2 PENDING": fmtNum(row.t2Pending),
+    "AUX FEE $ REC'D": fmtNum(row.auxFeeReceived),
+  };
+
+  // Strip null fields — sending null to a dropdown-validated column causes
+  // Google Sheets to reject the entire row write.
+  for (const [k, v] of Object.entries(optional)) {
+    if (v !== null) full[k] = v;
+  }
+
+  return full;
+};
 
 async function queryAllCases() {
   return db
     .select({
       clientId: cases.clientId,
+      externalId: cases.externalId,
       caseLink: cases.caseLink,
       approvalDate: cases.approvalDate,
       levelWon: cases.levelWon,
@@ -68,6 +132,7 @@ async function queryAllCases() {
       assignedTo: feeRecords.assignedTo,
       winSheetStatus: feeRecords.winSheetStatus,
       winSheetLink: feeRecords.winSheetLink,
+      winSheetLinkText: feeRecords.winSheetLinkText,
       caseStatus: feeRecords.caseStatus,
       feesConfirmation: feeRecords.feesConfirmation,
       approvedBy: feeRecords.approvedBy,
@@ -87,6 +152,14 @@ async function queryAllCases() {
       auxFeeReceived: feeRecords.auxFeeReceived,
       auxPending: feeRecords.auxPending,
       auxFeeReceivedDate: feeRecords.auxFeeReceivedDate,
+      totalRetroDue: feeRecords.totalRetroDue,
+      totalFeesExpected: feeRecords.totalFeesExpected,
+      totalFeesPaid: feeRecords.totalFeesPaid,
+      daysAfterApproval: feeRecords.daysAfterApproval,
+      approvalCategory: feeRecords.approvalCategory,
+      feesStatus: feeRecords.feesStatus,
+      weekAssignedToAgent: feeRecords.weekAssignedToAgent,
+      monthAssignedToAgent: feeRecords.monthAssignedToAgent,
     })
     .from(cases)
     .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -110,30 +183,6 @@ async function queryLatestNotes(clientIds: number[]): Promise<Map<number, string
   return map;
 }
 
-// Fetch existing CASE LINK values from the sheet via the sync webhook.
-// Returns a Set of trimmed CASE LINK strings already present in the sheet.
-// On failure, returns an empty set — rows are treated as new (WIN SHEET LINK included).
-async function fetchExistingSheetCaseLinks(): Promise<Set<string>> {
-  const webhookUrl = process.env.SHEETS_SYNC_WEBHOOK_URL;
-  if (!webhookUrl) return new Set();
-
-  try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trigger: "manual" }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) return new Set();
-    const rows = (await res.json()) as SheetRow[];
-    if (!Array.isArray(rows)) return new Set();
-    return new Set(
-      rows.map((r) => String(r["CASE LINK"] ?? "").trim()).filter(Boolean),
-    );
-  } catch {
-    return new Set();
-  }
-}
 
 // POST /api/sheets/push
 //   Query:
@@ -154,7 +203,7 @@ export const POST = async (req: NextRequest) => {
     if (mode === "preview") {
       const notesMap = await queryLatestNotes(clientIds);
       const sheetRows = allRows.map((r) =>
-        buildSheetRow(r, notesMap.get(r.clientId) ?? null, false),
+        buildSheetRow(r, notesMap.get(r.clientId) ?? null),
       );
       return NextResponse.json({
         total: sheetRows.length,
@@ -171,16 +220,11 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const [notesMap, existingCaseLinks] = await Promise.all([
-      queryLatestNotes(clientIds),
-      fetchExistingSheetCaseLinks(),
-    ]);
+    const notesMap = await queryLatestNotes(clientIds);
 
-    const sheetRows = allRows.map((r) => {
-      const caseLink = String(r.caseLink ?? "").trim();
-      const isNewToSheet = !existingCaseLinks.has(caseLink);
-      return buildSheetRow(r, notesMap.get(r.clientId) ?? null, isNewToSheet);
-    });
+    const sheetRows = allRows.map((r) =>
+      buildSheetRow(r, notesMap.get(r.clientId) ?? null),
+    );
 
     const res = await fetch(webhookUrl, {
       method: "POST",

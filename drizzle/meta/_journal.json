@@ -71,6 +71,20 @@
       "when": 1779381004085,
       "tag": "0009_add_auth_users_table",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779395317568,
+      "tag": "0010_chunky_purifiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1779397718059,
+      "tag": "0011_early_lady_bullseye",
+      "breakpoints": true
     }
   ]
 }

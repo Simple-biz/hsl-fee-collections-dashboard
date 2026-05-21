@@ -70,6 +70,11 @@ export interface CaseRow {
   daysAfterApproval: number | null;
   approvalCategory: string | null;
 
+  // Sheet-computed
+  feesStatus: string | null;
+  weekAssignedToAgent: string | null;
+  monthAssignedToAgent: string | null;
+
   // Context
   office: string;
 
@@ -195,6 +200,11 @@ export interface CaseDetailData {
   // Aging
   daysAfterApproval: number | null;
   approvalCategory: string | null;
+
+  // Sheet-computed
+  feesStatus: string | null;
+  weekAssignedToAgent: string | null;
+  monthAssignedToAgent: string | null;
 
   // User details
   userDetails: UserDetails | null;

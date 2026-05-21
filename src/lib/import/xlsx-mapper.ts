@@ -55,6 +55,13 @@ export interface ParsedCaseRow {
   auxPending: string;
   auxFeeReceivedDate: string | null;
 
+  // Sheet-computed fields
+  daysAfterApproval: number | null;
+  approvalCategory: string | null;
+  feesStatus: string | null;
+  weekAssignedToAgent: string | null;
+  monthAssignedToAgent: string | null;
+
   // Notes — entire raw blob, stored as one activity_log entry per case
   notes: string | null;
 }
@@ -332,6 +339,11 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
       auxPending: num(row[C.auxPending]),
       auxFeeReceivedDate: dateOnly(row[C.auxDate]),
 
+      daysAfterApproval: null,
+      approvalCategory: null,
+      feesStatus: null,
+      weekAssignedToAgent: null,
+      monthAssignedToAgent: null,
       notes: row[C.notes] ? String(row[C.notes]).trim() : null,
     });
   }

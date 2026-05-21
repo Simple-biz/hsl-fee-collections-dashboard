@@ -183,6 +183,13 @@ export const mapSheetRows = (
       auxFeeReceived: num(r["AUX FEE $ REC'D"]),
       auxPending: num(r["AUX PENDING"]),
       auxFeeReceivedDate: dateOnly(r["DATE AUX FEE REC'D"]),
+      daysAfterApproval: r["DAYS AFTER APPROVAL"] != null && r["DAYS AFTER APPROVAL"] !== ""
+        ? (Number(r["DAYS AFTER APPROVAL"]) || null)
+        : null,
+      approvalCategory: r["APPROVAL CATEGORY"] ? String(r["APPROVAL CATEGORY"]).trim() : null,
+      feesStatus: r["FEES STATUS"] ? String(r["FEES STATUS"]).trim() : null,
+      weekAssignedToAgent: r["WEEK ASSIGNED TO AGENT"] ? String(r["WEEK ASSIGNED TO AGENT"]).trim() : null,
+      monthAssignedToAgent: r["MONTH ASSIGNED TO AGENT"] ? String(r["MONTH ASSIGNED TO AGENT"]).trim() : null,
       notes: r["COLLECTION NOTES"] ? String(r["COLLECTION NOTES"]).trim() : null,
     });
   }

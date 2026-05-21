@@ -4,13 +4,13 @@
       "parameters": {
         "jsCode": "// Split { rows: [...] } into individual items for the Google Sheets node\n// n8n webhook (typeVersion 2) nests the POST body under .body\nconst raw = $input.first().json;\nconst payload = raw.body ?? raw;\nconst rows = Array.isArray(payload.rows) ? payload.rows : [];\nif (rows.length === 0) return [{ json: { _empty: true } }];\nreturn rows.map(row => ({ json: row }));\n"
       },
-      "id": "0f630d6d-96aa-4cae-a9fe-a49a1c8ecb5b",
+      "id": "d6b350b8-5ff0-49f2-9448-81936ff812df",
       "name": "Split Rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        64,
-        1248
+        -80,
+        1312
       ]
     },
     {
@@ -34,9 +34,19 @@
           "mappingMode": "autoMapInputData",
           "value": {},
           "matchingColumns": [
-            "CASE LINK"
+            "CLIENT_ID"
           ],
           "schema": [
+            {
+              "id": "CLIENT_ID",
+              "displayName": "CLIENT_ID",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
             {
               "id": "CASE LINK",
               "displayName": "CASE LINK",
@@ -357,15 +367,17 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         },
-        "options": {}
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
       },
-      "id": "942252b1-15b1-4a61-a2cd-a86442a5e956",
+      "id": "c28ade67-1164-499e-b955-452bd94c0a6a",
       "name": "Upsert Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
       "position": [
-        304,
-        1248
+        160,
+        1312
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -378,13 +390,13 @@
       "parameters": {
         "jsCode": "const count = $input.all().length;\nreturn [{ json: { pushed: count } }];\n"
       },
-      "id": "2772685b-6d07-43d1-8050-79bc8e5fcd37",
+      "id": "db26fb84-07db-4abd-9001-701a452e64cb",
       "name": "Count Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        544,
-        1248
+        400,
+        1312
       ]
     },
     {
@@ -394,13 +406,13 @@
         "width": 400,
         "color": 6
       },
-      "id": "d58bcbba-cec1-4b00-b818-dbe4f329a681",
+      "id": "8faf1321-1bd2-43a7-be0b-e79c48fa00c4",
       "name": "Setup Notes1",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -112,
-        880
+        -256,
+        944
       ]
     },
     {
@@ -410,13 +422,13 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "40628f93-892d-4d8c-b12e-995f789df2bd",
+      "id": "73d97a35-ea2c-428f-a9c6-f6fe4749c4f3",
       "name": "Webhook1",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -176,
-        1248
+        -320,
+        1312
       ],
       "webhookId": "cccccccc-cccc-cccc-cccc-cccccccccccc"
     },
@@ -435,13 +447,13 @@
           }
         }
       },
-      "id": "17cb97fc-f020-41f5-b453-400b70cc263b",
+      "id": "13372e9a-298b-4120-835d-79d285306f64",
       "name": "Respond to Webhook1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        784,
-        1248
+        640,
+        1312
       ]
     }
   ],

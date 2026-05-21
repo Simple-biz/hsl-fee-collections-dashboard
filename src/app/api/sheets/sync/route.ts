@@ -2,7 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { inArray, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cases, feeRecords } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import {
   mapSheetRows,
   MOCK_SHEET_ROWS,
@@ -63,6 +63,7 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
   assignedTo: r.assignedTo,
   winSheetStatus: r.winSheetStatus,
   winSheetLink: r.winSheetLink,
+  winSheetLinkText: r.winSheetLinkText,
   caseStatus: r.caseStatus,
   feesConfirmation: r.feesConfirmation,
   dateAssignedToAgent: r.dateAssignedToAgent,
@@ -82,6 +83,11 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
   auxFeeReceived: r.auxFeeReceived,
   auxPending: r.auxPending,
   auxFeeReceivedDate: r.auxFeeReceivedDate,
+  daysAfterApproval: r.daysAfterApproval,
+  approvalCategory: r.approvalCategory,
+  feesStatus: r.feesStatus,
+  weekAssignedToAgent: r.weekAssignedToAgent,
+  monthAssignedToAgent: r.monthAssignedToAgent,
 });
 
 const toCaseUpdate = (r: ParsedCaseRow) => ({
@@ -103,6 +109,7 @@ const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => (
   winSheetStatus: r.winSheetStatus,
   // Preserve existing win sheet link — only write incoming if DB is currently empty
   winSheetLink: existingWinSheetLink ?? r.winSheetLink,
+  winSheetLinkText: r.winSheetLinkText,
   caseStatus: r.caseStatus,
   feesConfirmation: r.feesConfirmation,
   dateAssignedToAgent: r.dateAssignedToAgent,
@@ -122,6 +129,11 @@ const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => (
   auxFeeReceived: r.auxFeeReceived,
   auxPending: r.auxPending,
   auxFeeReceivedDate: r.auxFeeReceivedDate,
+  daysAfterApproval: r.daysAfterApproval,
+  approvalCategory: r.approvalCategory,
+  feesStatus: r.feesStatus,
+  weekAssignedToAgent: r.weekAssignedToAgent,
+  monthAssignedToAgent: r.monthAssignedToAgent,
   updatedAt: new Date(),
 });
 
@@ -249,6 +261,16 @@ export const POST = async (req: NextRequest) => {
       for (const batch of chunked(newRows, CHUNK)) {
         await tx.insert(cases).values(batch.map(toCaseInsert));
         await tx.insert(feeRecords).values(batch.map(toFeeInsert));
+        const withNotes = batch.filter((r) => r.notes);
+        if (withNotes.length > 0) {
+          await tx.insert(activityLog).values(
+            withNotes.map((r) => ({
+              caseId: r.clientId,
+              message: r.notes!,
+              createdBy: "Sheet Sync",
+            })),
+          );
+        }
         inserted += batch.length;
       }
       for (const r of updateRows) {

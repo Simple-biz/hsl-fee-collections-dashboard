@@ -67,6 +67,9 @@ export const GET = async (req: NextRequest) => {
         feeMethod: feeRecords.feeMethod,
         applicableFeeCap: feeRecords.applicableFeeCap,
         syncStatus: feeRecords.syncStatus,
+        feesStatus: feeRecords.feesStatus,
+        weekAssignedToAgent: feeRecords.weekAssignedToAgent,
+        monthAssignedToAgent: feeRecords.monthAssignedToAgent,
         feeRecordUpdatedAt: feeRecords.updatedAt,
       })
       .from(cases)
@@ -192,6 +195,9 @@ export const GET = async (req: NextRequest) => {
               : "≤60"
             : null,
 
+        feesStatus: r.feesStatus ?? null,
+        weekAssignedToAgent: r.weekAssignedToAgent ?? null,
+        monthAssignedToAgent: r.monthAssignedToAgent ?? null,
         office: r.officeWithJurisdiction || "—",
         notesCount: notesCountMap.get(r.clientId) ?? 0,
       };
