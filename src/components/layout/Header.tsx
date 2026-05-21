@@ -18,6 +18,8 @@ const TABS = [
   { path: "/", label: "Overview" },
   { path: "/scoreboard", label: "Scoreboard" },
   { path: "/chronicle", label: "Chronicle Sync" },
+  { path: "/fee-petitions", label: "Fee Petitions" },
+  { path: "/overpaid-cases", label: "Overpaid Cases" },
   { path: "/reports", label: "Reports" },
   { path: "/notifications", label: "Notifications" },
 ];
