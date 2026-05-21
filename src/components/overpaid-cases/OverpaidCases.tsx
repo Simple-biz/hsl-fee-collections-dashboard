@@ -10,7 +10,7 @@ import {
   ArrowDown,
   ArrowUpDown,
   Check,
-  Gavel,
+  TrendingDown,
   Loader2,
   RefreshCw,
   ChevronLeft,
@@ -20,89 +20,66 @@ import {
   Undo2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmtDate } from "@/lib/formatters";
-import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists } from "@/app/(dashboard)/fee-petitions/actions";
+import { fmt, fmtFull } from "@/lib/formatters";
+import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared } from "@/app/(dashboard)/overpaid-cases/actions";
 
 // ---------- types ----------
-interface FeePetitionRow {
+interface OverpaidCaseRow {
   id: number;
   claimant: string;
-  approvalDate: string | null;
-  updatedAt: string | null;
-  noa: boolean;
-  timeDelineation: boolean;
-  feePetitionDoc: boolean;
-  ltrToClmt: boolean;
-  ltrToClmtWithSignature: boolean;
-  ltrToAlj: boolean;
-  faxConfFeePet: boolean;
+  assignedTo: string | null;
+  feesReceived: number;
+  overpaidAmount: number;
+  feesConfirmation: string | null;
+  opLtrReceived: string | null;
+  checksCleared: boolean;
   updateNote: string;
+  updatedAt: string | null;
 }
 
-type CheckboxKey =
-  | "noa"
-  | "timeDelineation"
-  | "feePetitionDoc"
-  | "ltrToClmt"
-  | "ltrToClmtWithSignature"
-  | "ltrToAlj"
-  | "faxConfFeePet";
-type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress";
+type CheckboxKey = "checksCleared";
+type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo";
 type SortDir = "asc" | "desc";
-type StatusFilter = "all" | "complete" | "incomplete";
-type TouchedFilter = "" | "none";
-type MissingFilter = "" | CheckboxKey;
+type StatusFilter = "all" | "cleared" | "pending";
+type LtrFilter = "" | "none";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
-const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress"];
-const CHECKBOX_KEYS = ["noa", "timeDelineation", "feePetitionDoc", "ltrToClmt", "ltrToClmtWithSignature", "ltrToAlj", "faxConfFeePet"] as const;
-
-const daysSince = (dateStr: string | null): number | null => {
-  if (!dateStr) return null;
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-};
-
-const formatRelativeDate = (dateStr: string): string => {
-  const diffDays = daysSince(dateStr) ?? 0;
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
-const STATUS_VALUES: StatusFilter[] = ["all", "complete", "incomplete"];
+const SORT_KEYS: SortKey[] = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo"];
+const STATUS_VALUES: StatusFilter[] = ["all", "cleared", "pending"];
 const DEFAULTS = {
   search: "",
   status: "all" as StatusFilter,
-  touched: "" as TouchedFilter,
-  missing: "" as MissingFilter,
-  sort: "approvalDate" as SortKey,
+  agent: "",
+  ltr: "" as LtrFilter,
+  minAmount: "",
+  maxAmount: "",
+  sort: "overpaidAmount" as SortKey,
   dir: "desc" as SortDir,
   page: 1,
   pageSize: 50,
 };
 
-const CHECKBOX_COLUMNS: { key: CheckboxKey; label: string }[] = [
-  { key: "noa", label: "NOA" },
-  { key: "timeDelineation", label: "Time Delineation" },
-  { key: "feePetitionDoc", label: "Fee Petition Doc" },
-  { key: "ltrToClmt", label: "Ltr to Clmt" },
-  { key: "ltrToClmtWithSignature", label: "Ltr to Clmt w/ Signature" },
-  { key: "ltrToAlj", label: "Ltr to ALJ" },
-  { key: "faxConfFeePet", label: "Fax Conf Fee Pet" },
-];
+const formatRelativeDate = (iso: string): string => {
+  const date = new Date(iso);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
 
-const patchPetition = async (
+const patchCase = async (
   caseId: number,
-  body: Partial<Omit<FeePetitionRow, "id" | "claimant">>,
+  body: Partial<Omit<OverpaidCaseRow, "id" | "claimant" | "feesReceived" | "overpaidAmount" | "feesConfirmation" | "updatedAt">>,
 ) => {
-  const result = await upsertFeePetition({ caseId, fields: body });
+  const result = await upsertOverpaidCase({ caseId, fields: body as Parameters<typeof upsertOverpaidCase>[0]["fields"] });
   if (!result.ok) throw new Error(result.error);
 };
 
 // ---------- component ----------
-export const FeePetitions = () => {
+export const OverpaidCases = () => {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -117,8 +94,10 @@ export const FeePetitions = () => {
     status: (STATUS_VALUES.includes(urlParams.get("status") as StatusFilter)
       ? (urlParams.get("status") as StatusFilter)
       : DEFAULTS.status) as StatusFilter,
-    touched: (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter,
-    missing: (CHECKBOX_KEYS.includes(urlParams.get("missing") as CheckboxKey) ? urlParams.get("missing") : "") as MissingFilter,
+    agent: urlParams.get("agent") ?? DEFAULTS.agent,
+    ltr: (urlParams.get("ltr") === "none" ? "none" : "") as LtrFilter,
+    minAmount: urlParams.get("minAmount") ?? DEFAULTS.minAmount,
+    maxAmount: urlParams.get("maxAmount") ?? DEFAULTS.maxAmount,
     sort: (SORT_KEYS.includes(urlParams.get("sort") as SortKey)
       ? (urlParams.get("sort") as SortKey)
       : DEFAULTS.sort) as SortKey,
@@ -129,10 +108,12 @@ export const FeePetitions = () => {
       : DEFAULTS.pageSize,
   }).current;
 
-  const [rows, setRows] = useState<FeePetitionRow[]>([]);
+  const [rows, setRows] = useState<OverpaidCaseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({ completeCount: 0, incompleteCount: 0, neverTouchedCount: 0 });
+  const [stats, setStats] = useState({ totalOverpaid: 0, clearedCount: 0, ltrCount: 0 });
+  const [pageTotals, setPageTotals] = useState({ pageFeesReceived: 0, pageOverpaid: 0 });
+  const [agents, setAgents] = useState<{ name: string; count: number }[]>([]);
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -143,19 +124,21 @@ export const FeePetitions = () => {
   const [total, setTotal] = useState(0);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialState.status);
-  const [touchedFilter, setTouchedFilter] = useState<TouchedFilter>(initialState.touched);
-  const [missingFilter, setMissingFilter] = useState<MissingFilter>(initialState.missing);
+  const [agentFilter, setAgentFilter] = useState(initialState.agent);
+  const [ltrFilter, setLtrFilter] = useState<LtrFilter>(initialState.ltr);
+  const [minAmount, setMinAmount] = useState(initialState.minAmount);
+  const [maxAmount, setMaxAmount] = useState(initialState.maxAmount);
+  const [appliedMinAmount, setAppliedMinAmount] = useState(initialState.minAmount);
+  const [appliedMaxAmount, setAppliedMaxAmount] = useState(initialState.maxAmount);
+  const amountDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkClearing, setBulkClearing] = useState(false);
   const [bulkConfirming, setBulkConfirming] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [undoInfo, setUndoInfo] = useState<{
-    rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
-    expiresAt: number;
-  } | null>(null);
+  const [undoInfo, setUndoInfo] = useState<{ caseIds: number[]; expiresAt: number } | null>(null);
   const [undoing, setUndoing] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
@@ -166,8 +149,10 @@ export const FeePetitions = () => {
     const params = new URLSearchParams();
     if (appliedSearch) params.set("q", appliedSearch);
     if (statusFilter !== DEFAULTS.status) params.set("status", statusFilter);
-    if (touchedFilter) params.set("touched", touchedFilter);
-    if (missingFilter) params.set("missing", missingFilter);
+    if (agentFilter !== DEFAULTS.agent) params.set("agent", agentFilter);
+    if (ltrFilter) params.set("ltr", ltrFilter);
+    if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+    if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
     if (sortKey !== DEFAULTS.sort) params.set("sort", sortKey);
     if (sortDir !== DEFAULTS.dir) params.set("dir", sortDir);
     if (page !== DEFAULTS.page) params.set("page", String(page));
@@ -182,7 +167,7 @@ export const FeePetitions = () => {
       { scroll: false },
     );
     urlMethodRef.current = "replace";
-  }, [appliedSearch, statusFilter, touchedFilter, missingFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
+  }, [appliedSearch, statusFilter, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
 
   // Sync URL → state (back/forward)
   useEffect(() => {
@@ -191,9 +176,6 @@ export const FeePetitions = () => {
     const urlStatus = STATUS_VALUES.includes(urlStatusRaw as StatusFilter)
       ? (urlStatusRaw as StatusFilter)
       : DEFAULTS.status;
-    const urlTouched = (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter;
-    const urlMissingRaw = urlParams.get("missing");
-    const urlMissing = (CHECKBOX_KEYS.includes(urlMissingRaw as CheckboxKey) ? urlMissingRaw : "") as MissingFilter;
     const urlSortRaw = urlParams.get("sort") as SortKey | null;
     const urlSort = SORT_KEYS.includes(urlSortRaw as SortKey)
       ? (urlSortRaw as SortKey)
@@ -202,11 +184,17 @@ export const FeePetitions = () => {
     const urlPage = Math.max(1, parseInt(urlParams.get("page") || "1") || 1);
     const sizeNum = parseInt(urlParams.get("size") || "0");
     const urlSize = PAGE_SIZE_OPTIONS.includes(sizeNum) ? sizeNum : DEFAULTS.pageSize;
+    const urlAgent = urlParams.get("agent") ?? DEFAULTS.agent;
+    const urlLtr = (urlParams.get("ltr") === "none" ? "none" : "") as LtrFilter;
+    const urlMin = urlParams.get("minAmount") ?? DEFAULTS.minAmount;
+    const urlMax = urlParams.get("maxAmount") ?? DEFAULTS.maxAmount;
 
     if (urlSearch !== appliedSearch) { setSearch(urlSearch); setAppliedSearch(urlSearch); }
     if (urlStatus !== statusFilter) setStatusFilter(urlStatus);
-    if (urlTouched !== touchedFilter) setTouchedFilter(urlTouched);
-    if (urlMissing !== missingFilter) setMissingFilter(urlMissing);
+    if (urlAgent !== agentFilter) setAgentFilter(urlAgent);
+    if (urlLtr !== ltrFilter) setLtrFilter(urlLtr);
+    if (urlMin !== appliedMinAmount) { setMinAmount(urlMin); setAppliedMinAmount(urlMin); }
+    if (urlMax !== appliedMaxAmount) { setMaxAmount(urlMax); setAppliedMaxAmount(urlMax); }
     if (urlSort !== sortKey) setSortKey(urlSort);
     if (urlDir !== sortDir) setSortDir(urlDir);
     if (urlPage !== page) setPage(urlPage);
@@ -215,9 +203,16 @@ export const FeePetitions = () => {
   }, [urlParams]);
 
   const noteSnapshot = useRef<Map<number, string>>(new Map());
+  const ltrSnapshot = useRef<Map<number, string | null>>(new Map());
+  const confirmationSnapshot = useRef<Map<number, string>>(new Map());
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [ltrState, setLtrState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [confirmationState, setConfirmationState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [liveMessage, setLiveMessage] = useState("");
-  const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
+  // Keyed by `${rowId}:${field}` so the three inline fields on one row don't
+  // share a timer slot — otherwise one field's reset can cancel another's,
+  // leaving a "saved ✓" stuck on screen.
+  const savedTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
     const timers = savedTimerRef.current;
@@ -236,9 +231,19 @@ export const FeePetitions = () => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
+  useEffect(() => {
+    if (amountDebounceRef.current) clearTimeout(amountDebounceRef.current);
+    amountDebounceRef.current = setTimeout(() => {
+      setAppliedMinAmount(minAmount.trim());
+      setAppliedMaxAmount(maxAmount.trim());
+      setPage(1);
+    }, 500);
+    return () => { if (amountDebounceRef.current) clearTimeout(amountDebounceRef.current); };
+  }, [minAmount, maxAmount]);
+
   const fetchAbortRef = useRef<AbortController | null>(null);
 
-  const fetchPetitions = useCallback(async () => {
+  const fetchCases = useCallback(async () => {
     fetchAbortRef.current?.abort();
     const controller = new AbortController();
     fetchAbortRef.current = controller;
@@ -252,38 +257,47 @@ export const FeePetitions = () => {
       });
       if (appliedSearch) params.set("search", appliedSearch);
       if (statusFilter !== "all") params.set("status", statusFilter);
-      if (touchedFilter) params.set("touched", touchedFilter);
-      if (missingFilter) params.set("missing", missingFilter);
+      if (agentFilter) params.set("agent", agentFilter);
+      if (ltrFilter) params.set("ltr", ltrFilter);
+      if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+      if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
       params.set("sort", sortKey);
       params.set("dir", sortDir);
-      const res = await fetch(`/api/fee-petitions?${params.toString()}`, {
+      const res = await fetch(`/api/overpaid-cases?${params.toString()}`, {
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(`Failed to load fee petitions (${res.status})`);
+      if (!res.ok) throw new Error(`Failed to load overpaid cases (${res.status})`);
       const json = await res.json();
-      const data: FeePetitionRow[] = json.data || [];
+      const data: OverpaidCaseRow[] = json.data || [];
       setRows(data);
       setSelectedIds(new Set());
       setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
       setStats({
-        completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
-        incompleteCount: typeof json.incompleteCount === "number" ? json.incompleteCount : 0,
-        neverTouchedCount: typeof json.neverTouchedCount === "number" ? json.neverTouchedCount : 0,
+        totalOverpaid: typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0,
+        clearedCount: typeof json.clearedCount === "number" ? json.clearedCount : 0,
+        ltrCount: typeof json.ltrCount === "number" ? json.ltrCount : 0,
       });
+      setPageTotals({
+        pageFeesReceived: typeof json.pageFeesReceived === "number" ? json.pageFeesReceived : 0,
+        pageOverpaid: typeof json.pageOverpaid === "number" ? json.pageOverpaid : 0,
+      });
+      if (Array.isArray(json.agents)) setAgents(json.agents);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
+      ltrSnapshot.current = new Map(data.map((r) => [r.id, r.opLtrReceived]));
+      confirmationSnapshot.current = new Map(data.map((r) => [r.id, r.feesConfirmation ?? ""]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       if (fetchAbortRef.current === controller) setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, statusFilter, touchedFilter, missingFilter, sortKey, sortDir]);
+  }, [page, pageSize, appliedSearch, statusFilter, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir]);
 
   useEffect(() => {
-    fetchPetitions();
+    fetchCases();
     return () => { fetchAbortRef.current?.abort(); };
-  }, [fetchPetitions]);
+  }, [fetchCases]);
 
   // Update select-all indeterminate state
   useEffect(() => {
@@ -297,16 +311,22 @@ export const FeePetitions = () => {
   const hasFilters =
     appliedSearch !== DEFAULTS.search ||
     statusFilter !== DEFAULTS.status ||
-    touchedFilter !== DEFAULTS.touched ||
-    missingFilter !== DEFAULTS.missing;
+    agentFilter !== DEFAULTS.agent ||
+    ltrFilter !== DEFAULTS.ltr ||
+    appliedMinAmount !== DEFAULTS.minAmount ||
+    appliedMaxAmount !== DEFAULTS.maxAmount;
 
   const clearAllFilters = () => {
     urlMethodRef.current = "push";
     setSearch(DEFAULTS.search);
     setAppliedSearch(DEFAULTS.search);
     setStatusFilter(DEFAULTS.status);
-    setTouchedFilter(DEFAULTS.touched);
-    setMissingFilter(DEFAULTS.missing);
+    setAgentFilter(DEFAULTS.agent);
+    setLtrFilter(DEFAULTS.ltr);
+    setMinAmount(DEFAULTS.minAmount);
+    setMaxAmount(DEFAULTS.maxAmount);
+    setAppliedMinAmount(DEFAULTS.minAmount);
+    setAppliedMaxAmount(DEFAULTS.maxAmount);
     setPage(1);
   };
 
@@ -336,49 +356,24 @@ export const FeePetitions = () => {
     });
   };
 
-  const handleBulkMarkComplete = async () => {
+  const handleBulkMarkCleared = async () => {
     if (selectedIds.size === 0 || bulkClearing) return;
     setBulkClearing(true);
     const ids = Array.from(selectedIds);
-    const previouslyIncomplete = rows.filter(
-      (r) => ids.includes(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
-    );
-    const snapshot = previouslyIncomplete.map((r) => ({
-      caseId: r.id,
-      fields: CHECKBOX_KEYS.reduce(
-        (acc, k) => ({ ...acc, [k]: r[k] }),
-        {} as Record<CheckboxKey, boolean>,
-      ),
-    }));
-    const notYetComplete = previouslyIncomplete.length;
+    const previouslyUnclearedIds = rows.filter((r) => ids.includes(r.id) && !r.checksCleared).map((r) => r.id);
     try {
-      const result = await bulkMarkComplete({ caseIds: ids });
+      const result = await bulkMarkCleared({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
-      const today = new Date().toISOString().slice(0, 10);
-      setRows((prev) =>
-        prev.map((r) =>
-          ids.includes(r.id)
-            ? {
-                ...r,
-                noa: true, timeDelineation: true, feePetitionDoc: true,
-                ltrToClmt: true, ltrToClmtWithSignature: true, ltrToAlj: true,
-                faxConfFeePet: true, updatedAt: today,
-              }
-            : r,
-        ),
-      );
-      setStats((s) => ({
-        ...s,
-        completeCount: s.completeCount + notYetComplete,
-        incompleteCount: Math.max(0, s.incompleteCount - notYetComplete),
-      }));
-      if (statusFilter === "incomplete") {
+      setRows((prev) => prev.map((r) => ids.includes(r.id) ? { ...r, checksCleared: true } : r));
+      setStats((s) => ({ ...s, clearedCount: s.clearedCount + previouslyUnclearedIds.length }));
+      if (statusFilter === "pending") {
         setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
         setTotal((tot) => Math.max(0, tot - ids.length));
       }
-      clearSelection();
-      if (snapshot.length > 0) {
-        setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
+      setSelectedIds(new Set());
+      setBulkConfirming(false);
+      if (previouslyUnclearedIds.length > 0) {
+        setUndoInfo({ caseIds: previouslyUnclearedIds, expiresAt: Date.now() + 8000 });
       }
     } catch (err) {
       setError((err as Error).message);
@@ -390,26 +385,16 @@ export const FeePetitions = () => {
   const handleUndoBulk = async () => {
     if (!undoInfo || undoing) return;
     setUndoing(true);
-    const snapshot = undoInfo.rows;
+    const restoreIds = undoInfo.caseIds;
     try {
-      const result = await bulkRestoreChecklists({ rows: snapshot });
+      const result = await bulkRestoreCleared({ caseIds: restoreIds });
       if (!result.ok) throw new Error(result.error);
       setUndoInfo(null);
-      if (statusFilter === "incomplete") {
-        fetchPetitions();
+      if (statusFilter === "pending") {
+        fetchCases();
       } else {
-        const byId = new Map(snapshot.map((r) => [r.caseId, r.fields]));
-        setRows((prev) =>
-          prev.map((r) => {
-            const f = byId.get(r.id);
-            return f ? { ...r, ...f } : r;
-          }),
-        );
-        setStats((s) => ({
-          ...s,
-          completeCount: Math.max(0, s.completeCount - snapshot.length),
-          incompleteCount: s.incompleteCount + snapshot.length,
-        }));
+        setRows((prev) => prev.map((r) => restoreIds.includes(r.id) ? { ...r, checksCleared: false } : r));
+        setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount - restoreIds.length) }));
       }
     } catch (err) {
       setError((err as Error).message);
@@ -456,49 +441,24 @@ export const FeePetitions = () => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
     const next = !prevRow[key];
-    const wasComplete = CHECKBOX_COLUMNS.every((c) => prevRow[c.key]);
-    const isComplete = CHECKBOX_COLUMNS.every((c) =>
-      c.key === key ? next : prevRow[c.key],
-    );
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: next } : r)));
     try {
-      await patchPetition(id, { [key]: next });
-      const today = new Date().toISOString().slice(0, 10);
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
-      const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
-      setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
-      if (statusFilter === "all") {
-        // Row stays visible — keep the Complete/Incomplete stat cards in sync.
-        if (wasComplete !== isComplete) {
-          setStats((s) => ({
-            ...s,
-            completeCount: Math.max(0, s.completeCount + (isComplete ? 1 : -1)),
-            incompleteCount: Math.max(0, s.incompleteCount + (isComplete ? -1 : 1)),
-          }));
-        }
-      } else {
-        const stillMatches = statusFilter === "complete" ? isComplete : !isComplete;
-        if (!stillMatches) {
-          // Row no longer matches the active filter — drop it and keep the
-          // filtered stat count aligned with the new total.
-          setRows((prev) => prev.filter((r) => r.id !== id));
-          setTotal((tot) => Math.max(0, tot - 1));
-          setStats((s) => ({
-            ...s,
-            completeCount:
-              statusFilter === "complete"
-                ? Math.max(0, s.completeCount - 1)
-                : s.completeCount,
-            incompleteCount:
-              statusFilter === "incomplete"
-                ? Math.max(0, s.incompleteCount - 1)
-                : s.incompleteCount,
-          }));
-        }
+      await patchCase(id, { [key]: next });
+      if (key === "checksCleared") {
+        setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount + (next ? 1 : -1)) }));
+      }
+      if (statusFilter === "cleared" && key === "checksCleared" && !next) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setTotal((tot) => Math.max(0, tot - 1));
+      } else if (statusFilter === "pending" && key === "checksCleared" && next) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setTotal((tot) => Math.max(0, tot - 1));
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
-      setLiveMessage("Save failed");
+      if (key === "checksCleared") {
+        setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount + (next ? -1 : 1)) }));
+      }
       setError((err as Error).message);
     }
   };
@@ -507,21 +467,55 @@ export const FeePetitions = () => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updateNote: value } : r)));
   };
 
-  const persistUpdateNote = async (row: FeePetitionRow) => {
+  const setLtrDateLocal = (id: number, value: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, opLtrReceived: value || null } : r)));
+  };
+
+  const setConfirmationLocal = (id: number, value: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, feesConfirmation: value } : r)));
+  };
+
+  const persistConfirmation = async (row: OverpaidCaseRow) => {
+    const current = row.feesConfirmation ?? "";
+    if (confirmationSnapshot.current.get(row.id) === current) return;
+    const timerKey = `${row.id}:confirmation`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
+    setConfirmationState((s) => ({ ...s, [row.id]: "saving" }));
+    try {
+      const result = await updateFeesConfirmation({ caseId: row.id, feesConfirmation: current });
+      if (!result.ok) throw new Error(result.error);
+      confirmationSnapshot.current.set(row.id, current);
+      setConfirmationState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Confirmation saved");
+      const timer = setTimeout(() => {
+        setConfirmationState((s) => ({ ...s, [row.id]: undefined }));
+        savedTimerRef.current.delete(timerKey);
+      }, 1500);
+      savedTimerRef.current.set(timerKey, timer);
+    } catch (err) {
+      setConfirmationState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Confirmation save failed");
+      setError((err as Error).message);
+    }
+  };
+
+  const persistUpdateNote = async (row: OverpaidCaseRow) => {
     if (noteSnapshot.current.get(row.id) === row.updateNote) return;
-    const existingTimer = savedTimerRef.current.get(row.id);
+    const timerKey = `${row.id}:note`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
     if (existingTimer) clearTimeout(existingTimer);
     setNoteState((s) => ({ ...s, [row.id]: "saving" }));
     try {
-      await patchPetition(row.id, { updateNote: row.updateNote });
+      await patchCase(row.id, { updateNote: row.updateNote });
       noteSnapshot.current.set(row.id, row.updateNote);
       setNoteState((s) => ({ ...s, [row.id]: "saved" }));
       setLiveMessage("Note saved");
       const timer = setTimeout(() => {
         setNoteState((s) => ({ ...s, [row.id]: undefined }));
-        savedTimerRef.current.delete(row.id);
+        savedTimerRef.current.delete(timerKey);
       }, 1500);
-      savedTimerRef.current.set(row.id, timer);
+      savedTimerRef.current.set(timerKey, timer);
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
       setLiveMessage("Note save failed");
@@ -529,59 +523,83 @@ export const FeePetitions = () => {
     }
   };
 
+  const persistLtrDate = async (row: OverpaidCaseRow) => {
+    const prev = ltrSnapshot.current.get(row.id);
+    if (prev === row.opLtrReceived) return;
+    const timerKey = `${row.id}:ltr`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
+    setLtrState((s) => ({ ...s, [row.id]: "saving" }));
+    try {
+      await patchCase(row.id, { opLtrReceived: row.opLtrReceived });
+      const wasSet = prev != null;
+      const nowSet = row.opLtrReceived != null;
+      if (!wasSet && nowSet) setStats((s) => ({ ...s, ltrCount: s.ltrCount + 1 }));
+      if (wasSet && !nowSet) setStats((s) => ({ ...s, ltrCount: Math.max(0, s.ltrCount - 1) }));
+      ltrSnapshot.current.set(row.id, row.opLtrReceived);
+      setLtrState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage(row.opLtrReceived ? "LTR date saved" : "LTR date cleared");
+      const timer = setTimeout(() => {
+        setLtrState((s) => ({ ...s, [row.id]: undefined }));
+        savedTimerRef.current.delete(timerKey);
+      }, 1500);
+      savedTimerRef.current.set(timerKey, timer);
+    } catch (err) {
+      setLtrState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("LTR date save failed");
+      setError((err as Error).message);
+    }
+  };
+
+  const [exporting, setExporting] = useState(false);
+
   const downloadCsv = async () => {
     setExporting(true);
     try {
-      let all: FeePetitionRow[];
+      let all: OverpaidCaseRow[];
       if (selectedIds.size > 0) {
         all = rows.filter((r) => selectedIds.has(r.id));
       } else {
         const params = new URLSearchParams({ page: "1", limit: "10000" });
         if (appliedSearch) params.set("search", appliedSearch);
         if (statusFilter !== "all") params.set("status", statusFilter);
-        if (touchedFilter) params.set("touched", touchedFilter);
-        if (missingFilter) params.set("missing", missingFilter);
+        if (agentFilter) params.set("agent", agentFilter);
+        if (ltrFilter) params.set("ltr", ltrFilter);
+        if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
+        if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
         params.set("sort", sortKey);
         params.set("dir", sortDir);
-        const res = await fetch(`/api/fee-petitions?${params.toString()}`);
+        const res = await fetch(`/api/overpaid-cases?${params.toString()}`);
         if (!res.ok) throw new Error(`Export failed (${res.status})`);
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = [
-        "Case", "Approval Date", "Last Updated", "Progress",
-        "NOA", "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
-        "Ltr to Clmt w/ Signature", "Ltr to ALJ", "Fax Conf Fee Pet", "Notes",
-      ];
+      const headers = ["Case", "Assigned To", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
       };
       const csvRows = [
         headers.join(","),
-        ...all.map((r) => {
-          const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (r[c.key] ? 1 : 0), 0);
-          return [
+        ...all.map((r) =>
+          [
             escape(r.claimant),
-            r.approvalDate ?? "",
-            r.updatedAt ?? "",
-            `${completedCount}/${CHECKBOX_COLUMNS.length}`,
-            r.noa ? "Yes" : "No",
-            r.timeDelineation ? "Yes" : "No",
-            r.feePetitionDoc ? "Yes" : "No",
-            r.ltrToClmt ? "Yes" : "No",
-            r.ltrToClmtWithSignature ? "Yes" : "No",
-            r.ltrToAlj ? "Yes" : "No",
-            r.faxConfFeePet ? "Yes" : "No",
+            escape(r.assignedTo ?? ""),
+            r.feesReceived.toFixed(2),
+            r.overpaidAmount.toFixed(2),
+            escape(r.feesConfirmation ?? ""),
+            r.opLtrReceived ?? "",
             escape(r.updateNote),
-          ].join(",");
-        }),
+            r.checksCleared ? "Yes" : "No",
+            r.updatedAt ? new Date(r.updatedAt).toLocaleDateString("en-US") : "",
+          ].join(","),
+        ),
       ].join("\n");
       const blob = new Blob([csvRows], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `fee-petitions-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `overpaid-cases-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -595,9 +613,9 @@ export const FeePetitions = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
-  const selectedIncompleteCount = rows.filter(
-    (r) => selectedIds.has(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
-  ).length;
+  const { pageFeesReceived, pageOverpaid } = pageTotals;
+
+  const selectedUnclearedCount = rows.filter((r) => selectedIds.has(r.id) && !r.checksCleared).length;
 
   const isInitialLoad = loading && rows.length === 0;
   const isRefreshing = loading && rows.length > 0;
@@ -613,7 +631,6 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 6;
 
   return (
     <div className="space-y-4">
@@ -623,40 +640,65 @@ export const FeePetitions = () => {
       {/* Page header */}
       <div className={`${sectionCard} p-4 md:p-5`}>
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-indigo-900/40" : "bg-indigo-50"}`}>
-            <Gavel aria-hidden="true" className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-600"}`} />
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-amber-900/40" : "bg-amber-50"}`}
+          >
+            <TrendingDown
+              aria-hidden="true"
+              className={`h-5 w-5 ${dark ? "text-amber-400" : "text-amber-600"}`}
+            />
           </div>
           <div>
-            <h3 className={`text-sm font-bold ${t.text}`}>Fee Petitions</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>Track and manage fee petition filings</p>
+            <h3 className={`text-sm font-bold ${t.text}`}>Overpaid Cases</h3>
+            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+              Cases where fees received exceed expected amount
+            </p>
           </div>
         </div>
       </div>
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total Cases", value: isInitialLoad ? "—" : String(total), sub: "at fee petition stage" },
-          {
-            label: "Complete",
-            value: isInitialLoad ? "—" : `${stats.completeCount} / ${total}`,
-            sub: "all steps done",
-            color: dark ? "text-emerald-400" : "text-emerald-600",
-          },
-          {
-            label: "Incomplete",
-            value: isInitialLoad ? "—" : `${stats.incompleteCount} / ${total}`,
-            sub: "pending steps",
-            color: dark ? "text-amber-400" : "text-amber-600",
-          },
-          { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
-        ].map((s) => (
-          <div key={s.label} className={`${sectionCard} p-4`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
-            <p className={`text-xl font-bold mt-1 ${"color" in s ? s.color : t.text}`}>{s.value}</p>
-            <p className={`text-[10px] ${t.textMuted} mt-0.5`}>{s.sub}</p>
-          </div>
-        ))}
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Cases</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : String(total)}</p>
+          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>with overpayment</p>
+        </div>
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
+          <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{isInitialLoad ? "—" : fmtFull(stats.totalOverpaid)}</p>
+          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
+        </div>
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Checks Cleared</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : `${stats.clearedCount} / ${total}`}</p>
+          {!isInitialLoad && total > 0 && (
+            <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
+              <div
+                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${Math.min(100, (stats.clearedCount / total) * 100)}%` }}
+              />
+            </div>
+          )}
+          <p className={`text-[10px] ${t.textMuted} mt-1`}>
+            {!isInitialLoad && total > 0 ? `${Math.round((stats.clearedCount / total) * 100)}% resolved` : "cases resolved"}
+          </p>
+        </div>
+        <div className={`${sectionCard} p-4`}>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
+          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : `${stats.ltrCount} / ${total}`}</p>
+          {!isInitialLoad && total > 0 && (
+            <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
+              <div
+                className="h-1.5 rounded-full bg-indigo-500 transition-all duration-300"
+                style={{ width: `${Math.min(100, (stats.ltrCount / total) * 100)}%` }}
+              />
+            </div>
+          )}
+          <p className={`text-[10px] ${t.textMuted} mt-1`}>
+            {!isInitialLoad && total > 0 ? `${Math.round((stats.ltrCount / total) * 100)}% on file` : "letters on file"}
+          </p>
+        </div>
       </div>
 
       {/* Error */}
@@ -666,7 +708,7 @@ export const FeePetitions = () => {
           className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
           <span className="text-sm">{error}</span>
-          <button onClick={fetchPetitions} className="ml-auto text-xs font-medium underline">Retry</button>
+          <button onClick={fetchCases} className="ml-auto text-xs font-medium underline">Retry</button>
         </div>
       )}
 
@@ -677,7 +719,7 @@ export const FeePetitions = () => {
           className={`rounded-xl border p-3 flex items-center gap-3 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
         >
           <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
-          <span className="text-sm">Marked {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"} as complete.</span>
+          <span className="text-sm">Marked {undoInfo.caseIds.length} case{undoInfo.caseIds.length === 1 ? "" : "s"} as cleared.</span>
           <button
             onClick={handleUndoBulk}
             disabled={undoing}
@@ -706,11 +748,11 @@ export const FeePetitions = () => {
                 {bulkConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
-                      Mark {selectedIncompleteCount} case{selectedIncompleteCount !== 1 ? "s" : ""} as complete?
+                      Mark {selectedUnclearedCount} case{selectedUnclearedCount !== 1 ? "s" : ""} as cleared?
                     </span>
                     <button
-                      onClick={handleBulkMarkComplete}
-                      disabled={bulkClearing || selectedIncompleteCount === 0}
+                      onClick={handleBulkMarkCleared}
+                      disabled={bulkClearing || selectedUnclearedCount === 0}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       {bulkClearing
@@ -729,21 +771,21 @@ export const FeePetitions = () => {
                   <>
                     <span className={`text-sm font-bold ${t.text}`}>
                       {selectedIds.size} selected
-                      {selectedIncompleteCount < selectedIds.size && (
+                      {selectedUnclearedCount < selectedIds.size && (
                         <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-                          ({selectedIncompleteCount} to complete)
+                          ({selectedUnclearedCount} to clear)
                         </span>
                       )}
                     </span>
                     <button
                       onClick={() => setBulkConfirming(true)}
-                      disabled={selectedIncompleteCount === 0}
-                      aria-label="Mark selected cases as complete"
-                      title={selectedIncompleteCount === 0 ? "All selected cases are already complete" : undefined}
+                      disabled={selectedUnclearedCount === 0}
+                      aria-label="Mark selected cases as cleared"
+                      title={selectedUnclearedCount === 0 ? "All selected cases are already cleared" : undefined}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
-                      Mark Complete
+                      Mark Cleared
                     </button>
                     <button
                       onClick={clearSelection}
@@ -758,13 +800,13 @@ export const FeePetitions = () => {
             ) : (
               <>
                 <h3 className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
-                  Petitions
+                  Cases
                   {isRefreshing && (
                     <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                   )}
                 </h3>
                 <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-                  {total === 0 ? "0 petitions" : `Showing ${rangeStart}–${rangeEnd} of ${total} petitions`}
+                  {total === 0 ? "0 cases" : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
                 </p>
               </>
             )}
@@ -772,9 +814,15 @@ export const FeePetitions = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 sm:flex-none">
               {search.trim() !== appliedSearch ? (
-                <Loader2 aria-hidden="true" className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin ${t.textMuted}`} />
+                <Loader2
+                  aria-hidden="true"
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin ${t.textMuted}`}
+                />
               ) : (
-                <Search aria-hidden="true" className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`} />
+                <Search
+                  aria-hidden="true"
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
+                />
               )}
               <input
                 value={search}
@@ -787,22 +835,22 @@ export const FeePetitions = () => {
             <select
               value={statusFilter}
               onChange={(e) => { urlMethodRef.current = "push"; setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
-              aria-label="Filter by completion status"
+              aria-label="Filter by status"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
               <option value="all">All</option>
-              <option value="complete">Complete</option>
-              <option value="incomplete">Incomplete</option>
+              <option value="cleared">Checks Cleared</option>
+              <option value="pending">Pending</option>
             </select>
             <select
-              value={missingFilter}
-              onChange={(e) => { urlMethodRef.current = "push"; setMissingFilter(e.target.value as MissingFilter); setPage(1); }}
-              aria-label="Filter by missing step"
+              value={agentFilter}
+              onChange={(e) => { urlMethodRef.current = "push"; setAgentFilter(e.target.value); setPage(1); }}
+              aria-label="Filter by assigned agent"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
-              <option value="">Missing: Any</option>
-              {CHECKBOX_COLUMNS.map((col) => (
-                <option key={col.key} value={col.key}>{col.label}</option>
+              <option value="">All Agents</option>
+              {agents.map((a) => (
+                <option key={a.name} value={a.name}>{a.name} ({a.count})</option>
               ))}
             </select>
             <select
@@ -831,27 +879,65 @@ export const FeePetitions = () => {
           </div>
         </div>
 
-        {/* Quick filter presets */}
+        {/* Quick filter presets + amount range */}
         <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
           <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
           <button
-            onClick={() => { urlMethodRef.current = "push"; setStatusFilter((v) => (v === "incomplete" ? "all" : "incomplete")); setPage(1); }}
-            className={`${presetBase} ${statusFilter === "incomplete" ? presetActive : t.outlineBtn}`}
+            onClick={() => {
+              urlMethodRef.current = "push";
+              const isActive = appliedMinAmount === "3000" && appliedMaxAmount === "";
+              setMinAmount(isActive ? "" : "3000");
+              setAppliedMinAmount(isActive ? "" : "3000");
+              setMaxAmount("");
+              setAppliedMaxAmount("");
+              setPage(1);
+            }}
+            className={`${presetBase} ${appliedMinAmount === "3000" && appliedMaxAmount === "" ? presetActive : t.outlineBtn}`}
           >
-            Incomplete
+            High Value (≥$3k)
           </button>
           <button
-            onClick={() => { urlMethodRef.current = "push"; setStatusFilter((v) => (v === "complete" ? "all" : "complete")); setPage(1); }}
-            className={`${presetBase} ${statusFilter === "complete" ? presetActive : t.outlineBtn}`}
+            onClick={() => {
+              urlMethodRef.current = "push";
+              setLtrFilter((v) => (v === "none" ? "" : "none"));
+              setPage(1);
+            }}
+            className={`${presetBase} ${ltrFilter === "none" ? presetActive : t.outlineBtn}`}
           >
-            Complete
+            No LTR Sent
           </button>
           <button
-            onClick={() => { urlMethodRef.current = "push"; setTouchedFilter((v) => (v === "none" ? "" : "none")); setPage(1); }}
-            className={`${presetBase} ${touchedFilter === "none" ? presetActive : t.outlineBtn}`}
+            onClick={() => {
+              urlMethodRef.current = "push";
+              setStatusFilter((v) => (v === "pending" ? "all" : "pending"));
+              setPage(1);
+            }}
+            className={`${presetBase} ${statusFilter === "pending" ? presetActive : t.outlineBtn}`}
           >
-            Never Touched
+            Pending
           </button>
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <span className={`text-[11px] ${t.textMuted}`}>$</span>
+            <input
+              type="number"
+              min={0}
+              value={minAmount}
+              onChange={(e) => setMinAmount(e.target.value)}
+              placeholder="Min"
+              aria-label="Minimum overpaid amount"
+              className={`h-7 w-20 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+            />
+            <span className={`text-[11px] ${t.textMuted}`}>–</span>
+            <input
+              type="number"
+              min={0}
+              value={maxAmount}
+              onChange={(e) => setMaxAmount(e.target.value)}
+              placeholder="Max"
+              aria-label="Maximum overpaid amount"
+              className={`h-7 w-20 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+            />
+          </div>
         </div>
 
         {/* Active filter chips */}
@@ -867,24 +953,40 @@ export const FeePetitions = () => {
             )}
             {statusFilter !== "all" && (
               <span className={chipBase}>
-                Status: {statusFilter === "complete" ? "Complete" : "Incomplete"}
+                Status: {statusFilter === "cleared" ? "Checks Cleared" : "Pending"}
                 <button aria-label="Clear status filter" onClick={() => { urlMethodRef.current = "push"; setStatusFilter("all"); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
             )}
-            {touchedFilter === "none" && (
+            {agentFilter && (
               <span className={chipBase}>
-                Never Touched
-                <button aria-label="Clear touched filter" onClick={() => { urlMethodRef.current = "push"; setTouchedFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                Agent: {agentFilter}
+                <button aria-label="Clear agent filter" onClick={() => { urlMethodRef.current = "push"; setAgentFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
             )}
-            {missingFilter && (
+            {ltrFilter === "none" && (
               <span className={chipBase}>
-                Missing: {CHECKBOX_COLUMNS.find((c) => c.key === missingFilter)?.label}
-                <button aria-label="Clear missing filter" onClick={() => { urlMethodRef.current = "push"; setMissingFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                No LTR Sent
+                <button aria-label="Clear LTR filter" onClick={() => { urlMethodRef.current = "push"; setLtrFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {appliedMinAmount && (
+              <span className={chipBase}>
+                Min: ${appliedMinAmount}
+                <button aria-label="Clear minimum amount filter" onClick={() => { setMinAmount(""); setAppliedMinAmount(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {appliedMaxAmount && (
+              <span className={chipBase}>
+                Max: ${appliedMaxAmount}
+                <button aria-label="Clear maximum amount filter" onClick={() => { setMaxAmount(""); setAppliedMaxAmount(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
@@ -895,12 +997,24 @@ export const FeePetitions = () => {
           </div>
         )}
 
+        {/* Legend */}
+        <div className={`px-4 py-1.5 flex items-center gap-4 flex-wrap border-b ${t.borderLight}`}>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Key</span>
+          <span className="flex items-center gap-1.5">
+            <span className={`inline-block w-4 h-4 rounded-sm border-l-2 border-l-amber-500 ${dark ? "bg-neutral-800" : "bg-neutral-100"}`} />
+            <span className={`text-[11px] ${t.textMuted}`}>Overpaid amount ≥ $3,000</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${dark ? "bg-amber-400" : "bg-amber-500"}`} />
+            <span className={`text-[11px] ${t.textMuted}`}>No workflow data entered</span>
+          </span>
+        </div>
+
         {/* Table */}
         <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
-          <table className="w-full min-w-250">
+          <table className="w-full min-w-200">
             <thead>
               <tr className={`border-b ${t.borderLight}`}>
-                {/* Select-all checkbox */}
                 <th className={`${thBase} text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
                   <input
                     ref={selectAllRef}
@@ -919,70 +1033,79 @@ export const FeePetitions = () => {
                     onClick={() => toggleSort("claimant")}
                     className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                   >
-                    Claimant {sortIcon("claimant")}
+                    Case {sortIcon("claimant")}
                   </button>
                 </th>
                 <th
-                  aria-sort={ariaSortFor("approvalDate")}
+                  aria-sort={ariaSortFor("assignedTo")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
                   <button
                     type="button"
-                    onClick={() => toggleSort("approvalDate")}
+                    onClick={() => toggleSort("assignedTo")}
                     className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                   >
-                    Approved {sortIcon("approvalDate")}
+                    Assigned To {sortIcon("assignedTo")}
                   </button>
                 </th>
                 <th
-                  aria-sort={ariaSortFor("updatedAt")}
+                  aria-sort={ariaSortFor("feesReceived")}
+                  className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("feesReceived")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Fees Received {sortIcon("feesReceived")}
+                  </button>
+                </th>
+                <th
+                  aria-sort={ariaSortFor("overpaidAmount")}
+                  className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("overpaidAmount")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Overpaid Amount {sortIcon("overpaidAmount")}
+                  </button>
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
+                <th
+                  aria-sort={ariaSortFor("opLtrDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
                   <button
                     type="button"
-                    onClick={() => toggleSort("updatedAt")}
+                    onClick={() => toggleSort("opLtrDate")}
                     className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                   >
-                    Updated {sortIcon("updatedAt")}
+                    O/P LTR Date Received {sortIcon("opLtrDate")}
                   </button>
                 </th>
-                <th
-                  aria-sort={ariaSortFor("progress")}
-                  className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("progress")}
-                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
-                  >
-                    Progress {sortIcon("progress")}
-                  </button>
-                </th>
-                {CHECKBOX_COLUMNS.map((col) => (
-                  <th key={col.key} className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    {col.label}
-                  </th>
-                ))}
-                <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>Update</th>
+                <th className={`${thBase} ${t.textSub} text-left min-w-48 sticky top-0 z-20 ${stickyHeaderBg}`}>Notes</th>
+                <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>Checks Cleared</th>
               </tr>
             </thead>
             <tbody>
               {isInitialLoad ? (
                 <tr>
-                  <td colSpan={colSpan} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
+                  <td colSpan={9} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                     <span className="inline-flex items-center gap-2">
                       <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
-                      Loading petitions...
+                      Loading cases...
                     </span>
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={colSpan} className={`${tdBase} text-center py-12 ${t.textMuted}`}>
+                  <td colSpan={9} className={`${tdBase} text-center py-12 ${t.textMuted}`}>
                     <div className="flex flex-col items-center gap-2">
-                      <Gavel aria-hidden="true" className="h-8 w-8 opacity-30" />
+                      <TrendingDown aria-hidden="true" className="h-8 w-8 opacity-30" />
                       <p className="text-sm font-medium">
-                        {hasFilters ? "No petitions match your filters." : "No fee petitions found."}
+                        {hasFilters ? "No cases match your filters." : "No overpaid cases found."}
                       </p>
                       {hasFilters && (
                         <button onClick={clearAllFilters} className={`text-xs font-medium underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
@@ -994,22 +1117,23 @@ export const FeePetitions = () => {
                 </tr>
               ) : (
                 rows.map((row) => {
-                  const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (row[c.key] ? 1 : 0), 0);
-                  const isComplete = completedCount === CHECKBOX_COLUMNS.length;
+                  const isCleared = row.checksCleared;
+                  const isHighValue = row.overpaidAmount >= 3000;
                   const isSelected = selectedIds.has(row.id);
-                  const completeBg = isComplete
+                  const needsAttention = !isCleared && !row.feesConfirmation && !row.opLtrReceived && !row.updateNote;
+                  const clearedBg = isCleared
                     ? dark ? "bg-emerald-900/40" : "bg-emerald-100/80"
                     : "";
-                  const stickyBg = isComplete
+                  const stickyBg = isCleared
                     ? dark ? "bg-emerald-900" : "bg-emerald-100"
                     : dark ? "bg-neutral-900" : "bg-white";
-                  const stickyHover = isComplete
+                  const stickyHover = isCleared
                     ? dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200"
                     : dark ? "group-hover/row:bg-neutral-800" : "group-hover/row:bg-neutral-50";
                   return (
                     <tr
                       key={row.id}
-                      className={`group/row border-b ${rowBorder} ${completeBg} ${rowHover} transition-colors`}
+                      className={`group/row border-b ${rowBorder} ${clearedBg} ${rowHover} transition-colors ${isHighValue ? "border-l-2 border-l-amber-500" : ""}`}
                     >
                       <td className={`${tdBase} text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
                         <input
@@ -1020,56 +1144,82 @@ export const FeePetitions = () => {
                           className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                         />
                       </td>
-                      <td
-                        className={`${tdBase} ${t.text} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
-                        title={row.claimant}
-                      >
-                        <Link
-                          href={`/cases/${row.id}`}
-                          className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                        >
-                          {row.claimant}
-                        </Link>
-                        {row.updatedAt && (
-                          <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
-                            Updated {formatRelativeDate(row.updatedAt)}
-                          </p>
+                      <td className={`${tdBase} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`} title={row.claimant}>
+                        <div className="flex items-center gap-1.5 max-w-45">
+                          {needsAttention && (
+                            <span
+                              title="No workflow data entered"
+                              aria-label="Needs attention"
+                              className={`shrink-0 w-1.5 h-1.5 rounded-full ${dark ? "bg-amber-400" : "bg-amber-500"}`}
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <Link href={`/cases/${row.id}`} className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
+                              {row.claimant}
+                            </Link>
+                            {row.updatedAt && (
+                              <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                                Updated {formatRelativeDate(row.updatedAt)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo ?? "—"}</td>
+                      <td className={`${tdBase} ${t.textMuted} text-right`}>{fmt(row.feesReceived)}</td>
+                      <td className={`${tdBase} text-right font-semibold ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                        {fmt(row.overpaidAmount)}
+                        {row.feesReceived > 0 && (
+                          <div className="mt-0.5">
+                            <div className={`h-1 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"} w-full`}>
+                              <div
+                                className="h-1 rounded-full bg-amber-500"
+                                style={{ width: `${Math.min(100, (row.overpaidAmount / row.feesReceived) * 100)}%` }}
+                              />
+                            </div>
+                            <span className={`text-[9px] font-normal ${dark ? "text-amber-400/70" : "text-amber-600/70"}`}>
+                              {Math.round((row.overpaidAmount / row.feesReceived) * 100)}% of received
+                            </span>
+                          </div>
                         )}
                       </td>
-                      <td className={`${tdBase} ${t.textMuted}`}>
-                        <div className="flex items-center gap-1.5">
-                          <span>{fmtDate(row.approvalDate)}</span>
-                          {daysSince(row.approvalDate) != null && (
-                            <span className={`text-[10px] font-semibold px-1 rounded ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-100 text-neutral-500"}`}>
-                              {daysSince(row.approvalDate)}d
-                            </span>
+                      <td className={`${tdBase}`}>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={row.feesConfirmation ?? ""}
+                            onChange={(e) => setConfirmationLocal(row.id, e.target.value)}
+                            onBlur={() => persistConfirmation(row)}
+                            placeholder="—"
+                            maxLength={50}
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                          />
+                          {confirmationState[row.id] === "saving" && (
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
+                          )}
+                          {confirmationState[row.id] === "saved" && (
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
                           )}
                         </div>
                       </td>
-                      <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>
-                      <td className={`${tdBase} text-center`}>
-                        <div className="flex items-center gap-2 justify-center">
-                          <div className="w-16 h-1.5 rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-700">
-                            <div
-                              className={`h-full rounded-full transition-[width] ${isComplete ? "bg-emerald-500" : completedCount > 0 ? "bg-amber-400" : ""}`}
-                              style={{ width: `${(completedCount / CHECKBOX_COLUMNS.length) * 100}%` }}
-                            />
-                          </div>
-                          <span className={`text-[11px] font-semibold ${isComplete ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                            {completedCount}/{CHECKBOX_COLUMNS.length}
-                          </span>
+                      <td className={`${tdBase}`}>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={row.opLtrReceived ?? ""}
+                            onChange={(e) => setLtrDateLocal(row.id, e.target.value)}
+                            onBlur={() => persistLtrDate(row)}
+                            aria-label="O/P letter received date"
+                            className={`w-36 h-7 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                          />
+                          {ltrState[row.id] === "saving" && (
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
+                          )}
+                          {ltrState[row.id] === "saved" && (
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
+                          )}
                         </div>
                       </td>
-                      {CHECKBOX_COLUMNS.map((col) => (
-                        <td key={col.key} className={`${tdBase} text-center`}>
-                          <input
-                            type="checkbox"
-                            checked={row[col.key]}
-                            onChange={() => toggleCheckbox(row.id, col.key)}
-                            className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-                          />
-                        </td>
-                      ))}
                       <td className={`${tdBase}`}>
                         <div className="relative">
                           <input
@@ -1089,11 +1239,32 @@ export const FeePetitions = () => {
                           )}
                         </div>
                       </td>
+                      <td className={`${tdBase} text-center`}>
+                        <input
+                          type="checkbox"
+                          checked={row.checksCleared}
+                          onChange={() => toggleCheckbox(row.id, "checksCleared")}
+                          aria-label="Checks cleared"
+                          className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                        />
+                      </td>
                     </tr>
                   );
                 })
               )}
             </tbody>
+            {!loading && rows.length > 0 && (
+              <tfoot>
+                <tr className={`border-t-2 ${dark ? "border-neutral-700 bg-neutral-800/60" : "border-neutral-300 bg-neutral-50"}`}>
+                  <td colSpan={3} className={`${tdBase} font-semibold ${t.textSub}`}>
+                    Page Totals <span className={`font-normal ${t.textMuted}`}>({rows.length} rows)</span>
+                  </td>
+                  <td className={`${tdBase} text-right font-bold ${t.text}`}>{fmtFull(pageFeesReceived)}</td>
+                  <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{fmtFull(pageOverpaid)}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 
