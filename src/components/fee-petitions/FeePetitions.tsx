@@ -440,10 +440,6 @@ export const FeePetitions = () => {
     setPage(1);
   };
 
-  const onSortKeyDown = (e: React.KeyboardEvent, key: SortKey) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(key); }
-  };
-
   const ariaSortFor = (key: SortKey): "ascending" | "descending" | "none" => {
     if (sortKey !== key) return "none";
     return sortDir === "asc" ? "ascending" : "descending";
@@ -460,6 +456,10 @@ export const FeePetitions = () => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
     const next = !prevRow[key];
+    const wasComplete = CHECKBOX_COLUMNS.every((c) => prevRow[c.key]);
+    const isComplete = CHECKBOX_COLUMNS.every((c) =>
+      c.key === key ? next : prevRow[c.key],
+    );
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: next } : r)));
     try {
       await patchPetition(id, { [key]: next });
@@ -467,13 +467,33 @@ export const FeePetitions = () => {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
       const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
       setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
-      if (statusFilter !== "all") {
-        const updated = { ...prevRow, [key]: next };
-        const isComplete = CHECKBOX_COLUMNS.every((c) => updated[c.key]);
+      if (statusFilter === "all") {
+        // Row stays visible — keep the Complete/Incomplete stat cards in sync.
+        if (wasComplete !== isComplete) {
+          setStats((s) => ({
+            ...s,
+            completeCount: Math.max(0, s.completeCount + (isComplete ? 1 : -1)),
+            incompleteCount: Math.max(0, s.incompleteCount + (isComplete ? -1 : 1)),
+          }));
+        }
+      } else {
         const stillMatches = statusFilter === "complete" ? isComplete : !isComplete;
         if (!stillMatches) {
+          // Row no longer matches the active filter — drop it and keep the
+          // filtered stat count aligned with the new total.
           setRows((prev) => prev.filter((r) => r.id !== id));
           setTotal((tot) => Math.max(0, tot - 1));
+          setStats((s) => ({
+            ...s,
+            completeCount:
+              statusFilter === "complete"
+                ? Math.max(0, s.completeCount - 1)
+                : s.completeCount,
+            incompleteCount:
+              statusFilter === "incomplete"
+                ? Math.max(0, s.incompleteCount - 1)
+                : s.incompleteCount,
+          }));
         }
       }
     } catch (err) {
@@ -891,32 +911,52 @@ export const FeePetitions = () => {
                   />
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("claimant")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-10 top-0 z-30 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("claimant")} onKeyDown={(e) => onSortKeyDown(e, "claimant")}
+                  aria-sort={ariaSortFor("claimant")}
+                  className={`${thBase} ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center gap-1">Claimant {sortIcon("claimant")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("claimant")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Claimant {sortIcon("claimant")}
+                  </button>
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("approvalDate")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("approvalDate")} onKeyDown={(e) => onSortKeyDown(e, "approvalDate")}
+                  aria-sort={ariaSortFor("approvalDate")}
+                  className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center gap-1">Approved {sortIcon("approvalDate")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("approvalDate")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Approved {sortIcon("approvalDate")}
+                  </button>
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("updatedAt")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("updatedAt")} onKeyDown={(e) => onSortKeyDown(e, "updatedAt")}
+                  aria-sort={ariaSortFor("updatedAt")}
+                  className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center gap-1">Updated {sortIcon("updatedAt")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("updatedAt")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Updated {sortIcon("updatedAt")}
+                  </button>
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("progress")}
-                  className={`${thBase} ${t.textSub} text-center cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("progress")} onKeyDown={(e) => onSortKeyDown(e, "progress")}
+                  aria-sort={ariaSortFor("progress")}
+                  className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center justify-center gap-1">Progress {sortIcon("progress")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("progress")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Progress {sortIcon("progress")}
+                  </button>
                 </th>
                 {CHECKBOX_COLUMNS.map((col) => (
                   <th key={col.key} className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>

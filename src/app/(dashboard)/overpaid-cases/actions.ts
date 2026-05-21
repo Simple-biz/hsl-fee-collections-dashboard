@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 const FIELD_KEYS = ["opLtrReceived", "checksCleared", "updateNote"] as const;
 
 const NOTE_MAX_LENGTH = 5000;
+const CONFIRMATION_MAX_LENGTH = 50; // matches feeRecords.feesConfirmation varchar(50)
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // opLtrReceived accepts a date string ("YYYY-MM-DD") or null to clear it
@@ -111,6 +112,12 @@ export async function updateFeesConfirmation(input: {
   try {
     if (!Number.isFinite(input.caseId)) {
       return { ok: false, error: "Invalid case ID" };
+    }
+    if (input.feesConfirmation.length > CONFIRMATION_MAX_LENGTH) {
+      return {
+        ok: false,
+        error: `Confirmation too long (max ${CONFIRMATION_MAX_LENGTH} characters)`,
+      };
     }
     await db
       .update(feeRecords)

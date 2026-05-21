@@ -209,7 +209,10 @@ export const OverpaidCases = () => {
   const [ltrState, setLtrState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [confirmationState, setConfirmationState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [liveMessage, setLiveMessage] = useState("");
-  const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
+  // Keyed by `${rowId}:${field}` so the three inline fields on one row don't
+  // share a timer slot — otherwise one field's reset can cancel another's,
+  // leaving a "saved ✓" stuck on screen.
+  const savedTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
     const timers = savedTimerRef.current;
@@ -422,10 +425,6 @@ export const OverpaidCases = () => {
     setPage(1);
   };
 
-  const onSortKeyDown = (e: React.KeyboardEvent, key: SortKey) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(key); }
-  };
-
   const ariaSortFor = (key: SortKey): "ascending" | "descending" | "none" => {
     if (sortKey !== key) return "none";
     return sortDir === "asc" ? "ascending" : "descending";
@@ -479,6 +478,9 @@ export const OverpaidCases = () => {
   const persistConfirmation = async (row: OverpaidCaseRow) => {
     const current = row.feesConfirmation ?? "";
     if (confirmationSnapshot.current.get(row.id) === current) return;
+    const timerKey = `${row.id}:confirmation`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
     setConfirmationState((s) => ({ ...s, [row.id]: "saving" }));
     try {
       const result = await updateFeesConfirmation({ caseId: row.id, feesConfirmation: current });
@@ -488,9 +490,9 @@ export const OverpaidCases = () => {
       setLiveMessage("Confirmation saved");
       const timer = setTimeout(() => {
         setConfirmationState((s) => ({ ...s, [row.id]: undefined }));
-        savedTimerRef.current.delete(row.id);
+        savedTimerRef.current.delete(timerKey);
       }, 1500);
-      savedTimerRef.current.set(row.id, timer);
+      savedTimerRef.current.set(timerKey, timer);
     } catch (err) {
       setConfirmationState((s) => ({ ...s, [row.id]: undefined }));
       setLiveMessage("Confirmation save failed");
@@ -500,7 +502,8 @@ export const OverpaidCases = () => {
 
   const persistUpdateNote = async (row: OverpaidCaseRow) => {
     if (noteSnapshot.current.get(row.id) === row.updateNote) return;
-    const existingTimer = savedTimerRef.current.get(row.id);
+    const timerKey = `${row.id}:note`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
     if (existingTimer) clearTimeout(existingTimer);
     setNoteState((s) => ({ ...s, [row.id]: "saving" }));
     try {
@@ -510,9 +513,9 @@ export const OverpaidCases = () => {
       setLiveMessage("Note saved");
       const timer = setTimeout(() => {
         setNoteState((s) => ({ ...s, [row.id]: undefined }));
-        savedTimerRef.current.delete(row.id);
+        savedTimerRef.current.delete(timerKey);
       }, 1500);
-      savedTimerRef.current.set(row.id, timer);
+      savedTimerRef.current.set(timerKey, timer);
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
       setLiveMessage("Note save failed");
@@ -523,6 +526,9 @@ export const OverpaidCases = () => {
   const persistLtrDate = async (row: OverpaidCaseRow) => {
     const prev = ltrSnapshot.current.get(row.id);
     if (prev === row.opLtrReceived) return;
+    const timerKey = `${row.id}:ltr`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
     setLtrState((s) => ({ ...s, [row.id]: "saving" }));
     try {
       await patchCase(row.id, { opLtrReceived: row.opLtrReceived });
@@ -535,9 +541,9 @@ export const OverpaidCases = () => {
       setLiveMessage(row.opLtrReceived ? "LTR date saved" : "LTR date cleared");
       const timer = setTimeout(() => {
         setLtrState((s) => ({ ...s, [row.id]: undefined }));
-        savedTimerRef.current.delete(row.id);
+        savedTimerRef.current.delete(timerKey);
       }, 1500);
-      savedTimerRef.current.set(row.id, timer);
+      savedTimerRef.current.set(timerKey, timer);
     } catch (err) {
       setLtrState((s) => ({ ...s, [row.id]: undefined }));
       setLiveMessage("LTR date save failed");
@@ -1019,40 +1025,65 @@ export const OverpaidCases = () => {
                   />
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("claimant")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky left-10 top-0 z-30 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("claimant")} onKeyDown={(e) => onSortKeyDown(e, "claimant")}
+                  aria-sort={ariaSortFor("claimant")}
+                  className={`${thBase} ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center gap-1">Case {sortIcon("claimant")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("claimant")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Case {sortIcon("claimant")}
+                  </button>
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("assignedTo")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("assignedTo")} onKeyDown={(e) => onSortKeyDown(e, "assignedTo")}
+                  aria-sort={ariaSortFor("assignedTo")}
+                  className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center gap-1">Assigned To {sortIcon("assignedTo")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("assignedTo")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Assigned To {sortIcon("assignedTo")}
+                  </button>
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("feesReceived")}
-                  className={`${thBase} ${t.textSub} text-right cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("feesReceived")} onKeyDown={(e) => onSortKeyDown(e, "feesReceived")}
+                  aria-sort={ariaSortFor("feesReceived")}
+                  className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center justify-end gap-1">Fees Received {sortIcon("feesReceived")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("feesReceived")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Fees Received {sortIcon("feesReceived")}
+                  </button>
                 </th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("overpaidAmount")}
-                  className={`${thBase} ${t.textSub} text-right cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("overpaidAmount")} onKeyDown={(e) => onSortKeyDown(e, "overpaidAmount")}
+                  aria-sort={ariaSortFor("overpaidAmount")}
+                  className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center justify-end gap-1">Overpaid Amount {sortIcon("overpaidAmount")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("overpaidAmount")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Overpaid Amount {sortIcon("overpaidAmount")}
+                  </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
                 <th
-                  role="button" tabIndex={0} aria-sort={ariaSortFor("opLtrDate")}
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer sticky top-0 z-20 ${stickyHeaderBg} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600`}
-                  onClick={() => toggleSort("opLtrDate")} onKeyDown={(e) => onSortKeyDown(e, "opLtrDate")}
+                  aria-sort={ariaSortFor("opLtrDate")}
+                  className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                 >
-                  <span className="flex items-center gap-1">O/P LTR Date Received {sortIcon("opLtrDate")}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("opLtrDate")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    O/P LTR Date Received {sortIcon("opLtrDate")}
+                  </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left min-w-48 sticky top-0 z-20 ${stickyHeaderBg}`}>Notes</th>
                 <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>Checks Cleared</th>
@@ -1160,6 +1191,7 @@ export const OverpaidCases = () => {
                             onChange={(e) => setConfirmationLocal(row.id, e.target.value)}
                             onBlur={() => persistConfirmation(row)}
                             placeholder="—"
+                            maxLength={50}
                             className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {confirmationState[row.id] === "saving" && (
