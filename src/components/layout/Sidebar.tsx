@@ -21,9 +21,12 @@ import {
   Gavel,
   TrendingDown,
   LogOut,
+  Shield,
+  KeyRound,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtClaim } from "@/lib/formatters";
+import { ChangePasswordDialog } from "@/components/layout/ChangePasswordDialog";
 
 interface SidebarProps {
   open: boolean;
@@ -39,10 +42,15 @@ interface SearchResult {
   assigned: string;
 }
 
-const NAV_ITEMS: {
-  section: string;
-  items: { path: string; icon: React.ElementType; label: string }[];
-}[] = [
+type NavItem = {
+  path: string;
+  icon: React.ElementType;
+  label: string;
+  // When set, only sessions whose user.role is admin/system_admin see this item.
+  adminOnly?: boolean;
+};
+
+const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
   {
     section: "General",
     items: [
@@ -59,6 +67,7 @@ const NAV_ITEMS: {
     section: "Management",
     items: [
       { path: "/team", icon: Users, label: "Team" },
+      { path: "/admin", icon: Shield, label: "Admin", adminOnly: true },
       { path: "/settings", icon: Settings, label: "Settings" },
     ],
   },
@@ -76,8 +85,11 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const role = session?.user?.role;
+  const isAdmin = role === "admin" || role === "system_admin";
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -248,7 +260,12 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-1">
-          {NAV_ITEMS.map((group) => (
+          {NAV_ITEMS.map((group) => {
+            const items = group.items.filter(
+              (item) => !item.adminOnly || isAdmin,
+            );
+            if (items.length === 0) return null;
+            return (
             <div key={group.section}>
               {open && (
                 <div
@@ -257,7 +274,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                   {group.section}
                 </div>
               )}
-              {group.items.map((item) => {
+              {items.map((item) => {
                 const active = isActive(item.path);
                 return (
                   <Link
@@ -290,7 +307,8 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                 );
               })}
             </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* User */}
@@ -302,6 +320,17 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
             <div
               className={`absolute bottom-full left-2 right-2 mb-1 rounded-lg border shadow-xl overflow-hidden ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}
             >
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  setChangePasswordOpen(true);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${t.textSub} ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}
+              >
+                <KeyRound className="h-4 w-4 shrink-0" />
+                Change password
+              </button>
+              <div className={`border-t ${t.borderLight}`} />
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${dark ? "text-red-400 hover:bg-neutral-800" : "text-red-600 hover:bg-neutral-50"}`}
@@ -351,6 +380,11 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
           )}
         </div>
       </aside>
+
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+      />
 
       {/* Search overlay */}
       {searchOpen && (

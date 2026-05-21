@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { authenticate } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,19 @@ export function LoginForm() {
     authenticate,
     undefined,
   );
+
+  // Full reload after a successful sign-in so SessionProvider remounts and
+  // picks up the new session cookie. (Its `session` prop is captured at
+  // initial render only — a soft navigation would leave the sidebar stuck
+  // on the pre-login state.)
+  const ok = state && "ok" in state && state.ok;
+  useEffect(() => {
+    if (ok) window.location.assign("/");
+  }, [ok]);
+
+  const redirecting = Boolean(ok);
+  const disabled = isPending || redirecting;
+  const error = state && "error" in state ? state.error : null;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -25,7 +38,7 @@ export function LoginForm() {
           placeholder="you@hogansmith.com"
           required
           autoFocus
-          disabled={isPending}
+          disabled={disabled}
         />
       </div>
 
@@ -38,23 +51,23 @@ export function LoginForm() {
           autoComplete="current-password"
           placeholder="••••••••"
           required
-          disabled={isPending}
+          disabled={disabled}
         />
       </div>
 
-      {state?.error && (
+      {error && (
         <p
           role="alert"
           className="flex items-center gap-2 text-sm text-destructive"
         >
           <AlertCircle className="h-4 w-4 shrink-0" />
-          {state.error}
+          {error}
         </p>
       )}
 
-      <Button type="submit" className="mt-2 w-full" disabled={isPending}>
-        {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-        {isPending ? "Signing in…" : "Sign in"}
+      <Button type="submit" className="mt-2 w-full" disabled={disabled}>
+        {disabled && <Loader2 className="h-4 w-4 animate-spin" />}
+        {redirecting ? "Redirecting…" : isPending ? "Signing in…" : "Sign in"}
       </Button>
     </form>
   );
