@@ -621,6 +621,36 @@ export const overpaidCases = pgTable(
 );
 
 // ============================================================================
+// USERS — Authentication (Auth.js credentials)
+// ============================================================================
+
+export const userRoleEnum = pgEnum("user_role_enum", [
+  "admin",
+  "member",
+  "system_admin",
+]);
+
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 255 }).notNull().unique(),
+    name: varchar("name", { length: 255 }),
+    passwordHash: text("password_hash").notNull(),
+    role: userRoleEnum("role").notNull().default("member"),
+    isActive: boolean("is_active").notNull().default(true),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_users_email").on(table.email)],
+);
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 
