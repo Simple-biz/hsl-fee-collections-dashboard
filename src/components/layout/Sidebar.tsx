@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 import {
   Home,
   Users,
@@ -17,6 +18,7 @@ import {
   FileText,
   X,
   Database,
+  LogOut,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtClaim } from "@/lib/formatters";
@@ -69,7 +71,10 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const t = themeClasses(dark);
   const router = useRouter();
   const pathname = usePathname();
+  const { data: session } = useSession();
 
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -141,6 +146,21 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [searchQuery]);
+
+  // Close the user menu on outside click.
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node))
+        setUserMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [userMenuOpen]);
+
+  const userName = session?.user?.name || session?.user?.email || "User";
+  const userEmail = session?.user?.email || "";
+  const userInitial = userName.charAt(0).toUpperCase();
 
   const closeSearch = () => {
     setSearchOpen(false);
@@ -270,26 +290,62 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
         </nav>
 
         {/* User */}
-        {open && (
-          <div
-            className={`border-t ${t.borderLight} px-3 py-3 flex items-center gap-2.5`}
-          >
+        <div
+          ref={userMenuRef}
+          className={`relative border-t ${t.borderLight} ${open ? "px-3 py-3" : "px-2 py-2"}`}
+        >
+          {userMenuOpen && (
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${t.avatarBg}`}
+              className={`absolute bottom-full left-2 right-2 mb-1 rounded-lg border shadow-xl overflow-hidden ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}
             >
-              U
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${dark ? "text-red-400 hover:bg-neutral-800" : "text-red-600 hover:bg-neutral-50"}`}
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                Sign out
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className={`text-[12px] font-semibold ${t.text} truncate`}>
-                User
+          )}
+
+          {open ? (
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className={`w-full flex items-center gap-2.5 rounded-md p-0.5 ${t.hover} transition-colors`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${t.avatarBg}`}
+              >
+                {userInitial}
               </div>
-              <div className={`text-[10px] ${t.textMuted} truncate`}>
-                admin@hogansmith.com
+              <div className="flex-1 min-w-0 text-left">
+                <div className={`text-[12px] font-semibold ${t.text} truncate`}>
+                  {userName}
+                </div>
+                {userEmail && (
+                  <div className={`text-[10px] ${t.textMuted} truncate`}>
+                    {userEmail}
+                  </div>
+                )}
               </div>
-            </div>
-            <ChevronDown className={`h-3.5 w-3.5 ${t.textMuted} shrink-0`} />
-          </div>
-        )}
+              <ChevronDown
+                className={`h-3.5 w-3.5 ${t.textMuted} shrink-0 transition-transform ${userMenuOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          ) : (
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className={`w-full flex justify-center`}
+              title={userName}
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${t.avatarBg}`}
+              >
+                {userInitial}
+              </div>
+            </button>
+          )}
+        </div>
       </aside>
 
       {/* Search overlay */}
