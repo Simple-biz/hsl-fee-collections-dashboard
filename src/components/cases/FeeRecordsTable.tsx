@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
-import { Search, ArrowUpDown, Upload, MessageSquare } from "lucide-react";
+import { Search, ArrowUpDown, Upload, MessageSquare, FileSpreadsheet, CloudUpload } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
 import {
@@ -15,6 +15,8 @@ import {
 import type { CaseRow } from "@/types";
 import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
+import SheetSyncModal from "@/components/modals/SheetSyncModal";
+import SheetPushModal from "@/components/modals/SheetPushModal";
 import NotesModal from "@/components/modals/NotesModal";
 
 interface FeeRecordsTableProps {
@@ -67,6 +69,8 @@ export const FeeRecordsTable = ({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [pushOpen, setPushOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
   );
@@ -223,10 +227,22 @@ export const FeeRecordsTable = ({
             ))}
           </select>
           <button
+            onClick={() => setSyncOpen(true)}
+            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Sync from Sheets
+          </button>
+          <button
+            onClick={() => setPushOpen(true)}
+            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-blue-700 hover:bg-blue-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"} transition-colors`}
+          >
+            <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push to Sheets
+          </button>
+          <button
             onClick={() => setImportOpen(true)}
             className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
           >
-            <Upload className="h-3.5 w-3.5" /> Import
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Import
           </button>
         </div>
       </div>
@@ -589,6 +605,24 @@ export const FeeRecordsTable = ({
           onImported={async () => {
             if (onImported) await onImported();
           }}
+        />
+      )}
+
+      {syncOpen && (
+        <SheetSyncModal
+          dark={dark}
+          onClose={() => setSyncOpen(false)}
+          onSynced={async () => {
+            if (onImported) await onImported();
+          }}
+        />
+      )}
+
+      {pushOpen && (
+        <SheetPushModal
+          dark={dark}
+          onClose={() => setPushOpen(false)}
+          onPushed={() => {}}
         />
       )}
 
