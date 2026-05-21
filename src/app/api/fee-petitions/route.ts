@@ -33,8 +33,10 @@ export const GET = async (req: NextRequest) => {
       ? (sortParam as SortKey)
       : "approvalDate";
     const dir = searchParams.get("dir") === "asc" ? sql`asc` : sql`desc`;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const rawPage = parseInt(searchParams.get("page") || "1");
+    const rawLimit = parseInt(searchParams.get("limit") || "50");
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, rawLimit), 10000) : 50;
     const offset = (page - 1) * limit;
 
     // All 7 checklist fields true (NULLs from LEFT JOIN coalesce to false)
@@ -147,7 +149,7 @@ export const GET = async (req: NextRequest) => {
   } catch (error) {
     console.error("GET /api/fee-petitions error:", error);
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Server error" },
       { status: 500 },
     );
   }

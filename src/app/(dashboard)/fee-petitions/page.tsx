@@ -5,7 +5,7 @@ import { FeePetitions } from "@/components/fee-petitions/FeePetitions";
 
 export default function FeePetitionsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Loading fee petitions…</div>}>
       <FeePetitions />
     </Suspense>
   );

@@ -17,10 +17,11 @@ import {
   ChevronRight,
   Download,
   X,
+  Undo2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDate } from "@/lib/formatters";
-import { upsertFeePetition, bulkMarkComplete } from "@/app/(dashboard)/fee-petitions/actions";
+import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists } from "@/app/(dashboard)/fee-petitions/actions";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -60,6 +61,15 @@ const CHECKBOX_KEYS = ["noa", "timeDelineation", "feePetitionDoc", "ltrToClmt", 
 const daysSince = (dateStr: string | null): number | null => {
   if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+};
+
+const formatRelativeDate = (dateStr: string): string => {
+  const diffDays = daysSince(dateStr) ?? 0;
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 const STATUS_VALUES: StatusFilter[] = ["all", "complete", "incomplete"];
 const DEFAULTS = {
@@ -142,6 +152,11 @@ export const FeePetitions = () => {
   const [bulkClearing, setBulkClearing] = useState(false);
   const [bulkConfirming, setBulkConfirming] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [undoInfo, setUndoInfo] = useState<{
+    rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
+    expiresAt: number;
+  } | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const urlMethodRef = useRef<"push" | "replace">("replace");
@@ -201,6 +216,7 @@ export const FeePetitions = () => {
 
   const noteSnapshot = useRef<Map<number, string>>(new Map());
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [liveMessage, setLiveMessage] = useState("");
   const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
@@ -324,9 +340,17 @@ export const FeePetitions = () => {
     if (selectedIds.size === 0 || bulkClearing) return;
     setBulkClearing(true);
     const ids = Array.from(selectedIds);
-    const notYetComplete = rows.filter(
+    const previouslyIncomplete = rows.filter(
       (r) => ids.includes(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
-    ).length;
+    );
+    const snapshot = previouslyIncomplete.map((r) => ({
+      caseId: r.id,
+      fields: CHECKBOX_KEYS.reduce(
+        (acc, k) => ({ ...acc, [k]: r[k] }),
+        {} as Record<CheckboxKey, boolean>,
+      ),
+    }));
+    const notYetComplete = previouslyIncomplete.length;
     try {
       const result = await bulkMarkComplete({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
@@ -353,12 +377,57 @@ export const FeePetitions = () => {
         setTotal((tot) => Math.max(0, tot - ids.length));
       }
       clearSelection();
+      if (snapshot.length > 0) {
+        setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBulkClearing(false);
     }
   };
+
+  const handleUndoBulk = async () => {
+    if (!undoInfo || undoing) return;
+    setUndoing(true);
+    const snapshot = undoInfo.rows;
+    try {
+      const result = await bulkRestoreChecklists({ rows: snapshot });
+      if (!result.ok) throw new Error(result.error);
+      setUndoInfo(null);
+      if (statusFilter === "incomplete") {
+        fetchPetitions();
+      } else {
+        const byId = new Map(snapshot.map((r) => [r.caseId, r.fields]));
+        setRows((prev) =>
+          prev.map((r) => {
+            const f = byId.get(r.id);
+            return f ? { ...r, ...f } : r;
+          }),
+        );
+        setStats((s) => ({
+          ...s,
+          completeCount: Math.max(0, s.completeCount - snapshot.length),
+          incompleteCount: s.incompleteCount + snapshot.length,
+        }));
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!undoInfo) return;
+    const remaining = undoInfo.expiresAt - Date.now();
+    if (remaining <= 0) {
+      setUndoInfo(null);
+      return;
+    }
+    const timer = setTimeout(() => setUndoInfo(null), remaining);
+    return () => clearTimeout(timer);
+  }, [undoInfo]);
 
   const toggleSort = (key: SortKey) => {
     urlMethodRef.current = "push";
@@ -396,6 +465,8 @@ export const FeePetitions = () => {
       await patchPetition(id, { [key]: next });
       const today = new Date().toISOString().slice(0, 10);
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
+      const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
+      setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
       if (statusFilter !== "all") {
         const updated = { ...prevRow, [key]: next };
         const isComplete = CHECKBOX_COLUMNS.every((c) => updated[c.key]);
@@ -407,6 +478,7 @@ export const FeePetitions = () => {
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
+      setLiveMessage("Save failed");
       setError((err as Error).message);
     }
   };
@@ -424,6 +496,7 @@ export const FeePetitions = () => {
       await patchPetition(row.id, { updateNote: row.updateNote });
       noteSnapshot.current.set(row.id, row.updateNote);
       setNoteState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Note saved");
       const timer = setTimeout(() => {
         setNoteState((s) => ({ ...s, [row.id]: undefined }));
         savedTimerRef.current.delete(row.id);
@@ -431,6 +504,7 @@ export const FeePetitions = () => {
       savedTimerRef.current.set(row.id, timer);
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Note save failed");
       setError((err as Error).message);
     }
   };
@@ -438,23 +512,31 @@ export const FeePetitions = () => {
   const downloadCsv = async () => {
     setExporting(true);
     try {
-      const params = new URLSearchParams({ page: "1", limit: "10000" });
-      if (appliedSearch) params.set("search", appliedSearch);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (touchedFilter) params.set("touched", touchedFilter);
-      if (missingFilter) params.set("missing", missingFilter);
-      params.set("sort", sortKey);
-      params.set("dir", sortDir);
-      const res = await fetch(`/api/fee-petitions?${params.toString()}`);
-      if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      const json = await res.json();
-      const all: FeePetitionRow[] = json.data || [];
+      let all: FeePetitionRow[];
+      if (selectedIds.size > 0) {
+        all = rows.filter((r) => selectedIds.has(r.id));
+      } else {
+        const params = new URLSearchParams({ page: "1", limit: "10000" });
+        if (appliedSearch) params.set("search", appliedSearch);
+        if (statusFilter !== "all") params.set("status", statusFilter);
+        if (touchedFilter) params.set("touched", touchedFilter);
+        if (missingFilter) params.set("missing", missingFilter);
+        params.set("sort", sortKey);
+        params.set("dir", sortDir);
+        const res = await fetch(`/api/fee-petitions?${params.toString()}`);
+        if (!res.ok) throw new Error(`Export failed (${res.status})`);
+        const json = await res.json();
+        all = json.data || [];
+      }
       const headers = [
         "Case", "Approval Date", "Last Updated", "Progress",
         "NOA", "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
         "Ltr to Clmt w/ Signature", "Ltr to ALJ", "Fax Conf Fee Pet", "Notes",
       ];
-      const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const escape = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
       const csvRows = [
         headers.join(","),
         ...all.map((r) => {
@@ -493,6 +575,13 @@ export const FeePetitions = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
+  const selectedIncompleteCount = rows.filter(
+    (r) => selectedIds.has(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
+  ).length;
+
+  const isInitialLoad = loading && rows.length === 0;
+  const isRefreshing = loading && rows.length > 0;
+
   const sectionCard = `rounded-xl border ${t.card}`;
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
@@ -508,6 +597,9 @@ export const FeePetitions = () => {
 
   return (
     <div className="space-y-4">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveMessage}
+      </div>
       {/* Page header */}
       <div className={`${sectionCard} p-4 md:p-5`}>
         <div className="flex items-center gap-3">
@@ -524,20 +616,20 @@ export const FeePetitions = () => {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Cases", value: loading ? "—" : String(total), sub: "at fee petition stage" },
+          { label: "Total Cases", value: isInitialLoad ? "—" : String(total), sub: "at fee petition stage" },
           {
             label: "Complete",
-            value: loading ? "—" : `${stats.completeCount} / ${total}`,
+            value: isInitialLoad ? "—" : `${stats.completeCount} / ${total}`,
             sub: "all steps done",
             color: dark ? "text-emerald-400" : "text-emerald-600",
           },
           {
             label: "Incomplete",
-            value: loading ? "—" : `${stats.incompleteCount} / ${total}`,
+            value: isInitialLoad ? "—" : `${stats.incompleteCount} / ${total}`,
             sub: "pending steps",
             color: dark ? "text-amber-400" : "text-amber-600",
           },
-          { label: "Never Touched", value: loading ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
+          { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
@@ -558,6 +650,32 @@ export const FeePetitions = () => {
         </div>
       )}
 
+      {/* Undo banner */}
+      {undoInfo && (
+        <div
+          role="status"
+          className={`rounded-xl border p-3 flex items-center gap-3 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
+        >
+          <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <span className="text-sm">Marked {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"} as complete.</span>
+          <button
+            onClick={handleUndoBulk}
+            disabled={undoing}
+            className="ml-auto flex items-center gap-1 text-xs font-semibold underline hover:opacity-80 disabled:opacity-50"
+          >
+            {undoing ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" /> : <Undo2 aria-hidden="true" className="h-3 w-3" />}
+            Undo
+          </button>
+          <button
+            onClick={() => setUndoInfo(null)}
+            aria-label="Dismiss undo banner"
+            className="hover:opacity-70"
+          >
+            <X aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Table card */}
       <div className={sectionCard}>
         {/* Toolbar */}
@@ -568,11 +686,11 @@ export const FeePetitions = () => {
                 {bulkConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
-                      Mark {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} as complete?
+                      Mark {selectedIncompleteCount} case{selectedIncompleteCount !== 1 ? "s" : ""} as complete?
                     </span>
                     <button
                       onClick={handleBulkMarkComplete}
-                      disabled={bulkClearing}
+                      disabled={bulkClearing || selectedIncompleteCount === 0}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       {bulkClearing
@@ -589,11 +707,20 @@ export const FeePetitions = () => {
                   </>
                 ) : (
                   <>
-                    <span className={`text-sm font-bold ${t.text}`}>{selectedIds.size} selected</span>
+                    <span className={`text-sm font-bold ${t.text}`}>
+                      {selectedIds.size} selected
+                      {selectedIncompleteCount < selectedIds.size && (
+                        <span className={`ml-1.5 font-normal ${t.textMuted}`}>
+                          ({selectedIncompleteCount} to complete)
+                        </span>
+                      )}
+                    </span>
                     <button
                       onClick={() => setBulkConfirming(true)}
+                      disabled={selectedIncompleteCount === 0}
                       aria-label="Mark selected cases as complete"
-                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
+                      title={selectedIncompleteCount === 0 ? "All selected cases are already complete" : undefined}
+                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
                       Mark Complete
@@ -610,7 +737,12 @@ export const FeePetitions = () => {
               </div>
             ) : (
               <>
-                <h3 className={`text-sm font-bold ${t.text}`}>Petitions</h3>
+                <h3 className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
+                  Petitions
+                  {isRefreshing && (
+                    <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                  )}
+                </h3>
                 <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
                   {total === 0 ? "0 petitions" : `Showing ${rangeStart}–${rangeEnd} of ${total} petitions`}
                 </p>
@@ -666,13 +798,15 @@ export const FeePetitions = () => {
             <button
               onClick={downloadCsv}
               disabled={exporting || total === 0}
-              aria-label="Export to CSV"
+              aria-label={selectedIds.size > 0 ? `Export ${selectedIds.size} selected to CSV` : "Export filtered to CSV"}
               className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {exporting
                 ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                 : <Download aria-hidden="true" className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">
+                {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
+              </span>
             </button>
           </div>
         </div>
@@ -793,7 +927,7 @@ export const FeePetitions = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isInitialLoad ? (
                 <tr>
                   <td colSpan={colSpan} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                     <span className="inline-flex items-center gap-2">
@@ -847,15 +981,20 @@ export const FeePetitions = () => {
                         />
                       </td>
                       <td
-                        className={`${tdBase} ${t.text} font-semibold max-w-45 truncate sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
+                        className={`${tdBase} ${t.text} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
                         <Link
                           href={`/cases/${row.id}`}
-                          className={`hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                          className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}
                         >
                           {row.claimant}
                         </Link>
+                        {row.updatedAt && (
+                          <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                            Updated {formatRelativeDate(row.updatedAt)}
+                          </p>
+                        )}
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
                         <div className="flex items-center gap-1.5">
@@ -899,6 +1038,7 @@ export const FeePetitions = () => {
                             onChange={(e) => setUpdateNoteLocal(row.id, e.target.value)}
                             onBlur={() => persistUpdateNote(row)}
                             placeholder="Add a note..."
+                            maxLength={5000}
                             className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {noteState[row.id] === "saving" && (
