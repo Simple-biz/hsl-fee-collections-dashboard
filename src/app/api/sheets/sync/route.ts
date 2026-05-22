@@ -208,8 +208,6 @@ export const POST = async (req: NextRequest) => {
         winSheetStatus: r.winSheetStatus,
         winSheetLink: r.winSheetLink,
         winSheetLinkText: r.winSheetLinkText,
-        levelWon: r.levelWon,
-        claimType: r.claimTypeLabel,
         totalExpected:
           (Number(r.t16FeeDue) || 0) +
           (Number(r.t2FeeDue) || 0) +

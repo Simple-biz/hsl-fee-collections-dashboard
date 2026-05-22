@@ -25,8 +25,6 @@ interface SheetPreviewRow {
   winSheetStatus: string;
   winSheetLink: string | null;
   winSheetLinkText: string | null;
-  levelWon: string | null;
-  claimType: string | null;
   totalExpected: number;
   hasNotes: boolean;
   status: "new" | "existing";
@@ -143,6 +141,7 @@ export default function SheetSyncModal({
     setPreview(null);
 
     const controller = new AbortController();
+    fetchControllerRef.current = controller;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 30_000);
     try {
@@ -156,7 +155,6 @@ export default function SheetSyncModal({
         throw new Error((json.error as string) || `Fetch failed (${res.status})`);
       const data = json as unknown as SyncPreviewResponse;
       setPreview(data);
-      // Pre-select all sheet rows (new + existing) for sync
       setSelected(new Set(data.rows.sheet.map((r) => r.clientId)));
     } catch (e) {
       const err = e as Error;
@@ -197,8 +195,12 @@ export default function SheetSyncModal({
     return r;
   }, [preview, filter, search]);
 
+  const fetchControllerRef = useRef<AbortController | null>(null);
   const syncControllerRef = useRef<AbortController | null>(null);
-  useEffect(() => () => { syncControllerRef.current?.abort(); }, []);
+  useEffect(() => () => {
+    fetchControllerRef.current?.abort();
+    syncControllerRef.current?.abort();
+  }, []);
 
   const runSync = async () => {
     if (!preview) return;
@@ -633,7 +635,7 @@ export default function SheetSyncModal({
             <button
               onClick={() => canAdvanceFromStep(step) && setStep((step + 1) as Step)}
               disabled={!canAdvanceFromStep(step)}
-              className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
+              className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} transition-colors disabled:opacity-50`}
             >
               Next: {STEPS[step].subtitle}
               <ArrowRight className="h-3 w-3" aria-hidden="true" />
@@ -642,7 +644,7 @@ export default function SheetSyncModal({
             <button
               onClick={runSync}
               disabled={syncing || selected.size === 0}
-              className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
+              className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} transition-colors disabled:opacity-50`}
             >
               {syncing ? (
                 <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
