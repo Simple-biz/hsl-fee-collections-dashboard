@@ -11,7 +11,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
 
 export default function OverviewPage() {
-  const { cases, summary, monthlyData, loading, error, refresh } =
+  const { cases, summary, monthlyData, loading, casesLoading, error, refresh } =
     useDashboard();
   const { dateRange } = useDateRange();
   const { resolvedTheme } = useTheme();
@@ -53,11 +53,20 @@ export default function OverviewPage() {
         <CollectionsPanel data={monthlyData} />
         <RevenuePanel stats={summary} cases={cases} />
       </div>
-      <FeeRecordsTable
-        cases={cases}
-        dateRange={dateRange}
-        onImported={refresh}
-      />
+      {casesLoading ? (
+        <div
+          className={`rounded-xl border ${t.card} flex items-center justify-center py-16`}
+        >
+          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
+          <span className={`ml-3 text-sm ${t.textSub}`}>Loading cases...</span>
+        </div>
+      ) : (
+        <FeeRecordsTable
+          cases={cases}
+          dateRange={dateRange}
+          onImported={refresh}
+        />
+      )}
     </>
   );
 }

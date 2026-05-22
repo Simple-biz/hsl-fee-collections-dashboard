@@ -13,7 +13,8 @@ interface DashboardData {
   summary: DashboardSummary;
   monthlyData: MonthlyData[];
   team: TeamMember[];
-  loading: boolean;
+  loading: boolean; // summary + team (fast — powers KPI cards + collections chart)
+  casesLoading: boolean; // the heavier /api/cases list (powers the fee records table)
   error: string | null;
   refresh: () => void;
 }
@@ -34,36 +35,48 @@ export const useDashboard = (): DashboardData => {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [casesLoading, setCasesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    setCasesLoading(true);
     setError(null);
 
-    try {
-      const [casesRes, dashRes, teamRes] = await Promise.all([
-        fetch("/api/cases"),
+    // Summary + team are quick and power the KPI cards and collections chart.
+    const summaryTask = (async () => {
+      const [dashRes, teamRes] = await Promise.all([
         fetch("/api/dashboard"),
         fetch("/api/team-members"),
       ]);
-
-      if (!casesRes.ok || !dashRes.ok || !teamRes.ok) {
+      if (!dashRes.ok || !teamRes.ok) {
         throw new Error("Failed to fetch dashboard data");
       }
-
-      const casesJson = await casesRes.json();
       const dashJson = await dashRes.json();
       const teamJson = await teamRes.json();
-
-      setCases(casesJson.data);
       setSummary(dashJson.summary);
       setMonthlyData(dashJson.monthlyData);
       setTeam(teamJson.data);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
+    })();
+
+    // The cases list is heavier; let it resolve independently so the table
+    // doesn't hold up the rest of the dashboard.
+    const casesTask = (async () => {
+      const casesRes = await fetch("/api/cases");
+      if (!casesRes.ok) throw new Error("Failed to fetch cases");
+      const casesJson = await casesRes.json();
+      setCases(casesJson.data);
+    })();
+
+    // Both fetches run in parallel; flip each loading flag as it settles.
+    await Promise.all([
+      summaryTask
+        .catch((err: unknown) => setError((err as Error).message))
+        .finally(() => setLoading(false)),
+      casesTask
+        .catch((err: unknown) => setError((err as Error).message))
+        .finally(() => setCasesLoading(false)),
+    ]);
   }, []);
 
   useEffect(() => {
@@ -76,6 +89,7 @@ export const useDashboard = (): DashboardData => {
     monthlyData,
     team,
     loading,
+    casesLoading,
     error,
     refresh: fetchAll,
   };
