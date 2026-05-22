@@ -79,7 +79,7 @@ export const mapFeesClosedRows = (
       approvalDate: dateOnly(r["APPROVAL DATE"]),
       winSheetStatus: r["WIN SHEET"] ? String(r["WIN SHEET"]).trim() : null,
       winSheetLink,
-      feesConfirmation: r["FEES CONFIRMATION"] ? String(r["FEES CONFIRMATION"]).trim() : null,
+      feesConfirmation: r["FEES CONFIRMATION"] ? String(r["FEES CONFIRMATION"]).trim().slice(0, 50) : null,
       caseStatus: r["CASE STATUS"] ? String(r["CASE STATUS"]).trim() : null,
       approvedBy: r["APPROVED BY (OK TO CLOSE)"] ? String(r["APPROVED BY (OK TO CLOSE)"]).trim() : null,
       t16Retro: num(r["T16 RETRO"]),

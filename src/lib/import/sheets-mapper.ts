@@ -162,7 +162,7 @@ export const mapSheetRows = (
       winSheetLinkText,
       caseStatus: r["CASE STATUS"] ? String(r["CASE STATUS"]).trim() : null,
       feesConfirmation: r["FEES CONFIRMATION"]
-        ? String(r["FEES CONFIRMATION"]).trim()
+        ? String(r["FEES CONFIRMATION"]).trim().slice(0, 50)
         : null,
       dateAssignedToAgent: dateOnly(r["DATE ASSIGNED TO AGENT"]),
       approvedBy: r["APPROVED BY (OK TO CLOSE)"]
