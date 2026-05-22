@@ -23,8 +23,9 @@ export const GET = async (
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
     }
 
-    // Fetch case + fee record
-    const [row] = await db
+    // Fetch case + fee record (built as a query, awaited below in Promise.all
+    // alongside the activity-log query — both depend only on caseId).
+    const caseQuery = db
       .select({
         // Case fields
         clientId: cases.clientId,
@@ -113,12 +114,9 @@ export const GET = async (
       .leftJoin(userDetails, eq(userDetails.caseId, cases.clientId))
       .where(eq(cases.clientId, caseId));
 
-    if (!row) {
-      return NextResponse.json({ error: "Case not found" }, { status: 404 });
-    }
-
-    // Fetch activity log
-    const activities = await db
+    // Activity log — independent of the case query (only needs caseId),
+    // so kick it off in parallel rather than waiting on the join above.
+    const activitiesQuery = db
       .select({
         id: activityLog.id,
         message: activityLog.message,
@@ -128,6 +126,13 @@ export const GET = async (
       .from(activityLog)
       .where(eq(activityLog.caseId, caseId))
       .orderBy(desc(activityLog.createdAt));
+
+    const [caseRows, activities] = await Promise.all([caseQuery, activitiesQuery]);
+    const row = caseRows[0];
+
+    if (!row) {
+      return NextResponse.json({ error: "Case not found" }, { status: 404 });
+    }
 
     // Compute aging
     const approvalDate = row.approvalDate ? new Date(row.approvalDate) : null;
