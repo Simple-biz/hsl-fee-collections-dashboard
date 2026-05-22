@@ -15,7 +15,7 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
 
-interface SyncPreviewRow {
+interface SheetPreviewRow {
   clientId: number;
   caseName: string;
   caseLink: string;
@@ -29,7 +29,15 @@ interface SyncPreviewRow {
   claimType: string | null;
   totalExpected: number;
   hasNotes: boolean;
-  isNew: boolean;
+  status: "new" | "existing";
+}
+
+interface DbOnlyRow {
+  clientId: number;
+  caseName: string;
+  caseLink: string;
+  approvalDate: string | null;
+  status: "fees_closed" | "missing";
 }
 
 interface SyncPreviewResponse {
@@ -38,9 +46,15 @@ interface SyncPreviewResponse {
     fetched: number;
     new: number;
     existing: number;
+    feesClosed: number;
+    missing: number;
     warnings: { row: number; message: string }[];
   };
-  rows: SyncPreviewRow[];
+  rows: {
+    sheet: SheetPreviewRow[];
+    feesClosed: DbOnlyRow[];
+    missing: DbOnlyRow[];
+  };
 }
 
 interface SheetSyncModalProps {
@@ -86,6 +100,24 @@ const STATUS_PILL: Record<string, string> = {
   closed: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
+const STATUS_BADGE = {
+  new: (dark: boolean) =>
+    dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700",
+  existing: (dark: boolean) =>
+    dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700",
+  fees_closed: (dark: boolean) =>
+    dark ? "bg-violet-900/40 text-violet-400" : "bg-violet-100 text-violet-700",
+  missing: (dark: boolean) =>
+    dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700",
+};
+
+const STATUS_LABEL = {
+  new: "NEW",
+  existing: "EXISTS",
+  fees_closed: "FEES CLOSED",
+  missing: "MISSING",
+};
+
 export default function SheetSyncModal({
   dark,
   onClose,
@@ -98,10 +130,7 @@ export default function SheetSyncModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    inserted: number;
-    updated: number;
-  } | null>(null);
+  const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "new" | "existing">("all");
 
@@ -127,7 +156,8 @@ export default function SheetSyncModal({
         throw new Error((json.error as string) || `Fetch failed (${res.status})`);
       const data = json as unknown as SyncPreviewResponse;
       setPreview(data);
-      setSelected(new Set(data.rows.map((r) => r.clientId)));
+      // Pre-select all sheet rows (new + existing) for sync
+      setSelected(new Set(data.rows.sheet.map((r) => r.clientId)));
     } catch (e) {
       const err = e as Error;
       if (err.name === "AbortError") {
@@ -143,9 +173,9 @@ export default function SheetSyncModal({
 
   const filteredRows = useMemo(() => {
     if (!preview) return [];
-    let r = preview.rows;
-    if (filter === "new") r = r.filter((x) => x.isNew);
-    if (filter === "existing") r = r.filter((x) => !x.isNew);
+    let r = preview.rows.sheet;
+    if (filter === "new") r = r.filter((x) => x.status === "new");
+    if (filter === "existing") r = r.filter((x) => x.status === "existing");
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(
@@ -208,17 +238,13 @@ export default function SheetSyncModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          className={`flex items-center justify-between px-5 py-3 border-b ${t.borderLight}`}
-        >
+        <div className={`flex items-center justify-between px-5 py-3 border-b ${t.borderLight}`}>
           <div className="flex items-center gap-2">
             <FileSpreadsheet
               className={`h-4 w-4 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
               aria-hidden="true"
             />
-            <h3 className={`text-sm font-bold ${t.text}`}>
-              Google Sheets Sync
-            </h3>
+            <h3 className={`text-sm font-bold ${t.text}`}>Google Sheets Sync</h3>
           </div>
           <button
             onClick={onClose}
@@ -230,9 +256,7 @@ export default function SheetSyncModal({
         </div>
 
         {/* Stepper */}
-        <div
-          className={`grid grid-cols-4 gap-1 p-1 ${dark ? "bg-neutral-900/50" : "bg-neutral-50"}`}
-        >
+        <div className={`grid grid-cols-4 gap-1 p-1 ${dark ? "bg-neutral-900/50" : "bg-neutral-50"}`}>
           {STEPS.map((s) => {
             const active = s.n === step;
             const completed = s.n < step;
@@ -256,9 +280,7 @@ export default function SheetSyncModal({
                         : "text-neutral-400"
                 }`}
               >
-                <div className="text-[10px] font-bold uppercase tracking-wider">
-                  {s.title}
-                </div>
+                <div className="text-[10px] font-bold uppercase tracking-wider">{s.title}</div>
                 <div className="text-[12px] font-medium">{s.subtitle}</div>
               </button>
             );
@@ -287,29 +309,19 @@ export default function SheetSyncModal({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <CloudDownload className={`h-4 w-4 ${t.textSub}`} aria-hidden="true" />
-                <h4 className={`text-sm font-semibold ${t.text}`}>
-                  Fetch from Google Sheets
-                </h4>
+                <h4 className={`text-sm font-semibold ${t.text}`}>Fetch from Google Sheets</h4>
               </div>
               <p className={`text-[11px] ${t.textMuted} mb-6`}>
-                Pulls the latest rows from the connected Google Sheet via the
-                sync webhook and compares them against the cases database.
+                Pulls the latest rows from the MASTER LIST and Fees Closed tabs via the sync
+                webhook and compares them against the cases database.
               </p>
 
               {!preview && !fetching && (
-                <div
-                  className={`rounded-lg border-2 border-dashed p-12 text-center ${dark ? "border-neutral-700" : "border-neutral-300"}`}
-                >
-                  <FileSpreadsheet
-                    className={`h-10 w-10 mx-auto mb-3 ${t.textMuted}`}
-                    aria-hidden="true"
-                  />
-                  <p className={`text-sm font-semibold ${t.text} mb-1`}>
-                    Ready to sync
-                  </p>
+                <div className={`rounded-lg border-2 border-dashed p-12 text-center ${dark ? "border-neutral-700" : "border-neutral-300"}`}>
+                  <FileSpreadsheet className={`h-10 w-10 mx-auto mb-3 ${t.textMuted}`} aria-hidden="true" />
+                  <p className={`text-sm font-semibold ${t.text} mb-1`}>Ready to sync</p>
                   <p className={`text-[11px] ${t.textMuted} mb-5`}>
-                    Click the button below to pull the latest data from Google
-                    Sheets
+                    Click the button below to pull the latest data from Google Sheets
                   </p>
                   <button
                     onClick={handleFetch}
@@ -323,34 +335,23 @@ export default function SheetSyncModal({
 
               {fetching && (
                 <div className="flex items-center justify-center py-16">
-                  <RefreshCw
-                    className={`h-5 w-5 animate-spin ${t.textMuted}`}
-                    aria-hidden="true"
-                  />
-                  <span className={`ml-2 text-sm ${t.textSub}`}>
-                    Fetching from Google Sheets…
-                  </span>
+                  <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} aria-hidden="true" />
+                  <span className={`ml-2 text-sm ${t.textSub}`}>Fetching from Google Sheets…</span>
                 </div>
               )}
 
               {preview && !fetching && (
                 <div className="space-y-4">
                   {preview.usingMock && (
-                    <div
-                      className={`rounded-md border p-3 flex items-center gap-2 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700"}`}
-                    >
+                    <div className={`rounded-md border p-3 flex items-center gap-2 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       Using mock data — set{" "}
-                      <code className="font-mono">SHEETS_SYNC_WEBHOOK_URL</code>{" "}
-                      in .env.local to connect a real sheet
+                      <code className="font-mono">SHEETS_SYNC_WEBHOOK_URL</code> in .env.local to
+                      connect a real sheet
                     </div>
                   )}
-                  <div className="grid grid-cols-3 gap-3">
-                    <Stat
-                      t={t}
-                      label="Rows fetched"
-                      value={preview.summary.fetched.toLocaleString()}
-                    />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <Stat t={t} label="Rows fetched" value={preview.summary.fetched.toLocaleString()} />
                     <Stat
                       t={t}
                       label="New cases"
@@ -359,15 +360,25 @@ export default function SheetSyncModal({
                     />
                     <Stat
                       t={t}
-                      label="Existing (will update)"
-                      value={preview.summary.existing.toLocaleString()}
-                      accent={dark ? "text-blue-400" : "text-blue-600"}
+                      label="Fees Closed"
+                      value={preview.summary.feesClosed.toLocaleString()}
+                      accent={dark ? "text-violet-400" : "text-violet-600"}
+                    />
+                    <Stat
+                      t={t}
+                      label="Missing"
+                      value={preview.summary.missing.toLocaleString()}
+                      accent={
+                        preview.summary.missing > 0
+                          ? dark
+                            ? "text-amber-400"
+                            : "text-amber-600"
+                          : undefined
+                      }
                     />
                   </div>
                   {preview.summary.warnings.length > 0 && (
-                    <div
-                      className={`rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
-                    >
+                    <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
                       <div className="flex items-center gap-1.5 font-semibold mb-1">
                         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                         {preview.summary.warnings.length} warning
@@ -375,9 +386,7 @@ export default function SheetSyncModal({
                       </div>
                       <ul className="space-y-0.5 max-h-24 overflow-y-auto">
                         {preview.summary.warnings.slice(0, 10).map((w, i) => (
-                          <li key={i}>
-                            Row {w.row}: {w.message}
-                          </li>
+                          <li key={i}>Row {w.row}: {w.message}</li>
                         ))}
                       </ul>
                     </div>
@@ -397,56 +406,32 @@ export default function SheetSyncModal({
           {/* STEP 2: Map Columns */}
           {step === 2 && (
             <div>
-              <h4 className={`text-sm font-semibold ${t.text} mb-1`}>
-                Map Columns
-              </h4>
+              <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Map Columns</h4>
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
-                The mapping below defines how Google Sheet columns write to the
-                database. No action needed — all columns are mapped automatically.
+                The mapping below defines how Google Sheet columns write to the database. No action
+                needed — all columns are mapped automatically.
               </p>
-              <div
-                className={`rounded-lg border ${t.borderLight} overflow-hidden`}
-              >
+              <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr
-                      className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}
-                    >
-                      <th className={`${lblCls} text-left px-3 py-2`}>
-                        Sheet column
-                      </th>
-                      <th className={`${lblCls} text-left px-3 py-2`}>
-                        Maps to
-                      </th>
-                      <th
-                        className={`${lblCls} text-center px-3 py-2 w-24`}
-                      >
-                        Required
-                      </th>
+                    <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
+                      <th className={`${lblCls} text-left px-3 py-2`}>Sheet column</th>
+                      <th className={`${lblCls} text-left px-3 py-2`}>Maps to</th>
+                      <th className={`${lblCls} text-center px-3 py-2 w-24`}>Required</th>
                     </tr>
                   </thead>
                   <tbody>
                     {COLUMN_MAP.map((m) => (
                       <tr key={m.sheet} className={`border-b ${t.borderLight}`}>
-                        <td className={`${t.text} px-3 py-2 font-medium`}>
-                          {m.sheet}
-                        </td>
-                        <td
-                          className={`${t.textSub} px-3 py-2 font-mono text-[11px]`}
-                        >
-                          {m.db}
-                        </td>
+                        <td className={`${t.text} px-3 py-2 font-medium`}>{m.sheet}</td>
+                        <td className={`${t.textSub} px-3 py-2 font-mono text-[11px]`}>{m.db}</td>
                         <td className="px-3 py-2 text-center">
                           {m.required ? (
-                            <span
-                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}
-                            >
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
                               REQUIRED
                             </span>
                           ) : (
-                            <span className={`text-[10px] ${t.textMuted}`}>
-                              optional
-                            </span>
+                            <span className={`text-[10px] ${t.textMuted}`}>optional</span>
                           )}
                         </td>
                       </tr>
@@ -460,50 +445,71 @@ export default function SheetSyncModal({
           {/* STEP 3: Compare & Preview */}
           {step === 3 && preview && (
             <div>
-              <h4 className={`text-sm font-semibold ${t.text} mb-1`}>
-                Compare & Preview
-              </h4>
-              <p className={`text-[11px] ${t.textMuted} mb-3`}>
-                Rows already in the database are marked{" "}
-                <span
-                  className={`font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}
-                >
-                  EXISTS
-                </span>{" "}
-                — syncing will update their fee record. New rows are marked{" "}
-                <span
-                  className={`font-semibold ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                >
-                  NEW
-                </span>
-                .
+              <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Compare & Preview</h4>
+              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+                Four categories based on where each record exists.
               </p>
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <Stat t={t} label="New" value={preview.summary.new.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
+                <Stat t={t} label="Existing" value={preview.summary.existing.toLocaleString()} accent={dark ? "text-blue-400" : "text-blue-600"} />
+                <Stat t={t} label="Fees Closed" value={preview.summary.feesClosed.toLocaleString()} accent={dark ? "text-violet-400" : "text-violet-600"} />
                 <Stat
                   t={t}
-                  label="Total rows"
-                  value={preview.summary.fetched.toLocaleString()}
-                />
-                <Stat
-                  t={t}
-                  label="New"
-                  value={preview.summary.new.toLocaleString()}
-                  accent={dark ? "text-emerald-400" : "text-emerald-600"}
-                />
-                <Stat
-                  t={t}
-                  label="Existing"
-                  value={preview.summary.existing.toLocaleString()}
-                  accent={dark ? "text-blue-400" : "text-blue-600"}
+                  label="Missing"
+                  value={preview.summary.missing.toLocaleString()}
+                  accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined}
                 />
               </div>
-              <PreviewTable
-                t={t}
-                dark={dark}
-                rows={preview.rows.slice(0, 100)}
-                truncated={preview.rows.length > 100}
-                total={preview.rows.length}
-              />
+              <div className="space-y-5">
+                <CategorySection
+                  status="new"
+                  count={preview.summary.new}
+                  description="In sheet · not yet in database — will be inserted on sync"
+                  dark={dark}
+                  t={t}
+                >
+                  <SheetRowsTable
+                    t={t}
+                    dark={dark}
+                    rows={preview.rows.sheet.filter((r) => r.status === "new").slice(0, 100)}
+                    truncated={preview.summary.new > 100}
+                    total={preview.summary.new}
+                  />
+                </CategorySection>
+                <CategorySection
+                  status="existing"
+                  count={preview.summary.existing}
+                  description="In sheet · already in database — values will be updated on sync"
+                  dark={dark}
+                  t={t}
+                >
+                  <SheetRowsTable
+                    t={t}
+                    dark={dark}
+                    rows={preview.rows.sheet.filter((r) => r.status === "existing").slice(0, 100)}
+                    truncated={preview.summary.existing > 100}
+                    total={preview.summary.existing}
+                  />
+                </CategorySection>
+                <CategorySection
+                  status="fees_closed"
+                  count={preview.summary.feesClosed}
+                  description="In database · removed from MASTER LIST · found in Fees Closed sheet"
+                  dark={dark}
+                  t={t}
+                >
+                  <DbOnlyTable t={t} dark={dark} rows={preview.rows.feesClosed} />
+                </CategorySection>
+                <CategorySection
+                  status="missing"
+                  count={preview.summary.missing}
+                  description="In database · not found in any sheet — may have been manually removed"
+                  dark={dark}
+                  t={t}
+                >
+                  <DbOnlyTable t={t} dark={dark} rows={preview.rows.missing} />
+                </CategorySection>
+              </div>
             </div>
           )}
 
@@ -512,18 +518,14 @@ export default function SheetSyncModal({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h4 className={`text-sm font-semibold ${t.text}`}>
-                    Select & Sync
-                  </h4>
+                  <h4 className={`text-sm font-semibold ${t.text}`}>Select & Sync</h4>
                   <p className={`text-[11px] ${t.textMuted}`}>
-                    Choose which rows to sync. By default all rows are selected.
+                    Choose which MASTER LIST rows to sync. Fees Closed moves are pending schema.
                   </p>
                 </div>
                 <div className={`text-[11px] ${t.textSub}`}>
-                  <span className={`font-bold ${t.text}`}>
-                    {selected.size.toLocaleString()}
-                  </span>{" "}
-                  / {preview.rows.length.toLocaleString()} selected
+                  <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
+                  {" "}/ {preview.rows.sheet.length.toLocaleString()} selected
                 </div>
               </div>
 
@@ -536,9 +538,7 @@ export default function SheetSyncModal({
                 />
                 <select
                   value={filter}
-                  onChange={(e) =>
-                    setFilter(e.target.value as typeof filter)
-                  }
+                  onChange={(e) => setFilter(e.target.value as typeof filter)}
                   className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
                 >
                   <option value="all">All rows</option>
@@ -546,14 +546,7 @@ export default function SheetSyncModal({
                   <option value="existing">Existing only</option>
                 </select>
                 <button
-                  onClick={() =>
-                    setSelected(
-                      new Set([
-                        ...selected,
-                        ...filteredRows.map((r) => r.clientId),
-                      ]),
-                    )
-                  }
+                  onClick={() => setSelected(new Set([...selected, ...filteredRows.map((r) => r.clientId)]))}
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
                 >
                   Select shown
@@ -590,21 +583,15 @@ export default function SheetSyncModal({
           {/* STEP 4 result */}
           {step === 4 && result && (
             <div className="py-12">
-              <div
-                className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
-              >
+              <div className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
                   <div className="text-[13px]">
                     <p className="font-bold">Sync complete.</p>
                     <p className="opacity-90 mt-1">
-                      <span className="font-semibold">
-                        {result.inserted.toLocaleString()}
-                      </span>{" "}
-                      new case{result.inserted === 1 ? "" : "s"} inserted ·{" "}
-                      <span className="font-semibold">
-                        {result.updated.toLocaleString()}
-                      </span>{" "}
+                      <span className="font-semibold">{result.inserted.toLocaleString()}</span> new
+                      case{result.inserted === 1 ? "" : "s"} inserted ·{" "}
+                      <span className="font-semibold">{result.updated.toLocaleString()}</span>{" "}
                       existing record{result.updated === 1 ? "" : "s"} updated.
                     </p>
                   </div>
@@ -615,9 +602,7 @@ export default function SheetSyncModal({
         </div>
 
         {/* Footer */}
-        <div
-          className={`flex items-center justify-between px-5 py-3 border-t ${t.borderLight}`}
-        >
+        <div className={`flex items-center justify-between px-5 py-3 border-t ${t.borderLight}`}>
           <button
             onClick={() => {
               if (step === 1) onClose();
@@ -631,9 +616,7 @@ export default function SheetSyncModal({
 
           {step < 4 ? (
             <button
-              onClick={() =>
-                canAdvanceFromStep(step) && setStep((step + 1) as Step)
-              }
+              onClick={() => canAdvanceFromStep(step) && setStep((step + 1) as Step)}
               disabled={!canAdvanceFromStep(step)}
               className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
             >
@@ -651,15 +634,10 @@ export default function SheetSyncModal({
               ) : (
                 <FileSpreadsheet className="h-3 w-3" aria-hidden="true" />
               )}
-              {syncing
-                ? "Syncing…"
-                : `Sync Selected (${selected.size.toLocaleString()})`}
+              {syncing ? "Syncing…" : `Sync Selected (${selected.size.toLocaleString()})`}
             </button>
           ) : (
-            <button
-              onClick={onClose}
-              className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn}`}
-            >
+            <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn}`}>
               Done
             </button>
           )}
@@ -681,20 +659,47 @@ const Stat = ({
   accent?: string;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} p-3`}>
-    <p
-      className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}
-    >
-      {label}
-    </p>
-    <p
-      className={`text-[18px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}
-    >
-      {value}
-    </p>
+    <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{label}</p>
+    <p className={`text-[18px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}>{value}</p>
   </div>
 );
 
-const PreviewTable = ({
+const CategorySection = ({
+  status,
+  count,
+  description,
+  dark,
+  t,
+  children,
+}: {
+  status: "new" | "existing" | "fees_closed" | "missing";
+  count: number;
+  description: string;
+  dark: boolean;
+  t: ReturnType<typeof themeClasses>;
+  children: React.ReactNode;
+}) => (
+  <div>
+    <div className="flex items-center gap-2 mb-2">
+      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE[status](dark)}`}>
+        {STATUS_LABEL[status]}
+      </span>
+      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>
+        {count.toLocaleString()}
+      </span>
+      <span className={`text-[11px] ${t.textMuted}`}>{description}</span>
+    </div>
+    {count === 0 ? (
+      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[11px] ${t.textMuted}`}>
+        None
+      </div>
+    ) : (
+      children
+    )}
+  </div>
+);
+
+const SheetRowsTable = ({
   t,
   dark,
   rows,
@@ -703,7 +708,7 @@ const PreviewTable = ({
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
-  rows: SyncPreviewRow[];
+  rows: SheetPreviewRow[];
   truncated: boolean;
   total: number;
 }) => (
@@ -711,10 +716,7 @@ const PreviewTable = ({
     <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
         <thead>
-          <tr
-            className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}
-          >
-            <Th>Status</Th>
+          <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             <Th>Case</Th>
             <Th>Approved</Th>
             <Th>Assigned</Th>
@@ -726,25 +728,7 @@ const PreviewTable = ({
         <tbody>
           {rows.map((r) => (
             <tr key={r.clientId} className={`border-b ${t.borderLight}`}>
-              <td className="px-3 py-1.5">
-                <span
-                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                    r.isNew
-                      ? dark
-                        ? "bg-emerald-900/40 text-emerald-400"
-                        : "bg-emerald-100 text-emerald-700"
-                      : dark
-                        ? "bg-blue-900/40 text-blue-400"
-                        : "bg-blue-100 text-blue-700"
-                  }`}
-                >
-                  {r.isNew ? "NEW" : "EXISTS"}
-                </span>
-              </td>
-              <td
-                className={`${t.text} px-3 py-1.5 font-medium max-w-72 truncate`}
-                title={r.caseLink}
-              >
+              <td className={`${t.text} px-3 py-1.5 font-medium max-w-72 truncate`} title={r.caseLink}>
                 {r.caseName}
                 {r.externalUrl && (
                   <a
@@ -758,12 +742,8 @@ const PreviewTable = ({
                   </a>
                 )}
               </td>
-              <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>
-                {fmtDate(r.approvalDate)}
-              </td>
-              <td className={`${t.textSub} px-3 py-1.5`}>
-                {r.assignedTo ?? "—"}
-              </td>
+              <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
+              <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
               <td className="px-3 py-1.5">
                 {r.winSheetLink && r.winSheetLink.startsWith("http") ? (
                   <a
@@ -777,23 +757,15 @@ const PreviewTable = ({
                     <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 ) : (
-                  <span className={`text-[11px] ${t.textMuted}`}>
-                    {r.winSheetLinkText ?? "—"}
-                  </span>
+                  <span className={`text-[11px] ${t.textMuted}`}>{r.winSheetLinkText ?? "—"}</span>
                 )}
               </td>
-              <td
-                className={`${t.text} px-3 py-1.5 text-right tabular-nums font-medium`}
-              >
+              <td className={`${t.text} px-3 py-1.5 text-right tabular-nums font-medium`}>
                 {r.totalExpected > 0 ? fmtFull(r.totalExpected) : "—"}
               </td>
               <td className="px-3 py-1.5 text-center">
                 {r.hasNotes ? (
-                  <span
-                    className={`text-[10px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}
-                  >
-                    YES
-                  </span>
+                  <span className={`text-[10px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>YES</span>
                 ) : (
                   <span className={`text-[10px] ${t.textMuted}`}>—</span>
                 )}
@@ -804,13 +776,45 @@ const PreviewTable = ({
       </table>
     </div>
     {truncated && (
-      <div
-        className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}
-      >
-        Showing first 100 of {total.toLocaleString()} rows. All will be
-        processed on sync.
+      <div className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
+        Showing first 100 of {total.toLocaleString()} rows.
       </div>
     )}
+  </div>
+);
+
+const DbOnlyTable = ({
+  t,
+  dark,
+  rows,
+}: {
+  t: ReturnType<typeof themeClasses>;
+  dark: boolean;
+  rows: DbOnlyRow[];
+}) => (
+  <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
+    <div className="overflow-x-auto">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
+            <Th>Case</Th>
+            <Th>Approved</Th>
+            <Th>Case Link</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.clientId} className={`border-b ${t.borderLight}`}>
+              <td className={`${t.text} px-3 py-1.5 font-medium`}>{r.caseName}</td>
+              <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
+              <td className={`${t.textMuted} px-3 py-1.5 text-[11px] max-w-80 truncate`} title={r.caseLink}>
+                {r.caseLink || "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </div>
 );
 
@@ -825,7 +829,7 @@ const SelectionTable = ({
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
-  rows: SyncPreviewRow[];
+  rows: SheetPreviewRow[];
   truncated: boolean;
   total: number;
   selected: Set<number>;
@@ -835,9 +839,7 @@ const SelectionTable = ({
     <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
         <thead>
-          <tr
-            className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} sticky top-0`}
-          >
+          <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} sticky top-0`}>
             <Th>{""}</Th>
             <Th>Case</Th>
             <Th>Status</Th>
@@ -864,37 +866,18 @@ const SelectionTable = ({
                     className="h-3.5 w-3.5 cursor-pointer"
                   />
                 </td>
-                <td
-                  className={`${t.text} px-3 py-1.5 font-medium max-w-80 truncate`}
-                  title={r.caseLink}
-                >
+                <td className={`${t.text} px-3 py-1.5 font-medium max-w-80 truncate`} title={r.caseLink}>
                   {r.caseName}
                 </td>
                 <td className="px-3 py-1.5">
-                  <span
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                      r.isNew
-                        ? dark
-                          ? "bg-emerald-900/40 text-emerald-400"
-                          : "bg-emerald-100 text-emerald-700"
-                        : dark
-                          ? "bg-blue-900/40 text-blue-400"
-                          : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {r.isNew ? "NEW" : "EXISTS"}
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>
+                    {STATUS_LABEL[r.status]}
                   </span>
                 </td>
-                <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>
-                  {fmtDate(r.approvalDate)}
-                </td>
-                <td className={`${t.textSub} px-3 py-1.5`}>
-                  {r.assignedTo ?? "—"}
-                </td>
+                <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
+                <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
                 <td className="px-3 py-1.5">
-                  <span
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}
-                  >
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
                     {r.winSheetStatus.replace(/_/g, " ")}
                   </span>
                 </td>
@@ -905,9 +888,7 @@ const SelectionTable = ({
       </table>
     </div>
     {truncated && (
-      <div
-        className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}
-      >
+      <div className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
         Showing first 200 of {total.toLocaleString()} matching rows.
       </div>
     )}
@@ -921,9 +902,7 @@ const Th = ({
   children: React.ReactNode;
   alignRight?: boolean;
 }) => (
-  <th
-    className={`text-[10px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}
-  >
+  <th className={`text-[10px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}>
     {children}
   </th>
 );

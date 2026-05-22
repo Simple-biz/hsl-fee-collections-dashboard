@@ -8,6 +8,7 @@ import {
   MOCK_SHEET_ROWS,
   type SheetRow,
 } from "@/lib/import/sheets-mapper";
+import { mapFeesClosedRows } from "@/lib/import/fees-closed-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ const chunked = <T>(arr: T[], size: number): T[][] => {
   return out;
 };
 
-const fetchFromSheets = async (): Promise<{
+const fetchMasterListRows = async (): Promise<{
   rows: SheetRow[];
   usingMock: boolean;
 }> => {
@@ -42,6 +43,24 @@ const fetchFromSheets = async (): Promise<{
   if (!Array.isArray(rows))
     throw new Error("Sheets sync webhook returned invalid response shape");
   return { rows, usingMock: false };
+};
+
+const fetchFeesClosedSheetRows = async (): Promise<SheetRow[]> => {
+  const webhookUrl = process.env.FEES_CLOSED_SYNC_WEBHOOK_URL;
+  if (!webhookUrl) return [];
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trigger: "manual" }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as SheetRow[];
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
 };
 
 const toCaseInsert = (r: ParsedCaseRow) => ({
@@ -107,7 +126,6 @@ const toCaseUpdate = (r: ParsedCaseRow) => ({
 const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => ({
   assignedTo: r.assignedTo,
   winSheetStatus: r.winSheetStatus,
-  // Preserve existing win sheet link — only write incoming if DB is currently empty
   winSheetLink: existingWinSheetLink ?? r.winSheetLink,
   winSheetLinkText: r.winSheetLinkText,
   caseStatus: r.caseStatus,
@@ -138,9 +156,8 @@ const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => (
 });
 
 // POST /api/sheets/sync
-//   Query:
-//     mode=preview  → fetch from n8n/mock, diff vs DB, return preview rows (no writes)
-//     mode=upsert   → re-fetch, insert new cases, update fee_records for existing
+//   mode=preview  → diff MASTER LIST + Fees Closed sheet vs DB; return all 4 categories
+//   mode=upsert   → import new rows + update existing (fees_closed move is TODO)
 export const POST = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
@@ -151,20 +168,82 @@ export const POST = async (req: NextRequest) => {
     const mode = modeParam;
 
     if (mode === "preview") {
-      const { rows: rawRows, usingMock } = await fetchFromSheets();
-      const { rows: parsed, warnings } = mapSheetRows(rawRows);
+      // Fetch MASTER LIST and Fees Closed sheet in parallel
+      const [{ rows: masterRaw, usingMock }, feesClosedRaw] = await Promise.all([
+        fetchMasterListRows(),
+        fetchFeesClosedSheetRows(),
+      ]);
 
-      const incomingIds = parsed.map((r) => r.clientId);
-      let existingSet = new Set<number>();
-      if (incomingIds.length > 0) {
-        const existing = await db
-          .select({ clientId: cases.clientId })
-          .from(cases)
-          .where(inArray(cases.clientId, incomingIds));
-        existingSet = new Set(existing.map((e) => e.clientId));
-      }
+      const { rows: parsed, warnings } = mapSheetRows(masterRaw);
+      const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
 
-      const newCount = parsed.filter((r) => !existingSet.has(r.clientId)).length;
+      // Build lookup sets
+      const sheetClientIdSet = new Set(parsed.map((r) => r.clientId));
+      const feesClosedCaseNameSet = new Set(
+        feesClosedParsed.map((r) => r.caseName.trim()),
+      );
+
+
+      // Pull all DB cases (lightweight: only fields needed for diff + display)
+      const allDbCases = await db
+        .select({
+          clientId: cases.clientId,
+          caseLink: cases.caseLink,
+          firstName: cases.firstName,
+          lastName: cases.lastName,
+          approvalDate: cases.approvalDate,
+        })
+        .from(cases);
+
+      const dbClientIdSet = new Set(allDbCases.map((c) => c.clientId));
+
+      // Category 1 & 2: sheet rows — new vs existing
+      const sheetRows = parsed.map((r) => ({
+        clientId: r.clientId,
+        caseName: `${r.lastName}, ${r.firstName}`,
+        caseLink: r.caseLink,
+        externalUrl: r.externalId,
+        approvalDate: r.approvalDate,
+        assignedTo: r.assignedTo,
+        winSheetStatus: r.winSheetStatus,
+        winSheetLink: r.winSheetLink,
+        winSheetLinkText: r.winSheetLinkText,
+        levelWon: r.levelWon,
+        claimType: r.claimTypeLabel,
+        totalExpected:
+          (Number(r.t16FeeDue) || 0) +
+          (Number(r.t2FeeDue) || 0) +
+          (Number(r.auxFeeDue) || 0),
+        hasNotes: !!r.notes,
+        status: dbClientIdSet.has(r.clientId) ? "existing" : "new",
+      }));
+
+      // Category 3 & 4: DB-only rows
+      const dbOnlyCases = allDbCases.filter(
+        (c) => !sheetClientIdSet.has(c.clientId),
+      );
+
+      const feesClosedRows = dbOnlyCases
+        .filter((c) => c.caseLink && feesClosedCaseNameSet.has(c.caseLink.trim()))
+        .map((c) => ({
+          clientId: c.clientId,
+          caseName: `${c.lastName}, ${c.firstName}`,
+          caseLink: c.caseLink ?? "",
+          approvalDate: c.approvalDate,
+          status: "fees_closed" as const,
+        }));
+
+      const missingRows = dbOnlyCases
+        .filter((c) => !c.caseLink || !feesClosedCaseNameSet.has(c.caseLink.trim()))
+        .map((c) => ({
+          clientId: c.clientId,
+          caseName: `${c.lastName}, ${c.firstName}`,
+          caseLink: c.caseLink ?? "",
+          approvalDate: c.approvalDate,
+          status: "missing" as const,
+        }));
+
+      const newCount = sheetRows.filter((r) => r.status === "new").length;
 
       return NextResponse.json({
         mode,
@@ -173,27 +252,15 @@ export const POST = async (req: NextRequest) => {
           fetched: parsed.length,
           new: newCount,
           existing: parsed.length - newCount,
+          feesClosed: feesClosedRows.length,
+          missing: missingRows.length,
           warnings,
         },
-        rows: parsed.map((r) => ({
-          clientId: r.clientId,
-          caseName: `${r.lastName}, ${r.firstName}`,
-          caseLink: r.caseLink,
-          externalUrl: r.externalId,
-          approvalDate: r.approvalDate,
-          assignedTo: r.assignedTo,
-          winSheetStatus: r.winSheetStatus,
-          winSheetLink: r.winSheetLink,
-          winSheetLinkText: r.winSheetLinkText,
-          levelWon: r.levelWon,
-          claimType: r.claimTypeLabel,
-          totalExpected:
-            (Number(r.t16FeeDue) || 0) +
-            (Number(r.t2FeeDue) || 0) +
-            (Number(r.auxFeeDue) || 0),
-          hasNotes: !!r.notes,
-          isNew: !existingSet.has(r.clientId),
-        })),
+        rows: {
+          sheet: sheetRows,
+          feesClosed: feesClosedRows,
+          missing: missingRows,
+        },
       });
     }
 
@@ -225,7 +292,7 @@ export const POST = async (req: NextRequest) => {
     }
     const selectedSet = new Set(ids);
 
-    const { rows: rawRows } = await fetchFromSheets();
+    const { rows: rawRows } = await fetchMasterListRows();
     const { rows: parsed } = mapSheetRows(rawRows);
     const candidates = parsed.filter((r) => selectedSet.has(r.clientId));
 
@@ -243,13 +310,13 @@ export const POST = async (req: NextRequest) => {
     const newRows = candidates.filter((r) => !existingSet.has(r.clientId));
     const updateRows = candidates.filter((r) => existingSet.has(r.clientId));
 
-    // Fetch existing win sheet links so we don't overwrite them during update
-    const existingLinks = updateRows.length > 0
-      ? await db
-          .select({ caseId: feeRecords.caseId, winSheetLink: feeRecords.winSheetLink })
-          .from(feeRecords)
-          .where(inArray(feeRecords.caseId, updateRows.map((r) => r.clientId)))
-      : [];
+    const existingLinks =
+      updateRows.length > 0
+        ? await db
+            .select({ caseId: feeRecords.caseId, winSheetLink: feeRecords.winSheetLink })
+            .from(feeRecords)
+            .where(inArray(feeRecords.caseId, updateRows.map((r) => r.clientId)))
+        : [];
     const existingLinkMap = new Map(
       existingLinks.map((e) => [e.caseId, e.winSheetLink]),
     );
@@ -285,6 +352,12 @@ export const POST = async (req: NextRequest) => {
         updated++;
       }
     });
+
+    // TODO: handle fees_closed moves once Sir Jeru's fees_closed schema lands.
+    // On upsert, feesClosedClientIds (passed separately) should be:
+    //   1. Inserted into fees_closed table
+    //   2. Deleted from cases table
+    // Wire up here when schema is ready.
 
     return NextResponse.json({ inserted, updated });
   } catch (error) {
