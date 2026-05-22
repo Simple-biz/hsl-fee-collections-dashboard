@@ -232,7 +232,7 @@ export default function SheetPushModal({
               </div>
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
                 All cases from the database will be pushed to Google Sheets.
-                Existing rows are matched by <span className="font-semibold">CASE LINK</span> and
+                Existing rows are matched by <span className="font-semibold">CLIENT_ID</span> and
                 updated in place. Cases not found in the sheet are appended as new rows.
               </p>
 
@@ -332,7 +332,7 @@ export default function SheetPushModal({
                 <span className={`font-semibold ${t.text}`}>
                   {preview?.total.toLocaleString() ?? "—"} cases
                 </span>{" "}
-                to Google Sheets. The n8n workflow will match each row by CASE LINK,
+                to Google Sheets. The n8n workflow will match each row by CLIENT_ID,
                 update existing rows, and append new ones.
               </p>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import {
   X,
   RefreshCw,
@@ -171,6 +171,15 @@ export default function SheetSyncModal({
     }
   };
 
+  const newRows = useMemo(
+    () => preview?.rows.sheet.filter((r) => r.status === "new") ?? [],
+    [preview],
+  );
+  const existingRows = useMemo(
+    () => preview?.rows.sheet.filter((r) => r.status === "existing") ?? [],
+    [preview],
+  );
+
   const filteredRows = useMemo(() => {
     if (!preview) return [];
     let r = preview.rows.sheet;
@@ -188,8 +197,13 @@ export default function SheetSyncModal({
     return r;
   }, [preview, filter, search]);
 
+  const syncControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { syncControllerRef.current?.abort(); }, []);
+
   const runSync = async () => {
     if (!preview) return;
+    const controller = new AbortController();
+    syncControllerRef.current = controller;
     setSyncing(true);
     setError(null);
     let syncResult: { inserted: number; updated: number } | null = null;
@@ -198,7 +212,7 @@ export default function SheetSyncModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selectedClientIds: [...selected] }),
-        signal: AbortSignal.timeout(60_000),
+        signal: controller.signal,
       });
       let json: Record<string, unknown> = {};
       try { json = await res.json(); } catch { /* non-JSON body */ }
@@ -207,7 +221,8 @@ export default function SheetSyncModal({
       syncResult = { inserted: json.inserted as number, updated: json.updated as number };
     } catch (e) {
       const err = e as Error;
-      setError(err.name === "AbortError" ? "Sync timed out — please try again." : err.message);
+      if (err.name !== "AbortError")
+        setError(err.message);
     } finally {
       setSyncing(false);
     }
@@ -325,7 +340,7 @@ export default function SheetSyncModal({
                   </p>
                   <button
                     onClick={handleFetch}
-                    className={`h-9 px-5 rounded-lg text-xs font-semibold flex items-center gap-2 mx-auto ${t.ctaBtn}`}
+                    className={`h-9 px-5 rounded-lg text-xs font-semibold flex items-center gap-2 mx-auto ${t.ctaBtn} transition-colors`}
                   >
                     <CloudDownload className="h-3.5 w-3.5" aria-hidden="true" />
                     Fetch from Sheets
@@ -393,7 +408,7 @@ export default function SheetSyncModal({
                   )}
                   <button
                     onClick={handleFetch}
-                    className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
+                    className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} transition-colors`}
                   >
                     <RefreshCw className="h-3 w-3" aria-hidden="true" />
                     Re-fetch
@@ -471,9 +486,9 @@ export default function SheetSyncModal({
                   <SheetRowsTable
                     t={t}
                     dark={dark}
-                    rows={preview.rows.sheet.filter((r) => r.status === "new").slice(0, 100)}
-                    truncated={preview.summary.new > 100}
-                    total={preview.summary.new}
+                    rows={newRows.slice(0, 100)}
+                    truncated={newRows.length > 100}
+                    total={newRows.length}
                   />
                 </CategorySection>
                 <CategorySection
@@ -486,9 +501,9 @@ export default function SheetSyncModal({
                   <SheetRowsTable
                     t={t}
                     dark={dark}
-                    rows={preview.rows.sheet.filter((r) => r.status === "existing").slice(0, 100)}
-                    truncated={preview.summary.existing > 100}
-                    total={preview.summary.existing}
+                    rows={existingRows.slice(0, 100)}
+                    truncated={existingRows.length > 100}
+                    total={existingRows.length}
                   />
                 </CategorySection>
                 <CategorySection
@@ -547,7 +562,7 @@ export default function SheetSyncModal({
                 </select>
                 <button
                   onClick={() => setSelected(new Set([...selected, ...filteredRows.map((r) => r.clientId)]))}
-                  className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
+                  className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
                 >
                   Select shown
                 </button>
@@ -557,7 +572,7 @@ export default function SheetSyncModal({
                     filteredRows.forEach((r) => next.delete(r.clientId));
                     setSelected(next);
                   }}
-                  className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
+                  className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
                 >
                   Deselect shown
                 </button>
@@ -637,7 +652,7 @@ export default function SheetSyncModal({
               {syncing ? "Syncing…" : `Sync Selected (${selected.size.toLocaleString()})`}
             </button>
           ) : (
-            <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn}`}>
+            <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn} transition-colors`}>
               Done
             </button>
           )}
