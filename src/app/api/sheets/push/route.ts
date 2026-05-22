@@ -104,11 +104,6 @@ const buildSheetRow = (
     "DATE ASSIGNED TO AGENT": fmt(row.dateAssignedToAgent),
     "WEEK ASSIGNED TO AGENT": computedWeek,
     "MONTH ASSIGNED TO AGENT": computedMonth,
-    // Duplicate column IDs at positions 39-41 (all-caps / no trailing space variants)
-    "DATE T16 FEE REC'D": fmt(row.t16FeeReceivedDate),
-    "T16 PENDING": fmtNum(row.t16Pending),
-    "T2 PENDING": fmtNum(row.t2Pending),
-    "AUX FEE $ REC'D": fmtNum(row.auxFeeReceived),
   };
 
   // Strip null fields — sending null to a dropdown-validated column causes
