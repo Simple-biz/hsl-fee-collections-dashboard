@@ -8,6 +8,8 @@ import "server-only";
 
 const WEBHOOK_URL = process.env.N8N_MYCASE_DOCS_WEBHOOK_URL;
 const WEBHOOK_TOKEN = process.env.N8N_MYCASE_DOCS_WEBHOOK_TOKEN;
+// Separate webhook for single-document downloads; shares the same auth token.
+const DOC_FILE_WEBHOOK_URL = process.env.N8N_MYCASE_DOC_FILE_WEBHOOK_URL;
 const AUTH_HEADER = "Fee-Collections-Docs-App-Token";
 
 // Shape returned by MyCase's GET /v1/cases/{id}/documents endpoint.
@@ -69,6 +71,80 @@ export async function fetchCaseDocuments(
     return flattenFolderTree(json);
   }
   return [];
+}
+
+/**
+ * Resolves a single MyCase document to a directly-openable file URL.
+ *
+ * MyCase's `GET /v1/documents/{id}/data` returns a 302 redirect to a temporary
+ * (presigned) file URL. The n8n webhook calls that endpoint with redirects
+ * disabled and returns the `Location` header, which we hand back to the browser.
+ */
+export async function fetchDocumentDownloadUrl(
+  documentId: number,
+): Promise<string> {
+  if (!DOC_FILE_WEBHOOK_URL || !WEBHOOK_TOKEN) {
+    throw new Error(
+      "MyCase document-file webhook is not configured (N8N_MYCASE_DOC_FILE_WEBHOOK_URL / N8N_MYCASE_DOCS_WEBHOOK_TOKEN)",
+    );
+  }
+
+  const res = await fetch(DOC_FILE_WEBHOOK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [AUTH_HEADER]: WEBHOOK_TOKEN,
+    },
+    body: JSON.stringify({ id: documentId }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `MyCase document-file webhook returned ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`,
+    );
+  }
+
+  const json = await res.json();
+  const url = pickUrl(json);
+
+  if (!url) {
+    throw new Error(
+      `MyCase document-file webhook did not return a file URL. Got: ${JSON.stringify(json).slice(0, 400)}`,
+    );
+  }
+  return url;
+}
+
+// Recursively dig an http(s) URL out of whatever shape the webhook returns:
+// a bare string, { url } / { location } / { Location }, a wrapped { data } /
+// { json } / { headers: { location } }, or an array of any of those.
+function pickUrl(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    return value.startsWith("http") ? value : null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = pickUrl(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return (
+      pickUrl(o.url) ??
+      pickUrl(o.location) ??
+      pickUrl(o.Location) ??
+      pickUrl(o.headers) ??
+      pickUrl(o.data) ??
+      pickUrl(o.json) ??
+      null
+    );
+  }
+  return null;
 }
 
 // ---- helpers ----------------------------------------------------------------

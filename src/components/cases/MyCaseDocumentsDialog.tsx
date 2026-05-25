@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { FileText, Search, Loader2, AlertCircle } from "lucide-react";
+import { FileText, Search, Loader2, AlertCircle, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -186,9 +186,20 @@ export function MyCaseDocumentsDialog({
                         </p>
                       )}
                     </div>
-                    <span className={`text-[10px] ${t.textMuted} shrink-0`}>
-                      {fmtDate(d.assigned_date || d.created_at)}
-                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-[10px] ${t.textMuted}`}>
+                        {fmtDate(d.assigned_date || d.created_at)}
+                      </span>
+                      <a
+                        href={`/api/mycase/documents/${d.id}/file`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-1 text-[11px] font-medium ${dark ? "text-indigo-400" : "text-indigo-600"} hover:underline`}
+                      >
+                        View
+                        <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                      </a>
+                    </div>
                   </div>
                   {d.description && (
                     <p className={`mt-1 ml-7 text-[11px] ${t.textSub}`}>
