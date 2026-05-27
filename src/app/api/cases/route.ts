@@ -10,22 +10,28 @@ export const GET = async (req: NextRequest) => {
     const search = searchParams.get("search");
     const status = searchParams.get("status");
     const assigned = searchParams.get("assigned");
+    // isClosed: "true" → closed only, "false" → active only, anything else
+    // (incl. absent) → no filter (preserves search/back-compat behavior).
+    const isClosedParam = searchParams.get("isClosed");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = (page - 1) * limit;
+
+    // Shared WHERE for the count and main queries.
+    const whereClause = sql`TRUE
+      ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
+      ${status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
+      ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
+      ${isClosedParam === "true" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = true` : sql``}
+      ${isClosedParam === "false" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
+    `;
 
     // Total count (respecting filters, ignoring pagination)
     const countQuery = db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
-      .where(
-        sql`TRUE
-          ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
-          ${status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
-          ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
-        `,
-      );
+      .where(whereClause);
 
     // Base query: cases joined with fee_records
     const rowsQuery = db
@@ -67,17 +73,15 @@ export const GET = async (req: NextRequest) => {
         applicableFeeCap: feeRecords.applicableFeeCap,
         syncStatus: feeRecords.syncStatus,
         feeRecordUpdatedAt: feeRecords.updatedAt,
+        isClosed: feeRecords.isClosed,
+        closedAt: feeRecords.closedAt,
+        approvedBy: feeRecords.approvedBy,
+        feesConfirmation: feeRecords.feesConfirmation,
+        caseStatus: feeRecords.caseStatus,
       })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
-      .where(
-        // Apply filters
-        sql`TRUE
-          ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
-          ${status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
-          ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
-        `,
-      )
+      .where(whereClause)
       .orderBy(desc(cases.approvalDate))
       .limit(limit)
       .offset(offset);
@@ -179,7 +183,11 @@ export const GET = async (req: NextRequest) => {
 
         // Workflow
         pif,
-        approvedBy: null,
+        approvedBy: r.approvedBy ?? null,
+        feesConfirmation: r.feesConfirmation ?? null,
+        caseStatus: r.caseStatus ?? null,
+        isClosed: r.isClosed ?? false,
+        closedAt: r.closedAt ? r.closedAt.toISOString() : null,
         update: activityMap.get(r.clientId) || "—",
         sync: r.syncStatus || "not_synced",
 

@@ -6,7 +6,7 @@ import { eq, sql, count } from "drizzle-orm";
 // GET /api/dashboard — Summary stats + monthly collections data
 export const GET = async () => {
   try {
-    // Summary stats from the view (or computed here)
+    // Summary stats (active rows only — closed cases live on /fees-closed)
     const [stats] = await db
       .select({
         totalCases: count(),
@@ -26,7 +26,8 @@ export const GET = async () => {
         totalPaid: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}::numeric), 0)`,
       })
       .from(cases)
-      .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId));
+      .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
+      .where(sql`COALESCE(${feeRecords.isClosed}, false) = false`);
 
     const expected = Number(stats.totalExpected);
     const paid = Number(stats.totalPaid);

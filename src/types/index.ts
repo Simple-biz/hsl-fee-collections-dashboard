@@ -63,6 +63,10 @@ export interface CaseRow {
   // Workflow
   pif: PifStatus;
   approvedBy: string | null;
+  feesConfirmation: string | null;
+  caseStatus: string | null;
+  isClosed: boolean;
+  closedAt: string | null;
   update: string;
   sync: SyncStatus;
 
@@ -75,6 +79,14 @@ export interface CaseRow {
 
   // Notes
   notesCount: number;
+}
+
+// Admin-managed option for the dashboard's "Approved By" dropdown (/settings).
+export interface ApprovedByOption {
+  id: number;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export interface DashboardSummary {
