@@ -25,6 +25,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { themeClasses } from "@/lib/theme-classes";
+import { MyCaseDocumentsDialog } from "@/components/cases/MyCaseDocumentsDialog";
 import {
   fmtFull,
   fmtDate,
@@ -156,6 +157,7 @@ export default function CaseDetailSheet({
   const [data, setData] = useState<CaseDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [docsOpen, setDocsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchCase = useCallback(async () => {
@@ -199,6 +201,7 @@ export default function CaseDetailSheet({
   const sectionCls = `p-4 border-b ${t.borderLight}`;
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
@@ -275,6 +278,13 @@ export default function CaseDetailSheet({
                   >
                     MyCase <ExternalLink aria-hidden="true" className="h-3 w-3" />
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => setDocsOpen(true)}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
+                  >
+                    Documents <FileText aria-hidden="true" className="h-3 w-3" />
+                  </button>
                   {data.userDetails?.chronicleId != null && (
                     <a
                       href={`https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}`}
@@ -441,5 +451,14 @@ export default function CaseDetailSheet({
         ) : null}
       </SheetContent>
     </Sheet>
+    {data && (
+      <MyCaseDocumentsDialog
+        open={docsOpen}
+        onOpenChange={setDocsOpen}
+        caseId={data.id}
+        caseName={data.name}
+      />
+    )}
+    </>
   );
 }

@@ -82,6 +82,10 @@ export const GET = async (
         totalFeesPaid: feeRecords.totalFeesPaid,
         pifReadyToClose: feeRecords.pifReadyToClose,
         approvedBy: feeRecords.approvedBy,
+        feesConfirmation: feeRecords.feesConfirmation,
+        caseStatus: feeRecords.caseStatus,
+        isClosed: feeRecords.isClosed,
+        closedAt: feeRecords.closedAt,
         feeMethod: feeRecords.feeMethod,
         applicableFeeCap: feeRecords.applicableFeeCap,
         feeCapApplied: feeRecords.feeCapApplied,
@@ -216,6 +220,10 @@ export const GET = async (
             ? "NO"
             : null,
       approvedBy: row.approvedBy,
+      feesConfirmation: row.feesConfirmation ?? null,
+      caseStatus: row.caseStatus ?? null,
+      isClosed: row.isClosed ?? false,
+      closedAt: row.closedAt ? row.closedAt.toISOString() : null,
       feeMethod: row.feeMethod,
       applicableFeeCap: Number(row.applicableFeeCap) || 9200,
       feeCapApplied: row.feeCapApplied,
@@ -342,8 +350,11 @@ export const PATCH = async (
         totalFeesPaid: "total_fees_paid",
         pifReadyToClose: "pif_ready_to_close",
         approvedBy: "approved_by",
+        feesConfirmation: "fees_confirmation",
+        caseStatus: "case_status",
         feeMethod: "fee_method",
         feeComputed: "fee_computed",
+        isClosed: "is_closed",
       };
 
       const updates = Object.entries(feeFields)
@@ -355,6 +366,14 @@ export const PATCH = async (
           if (typeof v === "number") return `${col} = ${v}`;
           return `${col} = '${String(v).replace(/'/g, "''")}'`;
         });
+
+      // When isClosed flips, also stamp/clear closed_at so the fees-closed
+      // page can show "closed on …" without the client having to track time.
+      if (feeFields.isClosed === true) {
+        updates.push("closed_at = NOW()");
+      } else if (feeFields.isClosed === false) {
+        updates.push("closed_at = NULL");
+      }
 
       if (updates.length > 0) {
         await db.execute(

@@ -75,7 +75,10 @@ export const GET = async (req: NextRequest) => {
     const touchedClause = touched === "none" ? sql`AND ${feePetitions.updatedAt} IS NULL` : sql``;
     const missingClause = getMissingClause(missing);
 
-    const whereClause = sql`${cases.levelWon} = 'FEE_PETITION'
+    // Accept both the legacy enum value and the worksheet-direct label
+    // saved via the dashboard dropdown (column C in the master sheet uses
+    // "FEE PETITION" with a space).
+    const whereClause = sql`${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
       ${searchClause}
       ${statusClause}
       ${touchedClause}
