@@ -100,7 +100,13 @@ const AGING_COLORS = (cat: string | null, dark: boolean) => {
   return dark ? "text-neutral-500" : "text-neutral-400";
 };
 
-type SortKey = "name" | "date" | "expected" | "paid" | "daysAfterApproval";
+type SortKey =
+  | "name"
+  | "assigned"
+  | "date"
+  | "expected"
+  | "paid"
+  | "daysAfterApproval";
 type SortDir = "asc" | "desc";
 
 export const FeeRecordsTable = ({
@@ -212,6 +218,12 @@ export const FeeRecordsTable = ({
           av = a.name;
           bv = b.name;
           break;
+        case "assigned":
+          // Empty assignees ("—") sort last regardless of direction so the
+          // unassigned bucket never breaks up real groups in the middle.
+          av = a.assigned === "—" ? "￿" : a.assigned.toLowerCase();
+          bv = b.assigned === "—" ? "￿" : b.assigned.toLowerCase();
+          break;
         case "date":
           av = a.date || "";
           bv = b.date || "";
@@ -249,7 +261,8 @@ export const FeeRecordsTable = ({
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else {
       setSortKey(key);
-      setSortDir("desc");
+      // Text columns default to A→Z; numeric/date columns default to newest/highest.
+      setSortDir(key === "name" || key === "assigned" ? "asc" : "desc");
     }
   };
 
@@ -342,32 +355,73 @@ export const FeeRecordsTable = ({
 
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
-  const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
+
+  // Opaque bg matching the card surface so sticky cells never show the
+  // scrolled content bleeding through. `stickyHover` lets frozen body cells
+  // inherit the row's hover from the <tr> (which carries `group`). The
+  // second frozen column gets a right divider marking the freeze boundary.
+  const stickyBg = dark ? "bg-neutral-900" : "bg-white";
+  const stickyHover = dark
+    ? "group-hover:bg-neutral-800/40"
+    : "group-hover:bg-neutral-50/80";
+  // Divider + the Assigned column's frozen styling apply only at sm+ — on
+  // mobile Assigned scrolls so the 352px of frozen columns don't crowd out
+  // the data. `stickyColBg` is the desktop-only opaque bg for the Assigned
+  // body cell (transparent on mobile so the row stripe/hover shows through).
+  const stickyDivider = dark
+    ? "sm:border-r sm:border-neutral-700/60"
+    : "sm:border-r sm:border-neutral-200";
+  // Freeze-boundary divider. On mobile only Case Name is frozen, so the line
+  // sits after Case Name (and is removed at sm+, where the freeze continues
+  // to Assigned and `stickyDivider` takes over after it).
+  const nameDivider = dark
+    ? "border-r border-neutral-700/60 sm:border-r-0"
+    : "border-r border-neutral-200 sm:border-r-0";
+  const stickyColBg = dark
+    ? "sm:bg-neutral-900 sm:group-hover:bg-neutral-800/40"
+    : "sm:bg-white sm:group-hover:bg-neutral-50/80";
+  // Frozen-column widths: Case Name stays frozen on all screens (narrower on
+  // mobile); Assigned is 160px on desktop. The desktop left-48 offset below
+  // assumes Case Name's sm width (w-48 = 192px).
+  // max-w pins the frozen columns to an exact box so the sticky, opaque
+  // Case Name cell can't overflow in front of (cover) the Assigned column.
+  const colNameW = `w-36 min-w-36 max-w-36 sm:w-48 sm:min-w-48 sm:max-w-48`;
+  const colAssignedW = `w-32 min-w-32 max-w-32 sm:w-40 sm:min-w-40 sm:max-w-40`;
+
+  // Every header cell is sticky vertically by default — the column-header
+  // row (row 2) parks 32px down. Baking this into `thBase` means the ~24
+  // column-header cells need no per-cell annotation. The group-header row
+  // (row 1) overrides to the very top with `top-0!`.
+  // `h-8` forces each header row to exactly 32px so row 2's `top-8` sits
+  // flush against row 1's bottom — no gap for body rows to peek through.
+  const thBase = `h-8 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap sticky top-8 z-20 ${stickyBg}`;
   const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
   const groupBorder = dark
     ? "border-l border-neutral-700/50"
     : "border-l border-neutral-200";
 
-  // Frozen left columns: Case Name (192px) + Assigned (160px). Each sticky
-  // cell needs an opaque background matching the card surface, plus a
-  // `group-hover` rule so it inherits the row's hover state from the <tr>
-  // (which carries the `group` class). The thead cells use the same bg
-  // without hover. The second column gets a right divider so the freeze
-  // boundary reads clearly when the rest of the table scrolls under it.
-  const stickyBg = dark ? "bg-neutral-900" : "bg-white";
-  const stickyHover = dark
-    ? "group-hover:bg-neutral-800/40"
-    : "group-hover:bg-neutral-50/80";
-  const stickyDivider = dark
-    ? "border-r border-neutral-700/60"
-    : "border-r border-neutral-200";
-  const stickyTh1 = `sticky left-0 z-20 w-48 min-w-48 ${stickyBg}`;
-  const stickyTh2 = `sticky left-48 z-20 w-40 min-w-40 ${stickyBg} ${stickyDivider}`;
-  // Group-row header that spans BOTH frozen columns (colSpan=2). Same z-index
-  // as the row-2 sticky headers so it stays pinned during horizontal scroll.
-  const stickyGroup = `sticky left-0 z-20 ${stickyBg} ${stickyDivider}`;
-  const stickyTd1 = `sticky left-0 z-10 w-48 min-w-48 ${stickyBg} ${stickyHover}`;
-  const stickyTd2 = `sticky left-48 z-10 w-40 min-w-40 ${stickyBg} ${stickyHover} ${stickyDivider}`;
+  // Group-header row (row 1) pins to the very top, overriding thBase's top-8.
+  const stickyThRow1 = `top-0!`;
+  // Frozen column headers (row 2). Case Name freezes left on all screens;
+  // Assigned freezes left only at sm+ (on mobile it keeps thBase's sticky-top
+  // but scrolls horizontally). Corner cells use z-30 to cover both single-axis
+  // sticky neighbors during scroll.
+  const stickyTh1 = `left-0 z-30 ${colNameW} ${nameDivider}`;
+  // z-30 only at sm+ (where Assigned is a frozen corner). On mobile Assigned
+  // scrolls, so it must stay at thBase's z-20 — BELOW the frozen Case Name
+  // (z-30) — otherwise it paints over the frozen "front index" on scroll.
+  const stickyTh2 = `sm:left-48 sm:z-30 ${colAssignedW} ${stickyDivider}`;
+  // "Case Info" group label is split into two cells so each part's freeze
+  // matches the column beneath it: the label over Case Name freezes on all
+  // screens (stickyGroup); the blank part over Assigned freezes only at sm+
+  // (stickyGroup2). This keeps "Case Info" pinned over the frozen Case Name
+  // column on mobile instead of letting T16/T2 labels slide over it.
+  const stickyGroup = `top-0! left-0 z-30 ${colNameW} ${nameDivider}`;
+  // Same as stickyTh2: z-30 only at sm+ so on mobile this scrolls below the
+  // frozen "Case Info" label (z-30) instead of covering it.
+  const stickyGroup2 = `top-0! sm:left-48 sm:z-30 ${colAssignedW} ${stickyDivider}`;
+  const stickyTd1 = `sticky left-0 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
+  const stickyTd2 = `sm:sticky sm:left-48 sm:z-10 ${colAssignedW} ${stickyColBg} ${stickyDivider}`;
   // const groupHeaderBg = (color: string) =>
   //   dark ? `bg-${color}-900/20` : `bg-${color}-50/60`;
 
@@ -382,9 +436,11 @@ export const FeeRecordsTable = ({
         />
       )}
 
-      {/* Header */}
+      {/* Header — sticky to the page scroll (<main>) so the title + filters
+          stay visible while scrolling the long list. z above the table's
+          own sticky thead. */}
       <div
-        className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight}`}
+        className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight} sticky top-0 z-40 rounded-t-xl ${stickyBg}`}
       >
         <div>
           <h3 className={`text-sm font-bold ${t.text}`}>Master Fee Records</h3>
@@ -436,55 +492,62 @@ export const FeeRecordsTable = ({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Table — own scroll container (both axes). Vertical scroll lets the
+          sticky <thead> rows pin; horizontal scroll keeps the frozen Case
+          Name + Assigned columns. max-h caps it so the header stays in view
+          on long lists. */}
+      <div className="overflow-auto max-h-[75vh]">
         <table className="w-full min-w-400">
           {/* Group headers */}
           <thead>
             <tr className={`border-b ${t.borderLight}`}>
-              {/* Split into a frozen 2-col label + a scrolling 4-col spacer
-                  so the "Case Info" group label stays pinned above the
-                  frozen Case Name + Assigned columns during horizontal
-                  scroll. */}
+              {/* "Case Info" label is split per column so each part's freeze
+                  matches the column below it: the label cell over Case Name
+                  freezes on all screens; the blank cell over Assigned freezes
+                  only at sm+. Then a scrolling 4-col spacer covers Level /
+                  Claim / Approval / Status. */}
               <th
-                colSpan={2}
                 className={`${thBase} ${t.textSub} text-left ${stickyGroup}`}
               >
                 Case Info
               </th>
               <th
+                aria-hidden="true"
+                className={`${thBase} ${t.textSub} text-left ${stickyGroup2}`}
+              />
+              <th
                 colSpan={4}
                 aria-hidden="true"
-                className={`${thBase} ${t.textSub} text-left`}
+                className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
               />
 
               <th
                 colSpan={5}
-                className={`${thBase} text-center ${groupBorder} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
               >
                 T16
               </th>
               <th
                 colSpan={5}
-                className={`${thBase} text-center ${groupBorder} ${dark ? "text-blue-400" : "text-blue-600"}`}
+                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-blue-400" : "text-blue-600"}`}
               >
                 T2
               </th>
               <th
                 colSpan={5}
-                className={`${thBase} text-center ${groupBorder} ${dark ? "text-violet-400" : "text-violet-600"}`}
+                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-violet-400" : "text-violet-600"}`}
               >
                 AUX
               </th>
               <th
                 colSpan={3}
-                className={`${thBase} text-center ${groupBorder} ${t.textSub}`}
+                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
               >
                 Totals
               </th>
               <th
                 colSpan={mode === "closed" ? 8 : 7}
-                className={`${thBase} text-center ${groupBorder} ${t.textSub}`}
+                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
               >
                 Workflow
               </th>
@@ -501,9 +564,13 @@ export const FeeRecordsTable = ({
                 </span>
               </th>
               <th
-                className={`${thBase} ${t.textSub} text-left ${stickyTh2}`}
+                className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh2}`}
+                onClick={() => toggleSort("assigned")}
+                title="Sort to group rows by assignee"
               >
-                Assigned
+                <span className="flex items-center gap-1">
+                  Assigned <ArrowUpDown className="h-3 w-3" />
+                </span>
               </th>
               <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
               <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
