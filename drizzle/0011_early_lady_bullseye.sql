@@ -1,1 +1,0 @@
-ALTER TABLE "fee_records" ADD COLUMN "win_sheet_link_text" varchar(200);

@@ -1,3 +1,4 @@
+ALTER TABLE "fee_records" ADD COLUMN "win_sheet_link_text" varchar(200);--> statement-breakpoint
 ALTER TABLE "fee_records" ADD COLUMN "days_after_approval" integer;--> statement-breakpoint
 ALTER TABLE "fee_records" ADD COLUMN "approval_category" varchar(100);--> statement-breakpoint
 ALTER TABLE "fee_records" ADD COLUMN "fees_status" varchar(100);--> statement-breakpoint

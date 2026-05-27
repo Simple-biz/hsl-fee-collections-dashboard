@@ -92,6 +92,20 @@
       "when": 1779830266321,
       "tag": "0012_loosen_enum_columns_to_varchar",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779897512004,
+      "tag": "0013_open_doorman",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1779897772795,
+      "tag": "0014_add_sheets_sync",
+      "breakpoints": true
     }
   ]
 }
