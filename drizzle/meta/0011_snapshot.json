@@ -1,6 +1,6 @@
 {
-  "id": "6f3bebe3-070a-4114-85c2-40ca90c0295b",
-  "prevId": "b34179da-18a8-469f-ab9f-2226be96acfc",
+  "id": "d70e8f55-a108-4b4c-a49f-e33b2019c950",
+  "prevId": "0e87df12-8e97-4b1a-9877-c93d5a24ca73",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -161,6 +161,67 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.approved_by_options": {
+      "name": "approved_by_options",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "approved_by_options_name_unique": {
+          "name": "approved_by_options_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -913,6 +974,102 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.dropdown_options": {
+      "name": "dropdown_options",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_dropdown_options_category_name": {
+          "name": "uq_dropdown_options_category_name",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_dropdown_options_category": {
+          "name": "idx_dropdown_options_category",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.fee_cap_history": {
       "name": "fee_cap_history",
       "schema": "",
@@ -1136,12 +1293,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "win_sheet_link_text": {
-          "name": "win_sheet_link_text",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "case_status": {
           "name": "case_status",
           "type": "varchar(100)",
@@ -1302,6 +1453,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_closed": {
+          "name": "is_closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "fee_method": {
           "name": "fee_method",
           "type": "fee_method_enum",
@@ -1334,36 +1498,6 @@
         "fee_computed_at": {
           "name": "fee_computed_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "days_after_approval": {
-          "name": "days_after_approval",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approval_category": {
-          "name": "approval_category",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fees_status": {
-          "name": "fees_status",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "week_assigned_to_agent": {
-          "name": "week_assigned_to_agent",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "month_assigned_to_agent": {
-          "name": "month_assigned_to_agent",
-          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1468,6 +1602,21 @@
           "columns": [
             {
               "expression": "pif_ready_to_close",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_fee_records_is_closed": {
+          "name": "idx_fee_records_is_closed",
+          "columns": [
+            {
+              "expression": "is_closed",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

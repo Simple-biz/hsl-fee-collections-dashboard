@@ -13,7 +13,7 @@ import {
   jsonb,
   index,
   unique,
-  // uniqueIndex,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -77,8 +77,13 @@ export const cases = pgTable(
 
     // Claim info
     claimType: text("claim_type").array().notNull().default([]),
-    claimTypeLabel: claimTypeEnum("claim_type_label"),
-    levelWon: levelWonEnum("level_won"),
+    // Loosened from pg enum to varchar so admins can manage the option list
+    // via /settings → Dropdown Options without code changes. Legacy values
+    // (T2/T16/T2_T16 and INITIAL/RECON/HEARING/AC/FEDERAL_COURT/FEE_PETITION)
+    // are preserved verbatim; new values (CONC, FEE PETITION, DWB, etc.)
+    // are accepted as-is. Display helpers in formatters.ts tolerate both.
+    claimTypeLabel: varchar("claim_type_label", { length: 50 }),
+    levelWon: varchar("level_won", { length: 50 }),
     t2Decision: decisionOutcomeEnum("t2_decision").default("unknown"),
     t16Decision: decisionOutcomeEnum("t16_decision").default("unknown"),
 
@@ -192,8 +197,10 @@ export const feeRecords = pgTable(
 
     // Assignment & Workflow
     assignedTo: varchar("assigned_to", { length: 100 }),
-    winSheetStatus:
-      winSheetStatusEnum("win_sheet_status").default("not_started"),
+    // Loosened from pg enum to varchar — see note on claimTypeLabel above.
+    winSheetStatus: varchar("win_sheet_status", { length: 50 }).default(
+      "not_started",
+    ),
     winSheetLink: text("win_sheet_link"),
     winSheetLinkText: varchar("win_sheet_link_text", { length: 200 }),
     caseStatus: varchar("case_status", { length: 100 }),
@@ -252,6 +259,11 @@ export const feeRecords = pgTable(
     pifReadyToClose: boolean("pif_ready_to_close").default(false),
     approvedBy: varchar("approved_by", { length: 100 }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
+    // True when an admin acknowledged the case as closed via the dashboard
+    // (Approved By dropdown → confirm); these rows leave the active dashboard
+    // and appear on /fees-closed.
+    isClosed: boolean("is_closed").notNull().default(false),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
 
     // Fee Computation Metadata
     feeMethod: feeMethodEnum("fee_method").default("fee_agreement"),
@@ -289,6 +301,7 @@ export const feeRecords = pgTable(
     index("idx_fee_records_win_sheet_status").on(table.winSheetStatus),
     index("idx_fee_records_sync_status").on(table.syncStatus),
     index("idx_fee_records_pif").on(table.pifReadyToClose),
+    index("idx_fee_records_is_closed").on(table.isClosed),
   ],
 );
 
@@ -389,6 +402,53 @@ export const teamMembers = pgTable("team_members", {
   role: varchar("role", { length: 100 }).default("collections_specialist"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ============================================================================
+// DROPDOWN_OPTIONS — Admin-managed option lists for the worksheet's dropdown
+// columns (Assigned To, Case Level, Claim Type, Win Sheet Status, Fees
+// Confirmation, Case Status, Approved By). Managed in /settings → Dropdown
+// Options. `category` keys the list; `name` is the displayed option.
+// ============================================================================
+
+export const dropdownOptions = pgTable(
+  "dropdown_options",
+  {
+    id: serial("id").primaryKey(),
+    category: varchar("category", { length: 50 }).notNull(),
+    name: varchar("name", { length: 150 }).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_dropdown_options_category_name").on(
+      table.category,
+      table.name,
+    ),
+    index("idx_dropdown_options_category").on(table.category),
+  ],
+);
+
+// Superseded by dropdown_options (category = 'approved_by'). Kept as an
+// unused table so the migration is a clean create (no rename prompt); safe to
+// drop in a later migration once confirmed empty.
+export const approvedByOptions = pgTable("approved_by_options", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });

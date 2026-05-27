@@ -2,7 +2,16 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
-import { Search, ArrowUpDown, Upload, MessageSquare, FileSpreadsheet, CloudUpload } from "lucide-react";
+import {
+  Search,
+  ArrowUpDown,
+  Upload,
+  MessageSquare,
+  FileSpreadsheet,
+  CloudUpload,
+  RotateCcw,
+  Loader2,
+} from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
 import {
@@ -12,18 +21,63 @@ import {
   STATUS_LABELS,
   getStatusColor,
 } from "@/lib/formatters";
-import type { CaseRow } from "@/types";
+import type { CaseRow, ApprovedByOption } from "@/types";
+import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
 import SheetSyncModal from "@/components/modals/SheetSyncModal";
 import SheetPushModal from "@/components/modals/SheetPushModal";
 import NotesModal from "@/components/modals/NotesModal";
+import { AcknowledgeAndCloseDialog } from "./AcknowledgeAndCloseDialog";
 
 interface FeeRecordsTableProps {
   cases: CaseRow[];
   dateRange?: { from: string; to: string } | null;
   onImported?: () => Promise<void> | void;
+  // Active dashboard (default) shows the Approved By dropdown + close flow.
+  // "closed" renders a read-only view for /fees-closed.
+  mode?: "active" | "closed";
+  approvedByOptions?: ApprovedByOption[];
+  // Per-category option lists for the other inline dropdowns (Assigned,
+  // Fees Confirmation, Case Status). Optional — an empty list just yields
+  // an empty dropdown with the current value preserved as a fallback.
+  dropdownOptions?: DropdownOptionsByCategory;
 }
+
+// Whether a field lives on the `fee_records` row or the `cases` row.
+// The PATCH endpoint splits its body into `feeFields` and `caseFields`.
+type CaseField = "claimTypeLabel" | "levelWon";
+type FeeField =
+  | "assignedTo"
+  | "approvedBy"
+  | "feesConfirmation"
+  | "caseStatus"
+  | "winSheetStatus";
+
+// Sends a single-field patch and logs an activity entry so the side
+// panel keeps a trail of who changed what.
+const patchSingleField = async (
+  caseId: number,
+  target: "case" | "fee",
+  field: CaseField | FeeField,
+  value: string | null,
+  fieldLabel: string,
+) => {
+  const payload =
+    target === "case"
+      ? { caseFields: { [field]: value } }
+      : { feeFields: { [field]: value } };
+  await fetch(`/api/cases/${caseId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...payload,
+      logMessage: value
+        ? `${fieldLabel} set to "${value}"`
+        : `${fieldLabel} cleared`,
+    }),
+  });
+};
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
@@ -57,10 +111,48 @@ export const FeeRecordsTable = ({
   cases,
   dateRange,
   onImported,
+  mode = "active",
+  approvedByOptions = [],
+  dropdownOptions = {},
 }: FeeRecordsTableProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+
+  const assignedOptions = dropdownOptions.assigned_to ?? [];
+  const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
+  const caseStatusOptions = dropdownOptions.case_status ?? [];
+  const caseLevelOptions = dropdownOptions.case_level ?? [];
+  const claimTypeOptions = dropdownOptions.claim_type ?? [];
+  const winSheetStatusOptions = dropdownOptions.win_sheet_status ?? [];
+
+  // Keys for varchar cells that support inline-edit dropdowns. `status` is
+  // the win_sheet_status row field; `level`/`claim` live on the cases row.
+  type DropdownRowKey =
+    | "assigned"
+    | "approvedBy"
+    | "feesConfirmation"
+    | "caseStatus"
+    | "level"
+    | "claim"
+    | "status";
+
+  // Optimistic overrides keyed by case id — the row value is patched
+  // immediately on change, and the server reconciles on the next refresh.
+  const [pending, setPending] = useState<
+    Record<number, Partial<Record<DropdownRowKey, string>>>
+  >({});
+
+  // Case row whose dropdown change should prompt the "mark closed?" modal.
+  // Currently triggered by Fees Confirmation = "Paid In Full"; the dialog is
+  // field-agnostic so it can host future triggers without another branch.
+  const [ackTarget, setAckTarget] = useState<{
+    caseId: number;
+    caseName: string;
+    triggerField: string;
+    triggerValue: string;
+    triggerLabel: string;
+  } | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -97,14 +189,21 @@ export const FeeRecordsTable = ({
       );
     }
     if (statusFilter !== "all") {
+      // win_sheet_status is now varchar — accept both the legacy enum
+      // groupings AND the worksheet labels saved via the dropdown.
       if (statusFilter === "finished") {
         d = d.filter((c) =>
-          ["pending_payment", "partially_paid", "paid_in_full"].includes(
-            c.status,
-          ),
+          [
+            "pending_payment",
+            "partially_paid",
+            "paid_in_full",
+            "Finished",
+          ].includes(c.status),
         );
       } else if (statusFilter === "started") {
-        d = d.filter((c) => ["started", "in_progress"].includes(c.status));
+        d = d.filter((c) =>
+          ["started", "in_progress", "Started"].includes(c.status),
+        );
       } else {
         d = d.filter((c) => c.status === statusFilter);
       }
@@ -160,6 +259,93 @@ export const FeeRecordsTable = ({
     }
   };
 
+  // Resolve the value the table should show for a varchar dropdown cell,
+  // preferring an in-flight optimistic edit over the server-loaded row.
+  const cellValue = (c: CaseRow, key: DropdownRowKey): string => {
+    const override = pending[c.id]?.[key];
+    if (override !== undefined) return override ?? "";
+    // `assigned`, `level`, `claim` come back as "—" from the API when null;
+    // treat that as empty so the select shows the placeholder option.
+    if (key === "assigned") return c.assigned === "—" ? "" : c.assigned;
+    if (key === "level") return c.level === "—" ? "" : c.level;
+    if (key === "claim") return c.claim === "—" ? "" : c.claim;
+    if (key === "status") return c.status ?? "";
+    if (key === "approvedBy") return c.approvedBy ?? "";
+    return c[key] ?? "";
+  };
+
+  // Optimistically patch the local row + fire the API call; on failure,
+  // roll back the override and surface the error in the console for now.
+  const handleVarcharChange = async (
+    c: CaseRow,
+    target: "case" | "fee",
+    field: CaseField | FeeField,
+    rowKey: DropdownRowKey,
+    fieldLabel: string,
+    next: string,
+  ) => {
+    const value = next || null;
+    setPending((prev) => ({
+      ...prev,
+      [c.id]: { ...prev[c.id], [rowKey]: value ?? "" },
+    }));
+    try {
+      await patchSingleField(c.id, target, field, value, fieldLabel);
+    } catch (err) {
+      console.error(`Failed to update ${fieldLabel}:`, err);
+      setPending((prev) => {
+        const copy = { ...prev };
+        if (copy[c.id]) {
+          const { [rowKey]: _drop, ...rest } = copy[c.id];
+          void _drop;
+          copy[c.id] = rest;
+        }
+        return copy;
+      });
+    }
+  };
+
+  // Track per-row reopen state so the button can show a spinner + disable
+  // while the PATCH is in flight. Cleared on refresh (the row leaves the
+  // closed list).
+  const [reopeningId, setReopeningId] = useState<number | null>(null);
+
+  // Reopen a closed case from /fees-closed: flip isClosed=false (the API
+  // also stamps closed_at NULL) and clear feesConfirmation so the case
+  // doesn't immediately re-trigger the "mark closed?" modal when the user
+  // sees it back on the dashboard.
+  const handleReopen = async (c: CaseRow) => {
+    if (reopeningId !== null) return;
+    if (
+      !window.confirm(
+        `Reopen "${c.name}"? It will move back to the active dashboard and Fees Confirmation will be cleared.`,
+      )
+    )
+      return;
+    setReopeningId(c.id);
+    try {
+      const res = await fetch(`/api/cases/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feeFields: { isClosed: false, feesConfirmation: null },
+          logMessage:
+            "Reopened from Fees Closed — moved back to the active dashboard and Fees Confirmation cleared.",
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Reopen failed (${res.status})`);
+      }
+      await onImported?.();
+    } catch (err) {
+      console.error("Failed to reopen case:", err);
+      window.alert((err as Error).message);
+    } finally {
+      setReopeningId(null);
+    }
+  };
+
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
@@ -167,8 +353,27 @@ export const FeeRecordsTable = ({
   const groupBorder = dark
     ? "border-l border-neutral-700/50"
     : "border-l border-neutral-200";
-  // const groupHeaderBg = (color: string) =>
-  //   dark ? `bg-${color}-900/20` : `bg-${color}-50/60`;
+
+  // Frozen left columns: Case Name (192px) + Assigned (160px). Each sticky
+  // cell needs an opaque background matching the card surface, plus a
+  // `group-hover` rule so it inherits the row's hover state from the <tr>
+  // (which carries the `group` class). The thead cells use the same bg
+  // without hover. The second column gets a right divider so the freeze
+  // boundary reads clearly when the rest of the table scrolls under it.
+  const stickyBg = dark ? "bg-neutral-900" : "bg-white";
+  const stickyHover = dark
+    ? "group-hover:bg-neutral-800/40"
+    : "group-hover:bg-neutral-50/80";
+  const stickyDivider = dark
+    ? "border-r border-neutral-700/60"
+    : "border-r border-neutral-200";
+  const stickyTh1 = `sticky left-0 z-20 w-48 min-w-48 ${stickyBg}`;
+  const stickyTh2 = `sticky left-48 z-20 w-40 min-w-40 ${stickyBg} ${stickyDivider}`;
+  // Group-row header that spans BOTH frozen columns (colSpan=2). Same z-index
+  // as the row-2 sticky headers so it stays pinned during horizontal scroll.
+  const stickyGroup = `sticky left-0 z-20 ${stickyBg} ${stickyDivider}`;
+  const stickyTd1 = `sticky left-0 z-10 w-48 min-w-48 ${stickyBg} ${stickyHover}`;
+  const stickyTd2 = `sticky left-48 z-10 w-40 min-w-40 ${stickyBg} ${stickyHover} ${stickyDivider}`;
 
   return (
     <div className={`rounded-xl border ${t.card}`}>
@@ -253,9 +458,18 @@ export const FeeRecordsTable = ({
           {/* Group headers */}
           <thead>
             <tr className={`border-b ${t.borderLight}`}>
-              <th colSpan={6} className={`${thBase} ${t.textSub} text-left`}>
+              <th
+                colSpan={2}
+                className={`${thBase} ${t.textSub} text-left ${stickyGroup}`}
+              >
                 Case Info
               </th>
+              <th
+                colSpan={4}
+                aria-hidden="true"
+                className={`${thBase} ${t.textSub} text-left`}
+              />
+
               <th
                 colSpan={5}
                 className={`${thBase} text-center ${groupBorder} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
@@ -281,7 +495,7 @@ export const FeeRecordsTable = ({
                 Totals
               </th>
               <th
-                colSpan={5}
+                colSpan={mode === "closed" ? 8 : 7}
                 className={`${thBase} text-center ${groupBorder} ${t.textSub}`}
               >
                 Workflow
@@ -289,16 +503,19 @@ export const FeeRecordsTable = ({
             </tr>
             {/* Column headers */}
             <tr className={`border-b ${t.borderLight}`}>
-              {/* Case Info */}
               <th
-                className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh1}`}
                 onClick={() => toggleSort("name")}
               >
                 <span className="flex items-center gap-1">
                   Case Name <ArrowUpDown className="h-3 w-3" />
                 </span>
               </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>Assigned</th>
+              <th
+                className={`${thBase} ${t.textSub} text-left ${stickyTh2}`}
+              >
+                Assigned
+              </th>
               <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
               <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
               <th
@@ -389,6 +606,12 @@ export const FeeRecordsTable = ({
                 Approved By
               </th>
               <th className={`${thBase} ${t.textSub} text-left`}>
+                Fees Conf
+              </th>
+              <th className={`${thBase} ${t.textSub} text-left`}>
+                Case Status
+              </th>
+              <th className={`${thBase} ${t.textSub} text-left`}>
                 Recent Update
               </th>
               <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
@@ -400,6 +623,11 @@ export const FeeRecordsTable = ({
                   Days <ArrowUpDown className="h-3 w-3" />
                 </span>
               </th>
+              {mode === "closed" && (
+                <th className={`${thBase} ${t.textSub} text-center`}>
+                  Action
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -409,37 +637,233 @@ export const FeeRecordsTable = ({
                 onClick={() => setSelectedCaseId(c.id)}
                 className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group`}
               >
-                {/* Case Info */}
+                {/* Case Info — first two columns are frozen */}
                 <td
-                  className={`${tdBase} ${t.text} font-semibold max-w-45 truncate`}
+                  className={`${tdBase} ${t.text} font-semibold truncate ${stickyTd1}`}
                   title={c.name}
                 >
                   {c.name}
                 </td>
-                <td className={`${tdBase} ${t.textSub}`}>{c.assigned}</td>
-                <td className={`${tdBase}`}>
-                  <span
-                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
-                  >
-                    {c.level}
-                  </span>
+                <td
+                  className={`${tdBase} ${t.textSub} ${stickyTd2}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    c.assigned
+                  ) : (
+                    <select
+                      value={cellValue(c, "assigned")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        handleVarcharChange(
+                          c,
+                          "fee",
+                          "assignedTo",
+                          "assigned",
+                          "Assigned To",
+                          e.target.value,
+                        )
+                      }
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        assignedOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "assigned");
+                        return (
+                          v &&
+                          !assignedOptions.some((o) => o.name === v) && (
+                            <option value={v}>{v}</option>
+                          )
+                        );
+                      })()}
+                      {assignedOptions
+                        .filter(
+                          (o) =>
+                            o.isActive ||
+                            o.name === cellValue(c, "assigned"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </td>
-                <td className={`${tdBase}`}>
-                  <span
-                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
-                  >
-                    {fmtClaim(c.claim)}
-                  </span>
+                {/* Level — varchar; lives on the cases row. */}
+                <td
+                  className={`${tdBase}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    <span
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                    >
+                      {cellValue(c, "level") || "—"}
+                    </span>
+                  ) : (
+                    <select
+                      value={cellValue(c, "level")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        handleVarcharChange(
+                          c,
+                          "case",
+                          "levelWon",
+                          "level",
+                          "Case Level",
+                          e.target.value,
+                        )
+                      }
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        caseLevelOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "level");
+                        return (
+                          v &&
+                          !caseLevelOptions.some((o) => o.name === v) && (
+                            <option value={v}>{v}</option>
+                          )
+                        );
+                      })()}
+                      {caseLevelOptions
+                        .filter(
+                          (o) =>
+                            o.isActive || o.name === cellValue(c, "level"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </td>
+                {/* Claim — varchar; lives on the cases row. */}
+                <td
+                  className={`${tdBase}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    <span
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                    >
+                      {fmtClaim(cellValue(c, "claim")) || "—"}
+                    </span>
+                  ) : (
+                    <select
+                      value={cellValue(c, "claim")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        handleVarcharChange(
+                          c,
+                          "case",
+                          "claimTypeLabel",
+                          "claim",
+                          "Claim Type",
+                          e.target.value,
+                        )
+                      }
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        claimTypeOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "claim");
+                        return (
+                          v &&
+                          !claimTypeOptions.some((o) => o.name === v) && (
+                            <option value={v}>{v}</option>
+                          )
+                        );
+                      })()}
+                      {claimTypeOptions
+                        .filter(
+                          (o) =>
+                            o.isActive || o.name === cellValue(c, "claim"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </td>
                 <td className={`${tdBase} ${t.textSub} tabular-nums`}>
                   {dateStr(c.date)}
                 </td>
-                <td className={`${tdBase}`}>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(c.status, dark)}`}
-                  >
-                    {STATUS_LABELS[c.status]}
-                  </span>
+                {/* Win-sheet Status — varchar; lives on fee_records. */}
+                <td
+                  className={`${tdBase}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(cellValue(c, "status"), dark)}`}
+                    >
+                      {STATUS_LABELS[cellValue(c, "status")] ||
+                        cellValue(c, "status") ||
+                        "—"}
+                    </span>
+                  ) : (
+                    <select
+                      value={cellValue(c, "status")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        handleVarcharChange(
+                          c,
+                          "fee",
+                          "winSheetStatus",
+                          "status",
+                          "Win Sheet Status",
+                          e.target.value,
+                        )
+                      }
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        winSheetStatusOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "status");
+                        return (
+                          v &&
+                          !winSheetStatusOptions.some(
+                            (o) => o.name === v,
+                          ) && <option value={v}>{v}</option>
+                        );
+                      })()}
+                      {winSheetStatusOptions
+                        .filter(
+                          (o) =>
+                            o.isActive || o.name === cellValue(c, "status"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </td>
 
                 {/* T16 */}
@@ -538,8 +962,174 @@ export const FeeRecordsTable = ({
                     </span>
                   )}
                 </td>
-                <td className={`${tdBase} ${t.textSub}`}>
-                  {c.approvedBy || "—"}
+                <td
+                  className={`${tdBase} ${t.textSub}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    cellValue(c, "approvedBy") || "—"
+                  ) : (
+                    <select
+                      value={cellValue(c, "approvedBy")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        handleVarcharChange(
+                          c,
+                          "fee",
+                          "approvedBy",
+                          "approvedBy",
+                          "Approved By",
+                          e.target.value,
+                        )
+                      }
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        approvedByOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "approvedBy");
+                        return (
+                          v &&
+                          !approvedByOptions.some((o) => o.name === v) && (
+                            <option value={v}>{v}</option>
+                          )
+                        );
+                      })()}
+                      {approvedByOptions
+                        .filter(
+                          (o) =>
+                            o.isActive || o.name === cellValue(c, "approvedBy"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </td>
+                {/* Fees Confirmation */}
+                <td
+                  className={`${tdBase} ${t.textSub}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    cellValue(c, "feesConfirmation") || "—"
+                  ) : (
+                    <select
+                      value={cellValue(c, "feesConfirmation")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        if (
+                          next &&
+                          next.toLowerCase() === "paid in full" &&
+                          next !== cellValue(c, "feesConfirmation")
+                        ) {
+                          setAckTarget({
+                            caseId: c.id,
+                            caseName: c.name,
+                            triggerField: "feesConfirmation",
+                            triggerValue: next,
+                            triggerLabel: "Fees Confirmation",
+                          });
+                          return;
+                        }
+                        handleVarcharChange(
+                          c,
+                          "fee",
+                          "feesConfirmation",
+                          "feesConfirmation",
+                          "Fees Confirmation",
+                          next,
+                        );
+                      }}
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        feesConfirmationOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "feesConfirmation");
+                        return (
+                          v &&
+                          !feesConfirmationOptions.some(
+                            (o) => o.name === v,
+                          ) && <option value={v}>{v}</option>
+                        );
+                      })()}
+                      {feesConfirmationOptions
+                        .filter(
+                          (o) =>
+                            o.isActive ||
+                            o.name === cellValue(c, "feesConfirmation"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </td>
+                {/* Case Status */}
+                <td
+                  className={`${tdBase} ${t.textSub}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mode === "closed" ? (
+                    cellValue(c, "caseStatus") || "—"
+                  ) : (
+                    <select
+                      value={cellValue(c, "caseStatus")}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        handleVarcharChange(
+                          c,
+                          "fee",
+                          "caseStatus",
+                          "caseStatus",
+                          "Case Status",
+                          e.target.value,
+                        )
+                      }
+                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                      title={
+                        caseStatusOptions.length === 0
+                          ? "No options configured — add them in Settings"
+                          : undefined
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {(() => {
+                        const v = cellValue(c, "caseStatus");
+                        return (
+                          v &&
+                          !caseStatusOptions.some((o) => o.name === v) && (
+                            <option value={v}>{v}</option>
+                          )
+                        );
+                      })()}
+                      {caseStatusOptions
+                        .filter(
+                          (o) =>
+                            o.isActive ||
+                            o.name === cellValue(c, "caseStatus"),
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.name}>
+                            {o.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </td>
                 <td
                   className={`${tdBase} ${t.textSub} max-w-65 truncate`}
@@ -586,6 +1176,30 @@ export const FeeRecordsTable = ({
                     "—"
                   )}
                 </td>
+                {mode === "closed" && (
+                  <td
+                    className={`${tdBase} text-center`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReopen(c);
+                      }}
+                      disabled={reopeningId !== null}
+                      className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn} disabled:opacity-40`}
+                      title="Move this case back to the active dashboard and clear Fees Confirmation"
+                    >
+                      {reopeningId === c.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
+                      Reopen
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -634,6 +1248,20 @@ export const FeeRecordsTable = ({
           onClose={() => setNotesFor(null)}
         />
       )}
+
+      <AcknowledgeAndCloseDialog
+        open={ackTarget !== null}
+        caseId={ackTarget?.caseId ?? null}
+        caseName={ackTarget?.caseName ?? ""}
+        triggerField={ackTarget?.triggerField ?? ""}
+        triggerValue={ackTarget?.triggerValue ?? ""}
+        triggerLabel={ackTarget?.triggerLabel ?? ""}
+        onClose={() => setAckTarget(null)}
+        onAcknowledged={() => {
+          setAckTarget(null);
+          onImported?.();
+        }}
+      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 {
-  "id": "0e87df12-8e97-4b1a-9877-c93d5a24ca73",
-  "prevId": "75d32514-bd89-4af9-81a1-866af3f9809d",
+  "id": "ad4783ce-1264-4fec-bcc3-ed119a5bf292",
+  "prevId": "d70e8f55-a108-4b4c-a49f-e33b2019c950",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -281,15 +281,13 @@
         },
         "claim_type_label": {
           "name": "claim_type_label",
-          "type": "claim_type_enum",
-          "typeSchema": "public",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
         "level_won": {
           "name": "level_won",
-          "type": "level_won_enum",
-          "typeSchema": "public",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -974,6 +972,102 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.dropdown_options": {
+      "name": "dropdown_options",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_dropdown_options_category_name": {
+          "name": "uq_dropdown_options_category_name",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_dropdown_options_category": {
+          "name": "idx_dropdown_options_category",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.fee_cap_history": {
       "name": "fee_cap_history",
       "schema": "",
@@ -1185,8 +1279,7 @@
         },
         "win_sheet_status": {
           "name": "win_sheet_status",
-          "type": "win_sheet_status_enum",
-          "typeSchema": "public",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "default": "'not_started'"

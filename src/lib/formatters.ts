@@ -19,15 +19,22 @@ export const fmtDate = (d: string | null | undefined): string => {
   return `${m}/${day}/${y}`;
 };
 
-// Claim type display: T2_T16 → CONC, T2/T16 → CONC
+// Claim type display: T2_T16 → CONC, T2/T16 → CONC.
+// Worksheet-style values (CONC, DWB, DAC, AUX) pass through unchanged so
+// rows saved directly via the dashboard dropdowns render verbatim.
 export const fmtClaim = (claim: string): string => {
   if (claim === "T2_T16" || claim === "T2/T16") return "CONC";
   return claim;
 };
 
-// Win sheet status labels matching the spreadsheet
-// DB has granular statuses → sheet shows simplified labels
+// Win sheet status labels matching the spreadsheet.
+// The DB used to enforce a 7-state enum; it's now varchar so the dropdown
+// values from /settings can be saved directly. The lookup covers BOTH the
+// legacy enum keys (`not_started`, `paid_in_full`, …) and the
+// worksheet-friendly labels (`Started`, `Finished`) — anything else falls
+// back to the raw string in the cell.
 export const STATUS_LABELS: Record<string, string> = {
+  // Legacy enum values
   not_started: "Not Started",
   started: "Started",
   in_progress: "Started", // sheet groups these as "Started"
@@ -35,6 +42,10 @@ export const STATUS_LABELS: Record<string, string> = {
   partially_paid: "Finished", // some fees received = Finished in sheet
   paid_in_full: "Finished", // all fees received = Finished
   closed: "Closed",
+  // Worksheet-direct values (pass-through)
+  Started: "Started",
+  Finished: "Finished",
+  Closed: "Closed",
 };
 
 // Detailed status for case detail page (keeps granularity)
@@ -55,7 +66,9 @@ export const SYNC_LABELS: Record<string, string> = {
   error: "Error",
 };
 
-// Level display
+// Level display. Accepts both the legacy enum values (FEE_PETITION,
+// FEDERAL_COURT, …) and the worksheet-style label ("FEE PETITION") so
+// dropdown saves and historical rows both render cleanly.
 export const LEVEL_LABELS: Record<string, string> = {
   INITIAL: "Initial",
   RECON: "Recon",
@@ -63,6 +76,7 @@ export const LEVEL_LABELS: Record<string, string> = {
   AC: "AC",
   FEDERAL_COURT: "Fed Court",
   FEE_PETITION: "Fee Petition",
+  "FEE PETITION": "Fee Petition",
 };
 
 const STATUS_FALLBACK: [string, string] = [
@@ -74,16 +88,22 @@ export const getStatusColor = (
   status: WinSheetStatus | string,
   dark: boolean,
 ): string => {
+  const FINISHED_COLORS: [string, string] = [
+    "bg-emerald-100 text-emerald-700",
+    "bg-emerald-900/40 text-emerald-400",
+  ];
+  const STARTED_COLORS: [string, string] = [
+    "bg-blue-100 text-blue-700",
+    "bg-blue-900/40 text-blue-400",
+  ];
   const map: Record<string, [string, string]> = {
-    paid_in_full: [
-      "bg-emerald-100 text-emerald-700",
-      "bg-emerald-900/40 text-emerald-400",
-    ],
+    // Legacy enum values
+    paid_in_full: FINISHED_COLORS,
     partially_paid: [
       "bg-amber-100 text-amber-700",
       "bg-amber-900/40 text-amber-400",
     ],
-    started: ["bg-blue-100 text-blue-700", "bg-blue-900/40 text-blue-400"],
+    started: STARTED_COLORS,
     in_progress: [
       "bg-orange-100 text-orange-700",
       "bg-orange-900/40 text-orange-400",
@@ -97,6 +117,13 @@ export const getStatusColor = (
       "bg-neutral-800 text-neutral-400",
     ],
     not_started: [
+      "bg-neutral-100 text-neutral-500",
+      "bg-neutral-800 text-neutral-400",
+    ],
+    // Worksheet-direct values
+    Started: STARTED_COLORS,
+    Finished: FINISHED_COLORS,
+    Closed: [
       "bg-neutral-100 text-neutral-500",
       "bg-neutral-800 text-neutral-400",
     ],

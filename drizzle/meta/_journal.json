@@ -75,15 +75,22 @@
     {
       "idx": 10,
       "version": "7",
-      "when": 1779395317568,
-      "tag": "0010_chunky_purifiers",
+      "when": 1779811696949,
+      "tag": "0010_fees_closed_and_approved_by_options",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
-      "when": 1779397718059,
-      "tag": "0011_early_lady_bullseye",
+      "when": 1779822270477,
+      "tag": "0011_dropdown_options_and_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1779830266321,
+      "tag": "0012_loosen_enum_columns_to_varchar",
       "breakpoints": true
     }
   ]
