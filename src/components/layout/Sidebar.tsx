@@ -24,6 +24,7 @@ import {
   Shield,
   KeyRound,
   Scale,
+  CheckCircle2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtClaim } from "@/lib/formatters";
@@ -56,6 +57,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
     section: "General",
     items: [
       { path: "/", icon: Home, label: "Overview" },
+      { path: "/fees-closed", icon: CheckCircle2, label: "Fees Closed" },
       { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
       { path: "/fee-petitions", icon: Gavel, label: "Fee Petitions" },

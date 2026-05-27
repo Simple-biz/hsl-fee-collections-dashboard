@@ -27,8 +27,10 @@ import {
   Loader2,
   // ExternalLink,
   CircleDot,
+  ListChecks,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { DropdownOptionsManager } from "@/components/settings/DropdownOptionsManager";
 
 // ============================================================================
 // Types
@@ -61,7 +63,12 @@ interface ConnectionStatus {
   message: string;
 }
 
-type TabKey = "fees" | "integrations" | "targets" | "notifications";
+type TabKey =
+  | "fees"
+  | "dropdowns"
+  | "integrations"
+  | "targets"
+  | "notifications";
 
 const TAB_META: Record<
   TabKey,
@@ -71,6 +78,11 @@ const TAB_META: Record<
     label: "Fee Configuration",
     icon: DollarSign,
     desc: "Fee cap history and computation defaults",
+  },
+  dropdowns: {
+    label: "Dropdown Options",
+    icon: ListChecks,
+    desc: "Manage the values that populate worksheet dropdowns",
   },
   integrations: {
     label: "Integrations",
@@ -85,7 +97,13 @@ const TAB_META: Record<
   },
 };
 
-const TABS: TabKey[] = ["fees", "integrations", "targets", "notifications"];
+const TABS: TabKey[] = [
+  "fees",
+  "dropdowns",
+  "integrations",
+  "targets",
+  "notifications",
+];
 
 const STATUS_STYLE: Record<
   ConnectionStatus["status"],
@@ -304,7 +322,7 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-          {activeTab !== "integrations" && (
+          {activeTab !== "integrations" && activeTab !== "dropdowns" && (
             <button
               onClick={handleSave}
               disabled={saving}
@@ -577,6 +595,13 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ── DROPDOWN OPTIONS TAB ── */}
+          {activeTab === "dropdowns" && (
+            <div className="space-y-4">
+              <DropdownOptionsManager />
             </div>
           )}
 

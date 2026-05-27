@@ -6,13 +6,21 @@ import type {
   DashboardSummary,
   MonthlyData,
   TeamMember,
+  ApprovedByOption,
 } from "@/types";
+import type { DropdownCategory } from "@/lib/dropdown-categories";
+
+export type DropdownOptionsByCategory = Partial<
+  Record<DropdownCategory, ApprovedByOption[]>
+>;
 
 interface DashboardData {
   cases: CaseRow[];
   summary: DashboardSummary;
   monthlyData: MonthlyData[];
   team: TeamMember[];
+  approvedByOptions: ApprovedByOption[];
+  dropdownOptions: DropdownOptionsByCategory;
   loading: boolean; // summary + team (fast — powers KPI cards + collections chart)
   casesLoading: boolean; // the heavier /api/cases list (powers the fee records table)
   error: string | null;
@@ -34,6 +42,11 @@ export const useDashboard = (): DashboardData => {
   const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [approvedByOptions, setApprovedByOptions] = useState<
+    ApprovedByOption[]
+  >([]);
+  const [dropdownOptions, setDropdownOptions] =
+    useState<DropdownOptionsByCategory>({});
   const [loading, setLoading] = useState(true);
   const [casesLoading, setCasesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +56,14 @@ export const useDashboard = (): DashboardData => {
     setCasesLoading(true);
     setError(null);
 
-    // Summary + team are quick and power the KPI cards and collections chart.
+    // Summary + team + ALL dropdown_options (one round-trip, grouped by
+    // category on the client) power the KPI cards and the inline-editable
+    // dropdowns in the fee records table.
     const summaryTask = (async () => {
-      const [dashRes, teamRes] = await Promise.all([
+      const [dashRes, teamRes, optRes] = await Promise.all([
         fetch("/api/dashboard"),
         fetch("/api/team-members"),
+        fetch("/api/settings/dropdown-options"),
       ]);
       if (!dashRes.ok || !teamRes.ok) {
         throw new Error("Failed to fetch dashboard data");
@@ -57,12 +73,26 @@ export const useDashboard = (): DashboardData => {
       setSummary(dashJson.summary);
       setMonthlyData(dashJson.monthlyData);
       setTeam(teamJson.data);
+      // Options are non-critical: an empty list just yields an empty dropdown.
+      if (optRes.ok) {
+        const optJson = await optRes.json();
+        const all: (ApprovedByOption & { category: DropdownCategory })[] =
+          optJson.data || [];
+        // Group by category for fast per-cell lookup in the table.
+        const grouped: DropdownOptionsByCategory = {};
+        for (const o of all) {
+          (grouped[o.category] ||= []).push(o);
+        }
+        setDropdownOptions(grouped);
+        setApprovedByOptions(grouped.approved_by || []);
+      }
     })();
 
     // The cases list is heavier; let it resolve independently so the table
-    // doesn't hold up the rest of the dashboard.
+    // doesn't hold up the rest of the dashboard. Active (non-closed) only —
+    // closed cases live on /fees-closed.
     const casesTask = (async () => {
-      const casesRes = await fetch("/api/cases");
+      const casesRes = await fetch("/api/cases?isClosed=false");
       if (!casesRes.ok) throw new Error("Failed to fetch cases");
       const casesJson = await casesRes.json();
       setCases(casesJson.data);
@@ -80,6 +110,7 @@ export const useDashboard = (): DashboardData => {
   }, []);
 
   useEffect(() => {
+    // Deliberate fetch-on-mount; fetchAll owns its loading/error state.
     fetchAll();
   }, [fetchAll]);
 
@@ -88,6 +119,8 @@ export const useDashboard = (): DashboardData => {
     summary,
     monthlyData,
     team,
+    approvedByOptions,
+    dropdownOptions,
     loading,
     casesLoading,
     error,

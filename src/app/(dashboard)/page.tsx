@@ -11,8 +11,17 @@ import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
 
 export default function OverviewPage() {
-  const { cases, summary, monthlyData, loading, casesLoading, error, refresh } =
-    useDashboard();
+  const {
+    cases,
+    summary,
+    monthlyData,
+    approvedByOptions,
+    dropdownOptions,
+    loading,
+    casesLoading,
+    error,
+    refresh,
+  } = useDashboard();
   const { dateRange } = useDateRange();
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
@@ -65,6 +74,8 @@ export default function OverviewPage() {
           cases={cases}
           dateRange={dateRange}
           onImported={refresh}
+          approvedByOptions={approvedByOptions}
+          dropdownOptions={dropdownOptions}
         />
       )}
     </>
