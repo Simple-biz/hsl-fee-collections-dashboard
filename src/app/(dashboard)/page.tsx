@@ -57,7 +57,7 @@ export default function OverviewPage() {
 
   return (
     <>
-      <StatCards stats={summary} />
+      <StatCards stats={summary} monthlyData={monthlyData} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         <CollectionsPanel data={monthlyData} />
         <RevenuePanel stats={summary} cases={cases} />

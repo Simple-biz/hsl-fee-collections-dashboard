@@ -149,8 +149,17 @@ export const GET = async (
         )
       : null;
 
-    const expected = Number(row.totalFeesExpected) || 0;
-    const paid = Number(row.totalFeesPaid) || 0;
+    // Computed from per-benefit subtotals to stay in sync with the dashboard
+    // cards (which also sum t16+t2+aux instead of using the stored
+    // total_fees_* columns).
+    const expected =
+      (Number(row.t16FeeDue) || 0) +
+      (Number(row.t2FeeDue) || 0) +
+      (Number(row.auxFeeDue) || 0);
+    const paid =
+      (Number(row.t16FeeReceived) || 0) +
+      (Number(row.t2FeeReceived) || 0) +
+      (Number(row.auxFeeReceived) || 0);
 
     const data = {
       // Case info

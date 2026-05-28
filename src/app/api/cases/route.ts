@@ -139,9 +139,18 @@ export const GET = async (req: NextRequest) => {
           )
         : null;
 
-      // PIF logic matching sheet: YES / NO / PENDING
-      const expected = Number(r.totalFeesExpected) || 0;
-      const paid = Number(r.totalFeesPaid) || 0;
+      // PIF logic matching sheet: YES / NO / PENDING.
+      // expected/paid are computed from the per-benefit subtotals so the
+      // table values match the dashboard cards regardless of whether the
+      // stored aggregate columns (total_fees_*) were populated.
+      const expected =
+        (Number(r.t16FeeDue) || 0) +
+        (Number(r.t2FeeDue) || 0) +
+        (Number(r.auxFeeDue) || 0);
+      const paid =
+        (Number(r.t16FeeReceived) || 0) +
+        (Number(r.t2FeeReceived) || 0) +
+        (Number(r.auxFeeReceived) || 0);
       let pif: string | null = null;
       if (expected > 0) {
         if (paid >= expected) pif = "YES";
