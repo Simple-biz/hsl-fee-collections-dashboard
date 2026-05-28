@@ -13,11 +13,24 @@ interface RevenuePanelProps {
 
 export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
   const { resolvedTheme } = useTheme();
-  const t = themeClasses(resolvedTheme === "dark");
-  const collectionRate =
-    stats.expected > 0
-      ? ((stats.paid / stats.expected) * 100).toFixed(1)
-      : "0.0";
+  const dark = resolvedTheme === "dark";
+  const t = themeClasses(dark);
+
+  // Collection rate = paid / expected. It's a standing ratio (not a delta),
+  // so no "+" prefix; color reflects how much of the expected fees are in.
+  const hasExpected = stats.expected > 0;
+  const rate = hasExpected ? (stats.paid / stats.expected) * 100 : 0;
+  const rateTone = !hasExpected
+    ? t.textMuted
+    : rate >= 80
+      ? "text-emerald-500"
+      : rate >= 40
+        ? dark
+          ? "text-amber-400"
+          : "text-amber-600"
+        : dark
+          ? "text-red-400"
+          : "text-red-500";
 
   return (
     <div className={`rounded-xl border p-4 md:p-5 ${t.card}`}>
@@ -25,8 +38,10 @@ export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
       <div className={`text-2xl font-extrabold ${t.text} mt-1`}>
         {fmtFull(stats.paid)}
       </div>
-      <div className="text-[11px] text-emerald-500 font-medium mt-0.5">
-        +{collectionRate}% collection rate
+      <div className={`text-[11px] font-medium mt-0.5 ${rateTone}`}>
+        {hasExpected
+          ? `${rate.toFixed(1)}% collection rate`
+          : "No fees expected yet"}
       </div>
 
       <div className="mt-4">

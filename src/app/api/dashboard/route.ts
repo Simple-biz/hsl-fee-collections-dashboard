@@ -6,13 +6,14 @@ import { eq, sql, count } from "drizzle-orm";
 // GET /api/dashboard — Summary stats + monthly collections data
 export const GET = async () => {
   try {
-    // Summary stats (active rows only — closed cases live on /fees-closed)
+    // Summary stats (active rows only — closed cases live on /fees-closed).
+    // expected/paid are computed from the per-benefit subtotals (T16 + T2 +
+    // AUX) instead of the stored `total_fees_expected`/`total_fees_paid`,
+    // which the xlsx import path does not populate — so the cards stay
+    // accurate regardless of whether the aggregate columns were filled.
     const [stats] = await db
       .select({
         totalCases: count(),
-        feesComputed: count(
-          sql`CASE WHEN ${feeRecords.feeComputed} = TRUE THEN 1 END`,
-        ),
         pif: count(
           sql`CASE WHEN ${feeRecords.pifReadyToClose} = TRUE THEN 1 END`,
         ),
@@ -22,8 +23,16 @@ export const GET = async () => {
         syncErrors: count(
           sql`CASE WHEN ${feeRecords.syncStatus} = 'error' THEN 1 END`,
         ),
-        totalExpected: sql<number>`COALESCE(SUM(${feeRecords.totalFeesExpected}::numeric), 0)`,
-        totalPaid: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}::numeric), 0)`,
+        totalExpected: sql<number>`COALESCE(SUM(
+          COALESCE(${feeRecords.t16FeeDue}, 0)::numeric
+          + COALESCE(${feeRecords.t2FeeDue}, 0)::numeric
+          + COALESCE(${feeRecords.auxFeeDue}, 0)::numeric
+        ), 0)`,
+        totalPaid: sql<number>`COALESCE(SUM(
+          COALESCE(${feeRecords.t16FeeReceived}, 0)::numeric
+          + COALESCE(${feeRecords.t2FeeReceived}, 0)::numeric
+          + COALESCE(${feeRecords.auxFeeReceived}, 0)::numeric
+        ), 0)`,
       })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -32,17 +41,28 @@ export const GET = async () => {
     const expected = Number(stats.totalExpected);
     const paid = Number(stats.totalPaid);
 
-    // Monthly collections data (last 6 months)
+    // Monthly collections data (last 6 months). Same dataset as the summary
+    // above — closed cases excluded, totals computed from T16+T2+AUX
+    // subtotals — so the chart and the cards never drift apart.
     const monthly = await db.execute(sql`
       SELECT
         TO_CHAR(c.approval_date, 'Mon') AS month,
         TO_CHAR(c.approval_date, 'YYYY-MM') AS sort_key,
-        COALESCE(SUM(f.total_fees_expected::numeric), 0) AS expected,
-        COALESCE(SUM(f.total_fees_paid::numeric), 0) AS collected
+        COALESCE(SUM(
+          COALESCE(f.t16_fee_due, 0)::numeric
+          + COALESCE(f.t2_fee_due, 0)::numeric
+          + COALESCE(f.aux_fee_due, 0)::numeric
+        ), 0) AS expected,
+        COALESCE(SUM(
+          COALESCE(f.t16_fee_received, 0)::numeric
+          + COALESCE(f.t2_fee_received, 0)::numeric
+          + COALESCE(f.aux_fee_received, 0)::numeric
+        ), 0) AS collected
       FROM cases c
       LEFT JOIN fee_records f ON f.case_id = c.client_id
       WHERE c.approval_date IS NOT NULL
         AND c.approval_date >= (CURRENT_DATE - INTERVAL '6 months')
+        AND COALESCE(f.is_closed, false) = false
       GROUP BY TO_CHAR(c.approval_date, 'Mon'), TO_CHAR(c.approval_date, 'YYYY-MM')
       ORDER BY sort_key ASC
     `);
