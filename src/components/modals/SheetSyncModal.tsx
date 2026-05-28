@@ -155,7 +155,13 @@ export default function SheetSyncModal({
         throw new Error((json.error as string) || `Fetch failed (${res.status})`);
       const data = json as unknown as SyncPreviewResponse;
       setPreview(data);
-      setSelected(new Set(data.rows.sheet.map((r) => r.clientId)));
+      setSelected(
+        new Set(
+          data.rows.sheet
+            .filter((r) => r.status === "new")
+            .map((r) => r.clientId),
+        ),
+      );
     } catch (e) {
       const err = e as Error;
       if (err.name === "AbortError") {
