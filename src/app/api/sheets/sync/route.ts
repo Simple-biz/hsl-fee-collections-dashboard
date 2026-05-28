@@ -281,18 +281,29 @@ export const POST = async (req: NextRequest) => {
         { status: 400 },
       );
     }
-    const ids = (body.selectedClientIds as unknown[]).map(Number);
-    if (ids.some((n) => !Number.isFinite(n))) {
+    const ids = Array.from(new Set((body.selectedClientIds as unknown[]).map(Number)));
+
+    if (ids.some((n) => !Number.isInteger(n))) {
       return NextResponse.json(
         { error: "selectedClientIds must contain only integers" },
         { status: 400 },
       );
     }
+
     const selectedSet = new Set(ids);
 
     const { rows: rawRows } = await fetchMasterListRows();
     const { rows: parsed } = mapSheetRows(rawRows);
-    const candidates = parsed.filter((r) => selectedSet.has(r.clientId));
+
+    const seenCandidates = new Set<number>();
+
+    const candidates = parsed.filter((r) => {
+      if (!selectedSet.has(r.clientId)) return false;
+      if (seenCandidates.has(r.clientId)) return false;
+
+      seenCandidates.add(r.clientId);
+      return true;
+    });
 
     if (candidates.length === 0) {
       return NextResponse.json({ inserted: 0, updated: 0 });
@@ -324,9 +335,27 @@ export const POST = async (req: NextRequest) => {
 
     await db.transaction(async (tx) => {
       for (const batch of chunked(newRows, CHUNK)) {
-        await tx.insert(cases).values(batch.map(toCaseInsert));
-        await tx.insert(feeRecords).values(batch.map(toFeeInsert));
-        const withNotes = batch.filter((r) => r.notes);
+        const insertedCases = await tx
+          .insert(cases)
+          .values(batch.map(toCaseInsert))
+          .onConflictDoNothing({
+            target: cases.clientId,
+          })
+          .returning({ clientId: cases.clientId });
+
+        const insertedClientIds = new Set(insertedCases.map((r) => r.clientId));
+        const insertedRows = batch.filter((r) => insertedClientIds.has(r.clientId));
+
+        if (insertedRows.length === 0) continue;
+
+        await tx
+          .insert(feeRecords)
+          .values(insertedRows.map(toFeeInsert))
+          .onConflictDoNothing({
+            target: feeRecords.caseId,
+          });
+
+        const withNotes = insertedRows.filter((r) => r.notes);
         if (withNotes.length > 0) {
           await tx.insert(activityLog).values(
             withNotes.map((r) => ({
@@ -336,7 +365,8 @@ export const POST = async (req: NextRequest) => {
             })),
           );
         }
-        inserted += batch.length;
+
+        inserted += insertedRows.length;
       }
       for (const r of updateRows) {
         await tx
