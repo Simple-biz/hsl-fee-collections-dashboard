@@ -10,7 +10,7 @@ export const GET = async () => {
         COUNT(*) FILTER (WHERE 'T16' = ANY(claim_type) AND 'T2' = ANY(claim_type))::int  AS concurrent,
         COUNT(*) FILTER (WHERE 'T16' = ANY(claim_type) AND NOT ('T2' = ANY(claim_type)))::int AS t16_only,
         COUNT(*) FILTER (WHERE 'T2'  = ANY(claim_type) AND NOT ('T16' = ANY(claim_type)))::int AS t2_only,
-        COUNT(*)::int AS total
+        COUNT(*) FILTER (WHERE 'T16' = ANY(claim_type) OR 'T2' = ANY(claim_type))::int AS total
       FROM cases
     `);
     const [row] = result as unknown as {

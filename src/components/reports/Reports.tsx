@@ -142,6 +142,7 @@ interface CaseTypeCounts {
 
 const CaseTypeChart = ({ dark, t }: { dark: boolean; t: ReturnType<typeof themeClasses> }) => {
   const [counts, setCounts] = useState<CaseTypeCounts | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -151,7 +152,7 @@ const CaseTypeChart = ({ dark, t }: { dark: boolean; t: ReturnType<typeof themeC
         return res.json();
       })
       .then(setCounts)
-      .catch((e) => { if (e.name !== "AbortError") console.error(e); });
+      .catch((e) => { if (e.name !== "AbortError") setError(e.message); });
     return () => controller.abort();
   }, []);
 
@@ -175,7 +176,11 @@ const CaseTypeChart = ({ dark, t }: { dark: boolean; t: ReturnType<typeof themeC
         ))}
       </div>
 
-      {counts == null ? (
+      {error ? (
+        <div className={`flex-1 flex items-center justify-center text-xs ${t.textMuted}`} role="alert">
+          {error}
+        </div>
+      ) : counts == null ? (
         <div className={`flex-1 flex items-center justify-center text-xs ${t.textMuted}`}>
           Loading…
         </div>
