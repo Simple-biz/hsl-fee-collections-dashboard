@@ -184,7 +184,7 @@ export const mapSheetRows = (
       auxPending: num(r["AUX PENDING"]),
       auxFeeReceivedDate: dateOnly(r["DATE AUX FEE REC'D"]),
       daysAfterApproval: r["DAYS AFTER APPROVAL"] != null && r["DAYS AFTER APPROVAL"] !== ""
-        ? (Number(r["DAYS AFTER APPROVAL"]) || null)
+        ? (Number.isNaN(Number(r["DAYS AFTER APPROVAL"])) ? null : Number(r["DAYS AFTER APPROVAL"]))
         : null,
       approvalCategory: r["APPROVAL CATEGORY"] ? String(r["APPROVAL CATEGORY"]).trim() : null,
       feesStatus: r["FEES STATUS"] ? String(r["FEES STATUS"]).trim() : null,
