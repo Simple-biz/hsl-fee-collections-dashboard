@@ -155,9 +155,15 @@ const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => (
   updatedAt: new Date(),
 });
 
+const toClosedAt = (closedDate: string | null): Date => {
+  if (!closedDate) return new Date();
+  const parsed = new Date(`${closedDate}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 // POST /api/sheets/sync
 //   mode=preview  → diff MASTER LIST + Fees Closed sheet vs DB; return all 4 categories
-//   mode=upsert   → import new rows + update existing (fees_closed move is TODO)
+//   mode=upsert   → import new rows, update existing, and mark Fees Closed rows closed
 export const POST = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
@@ -292,8 +298,12 @@ export const POST = async (req: NextRequest) => {
 
     const selectedSet = new Set(ids);
 
-    const { rows: rawRows } = await fetchMasterListRows();
+    const [{ rows: rawRows }, feesClosedRaw] = await Promise.all([
+      fetchMasterListRows(),
+      fetchFeesClosedSheetRows(),
+    ]);
     const { rows: parsed } = mapSheetRows(rawRows);
+    const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
 
     const seenCandidates = new Set<number>();
 
@@ -305,15 +315,39 @@ export const POST = async (req: NextRequest) => {
       return true;
     });
 
-    if (candidates.length === 0) {
-      return NextResponse.json({ inserted: 0, updated: 0 });
+    const sheetClientIdSet = new Set(parsed.map((r) => r.clientId));
+    const feesClosedByCaseName = new Map(
+      feesClosedParsed.map((r) => [r.caseName.trim(), r]),
+    );
+
+    const selectedDbCases =
+      ids.length > 0
+        ? await db
+            .select({ clientId: cases.clientId, caseLink: cases.caseLink })
+            .from(cases)
+            .where(inArray(cases.clientId, ids))
+        : [];
+
+    const feesClosedMatches = selectedDbCases.flatMap((c) => {
+      if (sheetClientIdSet.has(c.clientId) || !c.caseLink) return [];
+      const feesClosedRow = feesClosedByCaseName.get(c.caseLink.trim());
+      return feesClosedRow
+        ? [{ clientId: c.clientId, closedAt: toClosedAt(feesClosedRow.closedDate) }]
+        : [];
+    });
+
+    if (candidates.length === 0 && feesClosedMatches.length === 0) {
+      return NextResponse.json({ inserted: 0, updated: 0, closed: 0 });
     }
 
     const incomingIds = candidates.map((r) => r.clientId);
-    const existing = await db
-      .select({ clientId: cases.clientId })
-      .from(cases)
-      .where(inArray(cases.clientId, incomingIds));
+    const existing =
+      incomingIds.length > 0
+        ? await db
+            .select({ clientId: cases.clientId })
+            .from(cases)
+            .where(inArray(cases.clientId, incomingIds))
+        : [];
     const existingSet = new Set(existing.map((e) => e.clientId));
 
     const newRows = candidates.filter((r) => !existingSet.has(r.clientId));
@@ -332,6 +366,7 @@ export const POST = async (req: NextRequest) => {
 
     let inserted = 0;
     let updated = 0;
+    let closed = 0;
 
     await db.transaction(async (tx) => {
       for (const batch of chunked(newRows, CHUNK)) {
@@ -379,15 +414,36 @@ export const POST = async (req: NextRequest) => {
           .where(eq(feeRecords.caseId, r.clientId));
         updated++;
       }
+
+      for (const batch of chunked(feesClosedMatches, CHUNK)) {
+        if (batch.length === 0) continue;
+
+        for (const row of batch) {
+          await tx
+            .update(feeRecords)
+            .set({
+              isClosed: true,
+              closedAt: row.closedAt,
+              winSheetStatus: "closed",
+              syncStatus: "synced",
+              syncedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(feeRecords.caseId, row.clientId));
+        }
+
+        await tx.insert(activityLog).values(
+          batch.map((row) => ({
+            caseId: row.clientId,
+            message: "Marked closed from Fees Closed sheet during Google Sheets sync.",
+            createdBy: "Sheet Sync",
+          })),
+        );
+        closed += batch.length;
+      }
     });
 
-    // TODO: handle fees_closed moves once Sir Jeru's fees_closed schema lands.
-    // On upsert, feesClosedClientIds (passed separately) should be:
-    //   1. Inserted into fees_closed table
-    //   2. Deleted from cases table
-    // Wire up here when schema is ready.
-
-    return NextResponse.json({ inserted, updated });
+    return NextResponse.json({ inserted, updated, closed });
   } catch (error) {
     console.error("POST /api/sheets/sync error:", error);
     return NextResponse.json(

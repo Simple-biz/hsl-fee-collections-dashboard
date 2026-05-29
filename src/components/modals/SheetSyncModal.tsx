@@ -42,7 +42,7 @@ type Step4Filter = "all" | "new" | "existing" | "fees_closed" | "missing";
 
 type Step4PreviewRow =
   | (SheetPreviewRow & { syncable: true })
-  | (DbOnlyRow & { syncable: false });
+  | (DbOnlyRow & { syncable: boolean });
 
 interface SyncPreviewResponse {
   usingMock: boolean;
@@ -134,7 +134,7 @@ export default function SheetSyncModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
+  const [result, setResult] = useState<{ inserted: number; updated: number; closed: number } | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Step4Filter>("all");
 
@@ -163,9 +163,12 @@ export default function SheetSyncModal({
       setPreview(data);
       setSelected(
         new Set(
-          data.rows.sheet
-            .filter((r) => r.status === "new")
-            .map((r) => r.clientId),
+          [
+            ...data.rows.sheet
+              .filter((r) => r.status === "new")
+              .map((r) => r.clientId),
+            ...data.rows.feesClosed.map((r) => r.clientId),
+          ],
         ),
       );
     } catch (e) {
@@ -194,7 +197,7 @@ export default function SheetSyncModal({
     if (!preview) return [];
     return [
       ...preview.rows.sheet.map((r) => ({ ...r, syncable: true as const })),
-      ...preview.rows.feesClosed.map((r) => ({ ...r, syncable: false as const })),
+      ...preview.rows.feesClosed.map((r) => ({ ...r, syncable: true })),
       ...preview.rows.missing.map((r) => ({ ...r, syncable: false as const })),
     ];
   }, [preview]);
@@ -228,7 +231,7 @@ export default function SheetSyncModal({
     syncControllerRef.current = controller;
     setSyncing(true);
     setError(null);
-    let syncResult: { inserted: number; updated: number } | null = null;
+    let syncResult: { inserted: number; updated: number; closed: number } | null = null;
     try {
       const res = await fetch("/api/sheets/sync?mode=upsert", {
         method: "POST",
@@ -240,7 +243,11 @@ export default function SheetSyncModal({
       try { json = await res.json(); } catch { /* non-JSON body */ }
       if (!res.ok)
         throw new Error((json.error as string) || `Sync failed (${res.status})`);
-      syncResult = { inserted: json.inserted as number, updated: json.updated as number };
+      syncResult = {
+        inserted: json.inserted as number,
+        updated: json.updated as number,
+        closed: (json.closed as number | undefined) ?? 0,
+      };
     } catch (e) {
       const err = e as Error;
       if (err.name !== "AbortError")
@@ -557,13 +564,13 @@ export default function SheetSyncModal({
                 <div>
                   <h4 className={`text-sm font-semibold ${t.text}`}>Select & Sync</h4>
                   <p className={`text-[11px] ${t.textMuted}`}>
-                    Choose which MASTER LIST rows to sync. Missing and Fees Closed rows are shown
-                    for review but cannot be selected until their sync path is implemented.
+                    Choose which rows to sync. MASTER LIST rows are inserted or updated; Fees Closed
+                    rows are marked closed and moved to the Fees Closed page.
                   </p>
                 </div>
                 <div className={`text-[11px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
-                  {" "}/ {preview.rows.sheet.length.toLocaleString()} syncable selected
+                  {" "}/ {step4Rows.filter((r) => r.syncable).length.toLocaleString()} syncable selected
                 </div>
               </div>
 
@@ -641,7 +648,9 @@ export default function SheetSyncModal({
                       <span className="font-semibold">{result.inserted.toLocaleString()}</span> new
                       case{result.inserted === 1 ? "" : "s"} inserted ·{" "}
                       <span className="font-semibold">{result.updated.toLocaleString()}</span>{" "}
-                      existing record{result.updated === 1 ? "" : "s"} updated.
+                      existing record{result.updated === 1 ? "" : "s"} updated ·{" "}
+                      <span className="font-semibold">{result.closed.toLocaleString()}</span>
+                      {" "}case{result.closed === 1 ? "" : "s"} marked closed.
                     </p>
                   </div>
                 </div>
