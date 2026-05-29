@@ -1,5 +1,6 @@
 import { myCaseDb } from "@/lib/db/mycase";
-import { MyCaseCases, type MyCaseRow } from "@/components/mycase/MyCaseCases";
+import { MyCaseTabs } from "@/components/mycase/MyCaseTabs";
+import { type MyCaseRow } from "@/components/mycase/MyCaseCases";
 
 // Reads cookies via the auth layout → always dynamic.
 export const dynamic = "force-dynamic";
@@ -52,5 +53,5 @@ export default async function MyCasePage() {
     error = "Could not load cases from the MyCase database.";
   }
 
-  return <MyCaseCases cases={cases} error={error} />;
+  return <MyCaseTabs cases={cases} error={error} />;
 }
