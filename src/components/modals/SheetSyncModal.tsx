@@ -38,6 +38,12 @@ interface DbOnlyRow {
   status: "fees_closed" | "missing";
 }
 
+type Step4Filter = "all" | "new" | "existing" | "fees_closed" | "missing";
+
+type Step4PreviewRow =
+  | (SheetPreviewRow & { syncable: true })
+  | (DbOnlyRow & { syncable: false });
+
 interface SyncPreviewResponse {
   usingMock: boolean;
   summary: {
@@ -111,7 +117,7 @@ const STATUS_BADGE = {
 
 const STATUS_LABEL = {
   new: "NEW",
-  existing: "EXISTS",
+  existing: "TO UPDATE",
   fees_closed: "FEES CLOSED",
   missing: "MISSING",
 };
@@ -130,7 +136,7 @@ export default function SheetSyncModal({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "new" | "existing">("all");
+  const [filter, setFilter] = useState<Step4Filter>("all");
 
   const handleFetch = async () => {
     if (preview != null && selected.size > 0) {
@@ -184,22 +190,30 @@ export default function SheetSyncModal({
     [preview],
   );
 
+  const step4Rows = useMemo<Step4PreviewRow[]>(() => {
+    if (!preview) return [];
+    return [
+      ...preview.rows.sheet.map((r) => ({ ...r, syncable: true as const })),
+      ...preview.rows.feesClosed.map((r) => ({ ...r, syncable: false as const })),
+      ...preview.rows.missing.map((r) => ({ ...r, syncable: false as const })),
+    ];
+  }, [preview]);
+
   const filteredRows = useMemo(() => {
     if (!preview) return [];
-    let r = preview.rows.sheet;
-    if (filter === "new") r = r.filter((x) => x.status === "new");
-    if (filter === "existing") r = r.filter((x) => x.status === "existing");
+    let r = step4Rows;
+    if (filter !== "all") r = r.filter((x) => x.status === filter);
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(
         (x) =>
           x.caseName.toLowerCase().includes(q) ||
           String(x.clientId).includes(q) ||
-          (x.assignedTo ?? "").toLowerCase().includes(q),
+          ("assignedTo" in x ? (x.assignedTo ?? "").toLowerCase().includes(q) : false),
       );
     }
     return r;
-  }, [preview, filter, search]);
+  }, [preview, step4Rows, filter, search]);
 
   const fetchControllerRef = useRef<AbortController | null>(null);
   const syncControllerRef = useRef<AbortController | null>(null);
@@ -543,12 +557,13 @@ export default function SheetSyncModal({
                 <div>
                   <h4 className={`text-sm font-semibold ${t.text}`}>Select & Sync</h4>
                   <p className={`text-[11px] ${t.textMuted}`}>
-                    Choose which MASTER LIST rows to sync. Fees Closed moves are pending schema.
+                    Choose which MASTER LIST rows to sync. Missing and Fees Closed rows are shown
+                    for review but cannot be selected until their sync path is implemented.
                   </p>
                 </div>
                 <div className={`text-[11px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
-                  {" "}/ {preview.rows.sheet.length.toLocaleString()} selected
+                  {" "}/ {preview.rows.sheet.length.toLocaleString()} syncable selected
                 </div>
               </div>
 
@@ -566,10 +581,19 @@ export default function SheetSyncModal({
                 >
                   <option value="all">All rows</option>
                   <option value="new">New only</option>
-                  <option value="existing">Existing only</option>
+                  <option value="existing">To update only</option>
+                  <option value="fees_closed">Fees Closed only</option>
+                  <option value="missing">Missing only</option>
                 </select>
                 <button
-                  onClick={() => setSelected(new Set([...selected, ...filteredRows.map((r) => r.clientId)]))}
+                  onClick={() =>
+                    setSelected(
+                      new Set([
+                        ...selected,
+                        ...filteredRows.filter((r) => r.syncable).map((r) => r.clientId),
+                      ]),
+                    )
+                  }
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
                 >
                   Select shown
@@ -577,7 +601,7 @@ export default function SheetSyncModal({
                 <button
                   onClick={() => {
                     const next = new Set(selected);
-                    filteredRows.forEach((r) => next.delete(r.clientId));
+                    filteredRows.filter((r) => r.syncable).forEach((r) => next.delete(r.clientId));
                     setSelected(next);
                   }}
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
@@ -589,11 +613,13 @@ export default function SheetSyncModal({
               <SelectionTable
                 t={t}
                 dark={dark}
-                rows={filteredRows.slice(0, 200)}
-                truncated={filteredRows.length > 200}
+                rows={filteredRows}
+                truncated={false}
                 total={filteredRows.length}
                 selected={selected}
                 onToggle={(id) => {
+                  const row = step4Rows.find((r) => r.clientId === id);
+                  if (!row?.syncable) return;
                   const next = new Set(selected);
                   if (next.has(id)) next.delete(id);
                   else next.add(id);
@@ -852,7 +878,7 @@ const SelectionTable = ({
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
-  rows: SheetPreviewRow[];
+  rows: Step4PreviewRow[];
   truncated: boolean;
   total: number;
   selected: Set<number>;
@@ -877,16 +903,19 @@ const SelectionTable = ({
             return (
               <tr
                 key={r.clientId}
-                onClick={() => onToggle(r.clientId)}
-                className={`border-b ${t.borderLight} cursor-pointer ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
+                onClick={() => r.syncable && onToggle(r.clientId)}
+                className={`border-b ${t.borderLight} ${
+                  r.syncable ? "cursor-pointer" : "cursor-not-allowed opacity-70"
+                } ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
               >
                 <td className="px-3 py-1.5">
                   <input
                     type="checkbox"
                     checked={checked}
+                    disabled={!r.syncable}
                     onChange={() => onToggle(r.clientId)}
                     onClick={(e) => e.stopPropagation()}
-                    className="h-3.5 w-3.5 cursor-pointer"
+                    className="h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
                   />
                 </td>
                 <td className={`${t.text} px-3 py-1.5 font-medium max-w-80 truncate`} title={r.caseLink}>
@@ -898,11 +927,15 @@ const SelectionTable = ({
                   </span>
                 </td>
                 <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
-                <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
+                <td className={`${t.textSub} px-3 py-1.5`}>{"assignedTo" in r ? (r.assignedTo ?? "—") : "—"}</td>
                 <td className="px-3 py-1.5">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
-                    {r.winSheetStatus.replace(/_/g, " ")}
-                  </span>
+                  {"winSheetStatus" in r ? (
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
+                      {r.winSheetStatus.replace(/_/g, " ")}
+                    </span>
+                  ) : (
+                    <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                  )}
                 </td>
               </tr>
             );
