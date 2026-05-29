@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { inArray, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth-helpers";
 import {
   mapSheetRows,
   MOCK_SHEET_ROWS,
@@ -166,6 +167,14 @@ const toClosedAt = (closedDate: string | null): Date => {
 //   mode=upsert   → import new rows, update existing, and mark Fees Closed rows closed
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const modeParam = searchParams.get("mode") ?? "preview";
     if (modeParam !== "preview" && modeParam !== "upsert") {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -185,6 +186,14 @@ async function queryLatestNotes(clientIds: number[]): Promise<Map<number, string
 //     mode=push     → fetch sheet to identify new rows, then POST to n8n webhook
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const modeParam = searchParams.get("mode") ?? "preview";
     if (modeParam !== "preview" && modeParam !== "push") {

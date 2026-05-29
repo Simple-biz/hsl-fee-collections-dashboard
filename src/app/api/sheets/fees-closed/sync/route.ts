@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth-helpers";
 import {
   mapFeesClosedRows,
   type ParsedFeesClosedRow,
@@ -40,6 +41,14 @@ const fetchFeesClosedRows = async (): Promise<{
 //   mode=upsert   → re-fetch, insert/update fees_closed rows by clientId
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const modeParam = searchParams.get("mode") ?? "preview";
     if (modeParam !== "preview" && modeParam !== "upsert") {

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
+import { useSession } from "next-auth/react";
 import {
   Search,
   ArrowUpDown,
@@ -124,6 +125,8 @@ export const FeeRecordsTable = ({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "system_admin";
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -487,18 +490,22 @@ export const FeeRecordsTable = ({
               </option>
             ))}
           </select>
-          <button
-            onClick={() => setSyncOpen(true)}
-            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Sync from Sheets
-          </button>
-          <button
-            onClick={() => setPushOpen(true)}
-            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-blue-700 hover:bg-blue-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"} transition-colors`}
-          >
-            <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push to Sheets
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setSyncOpen(true)}
+                className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Sync from Sheets
+              </button>
+              <button
+                onClick={() => setPushOpen(true)}
+                className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-blue-700 hover:bg-blue-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"} transition-colors`}
+              >
+                <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push to Sheets
+              </button>
+            </>
+          )}
           <button
             onClick={() => setImportOpen(true)}
             className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
