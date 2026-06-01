@@ -84,6 +84,10 @@ export interface CaseRow {
 
   // Notes
   notesCount: number;
+
+  // Win Sheet
+  winSheetLink: string | null;
+  winSheetLinkText: string | null;
 }
 
 // Admin-managed option for the dashboard's "Approved By" dropdown (/settings).

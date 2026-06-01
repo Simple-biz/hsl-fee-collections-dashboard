@@ -12,6 +12,7 @@ import {
   CloudUpload,
   RotateCcw,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -539,7 +540,7 @@ export const FeeRecordsTable = ({
                 className={`${thBase} ${t.textSub} text-left ${stickyGroup2}`}
               />
               <th
-                colSpan={4}
+                colSpan={5}
                 aria-hidden="true"
                 className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
               />
@@ -605,6 +606,7 @@ export const FeeRecordsTable = ({
                 </span>
               </th>
               <th className={`${thBase} ${t.textSub} text-left`}>Status</th>
+              <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet</th>
 
               {/* T16 */}
               <th
@@ -941,6 +943,27 @@ export const FeeRecordsTable = ({
                           </option>
                         ))}
                     </select>
+                  )}
+                </td>
+
+                {/* Win Sheet Link */}
+                <td
+                  className={`${tdBase}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {c.winSheetLink ? (
+                    <a
+                      href={c.winSheetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      {c.winSheetLinkText || "Open"}
+                    </a>
+                  ) : (
+                    <span className={`text-[11px] ${t.textMuted}`}>—</span>
                   )}
                 </td>
 

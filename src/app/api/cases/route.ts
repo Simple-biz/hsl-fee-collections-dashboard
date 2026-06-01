@@ -81,6 +81,8 @@ export const GET = async (req: NextRequest) => {
         approvedBy: feeRecords.approvedBy,
         feesConfirmation: feeRecords.feesConfirmation,
         caseStatus: feeRecords.caseStatus,
+        winSheetLink: feeRecords.winSheetLink,
+        winSheetLinkText: feeRecords.winSheetLinkText,
       })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -217,6 +219,8 @@ export const GET = async (req: NextRequest) => {
         monthAssignedToAgent: r.monthAssignedToAgent ?? null,
         office: r.officeWithJurisdiction || "—",
         notesCount: notesCountMap.get(r.clientId) ?? 0,
+        winSheetLink: r.winSheetLink ?? null,
+        winSheetLinkText: r.winSheetLinkText ?? null,
       };
     });
 
