@@ -10,7 +10,9 @@
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate --config=./src/drizzle.config.ts",
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate --config=./src/drizzle.config.ts",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio --config=./src/drizzle.config.ts",
-    "user:create": "dotenv -e .env.local -- tsx scripts/create-user.ts"
+    "user:create": "dotenv -e .env.local -- tsx scripts/create-user.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
@@ -57,6 +59,8 @@
     "tsx": "^4.22.3",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.8",
     "xlsx": "^0.18.5"
   }
 }
