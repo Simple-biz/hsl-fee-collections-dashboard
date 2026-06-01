@@ -877,10 +877,6 @@ const CaseDetailPage = () => {
                     <p className={val}>#{caseData.id}</p>
                   </div>
                   <div>
-                    <p className={lbl}>External ID</p>
-                    <p className={val}>{caseData.externalId || "—"}</p>
-                  </div>
-                  <div>
                     <p className={lbl}>First Name</p>
                     {editing ? (
                       <input
