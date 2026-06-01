@@ -9,8 +9,8 @@ import { users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
 
 type ActionResult<T = void> = T extends void
-  ? { ok: true } | { ok: false; error: string }
-  : ({ ok: true } & T) | { ok: false; error: string };
+  ? { ok: true; warning?: string } | { ok: false; error: string }
+  : ({ ok: true; warning?: string } & T) | { ok: false; error: string };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MIN_PASSWORD_LEN = 8;
@@ -69,6 +69,30 @@ export async function createUser(input: {
     });
 
     revalidatePath("/admin");
+
+    const webhookUrl = process.env.N8N_NEW_USER_EMAIL_WEBHOOK_URL;
+    if (webhookUrl) {
+      try {
+        const emailRes = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            password: input.password,
+            name: input.name?.trim() || null,
+            role: input.role,
+          }),
+        });
+        if (!emailRes.ok) {
+          console.error("Welcome email webhook failed:", emailRes.status);
+          return { ok: true, warning: "User created but welcome email could not be sent." };
+        }
+      } catch (err) {
+        console.error("Welcome email webhook error:", err);
+        return { ok: true, warning: "User created but welcome email could not be sent." };
+      }
+    }
+
     return { ok: true };
   } catch (error) {
     console.error("createUser error:", error);

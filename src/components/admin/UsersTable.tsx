@@ -7,6 +7,7 @@ import {
   KeyRound,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   X,
 } from "lucide-react";
@@ -85,6 +86,7 @@ interface UsersTableProps {
 
 type Banner =
   | { kind: "error"; text: string }
+  | { kind: "warning"; text: string }
   | { kind: "success"; text: string }
   | null;
 
@@ -100,7 +102,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
 
   const run = async (
     userId: number | null,
-    fn: () => Promise<{ ok: true } | { ok: false; error: string }>,
+    fn: () => Promise<{ ok: true; warning?: string } | { ok: false; error: string }>,
     successText: string,
   ) => {
     setBusyId(userId);
@@ -108,6 +110,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
     try {
       const result = await fn();
       if (!result.ok) setBanner({ kind: "error", text: result.error });
+      else if (result.warning) setBanner({ kind: "warning", text: result.warning });
       else setBanner({ kind: "success", text: successText });
       return result;
     } finally {
@@ -158,21 +161,27 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
       {/* Banner */}
       {banner && (
         <div
-          role={banner.kind === "error" ? "alert" : "status"}
+          role="alert"
           className={`mx-4 mt-3 rounded-md border p-2.5 flex items-center gap-2 text-xs ${
             banner.kind === "error"
               ? dark
                 ? "bg-red-900/20 border-red-800 text-red-400"
                 : "bg-red-50 border-red-200 text-red-700"
-              : dark
-                ? "bg-emerald-900/20 border-emerald-800 text-emerald-300"
-                : "bg-emerald-50 border-emerald-200 text-emerald-700"
+              : banner.kind === "warning"
+                ? dark
+                  ? "bg-amber-900/20 border-amber-700 text-amber-400"
+                  : "bg-amber-50 border-amber-300 text-amber-700"
+                : dark
+                  ? "bg-emerald-900/20 border-emerald-800 text-emerald-300"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
           }`}
         >
           {banner.kind === "error" ? (
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          ) : banner.kind === "warning" ? (
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           ) : (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           )}
           <span className="flex-1">{banner.text}</span>
           <button
