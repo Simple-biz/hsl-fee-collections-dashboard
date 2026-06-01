@@ -1,0 +1,137 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## HSL Fee Collections— Google Sheets Sync\n\n**Webhook URL** — After activating, copy the production webhook URL and set it as `SHEETS_SYNC_WEBHOOK_URL` in your Next.js `.env.local`.\n\n**Expected sheet tab name:** `MASTER LIST` (falls back to first tab if not found)\n",
+        "height": 248,
+        "width": 420,
+        "color": 5
+      },
+      "id": "97022306-f0f2-4cfb-838f-c7f5d1944177",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hsl-sheets-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "252fd11a-7a1f-424c-9c80-09b465133ec2",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        672
+      ],
+      "webhookId": "33333333-3333-3333-3333-333333333333"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/1LjOm7UCvWNOvYph5hOgLKZMcfsPzT_thgpKw1jmpILU?includeGridData=true&fields=sheets.properties.title%2Csheets.data.rowData.values(formattedValue%2CeffectiveValue%2Chyperlink)",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ab5e460e-2f2c-41f4-82e2-26a29ec58aa7",
+      "name": "Get Sheet Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        128,
+        672
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LX2WrTjLkp78Ixiz",
+          "name": "Google Sheets - kentshinw@simple.biz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const spreadsheet = $input.first().json;\n\n// Find MASTER LIST tab, fall back to first sheet\nconst sheet =\n  spreadsheet.sheets?.find(s => s.properties?.title === 'MASTER LIST') ??\n  spreadsheet.sheets?.[0];\n\nif (!sheet?.data?.[0]?.rowData) {\n  throw new Error(\n    'No sheet data found. Verify SHEETS_SPREADSHEET_ID is correct and the sheet has at least one data row.',\n  );\n}\n\nconst rowData = sheet.data[0].rowData;\nif (rowData.length < 2) return [{ json: { rows: [] } }];\n\n// Map header names → column indices\nconst headerRow = rowData[0].values ?? [];\nconst headers = headerRow.map(cell =>\n  (cell.formattedValue ?? cell.effectiveValue?.stringValue ?? '').trim().toUpperCase(),\n);\nconst idx = name => headers.indexOf(name.toUpperCase());\n\nconst C = {\n  caseLink:         idx('CASE LINK'),\n  assignedTo:       idx('ASSIGNED TO'),\n  caseLevel:        idx('CASE LEVEL'),\n  claimType:        idx('CLAIM TYPE'),\n  approvalDate:     idx('APPROVAL DATE'),\n  winSheetStatus:   idx('WIN SHEET STATUS'),\n  winSheetLink:     idx('WIN SHEET LINK'),\n  feesConf:         idx('FEES CONFIRMATION'),\n  caseStatus:       idx('CASE STATUS'),\n  approvedBy:       idx('APPROVED BY (OK TO CLOSE)'),\n  t16Retro:         idx('T16 RETRO'),\n  t16FeeDue:        idx('T16 FEE DUE'),\n  t16FeeRcv:        idx(\"T16 FEE $ REC'D\"),\n  t16Pending:       idx('T16 PENDING'),\n  t16Date:          idx(\"DATE T16 FEE REC'D\"),\n  t2Retro:          idx('T2 RETRO'),\n  t2FeeDue:         idx('T2 FEE DUE'),\n  t2FeeRcv:         idx(\"T2 FEE $ REC'D\"),\n  t2Pending:        idx('T2 PENDING'),\n  t2Date:           idx(\"DATE T2 FEE REC'D\"),\n  auxRetro:         idx('RETRO AUX'),\n  auxFeeDue:        idx('AUX FEE DUE'),\n  auxFeeRcv:        idx(\"AUX FEE $ REC'D\"),\n  auxPending:       idx('AUX PENDING'),\n  auxDate:          idx(\"DATE AUX FEE REC'D\"),\n  notes:            idx('COLLECTION NOTES'),\n  dateAssigned:     idx('DATE ASSIGNED TO AGENT'),\n  daysAfterApproval: idx('DAYS AFTER APPROVAL'),\n  approvalCategory: idx('APPROVAL CATEGORY'),\n  feesStatus:       idx('FEES STATUS'),\n  weekAssigned:     idx('WEEK ASSIGNED TO AGENT'),\n  monthAssigned:    idx('MONTH ASSIGNED TO AGENT'),\n};\n\nconst getCell = (row, colIdx) =>\n  colIdx >= 0 ? (row.values?.[colIdx] ?? null) : null;\n\nconst val = (row, colIdx) => {\n  const cell = getCell(row, colIdx);\n  return cell?.formattedValue ?? cell?.effectiveValue?.stringValue ?? null;\n};\n\nconst link = (row, colIdx) =>\n  getCell(row, colIdx)?.hyperlink ?? null;\n\nconst num = (row, colIdx) => {\n  const cell = getCell(row, colIdx);\n  if (!cell) return null;\n  if (cell.effectiveValue?.numberValue !== undefined)\n    return cell.effectiveValue.numberValue;\n  const s = (cell.formattedValue ?? '').replace(/[,$\\s]/g, '');\n  const n = Number(s);\n  return Number.isFinite(n) ? n : null;\n};\n\nconst rows = [];\nfor (let i = 1; i < rowData.length; i++) {\n  const row = rowData[i];\n  const caseLinkText = val(row, C.caseLink);\n  if (!caseLinkText?.trim()) continue;\n\n  rows.push({\n    'CASE LINK':                  caseLinkText,\n    'CASE LINK_url':              link(row, C.caseLink),\n    'ASSIGNED TO':                val(row, C.assignedTo),\n    'CASE LEVEL':                 val(row, C.caseLevel),\n    'CLAIM TYPE':                 val(row, C.claimType),\n    'APPROVAL DATE':              val(row, C.approvalDate),\n    'WIN SHEET STATUS':           val(row, C.winSheetStatus),\n    'WIN SHEET LINK':             val(row, C.winSheetLink),\n    'WIN SHEET LINK_url':         link(row, C.winSheetLink),\n    'FEES CONFIRMATION':          val(row, C.feesConf),\n    'CASE STATUS':                val(row, C.caseStatus),\n    'APPROVED BY (OK TO CLOSE)':  val(row, C.approvedBy),\n    'T16 RETRO':                  num(row, C.t16Retro),\n    'T16 FEE DUE':                num(row, C.t16FeeDue),\n    \"T16 FEE $ REC'D\":            num(row, C.t16FeeRcv),\n    'T16 PENDING':                num(row, C.t16Pending),\n    \"DATE T16 FEE REC'D\":         val(row, C.t16Date),\n    'T2 RETRO':                   num(row, C.t2Retro),\n    'T2 FEE DUE':                 num(row, C.t2FeeDue),\n    \"T2 FEE $ REC'D\":             num(row, C.t2FeeRcv),\n    'T2 PENDING':                 num(row, C.t2Pending),\n    \"DATE T2 FEE REC'D\":          val(row, C.t2Date),\n    'RETRO AUX':                  num(row, C.auxRetro),\n    'AUX FEE DUE':                num(row, C.auxFeeDue),\n    \"AUX FEE $ REC'D\":            num(row, C.auxFeeRcv),\n    'AUX PENDING':                num(row, C.auxPending),\n    \"DATE AUX FEE REC'D\":         val(row, C.auxDate),\n    'COLLECTION NOTES':           val(row, C.notes),\n    'DATE ASSIGNED TO AGENT':     val(row, C.dateAssigned),\n    'DAYS AFTER APPROVAL':        num(row, C.daysAfterApproval),\n    'APPROVAL CATEGORY':          val(row, C.approvalCategory),\n    'FEES STATUS':                val(row, C.feesStatus),\n    'WEEK ASSIGNED TO AGENT':     val(row, C.weekAssigned),\n    'MONTH ASSIGNED TO AGENT':    val(row, C.monthAssigned),\n  });\n}\n\nreturn [{ json: { rows } }];\n"
+      },
+      "id": "3c23e8d3-9b47-4417-97e3-006b3060ad00",
+      "name": "Transform Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.rows }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fcef7d57-e436-4e05-a675-c96a6e0cda19",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        608,
+        672
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Sheet Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sheet Data": {
+      "main": [
+        [
+          {
+            "node": "Transform Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Rows": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "11d1e5febe5cccf14212f53d0231fc2668bea5400c633d6171c207137b8bdf5f"
+  }
+}

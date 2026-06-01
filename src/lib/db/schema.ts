@@ -202,6 +202,7 @@ export const feeRecords = pgTable(
       "not_started",
     ),
     winSheetLink: text("win_sheet_link"),
+    winSheetLinkText: varchar("win_sheet_link_text", { length: 200 }),
     caseStatus: varchar("case_status", { length: 100 }),
     feesConfirmation: varchar("fees_confirmation", { length: 50 }),
     dateAssignedToAgent: date("date_assigned_to_agent"),
@@ -273,6 +274,13 @@ export const feeRecords = pgTable(
     feeCapApplied: boolean("fee_cap_applied").default(false),
     feeComputed: boolean("fee_computed").default(false),
     feeComputedAt: timestamp("fee_computed_at", { withTimezone: true }),
+
+    // Sheet-computed fields (synced from Google Sheets as-is)
+    daysAfterApproval: integer("days_after_approval"),
+    approvalCategory: varchar("approval_category", { length: 100 }),
+    feesStatus: varchar("fees_status", { length: 100 }),
+    weekAssignedToAgent: varchar("week_assigned_to_agent", { length: 50 }),
+    monthAssignedToAgent: varchar("month_assigned_to_agent", { length: 50 }),
 
     // Sync
     syncStatus: syncStatusEnum("sync_status").default("not_synced"),

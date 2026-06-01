@@ -27,6 +27,7 @@ import {
   Gavel,
   XCircle,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import {
@@ -119,6 +120,8 @@ interface CaseDetail {
   syncStatus: string;
   daysAfterApproval: number | null;
   approvalCategory: string | null;
+  winSheetLink: string | null;
+  winSheetLinkText: string | null;
   activities: Activity[];
 }
 
@@ -1098,6 +1101,22 @@ const CaseDetailPage = () => {
                           caseData.status ||
                           "—"}
                       </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className={lbl}>Win Sheet Link</p>
+                    {caseData.winSheetLink ? (
+                      <a
+                        href={caseData.winSheetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-1 text-xs font-medium text-blue-500 hover:underline`}
+                      >
+                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        {caseData.winSheetLinkText || "Open"}
+                      </a>
+                    ) : (
+                      <p className={val}>—</p>
                     )}
                   </div>
                 </div>

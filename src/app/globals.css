@@ -134,6 +134,11 @@
   --animate-cell-ripple: cell-ripple var(--duration, 200ms) ease-out none 1
     var(--delay, 0ms);
 
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+
   @keyframes cell-ripple {
     0% {
       opacity: 0.4;

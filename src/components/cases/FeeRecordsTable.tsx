@@ -2,13 +2,17 @@
 
 import { useState, useMemo } from "react";
 import { useTheme } from "next-themes";
+import { useSession } from "next-auth/react";
 import {
   Search,
   ArrowUpDown,
   Upload,
   MessageSquare,
+  FileSpreadsheet,
+  CloudUpload,
   RotateCcw,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -23,6 +27,8 @@ import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
+import SheetSyncModal from "@/components/modals/SheetSyncModal";
+import SheetPushModal from "@/components/modals/SheetPushModal";
 import NotesModal from "@/components/modals/NotesModal";
 import { AcknowledgeAndCloseDialog } from "./AcknowledgeAndCloseDialog";
 
@@ -120,6 +126,8 @@ export const FeeRecordsTable = ({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "system_admin";
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -163,6 +171,8 @@ export const FeeRecordsTable = ({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [pushOpen, setPushOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
   );
@@ -422,8 +432,6 @@ export const FeeRecordsTable = ({
   const stickyGroup2 = `top-0! sm:left-48 sm:z-30 ${colAssignedW} ${stickyDivider}`;
   const stickyTd1 = `sticky left-0 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
   const stickyTd2 = `sm:sticky sm:left-48 sm:z-10 ${colAssignedW} ${stickyColBg} ${stickyDivider}`;
-  // const groupHeaderBg = (color: string) =>
-  //   dark ? `bg-${color}-900/20` : `bg-${color}-50/60`;
 
   return (
     <div className={`rounded-xl border ${t.card}`}>
@@ -483,11 +491,27 @@ export const FeeRecordsTable = ({
               </option>
             ))}
           </select>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setSyncOpen(true)}
+                className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Sync from Sheets
+              </button>
+              <button
+                onClick={() => setPushOpen(true)}
+                className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-blue-700 hover:bg-blue-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"} transition-colors`}
+              >
+                <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push to Sheets
+              </button>
+            </>
+          )}
           <button
             onClick={() => setImportOpen(true)}
             className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
           >
-            <Upload className="h-3.5 w-3.5" /> Import
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Import
           </button>
         </div>
       </div>
@@ -516,7 +540,7 @@ export const FeeRecordsTable = ({
                 className={`${thBase} ${t.textSub} text-left ${stickyGroup2}`}
               />
               <th
-                colSpan={4}
+                colSpan={5}
                 aria-hidden="true"
                 className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
               />
@@ -554,7 +578,6 @@ export const FeeRecordsTable = ({
             </tr>
             {/* Column headers */}
             <tr className={`border-b ${t.borderLight}`}>
-              {/* Case Info — first two columns are frozen */}
               <th
                 className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh1}`}
                 onClick={() => toggleSort("name")}
@@ -583,6 +606,7 @@ export const FeeRecordsTable = ({
                 </span>
               </th>
               <th className={`${thBase} ${t.textSub} text-left`}>Status</th>
+              <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet</th>
 
               {/* T16 */}
               <th
@@ -728,8 +752,6 @@ export const FeeRecordsTable = ({
                       }
                     >
                       <option value="">— Select —</option>
-                      {/* Preserve the current value if it's no longer in the
-                          configured list (e.g. imported from the sheet). */}
                       {(() => {
                         const v = cellValue(c, "assigned");
                         return (
@@ -808,8 +830,7 @@ export const FeeRecordsTable = ({
                     </select>
                   )}
                 </td>
-                {/* Claim — varchar; lives on the cases row. Display still
-                    routes through fmtClaim so legacy "T2_T16" → "CONC". */}
+                {/* Claim — varchar; lives on the cases row. */}
                 <td
                   className={`${tdBase}`}
                   onClick={(e) => e.stopPropagation()}
@@ -922,6 +943,27 @@ export const FeeRecordsTable = ({
                           </option>
                         ))}
                     </select>
+                  )}
+                </td>
+
+                {/* Win Sheet Link */}
+                <td
+                  className={`${tdBase}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {c.winSheetLink ? (
+                    <a
+                      href={c.winSheetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      {c.winSheetLinkText || "Open"}
+                    </a>
+                  ) : (
+                    <span className={`text-[11px] ${t.textMuted}`}>—</span>
                   )}
                 </td>
 
@@ -1049,8 +1091,6 @@ export const FeeRecordsTable = ({
                       }
                     >
                       <option value="">— Select —</option>
-                      {/* Keep the current value visible even if it's no longer
-                          a configured option (e.g. imported from the sheet). */}
                       {(() => {
                         const v = cellValue(c, "approvedBy");
                         return (
@@ -1073,10 +1113,7 @@ export const FeeRecordsTable = ({
                     </select>
                   )}
                 </td>
-                {/* Fees Confirmation — picking "Paid In Full" prompts the
-                    "mark closed?" modal (case-insensitive so a user-renamed
-                    option like "Paid in Full" still triggers it). Other
-                    values save inline like the rest of the dropdowns. */}
+                {/* Fees Confirmation */}
                 <td
                   className={`${tdBase} ${t.textSub}`}
                   onClick={(e) => e.stopPropagation()}
@@ -1283,6 +1320,24 @@ export const FeeRecordsTable = ({
           onImported={async () => {
             if (onImported) await onImported();
           }}
+        />
+      )}
+
+      {syncOpen && (
+        <SheetSyncModal
+          dark={dark}
+          onClose={() => setSyncOpen(false)}
+          onSynced={async () => {
+            if (onImported) await onImported();
+          }}
+        />
+      )}
+
+      {pushOpen && (
+        <SheetPushModal
+          dark={dark}
+          onClose={() => setPushOpen(false)}
+          onPushed={() => {}}
         />
       )}
 

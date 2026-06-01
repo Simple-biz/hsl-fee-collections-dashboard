@@ -74,11 +74,20 @@ export interface CaseRow {
   daysAfterApproval: number | null;
   approvalCategory: string | null;
 
+  // Sheet-computed
+  feesStatus: string | null;
+  weekAssignedToAgent: string | null;
+  monthAssignedToAgent: string | null;
+
   // Context
   office: string;
 
   // Notes
   notesCount: number;
+
+  // Win Sheet
+  winSheetLink: string | null;
+  winSheetLinkText: string | null;
 }
 
 // Admin-managed option for the dashboard's "Approved By" dropdown (/settings).
@@ -207,6 +216,11 @@ export interface CaseDetailData {
   // Aging
   daysAfterApproval: number | null;
   approvalCategory: string | null;
+
+  // Sheet-computed
+  feesStatus: string | null;
+  weekAssignedToAgent: string | null;
+  monthAssignedToAgent: string | null;
 
   // User details
   userDetails: UserDetails | null;

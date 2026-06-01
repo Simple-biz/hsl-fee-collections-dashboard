@@ -1,0 +1,510 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Split { rows: [...] } into individual items for the Google Sheets node\n// n8n webhook (typeVersion 2) nests the POST body under .body\nconst raw = $input.first().json;\nconst payload = raw.body ?? raw;\nconst rows = Array.isArray(payload.rows) ? payload.rows : [];\nif (rows.length === 0) return [{ json: { _empty: true } }];\nreturn rows.map(row => ({ json: row }));\n"
+      },
+      "id": "d6b350b8-5ff0-49f2-9448-81936ff812df",
+      "name": "Split Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1mVlPjuEs-0yr3mOpHGGF90uBZQ12xjn4qDLL6kDbDKM",
+          "mode": "list",
+          "cachedResultName": "Copy of MASTER FEES WORKSHEET",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1mVlPjuEs-0yr3mOpHGGF90uBZQ12xjn4qDLL6kDbDKM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 118237723,
+          "mode": "list",
+          "cachedResultName": "MASTER LIST",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1mVlPjuEs-0yr3mOpHGGF90uBZQ12xjn4qDLL6kDbDKM/edit#gid=118237723"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "CLIENT_ID"
+          ],
+          "schema": [
+            {
+              "id": "CLIENT_ID",
+              "displayName": "CLIENT_ID",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "CASE LINK",
+              "displayName": "CASE LINK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ASSIGNED TO",
+              "displayName": "ASSIGNED TO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CASE LEVEL",
+              "displayName": "CASE LEVEL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CLAIM TYPE",
+              "displayName": "CLAIM TYPE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "APPROVAL DATE",
+              "displayName": "APPROVAL DATE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "WIN SHEET STATUS",
+              "displayName": "WIN SHEET STATUS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "WIN SHEET LINK",
+              "displayName": "WIN SHEET LINK",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FEES CONFIRMATION",
+              "displayName": "FEES CONFIRMATION",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CASE STATUS",
+              "displayName": "CASE STATUS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "APPROVED BY (OK TO CLOSE)",
+              "displayName": "APPROVED BY (OK TO CLOSE)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T16 RETRO",
+              "displayName": "T16 RETRO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T16 FEE DUE",
+              "displayName": "T16 FEE DUE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T16 FEE $ REC'D",
+              "displayName": "T16 FEE $ REC'D",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T16 Pending",
+              "displayName": "T16 Pending",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DATE T16 FEE REC'D ",
+              "displayName": "DATE T16 FEE REC'D ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T2 RETRO",
+              "displayName": "T2 RETRO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T2 FEE DUE",
+              "displayName": "T2 FEE DUE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T2 FEE $ REC'D",
+              "displayName": "T2 FEE $ REC'D",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "T2 Pending",
+              "displayName": "T2 Pending",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DATE T2 FEE REC'D",
+              "displayName": "DATE T2 FEE REC'D",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "RETRO AUX",
+              "displayName": "RETRO AUX",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AUX FEE DUE",
+              "displayName": "AUX FEE DUE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AUX FEE $ REC'D ",
+              "displayName": "AUX FEE $ REC'D ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AUX PENDING",
+              "displayName": "AUX PENDING",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DATE AUX FEE REC'D",
+              "displayName": "DATE AUX FEE REC'D",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TOTAL RETRO DUE",
+              "displayName": "TOTAL RETRO DUE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TOTAL FEES EXPECTED",
+              "displayName": "TOTAL FEES EXPECTED",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TOTAL FEES PAID",
+              "displayName": "TOTAL FEES PAID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "COLLECTION NOTES",
+              "displayName": "COLLECTION NOTES",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DAYS AFTER APPROVAL",
+              "displayName": "DAYS AFTER APPROVAL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "APPROVAL CATEGORY",
+              "displayName": "APPROVAL CATEGORY",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FEES STATUS",
+              "displayName": "FEES STATUS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DATE ASSIGNED TO AGENT",
+              "displayName": "DATE ASSIGNED TO AGENT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "WEEK ASSIGNED TO AGENT",
+              "displayName": "WEEK ASSIGNED TO AGENT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "MONTH ASSIGNED TO AGENT",
+              "displayName": "MONTH ASSIGNED TO AGENT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "c28ade67-1164-499e-b955-452bd94c0a6a",
+      "name": "Upsert Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        160,
+        1312
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LX2WrTjLkp78Ixiz",
+          "name": "Google Sheets - kentshinw@simple.biz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const count = $input.all().length;\nreturn [{ json: { pushed: count } }];\n"
+      },
+      "id": "db26fb84-07db-4abd-9001-701a452e64cb",
+      "name": "Count Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## HSL Fee Collections — Push to Google Sheets\n\n**Webhook URL** — After activating, copy the production webhook URL and set it as `SHEETS_PUSH_WEBHOOK_URL` in your Next.js `.env.local`.\n\n**How it works:**\n- Next.js sends `{ rows: [...] }` to this webhook\n- Each row is matched against the sheet by **CASE LINK** column\n- Matched rows are updated in place; unmatched rows are appended\n- Returns `{ pushed: N }` to Next.js",
+        "height": 328,
+        "width": 400,
+        "color": 6
+      },
+      "id": "8faf1321-1bd2-43a7-be0b-e79c48fa00c4",
+      "name": "Setup Notes1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hsl-sheets-push",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "73d97a35-ea2c-428f-a9c6-f6fe4749c4f3",
+      "name": "Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        1312
+      ],
+      "webhookId": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "13372e9a-298b-4120-835d-79d285306f64",
+      "name": "Respond to Webhook1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        640,
+        1312
+      ]
+    }
+  ],
+  "connections": {
+    "Split Rows": {
+      "main": [
+        [
+          {
+            "node": "Upsert Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Rows": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Split Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "11d1e5febe5cccf14212f53d0231fc2668bea5400c633d6171c207137b8bdf5f"
+  }
+}
