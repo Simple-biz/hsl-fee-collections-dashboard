@@ -27,6 +27,7 @@ interface SheetPreviewRow {
   winSheetLinkText: string | null;
   totalExpected: number;
   hasNotes: boolean;
+  isSynthetic: boolean;
   status: "new" | "existing";
 }
 
@@ -52,6 +53,7 @@ interface SyncPreviewResponse {
     existing: number;
     feesClosed: number;
     missing: number;
+    synthetic: number;
     warnings: { row: number; message: string }[];
   };
   rows: {
@@ -132,6 +134,7 @@ export default function SheetSyncModal({
   const [fetching, setFetching] = useState(false);
   const [preview, setPreview] = useState<SyncPreviewResponse | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [allowSynthetic, setAllowSynthetic] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: number; updated: number; closed: number } | null>(null);
@@ -161,11 +164,12 @@ export default function SheetSyncModal({
         throw new Error((json.error as string) || `Fetch failed (${res.status})`);
       const data = json as unknown as SyncPreviewResponse;
       setPreview(data);
+      setAllowSynthetic(false);
       setSelected(
         new Set(
           [
             ...data.rows.sheet
-              .filter((r) => r.status === "new")
+              .filter((r) => r.status === "new" && !r.isSynthetic)
               .map((r) => r.clientId),
             ...data.rows.feesClosed.map((r) => r.clientId),
           ],
@@ -192,6 +196,21 @@ export default function SheetSyncModal({
     () => preview?.rows.sheet.filter((r) => r.status === "existing") ?? [],
     [preview],
   );
+  const syntheticRows = useMemo(
+    () => preview?.rows.sheet.filter((r) => r.isSynthetic) ?? [],
+    [preview],
+  );
+
+  useEffect(() => {
+    if (!allowSynthetic && syntheticRows.length > 0) {
+      setSelected((prev) => {
+        const syntheticIds = new Set(syntheticRows.map((r) => r.clientId));
+        const next = new Set(prev);
+        for (const id of syntheticIds) next.delete(id);
+        return next;
+      });
+    }
+  }, [allowSynthetic, syntheticRows]);
 
   const step4Rows = useMemo<Step4PreviewRow[]>(() => {
     if (!preview) return [];
@@ -394,7 +413,7 @@ export default function SheetSyncModal({
                       connect a real sheet
                     </div>
                   )}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <Stat t={t} label="Rows fetched" value={preview.summary.fetched.toLocaleString()} />
                     <Stat
                       t={t}
@@ -414,9 +433,17 @@ export default function SheetSyncModal({
                       value={preview.summary.missing.toLocaleString()}
                       accent={
                         preview.summary.missing > 0
-                          ? dark
-                            ? "text-amber-400"
-                            : "text-amber-600"
+                          ? dark ? "text-amber-400" : "text-amber-600"
+                          : undefined
+                      }
+                    />
+                    <Stat
+                      t={t}
+                      label="No URL"
+                      value={preview.summary.synthetic.toLocaleString()}
+                      accent={
+                        preview.summary.synthetic > 0
+                          ? dark ? "text-red-400" : "text-red-600"
                           : undefined
                       }
                     />
@@ -428,11 +455,14 @@ export default function SheetSyncModal({
                         {preview.summary.warnings.length} warning
                         {preview.summary.warnings.length === 1 ? "" : "s"}
                       </div>
-                      <ul className="space-y-0.5 max-h-24 overflow-y-auto">
-                        {preview.summary.warnings.slice(0, 10).map((w, i) => (
+                      <ul className="space-y-0.5 max-h-36 overflow-y-auto">
+                        {preview.summary.warnings.slice(0, 25).map((w, i) => (
                           <li key={i}>Row {w.row}: {w.message}</li>
                         ))}
                       </ul>
+                      {preview.summary.warnings.length > 25 && (
+                        <p className="mt-1 opacity-70">…and {preview.summary.warnings.length - 25} more</p>
+                      )}
                     </div>
                   )}
                   <button
@@ -597,7 +627,9 @@ export default function SheetSyncModal({
                     setSelected(
                       new Set([
                         ...selected,
-                        ...filteredRows.filter((r) => r.syncable).map((r) => r.clientId),
+                        ...filteredRows
+                          .filter((r) => r.syncable && (allowSynthetic || !("isSynthetic" in r && r.isSynthetic)))
+                          .map((r) => r.clientId),
                       ]),
                     )
                   }
@@ -617,6 +649,31 @@ export default function SheetSyncModal({
                 </button>
               </div>
 
+              {syntheticRows.length > 0 && (
+                <div className={`rounded-md border p-3 mb-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div className="flex-1">
+                      <p className="font-semibold mb-1">
+                        {syntheticRows.length} row{syntheticRows.length === 1 ? "" : "s"} {syntheticRows.length === 1 ? "has" : "have"} no valid MyCase URL
+                      </p>
+                      <p className="opacity-80 mb-2">
+                        These rows were assigned temporary IDs and will create a duplicate record on every re-sync. Check Step 1 warnings for details.
+                      </p>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={allowSynthetic}
+                          onChange={(e) => setAllowSynthetic(e.target.checked)}
+                          className="h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <span className="font-medium">Allow selection of rows without a valid MyCase link</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <SelectionTable
                 t={t}
                 dark={dark}
@@ -624,9 +681,12 @@ export default function SheetSyncModal({
                 truncated={false}
                 total={filteredRows.length}
                 selected={selected}
+                allowSynthetic={allowSynthetic}
                 onToggle={(id) => {
                   const row = step4Rows.find((r) => r.clientId === id);
                   if (!row?.syncable) return;
+                  const isSynth = "isSynthetic" in row && row.isSynthetic;
+                  if (isSynth && !allowSynthetic) return;
                   const next = new Set(selected);
                   if (next.has(id)) next.delete(id);
                   else next.add(id);
@@ -883,6 +943,7 @@ const SelectionTable = ({
   truncated,
   total,
   selected,
+  allowSynthetic,
   onToggle,
 }: {
   t: ReturnType<typeof themeClasses>;
@@ -891,6 +952,7 @@ const SelectionTable = ({
   truncated: boolean;
   total: number;
   selected: Set<number>;
+  allowSynthetic: boolean;
   onToggle: (id: number) => void;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
@@ -909,26 +971,36 @@ const SelectionTable = ({
         <tbody>
           {rows.map((r) => {
             const checked = selected.has(r.clientId);
+            const isSynthetic = "isSynthetic" in r && r.isSynthetic === true;
+            const effectivelyDisabled = !r.syncable || (isSynthetic && !allowSynthetic);
             return (
               <tr
                 key={r.clientId}
-                onClick={() => r.syncable && onToggle(r.clientId)}
+                onClick={() => !effectivelyDisabled && onToggle(r.clientId)}
                 className={`border-b ${t.borderLight} ${
-                  r.syncable ? "cursor-pointer" : "cursor-not-allowed opacity-70"
+                  effectivelyDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
                 } ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
               >
                 <td className="px-3 py-1.5">
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={!r.syncable}
+                    disabled={effectivelyDisabled}
                     onChange={() => onToggle(r.clientId)}
                     onClick={(e) => e.stopPropagation()}
                     className="h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
                   />
                 </td>
                 <td className={`${t.text} px-3 py-1.5 font-medium max-w-80 truncate`} title={r.caseLink}>
-                  {r.caseName}
+                  <span className="inline-flex items-center gap-1">
+                    {r.caseName}
+                    {isSynthetic && (
+                      <AlertTriangle
+                        className={`h-3 w-3 shrink-0 ${dark ? "text-amber-400" : "text-amber-500"}`}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
                 </td>
                 <td className="px-3 py-1.5">
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>

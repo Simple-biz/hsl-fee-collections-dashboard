@@ -2,7 +2,7 @@ import type { ParsedCaseRow } from "./xlsx-mapper";
 
 export type SheetRow = Record<string, string | number | null | undefined>;
 
-const SYNTHETIC_ID_BASE = 900_000_000;
+export const SYNTHETIC_ID_BASE = 900_000_000;
 const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
 
 const num = (v: unknown): string => {
@@ -125,16 +125,35 @@ export const mapSheetRows = (
     } else {
       while (seenIds.has(synthetic)) synthetic++;
       clientId = synthetic++;
-      if (myCaseId)
+      if (myCaseId) {
         warnings.push({
           row: i + 2,
           message: `Duplicate MyCase id ${myCaseId} — using synthetic ${clientId}`,
         });
+      } else {
+        warnings.push({
+          row: i + 2,
+          message: "No valid MyCase URL — synthetic ID assigned; row will create a duplicate on every re-sync",
+        });
+      }
     }
     seenIds.add(clientId);
 
     const { firstName, lastName, aljFirstName, aljLastName } = parseCaseLink(linkText);
+    if (!firstName || !lastName) {
+      warnings.push({
+        row: i + 2,
+        message: `Could not parse name from CASE LINK "${linkText.slice(0, 50)}" — stored as Unknown`,
+      });
+    }
+
     const ct = mapClaimType(r["CLAIM TYPE"]);
+    if (ct.claimTypeLabel === null && ct.claimType.length > 0 && ct.claimType[0]) {
+      warnings.push({
+        row: i + 2,
+        message: `Unrecognized claim type "${ct.claimType[0]}" — stored as-is with no label`,
+      });
+    }
     const winSheetLink = r["WIN SHEET LINK_url"]
       ? String(r["WIN SHEET LINK_url"]).trim()
       : r["WIN SHEET LINK"]
@@ -144,13 +163,22 @@ export const mapSheetRows = (
       ? String(r["WIN SHEET LINK"]).trim()
       : null;
 
+    const approvalDateRaw = r["APPROVAL DATE"];
+    const approvalDate = dateOnly(approvalDateRaw);
+    if (approvalDateRaw != null && approvalDateRaw !== "" && !approvalDate) {
+      warnings.push({
+        row: i + 2,
+        message: `Approval date "${String(approvalDateRaw).trim()}" could not be parsed — will be blank`,
+      });
+    }
+
     out.push({
       clientId,
       externalId: url,
       caseLink: linkText,
       firstName: firstName || "Unknown",
       lastName: lastName || "Unknown",
-      approvalDate: dateOnly(r["APPROVAL DATE"]),
+      approvalDate,
       levelWon: mapLevelWon(r["CASE LEVEL"]),
       claimType: ct.claimType,
       claimTypeLabel: ct.claimTypeLabel,

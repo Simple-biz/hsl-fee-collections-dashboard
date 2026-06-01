@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth-helpers";
 import {
   mapSheetRows,
   MOCK_SHEET_ROWS,
+  SYNTHETIC_ID_BASE,
   type SheetRow,
 } from "@/lib/import/sheets-mapper";
 import { mapFeesClosedRows } from "@/lib/import/fees-closed-mapper";
@@ -228,6 +229,7 @@ export const POST = async (req: NextRequest) => {
           (Number(r.t2FeeDue) || 0) +
           (Number(r.auxFeeDue) || 0),
         hasNotes: !!r.notes,
+        isSynthetic: r.clientId >= SYNTHETIC_ID_BASE,
         status: dbClientIdSet.has(r.clientId) ? "existing" : "new",
       }));
 
@@ -267,6 +269,7 @@ export const POST = async (req: NextRequest) => {
           existing: parsed.length - newCount,
           feesClosed: feesClosedRows.length,
           missing: missingRows.length,
+          synthetic: sheetRows.filter((r) => r.isSynthetic).length,
           warnings,
         },
         rows: {

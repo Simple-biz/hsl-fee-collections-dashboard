@@ -62,6 +62,8 @@ export const GET = async (
         feeRecordId: feeRecords.id,
         assignedTo: feeRecords.assignedTo,
         winSheetStatus: feeRecords.winSheetStatus,
+        winSheetLink: feeRecords.winSheetLink,
+        winSheetLinkText: feeRecords.winSheetLinkText,
         t16Retro: feeRecords.t16Retro,
         t16FeeDue: feeRecords.t16FeeDue,
         t16FeeReceived: feeRecords.t16FeeReceived,
@@ -177,6 +179,8 @@ export const GET = async (
       office: row.officeWithJurisdiction || "—",
       assigned: row.assignedTo || "—",
       status: row.winSheetStatus || "not_started",
+      winSheetLink: row.winSheetLink ?? null,
+      winSheetLinkText: row.winSheetLinkText ?? null,
 
       // PDF-extracted fields
       fullSsn: row.fullSsn || null,
