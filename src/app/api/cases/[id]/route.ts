@@ -62,6 +62,8 @@ export const GET = async (
         feeRecordId: feeRecords.id,
         assignedTo: feeRecords.assignedTo,
         winSheetStatus: feeRecords.winSheetStatus,
+        winSheetLink: feeRecords.winSheetLink,
+        winSheetLinkText: feeRecords.winSheetLinkText,
         t16Retro: feeRecords.t16Retro,
         t16FeeDue: feeRecords.t16FeeDue,
         t16FeeReceived: feeRecords.t16FeeReceived,
@@ -93,6 +95,9 @@ export const GET = async (
         feeComputedAt: feeRecords.feeComputedAt,
         syncStatus: feeRecords.syncStatus,
         syncedAt: feeRecords.syncedAt,
+        feesStatus: feeRecords.feesStatus,
+        weekAssignedToAgent: feeRecords.weekAssignedToAgent,
+        monthAssignedToAgent: feeRecords.monthAssignedToAgent,
         feeRecordUpdatedAt: feeRecords.updatedAt,
 
         // user_details fields
@@ -174,6 +179,8 @@ export const GET = async (
       office: row.officeWithJurisdiction || "—",
       assigned: row.assignedTo || "—",
       status: row.winSheetStatus || "not_started",
+      winSheetLink: row.winSheetLink ?? null,
+      winSheetLinkText: row.winSheetLinkText ?? null,
 
       // PDF-extracted fields
       fullSsn: row.fullSsn || null,
@@ -249,6 +256,10 @@ export const GET = async (
             ? ">60"
             : "≤60"
           : null,
+
+      feesStatus: row.feesStatus ?? null,
+      weekAssignedToAgent: row.weekAssignedToAgent ?? null,
+      monthAssignedToAgent: row.monthAssignedToAgent ?? null,
 
       // User details
       userDetails: {
