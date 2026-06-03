@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 // GET /api/reports/case-types
 export const GET = async () => {
+  const guard = await requireAdmin();
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: 403 });
+
   try {
     const result = await db.execute(sql`
       SELECT
