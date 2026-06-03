@@ -82,14 +82,15 @@ export async function createUser(input: {
             name: input.name?.trim() || null,
             role: input.role,
           }),
+          signal: AbortSignal.timeout(5_000),
         });
         if (!emailRes.ok) {
           console.error("Welcome email webhook failed:", emailRes.status);
-          return { ok: true, warning: "User created but welcome email could not be sent." };
+          return { ok: true, warning: `User created but welcome email could not be sent (webhook ${emailRes.status}).` };
         }
       } catch (err) {
         console.error("Welcome email webhook error:", err);
-        return { ok: true, warning: "User created but welcome email could not be sent." };
+        return { ok: true, warning: "User created but welcome email could not be sent (network error)." };
       }
     }
 
