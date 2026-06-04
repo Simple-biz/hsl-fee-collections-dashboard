@@ -115,52 +115,6 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
   monthAssignedToAgent: r.monthAssignedToAgent,
 });
 
-const toCaseUpdate = (r: ParsedCaseRow) => ({
-  externalId: r.externalId,
-  caseLink: r.caseLink,
-  firstName: r.firstName,
-  lastName: r.lastName,
-  approvalDate: r.approvalDate,
-  levelWon: r.levelWon,
-  claimType: r.claimType,
-  claimTypeLabel: r.claimTypeLabel,
-  aljFirstName: r.aljFirstName,
-  aljLastName: r.aljLastName,
-  updatedAt: new Date(),
-});
-
-const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => ({
-  assignedTo: r.assignedTo,
-  winSheetStatus: r.winSheetStatus,
-  winSheetLink: existingWinSheetLink ?? r.winSheetLink,
-  winSheetLinkText: r.winSheetLinkText,
-  caseStatus: r.caseStatus,
-  feesConfirmation: r.feesConfirmation,
-  dateAssignedToAgent: r.dateAssignedToAgent,
-  approvedBy: r.approvedBy,
-  t16Retro: r.t16Retro,
-  t16FeeDue: r.t16FeeDue,
-  t16FeeReceived: r.t16FeeReceived,
-  t16Pending: r.t16Pending,
-  t16FeeReceivedDate: r.t16FeeReceivedDate,
-  t2Retro: r.t2Retro,
-  t2FeeDue: r.t2FeeDue,
-  t2FeeReceived: r.t2FeeReceived,
-  t2Pending: r.t2Pending,
-  t2FeeReceivedDate: r.t2FeeReceivedDate,
-  auxRetro: r.auxRetro,
-  auxFeeDue: r.auxFeeDue,
-  auxFeeReceived: r.auxFeeReceived,
-  auxPending: r.auxPending,
-  auxFeeReceivedDate: r.auxFeeReceivedDate,
-  daysAfterApproval: r.daysAfterApproval,
-  approvalCategory: r.approvalCategory,
-  feesStatus: r.feesStatus,
-  weekAssignedToAgent: r.weekAssignedToAgent,
-  monthAssignedToAgent: r.monthAssignedToAgent,
-  updatedAt: new Date(),
-});
-
 const toClosedAt = (closedDate: string | null): Date | null => {
   if (!closedDate) return null;
   const parsed = new Date(`${closedDate}T12:00:00`);
