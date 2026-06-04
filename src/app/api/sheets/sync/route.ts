@@ -214,7 +214,7 @@ export const POST = async (req: NextRequest) => {
         // A difference < $0.01 is purely a precision artifact; any real change is ≥ $1.
         const n = (field: string, sheet: string, db: string | null | undefined) => {
           if (Math.abs(Number(sheet) - Number(db ?? "0")) >= 0.01)
-            f.push({ field, sheet, db: db ?? "null" });
+            f.push({ field, sheet, db: db ?? "" });
         };
         const a = (field: string, arr: string[], dbArr: string[] | null | undefined) => {
           if (JSON.stringify([...(arr ?? [])].sort()) !== JSON.stringify([...(dbArr ?? [])].sort()))
