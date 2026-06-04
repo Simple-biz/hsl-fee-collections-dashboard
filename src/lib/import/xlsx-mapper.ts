@@ -184,8 +184,8 @@ const mapWinSheetStatus = (raw: unknown): ParsedCaseRow["winSheetStatus"] => {
     .toLowerCase();
   if (!s) return "not_started";
   if (s === "finished") return "closed";
-  if (s.includes("started")) return "started";
   if (s === "not started" || s === "not_started") return "not_started";
+  if (s.includes("started")) return "started";
   if (s === "in progress" || s === "in_progress") return "in_progress";
   if (s === "pending payment") return "pending_payment";
   if (s === "partially paid") return "partially_paid";

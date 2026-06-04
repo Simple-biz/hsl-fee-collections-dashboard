@@ -157,10 +157,10 @@ const toFeeUpdate = (r: ParsedCaseRow, existingWinSheetLink: string | null) => (
   updatedAt: new Date(),
 });
 
-const toClosedAt = (closedDate: string | null): Date => {
-  if (!closedDate) return new Date();
+const toClosedAt = (closedDate: string | null): Date | null => {
+  if (!closedDate) return null;
   const parsed = new Date(`${closedDate}T12:00:00`);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 // POST /api/sheets/sync

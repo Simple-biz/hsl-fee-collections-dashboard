@@ -16,11 +16,15 @@ const dateOnly = (v: unknown): string | null => {
   const s = String(v).trim();
   if (!s) return null;
   const m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  if (m) {
+    const iso = `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    return Number.isNaN(new Date(iso).getTime()) ? null : iso;
+  }
   const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m2) {
     const yy = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
-    return `${yy}-${m2[1].padStart(2, "0")}-${m2[2].padStart(2, "0")}`;
+    const iso = `${yy}-${m2[1].padStart(2, "0")}-${m2[2].padStart(2, "0")}`;
+    return Number.isNaN(new Date(iso).getTime()) ? null : iso;
   }
   return null;
 };
@@ -100,8 +104,8 @@ const mapWinSheetStatus = (raw: unknown): ParsedCaseRow["winSheetStatus"] => {
     .toLowerCase();
   if (!s) return "not_started";
   if (s === "finished") return "closed";
-  if (s.includes("started")) return "started";
   if (s === "not started" || s === "not_started") return "not_started";
+  if (s.includes("started")) return "started";
   if (s === "in progress" || s === "in_progress") return "in_progress";
   if (s === "pending payment") return "pending_payment";
   if (s === "partially paid") return "partially_paid";
