@@ -14,7 +14,7 @@ import { mapFeesClosedRows } from "@/lib/import/fees-closed-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const CHUNK = 500;
 const SHEET_CACHE_TTL = 5 * 60 * 1000;
@@ -473,7 +473,7 @@ export const POST = async (req: NextRequest) => {
               ${r.lastName},
               ${r.approvalDate},
               ${r.levelWon},
-              ${JSON.stringify(r.claimType)},
+              ${'{' + r.claimType.join(',') + '}'},
               ${r.claimTypeLabel},
               ${r.aljFirstName},
               ${r.aljLastName}
