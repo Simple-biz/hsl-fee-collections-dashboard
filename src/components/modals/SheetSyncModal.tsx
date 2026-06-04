@@ -28,7 +28,8 @@ interface SheetPreviewRow {
   totalExpected: number;
   hasNotes: boolean;
   isSynthetic: boolean;
-  status: "new" | "existing";
+  status: "new" | "changed" | "unchanged";
+  changedFields: { field: string; sheet: string; db: string }[];
 }
 
 interface DbOnlyRow {
@@ -39,7 +40,7 @@ interface DbOnlyRow {
   status: "fees_closed" | "missing";
 }
 
-type Step4Filter = "all" | "new" | "existing" | "fees_closed" | "missing";
+type Step4Filter = "all" | "new" | "changed" | "unchanged" | "fees_closed" | "missing";
 
 type Step4PreviewRow =
   | (SheetPreviewRow & { syncable: true })
@@ -50,7 +51,8 @@ interface SyncPreviewResponse {
   summary: {
     fetched: number;
     new: number;
-    existing: number;
+    changed: number;
+    unchanged: number;
     feesClosed: number;
     missing: number;
     synthetic: number;
@@ -106,20 +108,23 @@ const STATUS_PILL: Record<string, string> = {
   closed: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
-const STATUS_BADGE = {
-  new: (dark: boolean) =>
+const STATUS_BADGE: Record<string, (dark: boolean) => string> = {
+  new: (dark) =>
     dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700",
-  existing: (dark: boolean) =>
+  changed: (dark) =>
     dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700",
-  fees_closed: (dark: boolean) =>
+  unchanged: (dark) =>
+    dark ? "bg-neutral-800 text-neutral-400" : "bg-neutral-100 text-neutral-600",
+  fees_closed: (dark) =>
     dark ? "bg-violet-900/40 text-violet-400" : "bg-violet-100 text-violet-700",
-  missing: (dark: boolean) =>
+  missing: (dark) =>
     dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700",
 };
 
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<string, string> = {
   new: "NEW",
-  existing: "TO UPDATE",
+  changed: "CHANGED",
+  unchanged: "UP TO DATE",
   fees_closed: "FEES CLOSED",
   missing: "MISSING",
 };
@@ -166,14 +171,12 @@ export default function SheetSyncModal({
       setPreview(data);
       setAllowSynthetic(false);
       setSelected(
-        new Set(
-          [
-            ...data.rows.sheet
-              .filter((r) => !r.isSynthetic)
-              .map((r) => r.clientId),
-            ...data.rows.feesClosed.map((r) => r.clientId),
-          ],
-        ),
+        new Set([
+          ...data.rows.sheet
+            .filter((r) => (r.status === "new" || r.status === "changed") && !r.isSynthetic)
+            .map((r) => r.clientId),
+          ...data.rows.feesClosed.map((r) => r.clientId),
+        ]),
       );
     } catch (e) {
       const err = e as Error;
@@ -192,8 +195,12 @@ export default function SheetSyncModal({
     () => preview?.rows.sheet.filter((r) => r.status === "new") ?? [],
     [preview],
   );
-  const existingRows = useMemo(
-    () => preview?.rows.sheet.filter((r) => r.status === "existing") ?? [],
+  const changedRows = useMemo(
+    () => preview?.rows.sheet.filter((r) => r.status === "changed") ?? [],
+    [preview],
+  );
+  const unchangedRows = useMemo(
+    () => preview?.rows.sheet.filter((r) => r.status === "unchanged") ?? [],
     [preview],
   );
   const syntheticRows = useMemo(
@@ -413,13 +420,23 @@ export default function SheetSyncModal({
                       connect a real sheet
                     </div>
                   )}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                     <Stat t={t} label="Rows fetched" value={preview.summary.fetched.toLocaleString()} />
                     <Stat
                       t={t}
                       label="New cases"
                       value={preview.summary.new.toLocaleString()}
                       accent={dark ? "text-emerald-400" : "text-emerald-600"}
+                    />
+                    <Stat
+                      t={t}
+                      label="Changed"
+                      value={preview.summary.changed.toLocaleString()}
+                      accent={
+                        preview.summary.changed > 0
+                          ? dark ? "text-blue-400" : "text-blue-600"
+                          : undefined
+                      }
                     />
                     <Stat
                       t={t}
@@ -523,9 +540,10 @@ export default function SheetSyncModal({
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
                 Four categories based on where each record exists.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
                 <Stat t={t} label="New" value={preview.summary.new.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
-                <Stat t={t} label="Existing" value={preview.summary.existing.toLocaleString()} accent={dark ? "text-blue-400" : "text-blue-600"} />
+                <Stat t={t} label="Changed" value={preview.summary.changed.toLocaleString()} accent={preview.summary.changed > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined} />
+                <Stat t={t} label="Up to date" value={preview.summary.unchanged.toLocaleString()} />
                 <Stat t={t} label="Fees Closed" value={preview.summary.feesClosed.toLocaleString()} accent={dark ? "text-violet-400" : "text-violet-600"} />
                 <Stat
                   t={t}
@@ -551,18 +569,34 @@ export default function SheetSyncModal({
                   />
                 </CategorySection>
                 <CategorySection
-                  status="existing"
-                  count={preview.summary.existing}
-                  description="In sheet · already in database — values will be updated on sync"
+                  status="changed"
+                  count={preview.summary.changed}
+                  description="In sheet · already in database · values have changed — will be updated on sync"
                   dark={dark}
                   t={t}
                 >
                   <SheetRowsTable
                     t={t}
                     dark={dark}
-                    rows={existingRows.slice(0, 100)}
-                    truncated={existingRows.length > 100}
-                    total={existingRows.length}
+                    rows={changedRows.slice(0, 100)}
+                    truncated={changedRows.length > 100}
+                    total={changedRows.length}
+                    showChangedFields
+                  />
+                </CategorySection>
+                <CategorySection
+                  status="unchanged"
+                  count={preview.summary.unchanged}
+                  description="In sheet · already in database · no changes detected — skipped by default"
+                  dark={dark}
+                  t={t}
+                >
+                  <SheetRowsTable
+                    t={t}
+                    dark={dark}
+                    rows={unchangedRows.slice(0, 100)}
+                    truncated={unchangedRows.length > 100}
+                    total={unchangedRows.length}
                   />
                 </CategorySection>
                 <CategorySection
@@ -618,7 +652,8 @@ export default function SheetSyncModal({
                 >
                   <option value="all">All rows</option>
                   <option value="new">New only</option>
-                  <option value="existing">To update only</option>
+                  <option value="changed">Changed only</option>
+                  <option value="unchanged">Up to date only</option>
                   <option value="fees_closed">Fees Closed only</option>
                   <option value="missing">Missing only</option>
                 </select>
@@ -790,7 +825,7 @@ const CategorySection = ({
   t,
   children,
 }: {
-  status: "new" | "existing" | "fees_closed" | "missing";
+  status: "new" | "changed" | "unchanged" | "fees_closed" | "missing";
   count: number;
   description: string;
   dark: boolean;
@@ -823,12 +858,14 @@ const SheetRowsTable = ({
   rows,
   truncated,
   total,
+  showChangedFields,
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
   rows: SheetPreviewRow[];
   truncated: boolean;
   total: number;
+  showChangedFields?: boolean;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
@@ -836,6 +873,7 @@ const SheetRowsTable = ({
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             <Th>Case</Th>
+            {showChangedFields && <Th>Changed (sheet → db)</Th>}
             <Th>Approved</Th>
             <Th>Assigned</Th>
             <Th>Win Sheet</Th>
@@ -860,6 +898,25 @@ const SheetRowsTable = ({
                   </a>
                 )}
               </td>
+              {showChangedFields && (
+                <td className="px-3 py-1.5 max-w-64">
+                  <div className={`text-[10px] font-mono space-y-0.5 ${dark ? "text-blue-300" : "text-blue-700"}`}>
+                    {r.changedFields.slice(0, 3).map((f) => (
+                      <div key={f.field} className="leading-tight">
+                        <span className="font-semibold">{f.field}</span>
+                        <span className={`ml-1 ${dark ? "text-neutral-400" : "text-neutral-500"}`}>
+                          {f.sheet || "∅"} → {f.db || "∅"}
+                        </span>
+                      </div>
+                    ))}
+                    {r.changedFields.length > 3 && (
+                      <div className={`${dark ? "text-neutral-500" : "text-neutral-400"}`}>
+                        +{r.changedFields.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </td>
+              )}
               <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
               <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
               <td className="px-3 py-1.5">

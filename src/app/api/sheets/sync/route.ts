@@ -205,7 +205,7 @@ export const POST = async (req: NextRequest) => {
       );
 
 
-      // Pull all DB cases (lightweight: only fields needed for diff + display)
+      // Pull all DB cases + their fee records for diff comparison
       const allDbCases = await db
         .select({
           clientId: cases.clientId,
@@ -213,32 +213,121 @@ export const POST = async (req: NextRequest) => {
           firstName: cases.firstName,
           lastName: cases.lastName,
           approvalDate: cases.approvalDate,
+          levelWon: cases.levelWon,
+          claimType: cases.claimType,
+          claimTypeLabel: cases.claimTypeLabel,
+          aljFirstName: cases.aljFirstName,
+          aljLastName: cases.aljLastName,
+          assignedTo: feeRecords.assignedTo,
+          winSheetStatus: feeRecords.winSheetStatus,
+          caseStatus: feeRecords.caseStatus,
+          feesConfirmation: feeRecords.feesConfirmation,
+          dateAssignedToAgent: feeRecords.dateAssignedToAgent,
+          approvedBy: feeRecords.approvedBy,
+          t16Retro: feeRecords.t16Retro,
+          t16FeeDue: feeRecords.t16FeeDue,
+          t16FeeReceived: feeRecords.t16FeeReceived,
+          t16Pending: feeRecords.t16Pending,
+          t16FeeReceivedDate: feeRecords.t16FeeReceivedDate,
+          t2Retro: feeRecords.t2Retro,
+          t2FeeDue: feeRecords.t2FeeDue,
+          t2FeeReceived: feeRecords.t2FeeReceived,
+          t2Pending: feeRecords.t2Pending,
+          t2FeeReceivedDate: feeRecords.t2FeeReceivedDate,
+          auxRetro: feeRecords.auxRetro,
+          auxFeeDue: feeRecords.auxFeeDue,
+          auxFeeReceived: feeRecords.auxFeeReceived,
+          auxPending: feeRecords.auxPending,
+          auxFeeReceivedDate: feeRecords.auxFeeReceivedDate,
         })
-        .from(cases);
+        .from(cases)
+        .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId));
 
-      const dbClientIdSet = new Set(allDbCases.map((c) => c.clientId));
+      type DbRow = (typeof allDbCases)[number];
 
-      // Category 1 & 2: sheet rows — new vs existing
-      const sheetRows = parsed.map((r) => ({
-        clientId: r.clientId,
-        caseName: `${r.lastName}, ${r.firstName}`,
-        caseLink: r.caseLink,
-        externalUrl: r.externalId,
-        approvalDate: r.approvalDate,
-        assignedTo: r.assignedTo,
-        winSheetStatus: r.winSheetStatus,
-        winSheetLink: r.winSheetLink,
-        winSheetLinkText: r.winSheetLinkText,
-        totalExpected:
-          (Number(r.t16FeeDue) || 0) +
-          (Number(r.t2FeeDue) || 0) +
-          (Number(r.auxFeeDue) || 0),
-        hasNotes: !!r.notes,
-        isSynthetic: r.clientId >= SYNTHETIC_ID_BASE,
-        status: dbClientIdSet.has(r.clientId) ? "existing" : "new",
-      }));
+      type ChangedField = { field: string; sheet: string; db: string };
 
-      // Category 3 & 4: DB-only rows
+      const getChangedFields = (r: ParsedCaseRow, db: DbRow): ChangedField[] => {
+        const f: ChangedField[] = [];
+        const s = (field: string, a: string | null | undefined, b: string | null | undefined) => {
+          if ((a ?? null) !== (b ?? null)) f.push({ field, sheet: String(a ?? ""), db: String(b ?? "") });
+        };
+        // Compare monetary amounts with 1-cent tolerance. The sheet formula (0.25 × retro)
+        // produces sub-cent values like 4760.695. Postgres decimal(12,2) stores 4760.70 (rounds
+        // up), but JavaScript IEEE 754 stores 4760.695 as 4760.6949... and any JS rounding
+        // gives 4760.69 — so string/toFixed comparisons always diverge on the boundary.
+        // A difference < $0.01 is purely a precision artifact; any real change is ≥ $1.
+        const n = (field: string, sheet: string, db: string | null | undefined) => {
+          if (Math.abs(Number(sheet) - Number(db ?? "0")) >= 0.01)
+            f.push({ field, sheet, db: db ?? "null" });
+        };
+        const a = (field: string, arr: string[], dbArr: string[] | null | undefined) => {
+          if (JSON.stringify([...(arr ?? [])].sort()) !== JSON.stringify([...(dbArr ?? [])].sort()))
+            f.push({ field, sheet: arr.join(","), db: (dbArr ?? []).join(",") });
+        };
+        s("caseLink", r.caseLink, db.caseLink);
+        s("firstName", r.firstName, db.firstName);
+        s("lastName", r.lastName, db.lastName);
+        s("approvalDate", r.approvalDate, db.approvalDate);
+        s("levelWon", r.levelWon, db.levelWon);
+        a("claimType", r.claimType, db.claimType);
+        s("claimTypeLabel", r.claimTypeLabel, db.claimTypeLabel);
+        s("aljFirstName", r.aljFirstName, db.aljFirstName);
+        s("aljLastName", r.aljLastName, db.aljLastName);
+        s("assignedTo", r.assignedTo, db.assignedTo);
+        s("winSheetStatus", r.winSheetStatus, db.winSheetStatus ?? "not_started");
+        s("caseStatus", r.caseStatus, db.caseStatus);
+        s("feesConfirmation", r.feesConfirmation, db.feesConfirmation);
+        s("dateAssignedToAgent", r.dateAssignedToAgent, db.dateAssignedToAgent);
+        s("approvedBy", r.approvedBy, db.approvedBy);
+        n("t16Retro", r.t16Retro, db.t16Retro);
+        n("t16FeeDue", r.t16FeeDue, db.t16FeeDue);
+        n("t16FeeReceived", r.t16FeeReceived, db.t16FeeReceived);
+        // t16Pending excluded: sheet webhook doesn't reliably return this column;
+        // the DB value is preserved by CASE WHEN in the upsert.
+        s("t16FeeReceivedDate", r.t16FeeReceivedDate, db.t16FeeReceivedDate);
+        n("t2Retro", r.t2Retro, db.t2Retro);
+        n("t2FeeDue", r.t2FeeDue, db.t2FeeDue);
+        n("t2FeeReceived", r.t2FeeReceived, db.t2FeeReceived);
+        // t2Pending excluded — same reason as t16Pending above.
+        s("t2FeeReceivedDate", r.t2FeeReceivedDate, db.t2FeeReceivedDate);
+        n("auxRetro", r.auxRetro, db.auxRetro);
+        n("auxFeeDue", r.auxFeeDue, db.auxFeeDue);
+        n("auxFeeReceived", r.auxFeeReceived, db.auxFeeReceived);
+        // auxPending excluded — same reason as t16Pending above.
+        s("auxFeeReceivedDate", r.auxFeeReceivedDate, db.auxFeeReceivedDate);
+        return f;
+      };
+
+      const dbMap = new Map(allDbCases.map((c) => [c.clientId, c]));
+
+      // Category 1 & 2: sheet rows — new vs changed vs unchanged
+      const sheetRows = parsed.map((r) => {
+        const dbEntry = dbMap.get(r.clientId);
+        const changedFields = dbEntry ? getChangedFields(r, dbEntry) : [];
+        const status = !dbEntry ? "new" : changedFields.length > 0 ? "changed" : "unchanged";
+        return {
+          clientId: r.clientId,
+          caseName: `${r.lastName}, ${r.firstName}`,
+          caseLink: r.caseLink,
+          externalUrl: r.externalId,
+          approvalDate: r.approvalDate,
+          assignedTo: r.assignedTo,
+          winSheetStatus: r.winSheetStatus,
+          winSheetLink: r.winSheetLink,
+          winSheetLinkText: r.winSheetLinkText,
+          totalExpected:
+            (Number(r.t16FeeDue) || 0) +
+            (Number(r.t2FeeDue) || 0) +
+            (Number(r.auxFeeDue) || 0),
+          hasNotes: !!r.notes,
+          isSynthetic: r.clientId >= SYNTHETIC_ID_BASE,
+          status,
+          changedFields,
+        };
+      });
+
+      // Category 3 & 4: DB-only rows (cases table entries not in the sheet)
       const dbOnlyCases = allDbCases.filter(
         (c) => !sheetClientIdSet.has(c.clientId),
       );
@@ -264,6 +353,7 @@ export const POST = async (req: NextRequest) => {
         }));
 
       const newCount = sheetRows.filter((r) => r.status === "new").length;
+      const changedCount = sheetRows.filter((r) => r.status === "changed").length;
 
       return NextResponse.json({
         mode,
@@ -271,7 +361,8 @@ export const POST = async (req: NextRequest) => {
         summary: {
           fetched: parsed.length,
           new: newCount,
-          existing: parsed.length - newCount,
+          changed: changedCount,
+          unchanged: parsed.length - newCount - changedCount,
           feesClosed: feesClosedRows.length,
           missing: missingRows.length,
           synthetic: sheetRows.filter((r) => r.isSynthetic).length,
@@ -371,17 +462,6 @@ export const POST = async (req: NextRequest) => {
     const newRows = candidates.filter((r) => !existingSet.has(r.clientId));
     const updateRows = candidates.filter((r) => existingSet.has(r.clientId));
 
-    const existingLinks =
-      updateRows.length > 0
-        ? await db
-            .select({ caseId: feeRecords.caseId, winSheetLink: feeRecords.winSheetLink })
-            .from(feeRecords)
-            .where(inArray(feeRecords.caseId, updateRows.map((r) => r.clientId)))
-        : [];
-    const existingLinkMap = new Map(
-      existingLinks.map((e) => [e.caseId, e.winSheetLink]),
-    );
-
     let inserted = 0;
     let updated = 0;
     let closed = 0;
@@ -450,106 +530,118 @@ export const POST = async (req: NextRequest) => {
     });
 
     if (updateRows.length > 0) {
-      await Promise.all([
-        db.execute(sql`
-          UPDATE cases SET
-            external_id        = v.external_id,
-            case_link          = v.case_link,
-            first_name         = v.first_name,
-            last_name          = v.last_name,
-            approval_date      = v.approval_date::date,
-            level_won          = v.level_won,
-            claim_type         = v.claim_type::text[],
-            claim_type_label   = v.claim_type_label,
-            alj_first_name     = v.alj_first_name,
-            alj_last_name      = v.alj_last_name,
-            updated_at         = now()
-          FROM (VALUES ${sql.join(
-            updateRows.map((r) => sql`(
-              ${r.clientId},
-              ${r.externalId},
-              ${r.caseLink},
-              ${r.firstName},
-              ${r.lastName},
-              ${r.approvalDate},
-              ${r.levelWon},
-              ${'{' + r.claimType.join(',') + '}'},
-              ${r.claimTypeLabel},
-              ${r.aljFirstName},
-              ${r.aljLastName}
-            )`),
-            sql`,`,
-          )}) AS v(client_id, external_id, case_link, first_name, last_name, approval_date, level_won, claim_type, claim_type_label, alj_first_name, alj_last_name)
-          WHERE cases.client_id = v.client_id::int
-        `),
-        db.execute(sql`
-          UPDATE fee_records SET
-            assigned_to              = v.assigned_to,
-            win_sheet_status         = v.win_sheet_status,
-            win_sheet_link           = v.win_sheet_link,
-            win_sheet_link_text      = v.win_sheet_link_text,
-            case_status              = v.case_status,
-            fees_confirmation        = v.fees_confirmation,
-            date_assigned_to_agent   = v.date_assigned_to_agent::date,
-            approved_by              = v.approved_by,
-            t16_retro                = v.t16_retro::numeric,
-            t16_fee_due              = v.t16_fee_due::numeric,
-            t16_fee_received         = v.t16_fee_received::numeric,
-            t16_pending              = v.t16_pending::numeric,
-            t16_fee_received_date    = v.t16_fee_received_date::date,
-            t2_retro                 = v.t2_retro::numeric,
-            t2_fee_due               = v.t2_fee_due::numeric,
-            t2_fee_received          = v.t2_fee_received::numeric,
-            t2_pending               = v.t2_pending::numeric,
-            t2_fee_received_date     = v.t2_fee_received_date::date,
-            aux_retro                = v.aux_retro::numeric,
-            aux_fee_due              = v.aux_fee_due::numeric,
-            aux_fee_received         = v.aux_fee_received::numeric,
-            aux_pending              = v.aux_pending::numeric,
-            aux_fee_received_date    = v.aux_fee_received_date::date,
-            days_after_approval      = v.days_after_approval::int,
-            approval_category        = v.approval_category,
-            fees_status              = v.fees_status,
-            week_assigned_to_agent   = v.week_assigned_to_agent,
-            month_assigned_to_agent  = v.month_assigned_to_agent,
-            updated_at               = now()
-          FROM (VALUES ${sql.join(
-            updateRows.map((r) => sql`(
-              ${r.clientId},
-              ${r.assignedTo},
-              ${r.winSheetStatus},
-              ${existingLinkMap.get(r.clientId) ?? r.winSheetLink},
-              ${r.winSheetLinkText},
-              ${r.caseStatus},
-              ${r.feesConfirmation},
-              ${r.dateAssignedToAgent},
-              ${r.approvedBy},
-              ${r.t16Retro},
-              ${r.t16FeeDue},
-              ${r.t16FeeReceived},
-              ${r.t16Pending},
-              ${r.t16FeeReceivedDate},
-              ${r.t2Retro},
-              ${r.t2FeeDue},
-              ${r.t2FeeReceived},
-              ${r.t2Pending},
-              ${r.t2FeeReceivedDate},
-              ${r.auxRetro},
-              ${r.auxFeeDue},
-              ${r.auxFeeReceived},
-              ${r.auxPending},
-              ${r.auxFeeReceivedDate},
-              ${r.daysAfterApproval},
-              ${r.approvalCategory},
-              ${r.feesStatus},
-              ${r.weekAssignedToAgent},
-              ${r.monthAssignedToAgent}
-            )`),
-            sql`,`,
-          )}) AS v(case_id, assigned_to, win_sheet_status, win_sheet_link, win_sheet_link_text, case_status, fees_confirmation, date_assigned_to_agent, approved_by, t16_retro, t16_fee_due, t16_fee_received, t16_pending, t16_fee_received_date, t2_retro, t2_fee_due, t2_fee_received, t2_pending, t2_fee_received_date, aux_retro, aux_fee_due, aux_fee_received, aux_pending, aux_fee_received_date, days_after_approval, approval_category, fees_status, week_assigned_to_agent, month_assigned_to_agent)
-          WHERE fee_records.case_id = v.case_id::int
-        `),
-      ]);
+      for (const batch of chunked(updateRows, CHUNK)) {
+        await Promise.all([
+          db.execute(sql`
+            UPDATE cases SET
+              external_id        = v.external_id,
+              case_link          = v.case_link,
+              first_name         = v.first_name,
+              last_name          = v.last_name,
+              approval_date      = v.approval_date::date,
+              level_won          = v.level_won,
+              claim_type         = v.claim_type::text[],
+              claim_type_label   = v.claim_type_label,
+              alj_first_name     = v.alj_first_name,
+              alj_last_name      = v.alj_last_name,
+              updated_at         = now()
+            FROM (VALUES ${sql.join(
+              batch.map((r) => sql`(
+                ${r.clientId},
+                ${r.externalId},
+                ${r.caseLink},
+                ${r.firstName},
+                ${r.lastName},
+                ${r.approvalDate},
+                ${r.levelWon},
+                ${'{' + r.claimType.join(',') + '}'},
+                ${r.claimTypeLabel},
+                ${r.aljFirstName},
+                ${r.aljLastName}
+              )`),
+              sql`,`,
+            )}) AS v(client_id, external_id, case_link, first_name, last_name, approval_date, level_won, claim_type, claim_type_label, alj_first_name, alj_last_name)
+            WHERE cases.client_id = v.client_id::int
+          `),
+          // Upsert fee_records so cases that somehow have no fee_record row still get written.
+          // COALESCE preserves the existing DB win_sheet_link rather than overwriting it.
+          db.execute(sql`
+            INSERT INTO fee_records (
+              case_id, assigned_to, win_sheet_status, win_sheet_link, win_sheet_link_text,
+              case_status, fees_confirmation, date_assigned_to_agent, approved_by,
+              t16_retro, t16_fee_due, t16_fee_received, t16_pending, t16_fee_received_date,
+              t2_retro, t2_fee_due, t2_fee_received, t2_pending, t2_fee_received_date,
+              aux_retro, aux_fee_due, aux_fee_received, aux_pending, aux_fee_received_date,
+              days_after_approval, approval_category, fees_status,
+              week_assigned_to_agent, month_assigned_to_agent
+            )
+            VALUES ${sql.join(
+              batch.map((r) => sql`(
+                ${r.clientId},
+                ${r.assignedTo},
+                ${r.winSheetStatus},
+                ${r.winSheetLink},
+                ${r.winSheetLinkText},
+                ${r.caseStatus},
+                ${r.feesConfirmation},
+                ${r.dateAssignedToAgent}::date,
+                ${r.approvedBy},
+                ${r.t16Retro}::numeric,
+                ${r.t16FeeDue}::numeric,
+                ${r.t16FeeReceived}::numeric,
+                ${r.t16Pending}::numeric,
+                ${r.t16FeeReceivedDate}::date,
+                ${r.t2Retro}::numeric,
+                ${r.t2FeeDue}::numeric,
+                ${r.t2FeeReceived}::numeric,
+                ${r.t2Pending}::numeric,
+                ${r.t2FeeReceivedDate}::date,
+                ${r.auxRetro}::numeric,
+                ${r.auxFeeDue}::numeric,
+                ${r.auxFeeReceived}::numeric,
+                ${r.auxPending}::numeric,
+                ${r.auxFeeReceivedDate}::date,
+                ${r.daysAfterApproval}::int,
+                ${r.approvalCategory},
+                ${r.feesStatus},
+                ${r.weekAssignedToAgent},
+                ${r.monthAssignedToAgent}
+              )`),
+              sql`,`,
+            )}
+            ON CONFLICT (case_id) DO UPDATE SET
+              assigned_to              = EXCLUDED.assigned_to,
+              win_sheet_status         = EXCLUDED.win_sheet_status,
+              win_sheet_link           = COALESCE(fee_records.win_sheet_link, EXCLUDED.win_sheet_link),
+              win_sheet_link_text      = EXCLUDED.win_sheet_link_text,
+              case_status              = EXCLUDED.case_status,
+              fees_confirmation        = EXCLUDED.fees_confirmation,
+              date_assigned_to_agent   = EXCLUDED.date_assigned_to_agent,
+              approved_by              = EXCLUDED.approved_by,
+              t16_retro                = EXCLUDED.t16_retro,
+              t16_fee_due              = EXCLUDED.t16_fee_due,
+              t16_fee_received         = EXCLUDED.t16_fee_received,
+              t16_pending              = CASE WHEN EXCLUDED.t16_pending::numeric != 0 THEN EXCLUDED.t16_pending ELSE fee_records.t16_pending END,
+              t16_fee_received_date    = EXCLUDED.t16_fee_received_date,
+              t2_retro                 = EXCLUDED.t2_retro,
+              t2_fee_due               = EXCLUDED.t2_fee_due,
+              t2_fee_received          = EXCLUDED.t2_fee_received,
+              t2_pending               = CASE WHEN EXCLUDED.t2_pending::numeric != 0 THEN EXCLUDED.t2_pending ELSE fee_records.t2_pending END,
+              t2_fee_received_date     = EXCLUDED.t2_fee_received_date,
+              aux_retro                = EXCLUDED.aux_retro,
+              aux_fee_due              = EXCLUDED.aux_fee_due,
+              aux_fee_received         = EXCLUDED.aux_fee_received,
+              aux_pending              = CASE WHEN EXCLUDED.aux_pending::numeric != 0 THEN EXCLUDED.aux_pending ELSE fee_records.aux_pending END,
+              aux_fee_received_date    = EXCLUDED.aux_fee_received_date,
+              days_after_approval      = EXCLUDED.days_after_approval,
+              approval_category        = EXCLUDED.approval_category,
+              fees_status              = EXCLUDED.fees_status,
+              week_assigned_to_agent   = EXCLUDED.week_assigned_to_agent,
+              month_assigned_to_agent  = EXCLUDED.month_assigned_to_agent,
+              updated_at               = now()
+          `),
+        ]);
+      }
       updated = updateRows.length;
     }
 
