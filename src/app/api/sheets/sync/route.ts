@@ -239,6 +239,7 @@ export const POST = async (req: NextRequest) => {
           auxFeeReceived: feeRecords.auxFeeReceived,
           auxPending: feeRecords.auxPending,
           auxFeeReceivedDate: feeRecords.auxFeeReceivedDate,
+          isClosed: feeRecords.isClosed,
         })
         .from(cases)
         .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId));
@@ -333,7 +334,7 @@ export const POST = async (req: NextRequest) => {
       );
 
       const feesClosedRows = dbOnlyCases
-        .filter((c) => c.caseLink && feesClosedCaseNameSet.has(c.caseLink.trim()))
+        .filter((c) => !c.isClosed && c.caseLink && feesClosedCaseNameSet.has(c.caseLink.trim()))
         .map((c) => ({
           clientId: c.clientId,
           caseName: `${c.lastName}, ${c.firstName}`,
@@ -343,7 +344,7 @@ export const POST = async (req: NextRequest) => {
         }));
 
       const missingRows = dbOnlyCases
-        .filter((c) => !c.caseLink || !feesClosedCaseNameSet.has(c.caseLink.trim()))
+        .filter((c) => !c.isClosed && (!c.caseLink || !feesClosedCaseNameSet.has(c.caseLink.trim())))
         .map((c) => ({
           clientId: c.clientId,
           caseName: `${c.lastName}, ${c.firstName}`,
@@ -506,16 +507,26 @@ export const POST = async (req: NextRequest) => {
 
         for (const row of batch) {
           await tx
-            .update(feeRecords)
-            .set({
+            .insert(feeRecords)
+            .values({
+              caseId: row.clientId,
               isClosed: true,
               closedAt: row.closedAt,
               winSheetStatus: "closed",
               syncStatus: "synced",
               syncedAt: new Date(),
-              updatedAt: new Date(),
             })
-            .where(eq(feeRecords.caseId, row.clientId));
+            .onConflictDoUpdate({
+              target: feeRecords.caseId,
+              set: {
+                isClosed: true,
+                closedAt: row.closedAt,
+                winSheetStatus: "closed",
+                syncStatus: "synced",
+                syncedAt: new Date(),
+                updatedAt: new Date(),
+              },
+            });
         }
 
         await tx.insert(activityLog).values(
