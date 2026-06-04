@@ -169,7 +169,7 @@ export default function SheetSyncModal({
         new Set(
           [
             ...data.rows.sheet
-              .filter((r) => r.status === "new" && !r.isSynthetic)
+              .filter((r) => !r.isSynthetic)
               .map((r) => r.clientId),
             ...data.rows.feesClosed.map((r) => r.clientId),
           ],

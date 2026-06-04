@@ -1,6 +1,6 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { inArray, eq } from "drizzle-orm";
+import { inArray, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
@@ -415,16 +415,111 @@ export const POST = async (req: NextRequest) => {
 
         inserted += insertedRows.length;
       }
-      for (const r of updateRows) {
-        await tx
-          .update(cases)
-          .set(toCaseUpdate(r))
-          .where(eq(cases.clientId, r.clientId));
-        await tx
-          .update(feeRecords)
-          .set(toFeeUpdate(r, existingLinkMap.get(r.clientId) ?? null))
-          .where(eq(feeRecords.caseId, r.clientId));
-        updated++;
+      if (updateRows.length > 0) {
+        await tx.execute(sql`
+          UPDATE cases SET
+            external_id        = v.external_id,
+            case_link          = v.case_link,
+            first_name         = v.first_name,
+            last_name          = v.last_name,
+            approval_date      = v.approval_date::date,
+            level_won          = v.level_won,
+            claim_type         = v.claim_type::text[],
+            claim_type_label   = v.claim_type_label,
+            alj_first_name     = v.alj_first_name,
+            alj_last_name      = v.alj_last_name,
+            updated_at         = now()
+          FROM (VALUES ${sql.join(
+            updateRows.map((r) => sql`(
+              ${r.clientId},
+              ${r.externalId},
+              ${r.caseLink},
+              ${r.firstName},
+              ${r.lastName},
+              ${r.approvalDate},
+              ${r.levelWon},
+              ${JSON.stringify(r.claimType)},
+              ${r.claimTypeLabel},
+              ${r.aljFirstName},
+              ${r.aljLastName}
+            )`),
+            sql`,`,
+          )}) AS v(client_id, external_id, case_link, first_name, last_name, approval_date, level_won, claim_type, claim_type_label, alj_first_name, alj_last_name)
+          WHERE cases.client_id = v.client_id::int
+        `);
+
+        await tx.execute(sql`
+          UPDATE fee_records SET
+            assigned_to              = v.assigned_to,
+            win_sheet_status         = v.win_sheet_status,
+            win_sheet_link           = v.win_sheet_link,
+            win_sheet_link_text      = v.win_sheet_link_text,
+            case_status              = v.case_status,
+            fees_confirmation        = v.fees_confirmation,
+            date_assigned_to_agent   = v.date_assigned_to_agent::date,
+            approved_by              = v.approved_by,
+            t16_retro                = v.t16_retro::numeric,
+            t16_fee_due              = v.t16_fee_due::numeric,
+            t16_fee_received         = v.t16_fee_received::numeric,
+            t16_pending              = v.t16_pending::numeric,
+            t16_fee_received_date    = v.t16_fee_received_date::date,
+            t2_retro                 = v.t2_retro::numeric,
+            t2_fee_due               = v.t2_fee_due::numeric,
+            t2_fee_received          = v.t2_fee_received::numeric,
+            t2_pending               = v.t2_pending::numeric,
+            t2_fee_received_date     = v.t2_fee_received_date::date,
+            aux_retro                = v.aux_retro::numeric,
+            aux_fee_due              = v.aux_fee_due::numeric,
+            aux_fee_received         = v.aux_fee_received::numeric,
+            aux_pending              = v.aux_pending::numeric,
+            aux_fee_received_date    = v.aux_fee_received_date::date,
+            days_after_approval      = v.days_after_approval::int,
+            approval_category        = v.approval_category,
+            fees_status              = v.fees_status,
+            week_assigned_to_agent   = v.week_assigned_to_agent,
+            month_assigned_to_agent  = v.month_assigned_to_agent,
+            updated_at               = now()
+          FROM (VALUES ${sql.join(
+            updateRows.map((r) => {
+              const existingLink = existingLinkMap.get(r.clientId) ?? null;
+              return sql`(
+                ${r.clientId},
+                ${r.assignedTo},
+                ${r.winSheetStatus},
+                ${existingLink ?? r.winSheetLink},
+                ${r.winSheetLinkText},
+                ${r.caseStatus},
+                ${r.feesConfirmation},
+                ${r.dateAssignedToAgent},
+                ${r.approvedBy},
+                ${r.t16Retro},
+                ${r.t16FeeDue},
+                ${r.t16FeeReceived},
+                ${r.t16Pending},
+                ${r.t16FeeReceivedDate},
+                ${r.t2Retro},
+                ${r.t2FeeDue},
+                ${r.t2FeeReceived},
+                ${r.t2Pending},
+                ${r.t2FeeReceivedDate},
+                ${r.auxRetro},
+                ${r.auxFeeDue},
+                ${r.auxFeeReceived},
+                ${r.auxPending},
+                ${r.auxFeeReceivedDate},
+                ${r.daysAfterApproval},
+                ${r.approvalCategory},
+                ${r.feesStatus},
+                ${r.weekAssignedToAgent},
+                ${r.monthAssignedToAgent}
+              )`;
+            }),
+            sql`,`,
+          )}) AS v(case_id, assigned_to, win_sheet_status, win_sheet_link, win_sheet_link_text, case_status, fees_confirmation, date_assigned_to_agent, approved_by, t16_retro, t16_fee_due, t16_fee_received, t16_pending, t16_fee_received_date, t2_retro, t2_fee_due, t2_fee_received, t2_pending, t2_fee_received_date, aux_retro, aux_fee_due, aux_fee_received, aux_pending, aux_fee_received_date, days_after_approval, approval_category, fees_status, week_assigned_to_agent, month_assigned_to_agent)
+          WHERE fee_records.case_id = v.case_id::int
+        `);
+
+        updated = updateRows.length;
       }
 
       for (const batch of chunked(feesClosedMatches, CHUNK)) {
