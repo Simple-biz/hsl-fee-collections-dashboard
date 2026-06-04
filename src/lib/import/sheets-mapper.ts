@@ -28,18 +28,25 @@ const dateOnly = (v: unknown): string | null => {
 const parseCaseLink = (link: string) => {
   let s = link.trim();
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
-  const parts = s.split(/\s+v(?:s|\.)\s+/i);
+  const parts = s.split(/\s+vs?\.?\s+/i);
   const left = parts[0] || "";
   const right = parts[1] || "";
-  const leftClean = left.replace(/\s*\([^)]*\)\s*$/, "").trim();
-  const [lastRaw, firstRaw] = leftClean.split(/,\s*/);
+  const leftClean = left.replace(/\s*\([^)]*\)?$/, "").trim();
+  let lastRaw: string, firstRaw: string;
+  if (leftClean.includes(",")) {
+    [lastRaw, firstRaw] = leftClean.split(/,\s*/);
+  } else {
+    const tokens = leftClean.split(/\s+/);
+    lastRaw = tokens[0] ?? leftClean;
+    firstRaw = tokens.slice(1).join(" ");
+  }
   const lastName = (lastRaw || leftClean).trim();
   const firstName = (firstRaw || "").trim();
   let aljFirstName: string | null = null;
   let aljLastName: string | null = null;
   const aljClean = right
     .replace(/^ALJ\s+/i, "")
-    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/\s*\([^)]*\)?$/, "")
     .trim();
   if (aljClean && !/^SSA$/i.test(aljClean)) {
     const tokens = aljClean.split(/\s+/);
@@ -50,7 +57,8 @@ const parseCaseLink = (link: string) => {
       aljLastName = tokens[0] ?? null;
     }
   }
-  return { firstName, lastName, aljFirstName, aljLastName };
+  const missingVSeparator = parts.length === 1;
+  return { firstName, lastName, aljFirstName, aljLastName, missingVSeparator };
 };
 
 const mapClaimType = (raw: unknown) => {
@@ -139,11 +147,16 @@ export const mapSheetRows = (
     }
     seenIds.add(clientId);
 
-    const { firstName, lastName, aljFirstName, aljLastName } = parseCaseLink(linkText);
+    const { firstName, lastName, aljFirstName, aljLastName, missingVSeparator } = parseCaseLink(linkText);
     if (!firstName || !lastName) {
       warnings.push({
         row: i + 2,
         message: `Could not parse name from CASE LINK "${linkText.slice(0, 50)}" — stored as Unknown`,
+      });
+    } else if (missingVSeparator) {
+      warnings.push({
+        row: i + 2,
+        message: `No "v" separator found in CASE LINK "${linkText.slice(0, 50)}" — ALJ data not captured`,
       });
     }
 
