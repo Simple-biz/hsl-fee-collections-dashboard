@@ -32,7 +32,7 @@ const dateOnly = (v: unknown): string | null => {
 const parseCaseLink = (link: string) => {
   let s = link.trim();
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
-  const parts = s.split(/\s+vs?\.?\s+/i);
+  const parts = s.split(/\s+vs?\.?\s*/i);
   const left = parts[0] || "";
   const right = parts[1] || "";
   const leftClean = left.replace(/\s*\([^)]*\)?$/, "").trim();
