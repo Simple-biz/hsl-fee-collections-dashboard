@@ -17,6 +17,10 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const CHUNK = 500;
+const SHEET_CACHE_TTL = 5 * 60 * 1000;
+
+type SheetCache = { masterRows: SheetRow[]; feesClosedRows: SheetRow[]; ts: number };
+let sheetCache: SheetCache | null = null;
 
 const chunked = <T>(arr: T[], size: number): T[][] => {
   const out: T[][] = [];
@@ -189,6 +193,7 @@ export const POST = async (req: NextRequest) => {
         fetchMasterListRows(),
         fetchFeesClosedSheetRows(),
       ]);
+      sheetCache = { masterRows: masterRaw, feesClosedRows: feesClosedRaw, ts: Date.now() };
 
       const { rows: parsed, warnings } = mapSheetRows(masterRaw);
       const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
@@ -310,10 +315,11 @@ export const POST = async (req: NextRequest) => {
 
     const selectedSet = new Set(ids);
 
-    const [{ rows: rawRows }, feesClosedRaw] = await Promise.all([
-      fetchMasterListRows(),
-      fetchFeesClosedSheetRows(),
-    ]);
+    const cached = sheetCache && Date.now() - sheetCache.ts < SHEET_CACHE_TTL ? sheetCache : null;
+    const [{ rows: rawRows }, feesClosedRaw] = cached
+      ? [{ rows: cached.masterRows }, cached.feesClosedRows]
+      : await Promise.all([fetchMasterListRows(), fetchFeesClosedSheetRows()]);
+    if (!cached) sheetCache = { masterRows: rawRows, feesClosedRows: feesClosedRaw, ts: Date.now() };
     const { rows: parsed } = mapSheetRows(rawRows);
     const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
 
@@ -415,8 +421,37 @@ export const POST = async (req: NextRequest) => {
 
         inserted += insertedRows.length;
       }
-      if (updateRows.length > 0) {
-        await tx.execute(sql`
+      for (const batch of chunked(feesClosedMatches, CHUNK)) {
+        if (batch.length === 0) continue;
+
+        for (const row of batch) {
+          await tx
+            .update(feeRecords)
+            .set({
+              isClosed: true,
+              closedAt: row.closedAt,
+              winSheetStatus: "closed",
+              syncStatus: "synced",
+              syncedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(feeRecords.caseId, row.clientId));
+        }
+
+        await tx.insert(activityLog).values(
+          batch.map((row) => ({
+            caseId: row.clientId,
+            message: "Marked closed from Fees Closed sheet during Google Sheets sync.",
+            createdBy: "Sheet Sync",
+          })),
+        );
+        closed += batch.length;
+      }
+    });
+
+    if (updateRows.length > 0) {
+      await Promise.all([
+        db.execute(sql`
           UPDATE cases SET
             external_id        = v.external_id,
             case_link          = v.case_link,
@@ -446,9 +481,8 @@ export const POST = async (req: NextRequest) => {
             sql`,`,
           )}) AS v(client_id, external_id, case_link, first_name, last_name, approval_date, level_won, claim_type, claim_type_label, alj_first_name, alj_last_name)
           WHERE cases.client_id = v.client_id::int
-        `);
-
-        await tx.execute(sql`
+        `),
+        db.execute(sql`
           UPDATE fee_records SET
             assigned_to              = v.assigned_to,
             win_sheet_status         = v.win_sheet_status,
@@ -480,75 +514,44 @@ export const POST = async (req: NextRequest) => {
             month_assigned_to_agent  = v.month_assigned_to_agent,
             updated_at               = now()
           FROM (VALUES ${sql.join(
-            updateRows.map((r) => {
-              const existingLink = existingLinkMap.get(r.clientId) ?? null;
-              return sql`(
-                ${r.clientId},
-                ${r.assignedTo},
-                ${r.winSheetStatus},
-                ${existingLink ?? r.winSheetLink},
-                ${r.winSheetLinkText},
-                ${r.caseStatus},
-                ${r.feesConfirmation},
-                ${r.dateAssignedToAgent},
-                ${r.approvedBy},
-                ${r.t16Retro},
-                ${r.t16FeeDue},
-                ${r.t16FeeReceived},
-                ${r.t16Pending},
-                ${r.t16FeeReceivedDate},
-                ${r.t2Retro},
-                ${r.t2FeeDue},
-                ${r.t2FeeReceived},
-                ${r.t2Pending},
-                ${r.t2FeeReceivedDate},
-                ${r.auxRetro},
-                ${r.auxFeeDue},
-                ${r.auxFeeReceived},
-                ${r.auxPending},
-                ${r.auxFeeReceivedDate},
-                ${r.daysAfterApproval},
-                ${r.approvalCategory},
-                ${r.feesStatus},
-                ${r.weekAssignedToAgent},
-                ${r.monthAssignedToAgent}
-              )`;
-            }),
+            updateRows.map((r) => sql`(
+              ${r.clientId},
+              ${r.assignedTo},
+              ${r.winSheetStatus},
+              ${existingLinkMap.get(r.clientId) ?? r.winSheetLink},
+              ${r.winSheetLinkText},
+              ${r.caseStatus},
+              ${r.feesConfirmation},
+              ${r.dateAssignedToAgent},
+              ${r.approvedBy},
+              ${r.t16Retro},
+              ${r.t16FeeDue},
+              ${r.t16FeeReceived},
+              ${r.t16Pending},
+              ${r.t16FeeReceivedDate},
+              ${r.t2Retro},
+              ${r.t2FeeDue},
+              ${r.t2FeeReceived},
+              ${r.t2Pending},
+              ${r.t2FeeReceivedDate},
+              ${r.auxRetro},
+              ${r.auxFeeDue},
+              ${r.auxFeeReceived},
+              ${r.auxPending},
+              ${r.auxFeeReceivedDate},
+              ${r.daysAfterApproval},
+              ${r.approvalCategory},
+              ${r.feesStatus},
+              ${r.weekAssignedToAgent},
+              ${r.monthAssignedToAgent}
+            )`),
             sql`,`,
           )}) AS v(case_id, assigned_to, win_sheet_status, win_sheet_link, win_sheet_link_text, case_status, fees_confirmation, date_assigned_to_agent, approved_by, t16_retro, t16_fee_due, t16_fee_received, t16_pending, t16_fee_received_date, t2_retro, t2_fee_due, t2_fee_received, t2_pending, t2_fee_received_date, aux_retro, aux_fee_due, aux_fee_received, aux_pending, aux_fee_received_date, days_after_approval, approval_category, fees_status, week_assigned_to_agent, month_assigned_to_agent)
           WHERE fee_records.case_id = v.case_id::int
-        `);
-
-        updated = updateRows.length;
-      }
-
-      for (const batch of chunked(feesClosedMatches, CHUNK)) {
-        if (batch.length === 0) continue;
-
-        for (const row of batch) {
-          await tx
-            .update(feeRecords)
-            .set({
-              isClosed: true,
-              closedAt: row.closedAt,
-              winSheetStatus: "closed",
-              syncStatus: "synced",
-              syncedAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .where(eq(feeRecords.caseId, row.clientId));
-        }
-
-        await tx.insert(activityLog).values(
-          batch.map((row) => ({
-            caseId: row.clientId,
-            message: "Marked closed from Fees Closed sheet during Google Sheets sync.",
-            createdBy: "Sheet Sync",
-          })),
-        );
-        closed += batch.length;
-      }
-    });
+        `),
+      ]);
+      updated = updateRows.length;
+    }
 
     return NextResponse.json({ inserted, updated, closed });
   } catch (error) {
