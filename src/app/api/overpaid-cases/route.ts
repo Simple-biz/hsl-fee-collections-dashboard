@@ -31,7 +31,7 @@ export const GET = async (req: NextRequest) => {
     const minAmount = minAmountRaw && Number.isFinite(Number(minAmountRaw)) ? Number(minAmountRaw) : null;
     const maxAmount = maxAmountRaw && Number.isFinite(Number(maxAmountRaw)) ? Number(maxAmountRaw) : null;
 
-    const overpaidCondition = sql`(${feeRecords.totalFeesPaid}::numeric > ${feeRecords.totalFeesExpected}::numeric OR COALESCE(${feeRecords.markedOverpaid}, false) = true)`;
+    const overpaidCondition = sql`COALESCE(${feeRecords.markedOverpaid}, false) = true`;
     const overpaidExpr = sql`(${feeRecords.totalFeesPaid}::numeric - ${feeRecords.totalFeesExpected}::numeric)`;
 
     const statusClause =

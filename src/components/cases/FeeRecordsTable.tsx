@@ -822,7 +822,7 @@ export const FeeRecordsTable = ({
               <tr
                 key={c.id}
                 onClick={() => setSelectedCaseId(c.id)}
-                className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group ${isOverpaid ? (dark ? "border-l-2 border-l-amber-500" : "border-l-2 border-l-amber-500") : ""}`}
+                className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group ${isOverpaid ? "border-l-2 border-l-amber-500" : ""}`}
               >
                 {/* Checkbox */}
                 <td className={`${stickyCheckTd} px-3 text-center`} onClick={(e) => e.stopPropagation()}>
