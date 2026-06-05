@@ -263,6 +263,7 @@ export const feeRecords = pgTable(
     // (Approved By dropdown → confirm); these rows leave the active dashboard
     // and appear on /fees-closed.
     isClosed: boolean("is_closed").notNull().default(false),
+    markedOverpaid: boolean("marked_overpaid").notNull().default(false),
     closedAt: timestamp("closed_at", { withTimezone: true }),
 
     // Fee Computation Metadata
@@ -677,7 +678,9 @@ export const overpaidCases = pgTable(
       .unique(),
     opLtrDate: date("op_ltr_date"),
     opLtrReceived: date("op_ltr_received"),
+    overpaidAmount: decimal("overpaid_amount", { precision: 12, scale: 2 }),
     checksCleared: boolean("checks_cleared").notNull().default(false),
+    checksClearedAt: timestamp("checks_cleared_at", { withTimezone: true }),
     updateNote: text("update_note").notNull().default(""),
     region: varchar("region", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true })

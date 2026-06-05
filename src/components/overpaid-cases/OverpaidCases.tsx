@@ -30,11 +30,12 @@ interface OverpaidCaseRow {
   assignedTo: string | null;
   region: string | null;
   feesReceived: number;
-  overpaidAmount: number;
+  overpaidAmount: number | null;
   feesConfirmation: string | null;
   opLtrDate: string | null;
   opLtrReceived: string | null;
   checksCleared: boolean;
+  checksClearedAt: string | null;
   updateNote: string;
   updatedAt: string | null;
 }
@@ -74,7 +75,7 @@ const formatRelativeDate = (iso: string): string => {
 
 const patchCase = async (
   caseId: number,
-  body: Partial<Omit<OverpaidCaseRow, "id" | "claimant" | "feesReceived" | "overpaidAmount" | "feesConfirmation" | "updatedAt">>,
+  body: Partial<Omit<OverpaidCaseRow, "id" | "claimant" | "feesReceived" | "feesConfirmation" | "updatedAt">>,
 ) => {
   const result = await upsertOverpaidCase({ caseId, fields: body as Parameters<typeof upsertOverpaidCase>[0]["fields"] });
   if (!result.ok) throw new Error(result.error);
@@ -209,11 +210,13 @@ export const OverpaidCases = () => {
   const opLtrDateSnapshot = useRef<Map<number, string | null>>(new Map());
   const confirmationSnapshot = useRef<Map<number, string>>(new Map());
   const regionSnapshot = useRef<Map<number, string>>(new Map());
+  const overpaidAmountSnapshot = useRef<Map<number, number | null>>(new Map());
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [ltrState, setLtrState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [opLtrDateState, setOpLtrDateState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [confirmationState, setConfirmationState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [regionState, setRegionState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [overpaidAmountState, setOverpaidAmountState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [liveMessage, setLiveMessage] = useState("");
   // Keyed by `${rowId}:${field}` so the three inline fields on one row don't
   // share a timer slot — otherwise one field's reset can cancel another's,
@@ -294,6 +297,7 @@ export const OverpaidCases = () => {
       opLtrDateSnapshot.current = new Map(data.map((r) => [r.id, r.opLtrDate]));
       confirmationSnapshot.current = new Map(data.map((r) => [r.id, r.feesConfirmation ?? ""]));
       regionSnapshot.current = new Map(data.map((r) => [r.id, r.region ?? ""]));
+      overpaidAmountSnapshot.current = new Map(data.map((r) => [r.id, r.overpaidAmount]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
@@ -491,6 +495,11 @@ export const OverpaidCases = () => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, region: value || null } : r)));
   };
 
+  const setOverpaidAmountLocal = (id: number, value: string) => {
+    const parsed = value === "" ? null : Number(value);
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, overpaidAmount: parsed != null && !isNaN(parsed) ? parsed : null } : r)));
+  };
+
   const persistConfirmation = async (row: OverpaidCaseRow) => {
     const current = row.feesConfirmation ?? "";
     if (confirmationSnapshot.current.get(row.id) === current) return;
@@ -535,6 +544,30 @@ export const OverpaidCases = () => {
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
       setLiveMessage("Note save failed");
+      setError((err as Error).message);
+    }
+  };
+
+  const persistOverpaidAmount = async (row: OverpaidCaseRow) => {
+    if (overpaidAmountSnapshot.current.get(row.id) === row.overpaidAmount) return;
+    const timerKey = `${row.id}:overpaidAmount`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
+    setOverpaidAmountState((s) => ({ ...s, [row.id]: "saving" }));
+    try {
+      const result = await upsertOverpaidCase({ caseId: row.id, fields: { overpaidAmount: row.overpaidAmount != null ? String(row.overpaidAmount) : null } });
+      if (!result.ok) throw new Error(result.error);
+      overpaidAmountSnapshot.current.set(row.id, row.overpaidAmount);
+      setOverpaidAmountState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Overpaid amount saved");
+      const timer = setTimeout(() => {
+        setOverpaidAmountState((s) => ({ ...s, [row.id]: undefined }));
+        savedTimerRef.current.delete(timerKey);
+      }, 1500);
+      savedTimerRef.current.set(timerKey, timer);
+    } catch (err) {
+      setOverpaidAmountState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Overpaid amount save failed");
       setError((err as Error).message);
     }
   };
@@ -651,7 +684,7 @@ export const OverpaidCases = () => {
             escape(r.assignedTo ?? ""),
             escape(r.region ?? ""),
             r.feesReceived.toFixed(2),
-            r.overpaidAmount.toFixed(2),
+            r.overpaidAmount != null ? r.overpaidAmount.toFixed(2) : "",
             escape(r.feesConfirmation ?? ""),
             r.opLtrDate ?? "",
             r.opLtrReceived ?? "",
@@ -1186,7 +1219,7 @@ export const OverpaidCases = () => {
               ) : (
                 rows.map((row) => {
                   const isCleared = row.checksCleared;
-                  const isHighValue = row.overpaidAmount >= 3000;
+                  const isHighValue = row.overpaidAmount != null && row.overpaidAmount >= 3000;
                   const isSelected = selectedIds.has(row.id);
                   const needsAttention = !isCleared && !row.feesConfirmation && !row.opLtrReceived && !row.updateNote;
                   const clearedBg = isCleared
@@ -1254,21 +1287,26 @@ export const OverpaidCases = () => {
                         </div>
                       </td>
                       <td className={`${tdBase} ${t.textMuted} text-right`}>{fmt(row.feesReceived)}</td>
-                      <td className={`${tdBase} text-right font-semibold ${dark ? "text-amber-400" : "text-amber-600"}`}>
-                        {fmt(row.overpaidAmount)}
-                        {row.feesReceived > 0 && (
-                          <div className="mt-0.5">
-                            <div className={`h-1 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"} w-full`}>
-                              <div
-                                className="h-1 rounded-full bg-amber-500"
-                                style={{ width: `${Math.min(100, (row.overpaidAmount / row.feesReceived) * 100)}%` }}
-                              />
-                            </div>
-                            <span className={`text-[9px] font-normal ${dark ? "text-amber-400/70" : "text-amber-600/70"}`}>
-                              {Math.round((row.overpaidAmount / row.feesReceived) * 100)}% of received
-                            </span>
-                          </div>
-                        )}
+                      <td className={`${tdBase}`}>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={row.overpaidAmount ?? ""}
+                            onChange={(e) => setOverpaidAmountLocal(row.id, e.target.value)}
+                            onBlur={() => persistOverpaidAmount(row)}
+                            placeholder="—"
+                            aria-label="Overpaid amount"
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                          />
+                          {overpaidAmountState[row.id] === "saving" && (
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
+                          )}
+                          {overpaidAmountState[row.id] === "saved" && (
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
+                          )}
+                        </div>
                       </td>
                       <td className={`${tdBase}`}>
                         <div className="relative">
@@ -1345,13 +1383,20 @@ export const OverpaidCases = () => {
                         </div>
                       </td>
                       <td className={`${tdBase} text-center`}>
-                        <input
-                          type="checkbox"
-                          checked={row.checksCleared}
-                          onChange={() => toggleCheckbox(row.id, "checksCleared")}
-                          aria-label="Checks cleared"
-                          className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-                        />
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="checkbox"
+                            checked={row.checksCleared}
+                            onChange={() => toggleCheckbox(row.id, "checksCleared")}
+                            aria-label="Checks cleared"
+                            className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                          />
+                          {row.checksClearedAt && (
+                            <p className={`text-[10px] ${t.textMuted}`}>
+                              {new Date(row.checksClearedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            </p>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

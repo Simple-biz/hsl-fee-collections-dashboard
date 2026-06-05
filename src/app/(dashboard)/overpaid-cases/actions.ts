@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-const FIELD_KEYS = ["opLtrDate", "opLtrReceived", "checksCleared", "updateNote", "region"] as const;
+const FIELD_KEYS = ["overpaidAmount", "opLtrDate", "opLtrReceived", "checksCleared", "updateNote", "region"] as const;
 
 const NOTE_MAX_LENGTH = 5000;
 const CONFIRMATION_MAX_LENGTH = 50; // matches feeRecords.feesConfirmation varchar(50)
@@ -51,12 +51,14 @@ export async function upsertOverpaidCase(input: {
       return { ok: false, error: "Invalid date (expected YYYY-MM-DD)" };
     }
 
+    const clearedAtUpdate = "checksCleared" in updates ? { checksClearedAt: new Date() } : {};
+
     const [row] = await db
       .insert(overpaidCases)
-      .values({ caseId: input.caseId, ...updates })
+      .values({ caseId: input.caseId, ...updates, ...clearedAtUpdate })
       .onConflictDoUpdate({
         target: overpaidCases.caseId,
-        set: { ...updates, updatedAt: new Date() },
+        set: { ...updates, ...clearedAtUpdate, updatedAt: new Date() },
       })
       .returning();
 
@@ -74,12 +76,13 @@ export async function bulkMarkCleared(input: {
     if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
+    const now = new Date();
     await db
       .insert(overpaidCases)
-      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: true })))
+      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: true, checksClearedAt: now })))
       .onConflictDoUpdate({
         target: overpaidCases.caseId,
-        set: { checksCleared: true, updatedAt: new Date() },
+        set: { checksCleared: true, checksClearedAt: now, updatedAt: now },
       });
     return { ok: true };
   } catch (error) {
@@ -95,12 +98,13 @@ export async function bulkRestoreCleared(input: {
     if (!input.caseIds.length) return { ok: false, error: "No cases to restore" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
+    const now = new Date();
     await db
       .insert(overpaidCases)
-      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: false })))
+      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: false, checksClearedAt: now })))
       .onConflictDoUpdate({
         target: overpaidCases.caseId,
-        set: { checksCleared: false, updatedAt: new Date() },
+        set: { checksCleared: false, checksClearedAt: now, updatedAt: now },
       });
     return { ok: true };
   } catch (error) {

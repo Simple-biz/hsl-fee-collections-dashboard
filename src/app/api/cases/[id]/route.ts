@@ -375,6 +375,7 @@ export const PATCH = async (
         feeMethod: "fee_method",
         feeComputed: "fee_computed",
         isClosed: "is_closed",
+        markedOverpaid: "marked_overpaid",
       };
 
       const updates = Object.entries(feeFields)

@@ -31,7 +31,7 @@ export const GET = async (req: NextRequest) => {
     const minAmount = minAmountRaw && Number.isFinite(Number(minAmountRaw)) ? Number(minAmountRaw) : null;
     const maxAmount = maxAmountRaw && Number.isFinite(Number(maxAmountRaw)) ? Number(maxAmountRaw) : null;
 
-    const overpaidCondition = sql`${feeRecords.totalFeesPaid}::numeric > ${feeRecords.totalFeesExpected}::numeric`;
+    const overpaidCondition = sql`(${feeRecords.totalFeesPaid}::numeric > ${feeRecords.totalFeesExpected}::numeric OR COALESCE(${feeRecords.markedOverpaid}, false) = true)`;
     const overpaidExpr = sql`(${feeRecords.totalFeesPaid}::numeric - ${feeRecords.totalFeesExpected}::numeric)`;
 
     const statusClause =
@@ -108,7 +108,7 @@ export const GET = async (req: NextRequest) => {
             ? sql`${overpaidCases.opLtrReceived} ${dir} NULLS LAST`
             : sort === "assignedTo"
               ? sql`${feeRecords.assignedTo} ${dir} NULLS LAST`
-              : sql`${overpaidExpr} ${dir} NULLS LAST`;
+              : sql`${overpaidCases.overpaidAmount} ${dir} NULLS LAST`;
 
     const rows = await db
       .select({
@@ -117,11 +117,12 @@ export const GET = async (req: NextRequest) => {
         lastName: cases.lastName,
         assignedTo: feeRecords.assignedTo,
         feesReceived: sql<string>`ROUND(${feeRecords.totalFeesPaid}::numeric, 2)`,
-        overpaidAmount: sql<string>`ROUND(${overpaidExpr}, 2)`,
+        overpaidAmount: overpaidCases.overpaidAmount,
         feesConfirmation: feeRecords.feesConfirmation,
         opLtrDate: overpaidCases.opLtrDate,
         opLtrReceived: overpaidCases.opLtrReceived,
         checksCleared: overpaidCases.checksCleared,
+        checksClearedAt: overpaidCases.checksClearedAt,
         updateNote: overpaidCases.updateNote,
         region: overpaidCases.region,
         updatedAt: overpaidCases.updatedAt,
@@ -139,11 +140,12 @@ export const GET = async (req: NextRequest) => {
       claimant: `${r.lastName}, ${r.firstName}`,
       assignedTo: r.assignedTo ?? null,
       feesReceived: Number(r.feesReceived),
-      overpaidAmount: Number(r.overpaidAmount),
+      overpaidAmount: r.overpaidAmount != null ? Number(r.overpaidAmount) : null,
       feesConfirmation: r.feesConfirmation ?? null,
       opLtrDate: r.opLtrDate ?? null,
       opLtrReceived: r.opLtrReceived ?? null,
       checksCleared: r.checksCleared ?? false,
+      checksClearedAt: r.checksClearedAt ? (r.checksClearedAt as Date).toISOString() : null,
       updateNote: r.updateNote ?? "",
       region: r.region ?? null,
       updatedAt: r.updatedAt ? (r.updatedAt as Date).toISOString() : null,
@@ -151,7 +153,7 @@ export const GET = async (req: NextRequest) => {
 
     // Sum as integer cents on the server so the footer never drifts from float math.
     const pageFeesCents = rows.reduce((s, r) => s + Math.round(parseFloat(r.feesReceived) * 100), 0);
-    const pageOverpaidCents = rows.reduce((s, r) => s + Math.round(parseFloat(r.overpaidAmount) * 100), 0);
+    const pageOverpaidCents = rows.reduce((s, r) => r.overpaidAmount != null ? s + Math.round(parseFloat(r.overpaidAmount) * 100) : s, 0);
     const pageFeesReceived = pageFeesCents / 100;
     const pageOverpaid = pageOverpaidCents / 100;
 

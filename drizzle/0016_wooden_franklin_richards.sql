@@ -1,0 +1,1 @@
+ALTER TABLE "overpaid_cases" ADD COLUMN "overpaid_amount" numeric(12, 2);
