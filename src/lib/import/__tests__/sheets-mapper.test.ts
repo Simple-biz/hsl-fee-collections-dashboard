@@ -149,9 +149,9 @@ describe("CASE LINK name parsing", () => {
     expect(ws.some((w) => w.message.includes("Could not parse name"))).toBe(true);
   });
 
-  it("emits warning when there is no v. separator", () => {
+  it("emits warning when there is no v separator", () => {
     const ws = warnings([row({ "CASE LINK": "2024.01.15 Smith John" })]);
-    expect(ws.some((w) => w.message.includes("Could not parse name"))).toBe(true);
+    expect(ws.some((w) => w.message.includes('No "v" separator found'))).toBe(true);
   });
 
   it("falls back to Unknown when name cannot be parsed", () => {

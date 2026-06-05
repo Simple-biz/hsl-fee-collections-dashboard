@@ -16,11 +16,15 @@ const dateOnly = (v: unknown): string | null => {
   const s = String(v).trim();
   if (!s) return null;
   const m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  if (m) {
+    const iso = `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    return Number.isNaN(new Date(iso).getTime()) ? null : iso;
+  }
   const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m2) {
     const yy = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
-    return `${yy}-${m2[1].padStart(2, "0")}-${m2[2].padStart(2, "0")}`;
+    const iso = `${yy}-${m2[1].padStart(2, "0")}-${m2[2].padStart(2, "0")}`;
+    return Number.isNaN(new Date(iso).getTime()) ? null : iso;
   }
   return null;
 };
@@ -28,18 +32,25 @@ const dateOnly = (v: unknown): string | null => {
 const parseCaseLink = (link: string) => {
   let s = link.trim();
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
-  const parts = s.split(/\s+v(?:s|\.)\s+/i);
+  const parts = s.split(/\s+vs?(?:[.,]\s*|\s+)/i);
   const left = parts[0] || "";
   const right = parts[1] || "";
-  const leftClean = left.replace(/\s*\([^)]*\)\s*$/, "").trim();
-  const [lastRaw, firstRaw] = leftClean.split(/,\s*/);
+  const leftClean = left.replace(/\s*\([^)]*\)?$/, "").trim();
+  let lastRaw: string, firstRaw: string;
+  if (leftClean.includes(",")) {
+    [lastRaw, firstRaw] = leftClean.split(/,\s*/);
+  } else {
+    const tokens = leftClean.split(/\s+/);
+    lastRaw = tokens[0] ?? leftClean;
+    firstRaw = tokens.slice(1).join(" ");
+  }
   const lastName = (lastRaw || leftClean).trim();
   const firstName = (firstRaw || "").trim();
   let aljFirstName: string | null = null;
   let aljLastName: string | null = null;
   const aljClean = right
     .replace(/^ALJ\s+/i, "")
-    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/\s*\([^)]*\)?$/, "")
     .trim();
   if (aljClean && !/^SSA$/i.test(aljClean)) {
     const tokens = aljClean.split(/\s+/);
@@ -50,7 +61,8 @@ const parseCaseLink = (link: string) => {
       aljLastName = tokens[0] ?? null;
     }
   }
-  return { firstName, lastName, aljFirstName, aljLastName };
+  const missingVSeparator = parts.length === 1;
+  return { firstName, lastName, aljFirstName, aljLastName, missingVSeparator };
 };
 
 const mapClaimType = (raw: unknown) => {
@@ -92,8 +104,8 @@ const mapWinSheetStatus = (raw: unknown): ParsedCaseRow["winSheetStatus"] => {
     .toLowerCase();
   if (!s) return "not_started";
   if (s === "finished") return "closed";
-  if (s.includes("started")) return "started";
   if (s === "not started" || s === "not_started") return "not_started";
+  if (s.includes("started")) return "started";
   if (s === "in progress" || s === "in_progress") return "in_progress";
   if (s === "pending payment") return "pending_payment";
   if (s === "partially paid") return "partially_paid";
@@ -139,11 +151,16 @@ export const mapSheetRows = (
     }
     seenIds.add(clientId);
 
-    const { firstName, lastName, aljFirstName, aljLastName } = parseCaseLink(linkText);
+    const { firstName, lastName, aljFirstName, aljLastName, missingVSeparator } = parseCaseLink(linkText);
     if (!firstName || !lastName) {
       warnings.push({
         row: i + 2,
         message: `Could not parse name from CASE LINK "${linkText.slice(0, 50)}" — stored as Unknown`,
+      });
+    } else if (missingVSeparator) {
+      warnings.push({
+        row: i + 2,
+        message: `No "v" separator found in CASE LINK "${linkText.slice(0, 50)}" — ALJ data not captured`,
       });
     }
 
