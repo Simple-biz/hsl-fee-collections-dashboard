@@ -453,7 +453,10 @@ export const OverpaidCases = () => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
     const next = !prevRow[key];
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: next } : r)));
+    const clearedAtPatch = key === "checksCleared"
+      ? { checksClearedAt: next ? new Date().toISOString() : null }
+      : {};
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: next, ...clearedAtPatch, updatedAt: new Date().toISOString() } : r)));
     try {
       await patchCase(id, { [key]: next });
       if (key === "checksCleared") {
@@ -467,7 +470,7 @@ export const OverpaidCases = () => {
         setTotal((tot) => Math.max(0, tot - 1));
       }
     } catch (err) {
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next, ...( key === "checksCleared" ? { checksClearedAt: prevRow.checksClearedAt } : {}) } : r)));
       if (key === "checksCleared") {
         setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount + (next ? -1 : 1)) }));
       }
@@ -534,6 +537,7 @@ export const OverpaidCases = () => {
     try {
       await patchCase(row.id, { updateNote: row.updateNote });
       noteSnapshot.current.set(row.id, row.updateNote);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, updatedAt: new Date().toISOString() } : r));
       setNoteState((s) => ({ ...s, [row.id]: "saved" }));
       setLiveMessage("Note saved");
       const timer = setTimeout(() => {
@@ -558,6 +562,7 @@ export const OverpaidCases = () => {
       const result = await upsertOverpaidCase({ caseId: row.id, fields: { overpaidAmount: row.overpaidAmount != null ? String(row.overpaidAmount) : null } });
       if (!result.ok) throw new Error(result.error);
       overpaidAmountSnapshot.current.set(row.id, row.overpaidAmount);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, updatedAt: new Date().toISOString() } : r));
       setOverpaidAmountState((s) => ({ ...s, [row.id]: "saved" }));
       setLiveMessage("Overpaid amount saved");
       const timer = setTimeout(() => {
@@ -582,6 +587,7 @@ export const OverpaidCases = () => {
     try {
       await patchCase(row.id, { opLtrDate: row.opLtrDate });
       opLtrDateSnapshot.current.set(row.id, row.opLtrDate);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, updatedAt: new Date().toISOString() } : r));
       setOpLtrDateState((s) => ({ ...s, [row.id]: "saved" }));
       setLiveMessage(row.opLtrDate ? "O/P LTR date saved" : "O/P LTR date cleared");
       const timer = setTimeout(() => {
@@ -606,6 +612,7 @@ export const OverpaidCases = () => {
     try {
       await patchCase(row.id, { region: current || null });
       regionSnapshot.current.set(row.id, current);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, updatedAt: new Date().toISOString() } : r));
       setRegionState((s) => ({ ...s, [row.id]: "saved" }));
       setLiveMessage("Region saved");
       const timer = setTimeout(() => {
@@ -634,6 +641,7 @@ export const OverpaidCases = () => {
       if (!wasSet && nowSet) setStats((s) => ({ ...s, ltrCount: s.ltrCount + 1 }));
       if (wasSet && !nowSet) setStats((s) => ({ ...s, ltrCount: Math.max(0, s.ltrCount - 1) }));
       ltrSnapshot.current.set(row.id, row.opLtrReceived);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, updatedAt: new Date().toISOString() } : r));
       setLtrState((s) => ({ ...s, [row.id]: "saved" }));
       setLiveMessage(row.opLtrReceived ? "LTR date saved" : "LTR date cleared");
       const timer = setTimeout(() => {
