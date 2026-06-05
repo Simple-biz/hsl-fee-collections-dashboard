@@ -28,9 +28,11 @@ interface OverpaidCaseRow {
   id: number;
   claimant: string;
   assignedTo: string | null;
+  region: string | null;
   feesReceived: number;
   overpaidAmount: number;
   feesConfirmation: string | null;
+  opLtrDate: string | null;
   opLtrReceived: string | null;
   checksCleared: boolean;
   updateNote: string;
@@ -204,10 +206,14 @@ export const OverpaidCases = () => {
 
   const noteSnapshot = useRef<Map<number, string>>(new Map());
   const ltrSnapshot = useRef<Map<number, string | null>>(new Map());
+  const opLtrDateSnapshot = useRef<Map<number, string | null>>(new Map());
   const confirmationSnapshot = useRef<Map<number, string>>(new Map());
+  const regionSnapshot = useRef<Map<number, string>>(new Map());
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [ltrState, setLtrState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [opLtrDateState, setOpLtrDateState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [confirmationState, setConfirmationState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [regionState, setRegionState] = useState<Record<number, "saving" | "saved" | undefined>>({});
   const [liveMessage, setLiveMessage] = useState("");
   // Keyed by `${rowId}:${field}` so the three inline fields on one row don't
   // share a timer slot — otherwise one field's reset can cancel another's,
@@ -285,7 +291,9 @@ export const OverpaidCases = () => {
       if (Array.isArray(json.agents)) setAgents(json.agents);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
       ltrSnapshot.current = new Map(data.map((r) => [r.id, r.opLtrReceived]));
+      opLtrDateSnapshot.current = new Map(data.map((r) => [r.id, r.opLtrDate]));
       confirmationSnapshot.current = new Map(data.map((r) => [r.id, r.feesConfirmation ?? ""]));
+      regionSnapshot.current = new Map(data.map((r) => [r.id, r.region ?? ""]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
@@ -471,8 +479,16 @@ export const OverpaidCases = () => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, opLtrReceived: value || null } : r)));
   };
 
+  const setOpLtrDateLocal = (id: number, value: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, opLtrDate: value || null } : r)));
+  };
+
   const setConfirmationLocal = (id: number, value: string) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, feesConfirmation: value } : r)));
+  };
+
+  const setRegionLocal = (id: number, value: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, region: value || null } : r)));
   };
 
   const persistConfirmation = async (row: OverpaidCaseRow) => {
@@ -519,6 +535,54 @@ export const OverpaidCases = () => {
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
       setLiveMessage("Note save failed");
+      setError((err as Error).message);
+    }
+  };
+
+  const persistOpLtrDate = async (row: OverpaidCaseRow) => {
+    const prev = opLtrDateSnapshot.current.get(row.id);
+    if (prev === row.opLtrDate) return;
+    const timerKey = `${row.id}:opLtrDate`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
+    setOpLtrDateState((s) => ({ ...s, [row.id]: "saving" }));
+    try {
+      await patchCase(row.id, { opLtrDate: row.opLtrDate });
+      opLtrDateSnapshot.current.set(row.id, row.opLtrDate);
+      setOpLtrDateState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage(row.opLtrDate ? "O/P LTR date saved" : "O/P LTR date cleared");
+      const timer = setTimeout(() => {
+        setOpLtrDateState((s) => ({ ...s, [row.id]: undefined }));
+        savedTimerRef.current.delete(timerKey);
+      }, 1500);
+      savedTimerRef.current.set(timerKey, timer);
+    } catch (err) {
+      setOpLtrDateState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("O/P LTR date save failed");
+      setError((err as Error).message);
+    }
+  };
+
+  const persistRegion = async (row: OverpaidCaseRow) => {
+    const current = row.region ?? "";
+    if (regionSnapshot.current.get(row.id) === current) return;
+    const timerKey = `${row.id}:region`;
+    const existingTimer = savedTimerRef.current.get(timerKey);
+    if (existingTimer) clearTimeout(existingTimer);
+    setRegionState((s) => ({ ...s, [row.id]: "saving" }));
+    try {
+      await patchCase(row.id, { region: current || null });
+      regionSnapshot.current.set(row.id, current);
+      setRegionState((s) => ({ ...s, [row.id]: "saved" }));
+      setLiveMessage("Region saved");
+      const timer = setTimeout(() => {
+        setRegionState((s) => ({ ...s, [row.id]: undefined }));
+        savedTimerRef.current.delete(timerKey);
+      }, 1500);
+      savedTimerRef.current.set(timerKey, timer);
+    } catch (err) {
+      setRegionState((s) => ({ ...s, [row.id]: undefined }));
+      setLiveMessage("Region save failed");
       setError((err as Error).message);
     }
   };
@@ -574,7 +638,7 @@ export const OverpaidCases = () => {
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = ["Case", "Assigned To", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
+      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P Ltr Date", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
@@ -585,9 +649,11 @@ export const OverpaidCases = () => {
           [
             escape(r.claimant),
             escape(r.assignedTo ?? ""),
+            escape(r.region ?? ""),
             r.feesReceived.toFixed(2),
             r.overpaidAmount.toFixed(2),
             escape(r.feesConfirmation ?? ""),
+            r.opLtrDate ?? "",
             r.opLtrReceived ?? "",
             escape(r.updateNote),
             r.checksCleared ? "Yes" : "No",
@@ -1048,6 +1114,7 @@ export const OverpaidCases = () => {
                     Assigned To {sortIcon("assignedTo")}
                   </button>
                 </th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Region</th>
                 <th
                   aria-sort={ariaSortFor("feesReceived")}
                   className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -1073,6 +1140,7 @@ export const OverpaidCases = () => {
                   </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>O/P Ltr Date</th>
                 <th
                   aria-sort={ariaSortFor("opLtrDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -1092,7 +1160,7 @@ export const OverpaidCases = () => {
             <tbody>
               {isInitialLoad ? (
                 <tr>
-                  <td colSpan={9} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
+                  <td colSpan={11} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                     <span className="inline-flex items-center gap-2">
                       <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                       Loading cases...
@@ -1101,7 +1169,7 @@ export const OverpaidCases = () => {
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className={`${tdBase} text-center py-12 ${t.textMuted}`}>
+                  <td colSpan={11} className={`${tdBase} text-center py-12 ${t.textMuted}`}>
                     <div className="flex flex-col items-center gap-2">
                       <TrendingDown aria-hidden="true" className="h-8 w-8 opacity-30" />
                       <p className="text-sm font-medium">
@@ -1166,6 +1234,25 @@ export const OverpaidCases = () => {
                         </div>
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo ?? "—"}</td>
+                      <td className={`${tdBase}`}>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={row.region ?? ""}
+                            onChange={(e) => setRegionLocal(row.id, e.target.value)}
+                            onBlur={() => persistRegion(row)}
+                            placeholder="—"
+                            maxLength={100}
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                          />
+                          {regionState[row.id] === "saving" && (
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
+                          )}
+                          {regionState[row.id] === "saved" && (
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
+                          )}
+                        </div>
+                      </td>
                       <td className={`${tdBase} ${t.textMuted} text-right`}>{fmt(row.feesReceived)}</td>
                       <td className={`${tdBase} text-right font-semibold ${dark ? "text-amber-400" : "text-amber-600"}`}>
                         {fmt(row.overpaidAmount)}
@@ -1198,6 +1285,24 @@ export const OverpaidCases = () => {
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
                           )}
                           {confirmationState[row.id] === "saved" && (
+                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
+                          )}
+                        </div>
+                      </td>
+                      <td className={`${tdBase}`}>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={row.opLtrDate ?? ""}
+                            onChange={(e) => setOpLtrDateLocal(row.id, e.target.value)}
+                            onBlur={() => persistOpLtrDate(row)}
+                            aria-label="O/P letter sent date"
+                            className={`w-36 h-7 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                          />
+                          {opLtrDateState[row.id] === "saving" && (
+                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
+                          )}
+                          {opLtrDateState[row.id] === "saved" && (
                             <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
                           )}
                         </div>
@@ -1256,12 +1361,12 @@ export const OverpaidCases = () => {
             {!loading && rows.length > 0 && (
               <tfoot>
                 <tr className={`border-t-2 ${dark ? "border-neutral-700 bg-neutral-800/60" : "border-neutral-300 bg-neutral-50"}`}>
-                  <td colSpan={3} className={`${tdBase} font-semibold ${t.textSub}`}>
+                  <td colSpan={4} className={`${tdBase} font-semibold ${t.textSub}`}>
                     Page Totals <span className={`font-normal ${t.textMuted}`}>({rows.length} rows)</span>
                   </td>
                   <td className={`${tdBase} text-right font-bold ${t.text}`}>{fmtFull(pageFeesReceived)}</td>
                   <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{fmtFull(pageOverpaid)}</td>
-                  <td colSpan={4} />
+                  <td colSpan={5} />
                 </tr>
               </tfoot>
             )}

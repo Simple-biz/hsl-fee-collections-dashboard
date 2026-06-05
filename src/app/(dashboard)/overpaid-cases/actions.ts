@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-const FIELD_KEYS = ["opLtrReceived", "checksCleared", "updateNote"] as const;
+const FIELD_KEYS = ["opLtrDate", "opLtrReceived", "checksCleared", "updateNote", "region"] as const;
 
 const NOTE_MAX_LENGTH = 5000;
 const CONFIRMATION_MAX_LENGTH = 50; // matches feeRecords.feesConfirmation varchar(50)
@@ -41,6 +41,10 @@ export async function upsertOverpaidCase(input: {
 
     if (typeof updates.updateNote === "string" && updates.updateNote.length > NOTE_MAX_LENGTH) {
       return { ok: false, error: `Note too long (max ${NOTE_MAX_LENGTH} characters)` };
+    }
+
+    if ("opLtrDate" in updates && updates.opLtrDate != null && !DATE_RE.test(updates.opLtrDate)) {
+      return { ok: false, error: "Invalid date (expected YYYY-MM-DD)" };
     }
 
     if ("opLtrReceived" in updates && updates.opLtrReceived != null && !DATE_RE.test(updates.opLtrReceived)) {

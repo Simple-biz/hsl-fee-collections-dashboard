@@ -119,9 +119,11 @@ export const GET = async (req: NextRequest) => {
         feesReceived: sql<string>`ROUND(${feeRecords.totalFeesPaid}::numeric, 2)`,
         overpaidAmount: sql<string>`ROUND(${overpaidExpr}, 2)`,
         feesConfirmation: feeRecords.feesConfirmation,
+        opLtrDate: overpaidCases.opLtrDate,
         opLtrReceived: overpaidCases.opLtrReceived,
         checksCleared: overpaidCases.checksCleared,
         updateNote: overpaidCases.updateNote,
+        region: overpaidCases.region,
         updatedAt: overpaidCases.updatedAt,
       })
       .from(cases)
@@ -139,9 +141,11 @@ export const GET = async (req: NextRequest) => {
       feesReceived: Number(r.feesReceived),
       overpaidAmount: Number(r.overpaidAmount),
       feesConfirmation: r.feesConfirmation ?? null,
+      opLtrDate: r.opLtrDate ?? null,
       opLtrReceived: r.opLtrReceived ?? null,
       checksCleared: r.checksCleared ?? false,
       updateNote: r.updateNote ?? "",
+      region: r.region ?? null,
       updatedAt: r.updatedAt ? (r.updatedAt as Date).toISOString() : null,
     }));
 
