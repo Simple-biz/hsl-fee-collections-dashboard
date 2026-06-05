@@ -660,6 +660,7 @@ export const OverpaidCases = () => {
 
   const downloadCsv = async () => {
     setExporting(true);
+    const controller = new AbortController();
     try {
       let all: OverpaidCaseRow[];
       if (selectedIds.size > 0) {
@@ -674,7 +675,7 @@ export const OverpaidCases = () => {
         if (appliedMaxAmount) params.set("maxAmount", appliedMaxAmount);
         params.set("sort", sortKey);
         params.set("dir", sortDir);
-        const res = await fetch(`/api/overpaid-cases?${params.toString()}`);
+        const res = await fetch(`/api/overpaid-cases?${params.toString()}`, { signal: controller.signal });
         if (!res.ok) throw new Error(`Export failed (${res.status})`);
         const json = await res.json();
         all = json.data || [];
@@ -710,6 +711,7 @@ export const OverpaidCases = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setExporting(false);
