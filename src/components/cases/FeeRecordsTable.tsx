@@ -583,7 +583,7 @@ export const FeeRecordsTable = ({
 
       {/* Floating batch action pill — anchored to the bottom of the table card */}
       {selectedIds.size > 0 && (
-        <div className="pointer-events-none absolute bottom-6 left-0 right-0 z-50 flex justify-center">
+        <div className="pointer-events-none absolute bottom-12 left-0 right-0 z-50 flex justify-center">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
             <span className="text-[11px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
