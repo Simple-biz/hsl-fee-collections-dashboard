@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { CheckCircle2, DollarSign } from "lucide-react";
-import { LoginForm } from "./login-form";
+import { DollarSign } from "lucide-react";
+import { ChangePasswordForm } from "./change-password-form";
 import {
   Card,
   CardContent,
@@ -10,16 +10,10 @@ import {
 } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "Sign in · SSA Fee Collections",
+  title: "Set new password · SSA Fee Collections",
 };
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ changed?: string }>;
-}) {
-  const { changed } = await searchParams;
-
+export default function ChangePasswordPage() {
   return (
     <main className="flex min-h-svh items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
@@ -35,32 +29,17 @@ export default async function LoginPage({
           </div>
         </div>
 
-        {changed === "1" && (
-          <div
-            role="alert"
-            className="mb-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700"
-          >
-            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-            Password updated — please sign in with your new password.
-          </div>
-        )}
-
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
+            <CardTitle>Set a new password</CardTitle>
             <CardDescription>
-              Enter your credentials to access the dashboard.
+              Your account requires a password change before you can continue.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LoginForm />
+            <ChangePasswordForm />
           </CardContent>
         </Card>
-
-        <p className="mt-6 text-center text-xs text-neutral-400">
-          Access is restricted to authorized staff. Contact an administrator if
-          you need an account.
-        </p>
       </div>
     </main>
   );
