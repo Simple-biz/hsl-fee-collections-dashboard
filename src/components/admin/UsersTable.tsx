@@ -352,6 +352,24 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
   );
 }
 
+// ---------------- Password helpers ----------------
+
+const CHARSET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%";
+
+const generatePassword = (): string => {
+  // Rejection sampling: discard bytes >= limit so every charset position is equally likely.
+  const limit = 256 - (256 % CHARSET.length);
+  const result: string[] = [];
+  while (result.length < 12) {
+    const buf = new Uint8Array(24);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b < limit && result.length < 12) result.push(CHARSET[b % CHARSET.length]);
+    }
+  }
+  return result.join("");
+};
+
 // ---------------- New user dialog ----------------
 
 type NewUserValues = {
@@ -372,7 +390,6 @@ function NewUserDialog({
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
   const [role, setRole] = useState<AdminUser["role"]>("member");
   const [submitting, setSubmitting] = useState(false);
 
@@ -381,7 +398,6 @@ function NewUserDialog({
     if (v) {
       setEmail("");
       setName("");
-      setPassword("");
       setRole("member");
     }
     onOpenChange(v);
@@ -395,7 +411,7 @@ function NewUserDialog({
       await onSubmit({
         email: email.trim(),
         name: name.trim() || null,
-        password,
+        password: generatePassword(),
         role,
       });
     } finally {
@@ -409,8 +425,8 @@ function NewUserDialog({
         <DialogHeader>
           <DialogTitle>New user</DialogTitle>
           <DialogDescription>
-            Accounts are admin-seeded. Pass the password to the user
-            out-of-band; they can sign in immediately.
+            A temporary password will be generated and emailed to the user.
+            They will be prompted to change it on first login.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -435,20 +451,6 @@ function NewUserDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Jane Doe"
-              disabled={submitting}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="nu-password">Password</Label>
-            <Input
-              id="nu-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
               disabled={submitting}
             />
           </div>
@@ -500,53 +502,31 @@ function ResetPasswordDialog({
   onClose: () => void;
   onSubmit: (password: string) => Promise<void>;
 }) {
-  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  // Clear field when the target changes.
-  const handleOpenChange = (v: boolean) => {
-    if (!v) onClose();
-    if (v) setPassword("");
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
     try {
-      await onSubmit(password);
+      await onSubmit(generatePassword());
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={target != null} onOpenChange={handleOpenChange}>
+    <Dialog open={target != null} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Reset password</DialogTitle>
           <DialogDescription>
-            Set a new password for{" "}
-            <span className="font-semibold">{target?.email}</span>. Share it
-            with them out-of-band — they can sign in immediately.
+            A new temporary password will be generated and emailed to{" "}
+            <span className="font-semibold">{target?.email}</span>. They will
+            be prompted to change it on next login.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="rp-password">New password</Label>
-            <Input
-              id="rp-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              disabled={submitting}
-              autoFocus
-            />
-          </div>
           <DialogFooter className="mt-2">
             <Button
               type="button"
