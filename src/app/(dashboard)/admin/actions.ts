@@ -83,7 +83,7 @@ export async function createUser(input: {
             name: input.name?.trim() || null,
             role: input.role,
           }),
-          signal: AbortSignal.timeout(5_000),
+          signal: AbortSignal.timeout(15_000),
         });
         if (!emailRes.ok) {
           console.error("Welcome email webhook failed:", emailRes.status);
