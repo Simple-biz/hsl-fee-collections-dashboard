@@ -39,6 +39,7 @@ export async function createUser(input: {
   password: string;
   name?: string | null;
   role: Role;
+  mustChangePassword?: boolean;
 }): Promise<ActionResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
@@ -66,7 +67,7 @@ export async function createUser(input: {
       name: input.name?.trim() || null,
       passwordHash,
       role: input.role,
-      mustChangePassword: true,
+      mustChangePassword: input.mustChangePassword ?? true,
     });
 
     revalidatePath("/admin");
@@ -194,6 +195,7 @@ export async function setUserActive(input: {
 export async function resetUserPassword(input: {
   userId: number;
   password: string;
+  mustChangePassword?: boolean;
 }): Promise<ActionResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
@@ -207,7 +209,7 @@ export async function resetUserPassword(input: {
     const passwordHash = await bcrypt.hash(input.password, 12);
     const result = await db
       .update(users)
-      .set({ passwordHash, mustChangePassword: true, updatedAt: new Date() })
+      .set({ passwordHash, mustChangePassword: input.mustChangePassword ?? true, updatedAt: new Date() })
       .where(eq(users.id, input.userId));
 
     if (result.length === 0) {
