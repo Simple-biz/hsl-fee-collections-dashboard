@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
 import { DollarSign } from "lucide-react";
 import { ChangePasswordForm } from "./change-password-form";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Set new password · SSA Fee Collections",
@@ -29,17 +22,22 @@ export default function ChangePasswordPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Set a new password</CardTitle>
-            <CardDescription>
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+          <div className="px-6 pt-6 pb-4">
+            <p className="text-base font-semibold text-neutral-900">Set a new password</p>
+            <p className="text-sm text-neutral-500 mt-1">
               Your account requires a password change before you can continue.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="px-6 pb-6">
             <ChangePasswordForm />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-neutral-400">
+          Access is restricted to authorized staff. Contact an administrator if
+          you need an account.
+        </p>
       </div>
     </main>
   );

@@ -156,7 +156,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
           </p>
         </div>
         <Button size="sm" onClick={() => setNewOpen(true)}>
-          <UserPlus className="h-4 w-4" />
+          <UserPlus className="h-4 w-4" aria-hidden="true" />
           New user
         </Button>
       </div>
@@ -176,9 +176,9 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
           }`}
         >
           {banner.kind === "error" ? (
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           ) : (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           )}
           <span className="flex-1">{banner.text}</span>
           <button
@@ -186,7 +186,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
             aria-label="Dismiss"
             className="hover:opacity-70"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3" aria-hidden="true" />
           </button>
         </div>
       )}
@@ -306,7 +306,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                           disabled={rowBusy}
                           className="h-7 text-[11px]"
                         >
-                          <KeyRound className="h-3 w-3" />
+                          <KeyRound className="h-3 w-3" aria-hidden="true" />
                           Reset password
                         </Button>
                       </div>
