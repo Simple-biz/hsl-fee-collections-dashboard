@@ -19,7 +19,7 @@ export default function ChangePasswordPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900">
-            <DollarSign className="h-5 w-5 text-white" />
+            <DollarSign className="h-5 w-5 text-white" aria-hidden="true" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-neutral-900">

@@ -74,7 +74,7 @@ export function ChangePasswordForm() {
       )}
 
       <Button type="submit" className="mt-2 w-full" disabled={submitting}>
-        {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+        {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {submitting ? "Saving…" : "Set password"}
       </Button>
     </form>
