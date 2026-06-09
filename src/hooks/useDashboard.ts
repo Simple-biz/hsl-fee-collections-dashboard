@@ -92,7 +92,10 @@ export const useDashboard = (): DashboardData => {
     // doesn't hold up the rest of the dashboard. Active (non-closed) only —
     // closed cases live on /fees-closed.
     const casesTask = (async () => {
-      const casesRes = await fetch("/api/cases?isClosed=false");
+      // Pull the full active set in one request — the table paginates/filters
+      // client-side, so it needs every row, not the API's default page of 50.
+      // Active caseload is hundreds to low-thousands; a high limit is fine.
+      const casesRes = await fetch("/api/cases?isClosed=false&limit=100000");
       if (!casesRes.ok) throw new Error("Failed to fetch cases");
       const casesJson = await casesRes.json();
       setCases(casesJson.data);

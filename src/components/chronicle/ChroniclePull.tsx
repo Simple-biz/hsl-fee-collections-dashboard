@@ -70,6 +70,21 @@ interface PullResult {
   usingMock: boolean;
 }
 
+// Compact shape returned by /api/chronicle/search
+interface SearchResult {
+  clientId: number;
+  firstName: string;
+  lastName: string;
+  last4Ssn: string | null;
+  externalId: string | null;
+  claimType: string[];
+  reportType: string;
+  statusOfCase: string;
+  office: string;
+  t2Decision: string | null;
+  t16Decision: string | null;
+}
+
 // ============================================================================
 // PDF field groups — defines selectable fields for import
 // ============================================================================
@@ -266,6 +281,43 @@ export const ChroniclePull = () => {
   const [pullHistory, setPullHistory] = useState<PullResult[]>([]);
   const [importResult, setImportResult] = useState<string | null>(null);
 
+  // Search (test/lookup) state — validates the Chronicle search endpoint and
+  // lets us jump from a match straight into the Pull flow above.
+  const [searchFields, setSearchFields] = useState({
+    firstName: "",
+    lastName: "",
+    last4Ssn: "",
+    externalId: "",
+  });
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(
+    null,
+  );
+
+  const handleSearch = async () => {
+    const { firstName, lastName, last4Ssn, externalId } = searchFields;
+    if (!firstName.trim() && !lastName.trim() && !last4Ssn.trim() && !externalId.trim())
+      return;
+    setSearching(true);
+    setSearchError(null);
+    setSearchResults(null);
+    try {
+      const res = await fetch("/api/chronicle/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(searchFields),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Search failed");
+      setSearchResults(data.results);
+    } catch (err) {
+      setSearchError((err as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   // PDF parsing state
   const [parsingPdf, setParsingPdf] = useState(false);
   const [pdfData, setPdfData] = useState<PdfExtractedData | null>(null);
@@ -337,8 +389,11 @@ export const ChroniclePull = () => {
     }
   };
 
-  const handlePull = async () => {
-    if (!clientId.trim()) return;
+  const handlePull = async (idOverride?: string) => {
+    const id = (idOverride ?? clientId).trim();
+    if (!id) return;
+    // Reflect the pulled id in the input (e.g. when triggered from a search result).
+    if (id !== clientId) setClientId(id);
     setPulling(true);
     setError(null);
     setResult(null);
@@ -351,7 +406,7 @@ export const ChroniclePull = () => {
       const res = await fetch("/api/chronicle/pull", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId: clientId.trim() }),
+        body: JSON.stringify({ clientId: id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to pull");
@@ -535,7 +590,7 @@ export const ChroniclePull = () => {
               />
             </div>
             <button
-              onClick={handlePull}
+              onClick={() => handlePull()}
               disabled={pulling || !clientId.trim()}
               className={`h-9 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 ${t.ctaBtn} disabled:opacity-40`}
             >
@@ -547,6 +602,171 @@ export const ChroniclePull = () => {
               {pulling ? "Pulling..." : "Pull"}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Search (test) — find a client by name / SSN4 / external ID */}
+      <div className={`rounded-xl border ${t.card}`}>
+        <div className="p-4 md:p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-violet-900/40" : "bg-violet-50"}`}
+            >
+              <FileSearch
+                className={`h-5 w-5 ${dark ? "text-violet-400" : "text-violet-600"}`}
+              />
+            </div>
+            <div>
+              <h3 className={`text-sm font-bold ${t.text}`}>
+                Search Clients
+              </h3>
+              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                Find a Chronicle client by name, last-4 SSN, or external ID
+                (fields are combined). Useful for cases where you don&apos;t
+                know the Chronicle ID.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <input
+              value={searchFields.firstName}
+              onChange={(e) =>
+                setSearchFields((p) => ({ ...p, firstName: e.target.value }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="First name"
+              className={`h-9 px-3 rounded-lg border text-sm outline-none ${t.inputBg}`}
+            />
+            <input
+              value={searchFields.lastName}
+              onChange={(e) =>
+                setSearchFields((p) => ({ ...p, lastName: e.target.value }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Last name"
+              className={`h-9 px-3 rounded-lg border text-sm outline-none ${t.inputBg}`}
+            />
+            <input
+              value={searchFields.last4Ssn}
+              onChange={(e) =>
+                setSearchFields((p) => ({ ...p, last4Ssn: e.target.value }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Last 4 SSN"
+              maxLength={4}
+              className={`h-9 px-3 rounded-lg border text-sm outline-none ${t.inputBg}`}
+            />
+            <input
+              value={searchFields.externalId}
+              onChange={(e) =>
+                setSearchFields((p) => ({ ...p, externalId: e.target.value }))
+              }
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="External ID"
+              className={`h-9 px-3 rounded-lg border text-sm outline-none ${t.inputBg}`}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              onClick={() => handleSearch()}
+              disabled={
+                searching ||
+                (!searchFields.firstName.trim() &&
+                  !searchFields.lastName.trim() &&
+                  !searchFields.last4Ssn.trim() &&
+                  !searchFields.externalId.trim())
+              }
+              className={`h-9 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 ${t.ctaBtn} disabled:opacity-40`}
+            >
+              {searching ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Search className="h-3.5 w-3.5" />
+              )}
+              {searching ? "Searching..." : "Search"}
+            </button>
+            {searchResults && (
+              <span className={`text-[11px] ${t.textMuted}`}>
+                {searchResults.length} result
+                {searchResults.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+
+          {searchError && (
+            <div
+              className={`mt-3 rounded-lg border p-2.5 flex items-center gap-2 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="text-[12px]">{searchError}</span>
+            </div>
+          )}
+
+          {searchResults && searchResults.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className={`text-left ${t.textMuted}`}>
+                    <th className="py-1.5 pr-3 font-medium">Chronicle ID</th>
+                    <th className="py-1.5 pr-3 font-medium">Name</th>
+                    <th className="py-1.5 pr-3 font-medium">SSN4</th>
+                    <th className="py-1.5 pr-3 font-medium">Ext ID</th>
+                    <th className="py-1.5 pr-3 font-medium">Claim</th>
+                    <th className="py-1.5 pr-3 font-medium">Status</th>
+                    <th className="py-1.5 pr-3 font-medium">Office</th>
+                    <th className="py-1.5 pr-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {searchResults.map((r) => (
+                    <tr
+                      key={r.clientId}
+                      className={`border-t ${dark ? "border-neutral-800" : "border-neutral-100"}`}
+                    >
+                      <td className={`py-1.5 pr-3 font-mono ${t.text}`}>
+                        {r.clientId}
+                      </td>
+                      <td className={`py-1.5 pr-3 ${t.text}`}>
+                        {r.lastName}, {r.firstName}
+                      </td>
+                      <td className={`py-1.5 pr-3 ${t.textSub}`}>
+                        {r.last4Ssn || "—"}
+                      </td>
+                      <td className={`py-1.5 pr-3 ${t.textSub}`}>
+                        {r.externalId || "—"}
+                      </td>
+                      <td className={`py-1.5 pr-3 ${t.textSub}`}>
+                        {(r.claimType || []).join(", ") || "—"}
+                      </td>
+                      <td className={`py-1.5 pr-3 ${t.textSub}`}>
+                        {r.statusOfCase || "—"}
+                      </td>
+                      <td className={`py-1.5 pr-3 ${t.textSub}`}>
+                        {r.office || "—"}
+                      </td>
+                      <td className="py-1.5 pr-3">
+                        <button
+                          onClick={() => handlePull(String(r.clientId))}
+                          className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn}`}
+                          title="Pull this client into the lookup above"
+                        >
+                          <ArrowRight className="h-3 w-3" /> Pull
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {searchResults && searchResults.length === 0 && !searchError && (
+            <p className={`mt-3 text-[12px] ${t.textMuted}`}>
+              No clients matched.
+            </p>
+          )}
         </div>
       </div>
 
