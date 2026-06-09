@@ -51,7 +51,12 @@ export async function upsertOverpaidCase(input: {
       return { ok: false, error: "Invalid date (expected YYYY-MM-DD)" };
     }
 
-    const clearedAtUpdate = "checksCleared" in updates ? { checksClearedAt: new Date() } : {};
+    // Stamp checksClearedAt only when clearing (true); null it when un-clearing
+    // (false) so the timestamp never misrepresents "when checks cleared".
+    const clearedAtUpdate =
+      "checksCleared" in updates
+        ? { checksClearedAt: updates.checksCleared ? new Date() : null }
+        : {};
 
     const [row] = await db
       .insert(overpaidCases)
@@ -101,10 +106,10 @@ export async function bulkRestoreCleared(input: {
     const now = new Date();
     await db
       .insert(overpaidCases)
-      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: false, checksClearedAt: now })))
+      .values(input.caseIds.map((caseId) => ({ caseId, checksCleared: false, checksClearedAt: null })))
       .onConflictDoUpdate({
         target: overpaidCases.caseId,
-        set: { checksCleared: false, checksClearedAt: now, updatedAt: now },
+        set: { checksCleared: false, checksClearedAt: null, updatedAt: now },
       });
     return { ok: true };
   } catch (error) {
