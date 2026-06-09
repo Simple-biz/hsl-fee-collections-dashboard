@@ -6,6 +6,7 @@ import { cases, userDetails } from "@/lib/db/schema";
 import { myCaseDb } from "@/lib/db/mycase";
 import { mapMyCaseRows, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
 import { fetchCaseDetails } from "@/lib/mycase-proxy";
+import { auth } from "@/auth";
 
 const CHRONICLE_LINK_FIELD_ID = 1101112;
 
@@ -26,6 +27,11 @@ export const GET = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
     const caseId = await resolveId(context);
     if (!Number.isFinite(caseId)) {
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
