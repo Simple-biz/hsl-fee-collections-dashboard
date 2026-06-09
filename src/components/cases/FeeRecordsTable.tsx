@@ -171,6 +171,10 @@ export const FeeRecordsTable = ({
   const [assignedFilter, setAssignedFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // Client-side pagination over the filtered+sorted set. Page size is
+  // user-selectable; "all" renders the whole filtered set on one page.
+  const [pageSize, setPageSize] = useState<number | "all">(100);
+  const [pageIndex, setPageIndex] = useState(0);
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
@@ -321,6 +325,25 @@ export const FeeRecordsTable = ({
     sortDir,
     dateRange,
   ]);
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  const pageCount =
+    pageSize === "all" ? 1 : Math.max(1, Math.ceil(filtered.length / pageSize));
+  // Clamp so a stale pageIndex (e.g. after a filter shrinks the set) never
+  // renders an empty page — fall back to the last valid page instead.
+  const currentPage = Math.min(pageIndex, pageCount - 1);
+  const pageStart = pageSize === "all" ? 0 : currentPage * pageSize;
+  const pageEnd =
+    pageSize === "all"
+      ? filtered.length
+      : Math.min(pageStart + pageSize, filtered.length);
+  const paged =
+    pageSize === "all" ? filtered : filtered.slice(pageStart, pageEnd);
+
+  // Reset to the first page whenever the result set or page size changes.
+  useEffect(() => {
+    setPageIndex(0);
+  }, [search, statusFilter, assignedFilter, sortKey, sortDir, pageSize, dateRange]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;
@@ -816,7 +839,7 @@ export const FeeRecordsTable = ({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c) => {
+            {paged.map((c) => {
               const isOverpaid = overpaidOverrides[c.id] ?? c.markedOverpaid;
               return (
               <tr
@@ -1424,6 +1447,62 @@ export const FeeRecordsTable = ({
           </tbody>
         </table>
       </div>
+
+      {filtered.length > 0 && (
+        <div
+          className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t ${t.borderLight}`}
+        >
+          <p className={`text-[11px] ${t.textMuted}`}>
+            Showing {pageStart + 1}–{pageEnd} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <label
+              className={`text-[11px] font-medium ${t.textSub} flex items-center gap-1.5`}
+            >
+              Rows per page
+              <select
+                value={String(pageSize)}
+                onChange={(e) =>
+                  setPageSize(
+                    e.target.value === "all" ? "all" : Number(e.target.value),
+                  )
+                }
+                className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+              >
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="all">All</option>
+              </select>
+            </label>
+            {pageSize !== "all" && pageCount > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                  disabled={currentPage === 0}
+                  className={`h-8 px-3 rounded-md text-xs font-medium border ${t.outlineBtn} disabled:opacity-40`}
+                >
+                  Prev
+                </button>
+                <span className={`text-[11px] ${t.textSub} px-1 whitespace-nowrap`}>
+                  Page {currentPage + 1} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPageIndex((p) => Math.min(pageCount - 1, p + 1))
+                  }
+                  disabled={currentPage >= pageCount - 1}
+                  className={`h-8 px-3 rounded-md text-xs font-medium border ${t.outlineBtn} disabled:opacity-40`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className={`py-12 text-center text-sm ${t.textMuted}`}>
