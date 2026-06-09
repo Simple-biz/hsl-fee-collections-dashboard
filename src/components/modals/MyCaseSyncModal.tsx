@@ -11,6 +11,8 @@ import {
   ArrowLeft,
   ArrowRight,
   CloudDownload,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
@@ -25,7 +27,7 @@ interface SourceRow {
   winSheetStatus: string;
   totalExpected: number;
   hasNotes: boolean;
-  status: "new" | "changed" | "unchanged";
+  status: "new" | "changed" | "unchanged" | "viewed";
   changedFields: { field: string; mycase: string; db: string }[];
 }
 
@@ -44,6 +46,7 @@ interface SyncPreviewResponse {
     changed: number;
     unchanged: number;
     missing: number;
+    viewed: number;
     warnings: { row: number; message: string }[];
   };
   rows: {
@@ -59,7 +62,7 @@ interface MyCaseSyncModalProps {
 }
 
 type Step = 1 | 2 | 3 | 4;
-type RowFilter = "all" | "new" | "changed" | "unchanged" | "missing";
+type RowFilter = "all" | "new" | "changed" | "unchanged" | "missing" | "viewed";
 
 const STEPS: { n: Step; title: string; subtitle: string }[] = [
   { n: 1, title: "Step 1", subtitle: "Fetch from MyCase" },
@@ -101,6 +104,7 @@ const STATUS_BADGE: Record<string, (dark: boolean) => string> = {
   changed: (dark) => (dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700"),
   unchanged: (dark) => (dark ? "bg-neutral-800 text-neutral-400" : "bg-neutral-100 text-neutral-600"),
   missing: (dark) => (dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700"),
+  viewed: (dark) => (dark ? "bg-violet-900/40 text-violet-400" : "bg-violet-100 text-violet-700"),
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -108,6 +112,7 @@ const STATUS_LABEL: Record<string, string> = {
   changed: "CHANGED",
   unchanged: "UP TO DATE",
   missing: "MISSING",
+  viewed: "VIEWED",
 };
 
 export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncModalProps) {
@@ -116,6 +121,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
   const [fetching, setFetching] = useState(false);
   const [preview, setPreview] = useState<SyncPreviewResponse | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
@@ -152,6 +158,9 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
         throw new Error((json.error as string) || `Fetch failed (${res.status})`);
       const data = json as unknown as SyncPreviewResponse;
       setPreview(data);
+      setViewedIds(
+        new Set(data.rows.source.filter((r) => r.status === "viewed").map((r) => r.clientId)),
+      );
       setSelected(
         new Set(
           data.rows.source
@@ -172,17 +181,78 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
     }
   };
 
-  const newRows = useMemo(() => preview?.rows.source.filter((r) => r.status === "new") ?? [], [preview]);
-  const changedRows = useMemo(() => preview?.rows.source.filter((r) => r.status === "changed") ?? [], [preview]);
-  const unchangedRows = useMemo(() => preview?.rows.source.filter((r) => r.status === "unchanged") ?? [], [preview]);
+  const handleTag = async (clientIds: number[]) => {
+    setViewedIds((prev) => new Set([...prev, ...clientIds]));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      clientIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    try {
+      const res = await fetch("/api/mycase/sync/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ myCaseCaseIds: clientIds }),
+      });
+      if (!res.ok) {
+        const json: Record<string, unknown> = await res.json().catch(() => ({}));
+        throw new Error((json.error as string) ?? `Tag failed (${res.status})`);
+      }
+    } catch (e) {
+      setViewedIds((prev) => {
+        const next = new Set(prev);
+        clientIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setError((e as Error).message);
+    }
+  };
+
+  const handleUntag = async (clientIds: number[]) => {
+    setViewedIds((prev) => {
+      const next = new Set(prev);
+      clientIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    try {
+      const res = await fetch("/api/mycase/sync/tags", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ myCaseCaseIds: clientIds }),
+      });
+      if (!res.ok) {
+        const json: Record<string, unknown> = await res.json().catch(() => ({}));
+        throw new Error((json.error as string) ?? `Untag failed (${res.status})`);
+      }
+    } catch (e) {
+      setViewedIds((prev) => new Set([...prev, ...clientIds]));
+      setError((e as Error).message);
+    }
+  };
+
+  // Apply local tag overrides on top of server response
+  const effectiveRows = useMemo(
+    () =>
+      preview?.rows.source.map((r): SourceRow => ({
+        ...r,
+        status: viewedIds.has(r.clientId)
+          ? "viewed"
+          : r.status === "viewed"
+          ? "new"
+          : r.status,
+      })) ?? [],
+    [preview, viewedIds],
+  );
+
+  const newRows = useMemo(() => effectiveRows.filter((r) => r.status === "new"), [effectiveRows]);
+  const changedRows = useMemo(() => effectiveRows.filter((r) => r.status === "changed"), [effectiveRows]);
+  const unchangedRows = useMemo(() => effectiveRows.filter((r) => r.status === "unchanged"), [effectiveRows]);
+  const viewedRows = useMemo(() => effectiveRows.filter((r) => r.status === "viewed"), [effectiveRows]);
 
   const allRows = useMemo(() => {
     if (!preview) return [];
-    return [
-      ...preview.rows.source,
-      ...preview.rows.missing,
-    ];
-  }, [preview]);
+    return [...effectiveRows, ...preview.rows.missing];
+  }, [effectiveRows, preview]);
 
   const filteredRows = useMemo(() => {
     let r = allRows;
@@ -225,6 +295,13 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
       setSyncing(false);
     }
     if (syncResult) {
+      // Auto-tag new cases that were not selected — they won't appear as "new" on the next fetch
+      const unselectedNewIds = newRows
+        .filter((r) => !selected.has(r.clientId))
+        .map((r) => r.clientId);
+      if (unselectedNewIds.length > 0) {
+        void handleTag(unselectedNewIds);
+      }
       setResult(syncResult);
       try { await onSynced(); } catch { /* refresh failed; sync succeeded */ }
     }
@@ -237,6 +314,11 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
     if (s === 4) return selected.size > 0;
     return false;
   };
+
+  const syncableCount = useMemo(
+    () => effectiveRows.filter((r) => r.status !== "viewed").length,
+    [effectiveRows],
+  );
 
   const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
@@ -341,26 +423,32 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
 
               {preview && !fetching && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                     <Stat t={t} label="Rows fetched" value={preview.summary.fetched.toLocaleString()} />
                     <Stat
                       t={t}
                       label="New cases"
-                      value={preview.summary.new.toLocaleString()}
+                      value={newRows.length.toLocaleString()}
                       accent={dark ? "text-emerald-400" : "text-emerald-600"}
                     />
                     <Stat
                       t={t}
                       label="Changed"
-                      value={preview.summary.changed.toLocaleString()}
-                      accent={preview.summary.changed > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined}
+                      value={changedRows.length.toLocaleString()}
+                      accent={changedRows.length > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined}
                     />
-                    <Stat t={t} label="Up to date" value={preview.summary.unchanged.toLocaleString()} />
+                    <Stat t={t} label="Up to date" value={unchangedRows.length.toLocaleString()} />
                     <Stat
                       t={t}
                       label="Missing"
                       value={preview.summary.missing.toLocaleString()}
                       accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined}
+                    />
+                    <Stat
+                      t={t}
+                      label="Viewed"
+                      value={viewedRows.length.toLocaleString()}
+                      accent={viewedRows.length > 0 ? (dark ? "text-violet-400" : "text-violet-600") : undefined}
                     />
                   </div>
                   {preview.summary.warnings.length > 0 && (
@@ -437,24 +525,28 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
                 Categories based on how each record compares between MyCase and the fee collections database.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                <Stat t={t} label="New" value={preview.summary.new.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
-                <Stat t={t} label="Changed" value={preview.summary.changed.toLocaleString()} accent={preview.summary.changed > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined} />
-                <Stat t={t} label="Up to date" value={preview.summary.unchanged.toLocaleString()} />
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+                <Stat t={t} label="New" value={newRows.length.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
+                <Stat t={t} label="Changed" value={changedRows.length.toLocaleString()} accent={changedRows.length > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined} />
+                <Stat t={t} label="Up to date" value={unchangedRows.length.toLocaleString()} />
                 <Stat t={t} label="Missing" value={preview.summary.missing.toLocaleString()} accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined} />
+                <Stat t={t} label="Viewed" value={viewedRows.length.toLocaleString()} accent={viewedRows.length > 0 ? (dark ? "text-violet-400" : "text-violet-600") : undefined} />
               </div>
               <div className="space-y-5">
-                <CategorySection status="new" count={preview.summary.new} description="In MyCase · not yet in database — will be inserted on sync" dark={dark} t={t}>
+                <CategorySection status="new" count={newRows.length} description="In MyCase · not yet in database — will be inserted on sync" dark={dark} t={t}>
                   <SourceRowsTable t={t} dark={dark} rows={newRows.slice(0, 100)} truncated={newRows.length > 100} total={newRows.length} />
                 </CategorySection>
-                <CategorySection status="changed" count={preview.summary.changed} description="In MyCase · already in database · values have changed — will be updated on sync" dark={dark} t={t}>
+                <CategorySection status="changed" count={changedRows.length} description="In MyCase · already in database · values have changed — will be updated on sync" dark={dark} t={t}>
                   <SourceRowsTable t={t} dark={dark} rows={changedRows.slice(0, 100)} truncated={changedRows.length > 100} total={changedRows.length} showChangedFields />
                 </CategorySection>
-                <CategorySection status="unchanged" count={preview.summary.unchanged} description="In MyCase · already in database · no changes detected — skipped by default" dark={dark} t={t}>
+                <CategorySection status="unchanged" count={unchangedRows.length} description="In MyCase · already in database · no changes detected — skipped by default" dark={dark} t={t}>
                   <SourceRowsTable t={t} dark={dark} rows={unchangedRows.slice(0, 100)} truncated={unchangedRows.length > 100} total={unchangedRows.length} />
                 </CategorySection>
                 <CategorySection status="missing" count={preview.summary.missing} description="In fee collections database · not found in MyCase with an approval date" dark={dark} t={t}>
                   <MissingRowsTable t={t} dark={dark} rows={preview.rows.missing} />
+                </CategorySection>
+                <CategorySection status="viewed" count={viewedRows.length} description="In MyCase · not yet in database · previously marked as viewed — skipped on sync" dark={dark} t={t}>
+                  <SourceRowsTable t={t} dark={dark} rows={viewedRows.slice(0, 100)} truncated={viewedRows.length > 100} total={viewedRows.length} />
                 </CategorySection>
               </div>
             </div>
@@ -472,7 +564,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 </div>
                 <div className={`text-[11px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
-                  {" "}/ {preview.rows.source.length.toLocaleString()} syncable selected
+                  {" "}/ {syncableCount.toLocaleString()} syncable selected
                 </div>
               </div>
 
@@ -493,12 +585,15 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                   <option value="changed">Changed only</option>
                   <option value="unchanged">Up to date only</option>
                   <option value="missing">Missing only</option>
+                  <option value="viewed">Viewed only</option>
                 </select>
                 <button
                   onClick={() =>
                     setSelected(new Set([
                       ...selected,
-                      ...filteredRows.filter((r) => r.status !== "missing").map((r) => r.clientId),
+                      ...filteredRows
+                        .filter((r) => r.status !== "missing" && r.status !== "viewed")
+                        .map((r) => r.clientId),
                     ]))
                   }
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
@@ -508,7 +603,9 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 <button
                   onClick={() => {
                     const next = new Set(selected);
-                    filteredRows.filter((r) => r.status !== "missing").forEach((r) => next.delete(r.clientId));
+                    filteredRows
+                      .filter((r) => r.status !== "missing" && r.status !== "viewed")
+                      .forEach((r) => next.delete(r.clientId));
                     setSelected(next);
                   }}
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
@@ -524,11 +621,13 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 selected={selected}
                 onToggle={(id) => {
                   const row = allRows.find((r) => r.clientId === id);
-                  if (!row || row.status === "missing") return;
+                  if (!row || row.status === "missing" || row.status === "viewed") return;
                   const next = new Set(selected);
                   if (next.has(id)) next.delete(id); else next.add(id);
                   setSelected(next);
                 }}
+                onTag={(id) => handleTag([id])}
+                onUntag={(id) => handleUntag([id])}
               />
             </div>
           )}
@@ -622,7 +721,7 @@ const CategorySection = ({
   t,
   children,
 }: {
-  status: "new" | "changed" | "unchanged" | "missing";
+  status: "new" | "changed" | "unchanged" | "missing" | "viewed";
   count: number;
   description: string;
   dark: boolean;
@@ -781,12 +880,16 @@ const SelectionTable = ({
   rows,
   selected,
   onToggle,
+  onTag,
+  onUntag,
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
   rows: (SourceRow | MissingRow)[];
   selected: Set<number>;
   onToggle: (id: number) => void;
+  onTag: (id: number) => void;
+  onUntag: (id: number) => void;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
@@ -799,23 +902,27 @@ const SelectionTable = ({
             <Th>Approved</Th>
             <Th>Assigned</Th>
             <Th>Win Sheet Status</Th>
+            <Th>{""}</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => {
             const isMissing = r.status === "missing";
+            const isViewed = r.status === "viewed";
+            const isNew = r.status === "new";
+            const isSelectable = !isMissing && !isViewed;
             const checked = selected.has(r.clientId);
             return (
               <tr
                 key={r.clientId}
-                onClick={() => !isMissing && onToggle(r.clientId)}
-                className={`border-b ${t.borderLight} ${isMissing ? "cursor-not-allowed opacity-60" : "cursor-pointer"} ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
+                onClick={() => isSelectable && onToggle(r.clientId)}
+                className={`border-b ${t.borderLight} ${!isSelectable ? "cursor-default opacity-60" : "cursor-pointer"} ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
               >
                 <td className="px-3 py-1.5">
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={isMissing}
+                    disabled={!isSelectable}
                     onChange={() => onToggle(r.clientId)}
                     onClick={(e) => e.stopPropagation()}
                     className="h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
@@ -840,6 +947,28 @@ const SelectionTable = ({
                     </span>
                   ) : (
                     <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  {isNew && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onTag(r.clientId); }}
+                      title="Mark as viewed — hide from future new cases"
+                      className={`h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-violet-400 hover:bg-violet-900/40" : "text-violet-600 hover:bg-violet-100"}`}
+                    >
+                      <Eye className="h-3 w-3" aria-hidden="true" />
+                      Mark Viewed
+                    </button>
+                  )}
+                  {isViewed && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onUntag(r.clientId); }}
+                      title="Unmark — restore to new"
+                      className={`h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-neutral-400 hover:bg-neutral-700" : "text-neutral-500 hover:bg-neutral-200"}`}
+                    >
+                      <EyeOff className="h-3 w-3" aria-hidden="true" />
+                      Unmark
+                    </button>
                   )}
                 </td>
               </tr>

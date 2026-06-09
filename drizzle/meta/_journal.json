@@ -120,6 +120,13 @@
       "when": 1781022889619,
       "tag": "0016_backfill_overpaid_checks_cleared_at",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781027880813,
+      "tag": "0017_mycase_sync_tags",
+      "breakpoints": true
     }
   ]
 }

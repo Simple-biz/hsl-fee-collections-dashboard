@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { inArray, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { myCaseDb } from "@/lib/db/mycase";
-import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, myCaseSyncTags } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { mapMyCaseRows, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
@@ -216,13 +216,22 @@ export const POST = async (req: NextRequest) => {
         return f;
       };
 
+      const [tagRows] = await Promise.all([
+        db.select({ myCaseCaseId: myCaseSyncTags.myCaseCaseId, tag: myCaseSyncTags.tag })
+          .from(myCaseSyncTags),
+      ]);
+      const tagMap = new Map(tagRows.map((t) => [t.myCaseCaseId, t.tag]));
+
       const dbMap = new Map(allDbCases.map((c) => [c.clientId, c]));
       const myCaseIdSet = new Set(parsed.map((r) => r.clientId));
 
       const sourceRows = parsed.map((r) => {
         const dbEntry = dbMap.get(r.clientId);
         const changedFields = dbEntry ? getChangedFields(r, dbEntry) : [];
-        const status = !dbEntry ? "new" : changedFields.length > 0 ? "changed" : "unchanged";
+        const isTagged = tagMap.has(r.clientId);
+        const status = !dbEntry
+          ? (isTagged ? "viewed" : "new")
+          : changedFields.length > 0 ? "changed" : "unchanged";
         return {
           clientId: r.clientId,
           caseName: `${r.lastName}, ${r.firstName}`,
@@ -250,6 +259,7 @@ export const POST = async (req: NextRequest) => {
 
       const newCount = sourceRows.filter((r) => r.status === "new").length;
       const changedCount = sourceRows.filter((r) => r.status === "changed").length;
+      const viewedCount = sourceRows.filter((r) => r.status === "viewed").length;
 
       return NextResponse.json({
         mode,
@@ -257,7 +267,8 @@ export const POST = async (req: NextRequest) => {
           fetched: parsed.length,
           new: newCount,
           changed: changedCount,
-          unchanged: parsed.length - newCount - changedCount,
+          unchanged: parsed.length - newCount - changedCount - viewedCount,
+          viewed: viewedCount,
           missing: missingRows.length,
           warnings,
         },

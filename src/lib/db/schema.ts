@@ -776,3 +776,13 @@ export const activityLogRelations = relations(activityLog, ({ one }) => ({
     references: [feeRecords.id],
   }),
 }));
+
+// ============================================================================
+// MyCase sync tags — tracks cases that have been reviewed but not synced
+// ============================================================================
+export const myCaseSyncTags = pgTable("mycase_sync_tags", {
+  myCaseCaseId: integer("mycase_case_id").primaryKey(),
+  tag: varchar("tag", { length: 50 }).notNull().default("viewed"),
+  taggedAt: timestamp("tagged_at", { withTimezone: true }).notNull().defaultNow(),
+  taggedBy: varchar("tagged_by", { length: 255 }),
+});
