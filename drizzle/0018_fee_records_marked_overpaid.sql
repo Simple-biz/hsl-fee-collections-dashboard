@@ -1,1 +1,0 @@
-ALTER TABLE "fee_records" ADD COLUMN "marked_overpaid" boolean DEFAULT false NOT NULL;
