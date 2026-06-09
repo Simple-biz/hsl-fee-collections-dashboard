@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,8 +71,7 @@ export function ChangePasswordDialog({
         return;
       }
       setDone(true);
-      // Brief success state, then close.
-      setTimeout(() => onOpenChange(false), 1200);
+      setTimeout(() => signOut({ callbackUrl: "/login" }), 1500);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -92,7 +92,7 @@ export function ChangePasswordDialog({
         {done ? (
           <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Password updated.
+            Password updated. Signing you out…
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">

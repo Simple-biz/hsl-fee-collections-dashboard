@@ -153,8 +153,8 @@ export default function FeeEditModal({
 
   // Styles
   const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
-  const valCls = `text-[13px] font-semibold ${t.text} mt-0.5`;
   const inpCls = `mt-1 h-7 px-2 rounded border text-[12px] outline-none w-full ${t.inputBg}`;
+  const readonlyCls = `mt-1 h-7 px-2 rounded border text-[12px] font-semibold flex items-center select-none ${dark ? "border-neutral-700 bg-neutral-900/40" : "border-neutral-200 bg-neutral-100"}`;
   const amber = dark ? "text-amber-400" : "text-amber-600";
 
   return (
@@ -203,13 +203,8 @@ export default function FeeEditModal({
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Fee Due{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p className={`${valCls} ${amber}`}>{fmtFull(t16Due)}</p>
+                <p className={lbl}>Fee Due <span className="text-[8px] normal-case font-normal">(auto)</span></p>
+                <div className={`${readonlyCls} ${amber}`}>{fmtFull(t16Due)}</div>
               </div>
               <div>
                 <p className={lbl}>Fee Received</p>
@@ -222,15 +217,8 @@ export default function FeeEditModal({
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Pending{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p className={`${valCls} ${t16Pend > 0 ? amber : t.textMuted}`}>
-                  {fmtFull(t16Pend)}
-                </p>
+                <p className={lbl}>Pending <span className="text-[8px] normal-case font-normal">(auto)</span></p>
+                <div className={`${readonlyCls} ${t16Pend > 0 ? amber : t.textMuted}`}>{fmtFull(t16Pend)}</div>
               </div>
               <div>
                 <p className={lbl}>Date Received</p>
@@ -263,13 +251,8 @@ export default function FeeEditModal({
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Fee Due{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p className={`${valCls} ${amber}`}>{fmtFull(t2Due)}</p>
+                <p className={lbl}>Fee Due <span className="text-[8px] normal-case font-normal">(auto)</span></p>
+                <div className={`${readonlyCls} ${amber}`}>{fmtFull(t2Due)}</div>
               </div>
               <div>
                 <p className={lbl}>Fee Received</p>
@@ -282,15 +265,8 @@ export default function FeeEditModal({
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Pending{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p className={`${valCls} ${t2Pend > 0 ? amber : t.textMuted}`}>
-                  {fmtFull(t2Pend)}
-                </p>
+                <p className={lbl}>Pending <span className="text-[8px] normal-case font-normal">(auto)</span></p>
+                <div className={`${readonlyCls} ${t2Pend > 0 ? amber : t.textMuted}`}>{fmtFull(t2Pend)}</div>
               </div>
               <div>
                 <p className={lbl}>Date Received</p>
@@ -323,13 +299,8 @@ export default function FeeEditModal({
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Fee Due{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p className={`${valCls} ${amber}`}>{fmtFull(auxDue)}</p>
+                <p className={lbl}>Fee Due <span className="text-[8px] normal-case font-normal">(auto)</span></p>
+                <div className={`${readonlyCls} ${amber}`}>{fmtFull(auxDue)}</div>
               </div>
               <div>
                 <p className={lbl}>Fee Received</p>
@@ -342,15 +313,8 @@ export default function FeeEditModal({
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Pending{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p className={`${valCls} ${auxPend > 0 ? amber : t.textMuted}`}>
-                  {fmtFull(auxPend)}
-                </p>
+                <p className={lbl}>Pending <span className="text-[8px] normal-case font-normal">(auto)</span></p>
+                <div className={`${readonlyCls} ${auxPend > 0 ? amber : t.textMuted}`}>{fmtFull(auxPend)}</div>
               </div>
               <div>
                 <p className={lbl}>Date Received</p>
