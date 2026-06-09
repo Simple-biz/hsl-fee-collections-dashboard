@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DollarSign } from "lucide-react";
+import { CheckCircle2, DollarSign } from "lucide-react";
 import { LoginForm } from "./login-form";
 import {
   Card,
@@ -13,13 +13,19 @@ export const metadata: Metadata = {
   title: "Sign in · SSA Fee Collections",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ changed?: string }>;
+}) {
+  const { changed } = await searchParams;
+
   return (
     <main className="flex min-h-svh items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900">
-            <DollarSign className="h-5 w-5 text-white" />
+            <DollarSign className="h-5 w-5 text-white" aria-hidden="true" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-neutral-900">
@@ -28,6 +34,16 @@ export default function LoginPage() {
             <p className="text-xs text-neutral-500">Hogan Smith Law</p>
           </div>
         </div>
+
+        {changed === "1" && (
+          <div
+            role="alert"
+            className="mb-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700"
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Password updated — please sign in with your new password.
+          </div>
+        )}
 
         <Card>
           <CardHeader>

@@ -9,8 +9,14 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -150,7 +156,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
           </p>
         </div>
         <Button size="sm" onClick={() => setNewOpen(true)}>
-          <UserPlus className="h-4 w-4" />
+          <UserPlus className="h-4 w-4" aria-hidden="true" />
           New user
         </Button>
       </div>
@@ -170,9 +176,9 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
           }`}
         >
           {banner.kind === "error" ? (
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           ) : (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           )}
           <span className="flex-1">{banner.text}</span>
           <button
@@ -180,7 +186,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
             aria-label="Dismiss"
             className="hover:opacity-70"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3" aria-hidden="true" />
           </button>
         </div>
       )}
@@ -300,7 +306,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                           disabled={rowBusy}
                           className="h-7 text-[11px]"
                         >
-                          <KeyRound className="h-3 w-3" />
+                          <KeyRound className="h-3 w-3" aria-hidden="true" />
                           Reset password
                         </Button>
                       </div>
@@ -326,14 +332,15 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
         }}
       />
 
+
       <ResetPasswordDialog
         target={resetTarget}
         onClose={() => setResetTarget(null)}
-        onSubmit={async (password) => {
+        onSubmit={async (password, mustChangePassword) => {
           if (!resetTarget) return;
           const result = await run(
             resetTarget.id,
-            () => resetUserPassword({ userId: resetTarget.id, password }),
+            () => resetUserPassword({ userId: resetTarget.id, password, mustChangePassword }),
             `Password reset for ${resetTarget.email}`,
           );
           if (result.ok) setResetTarget(null);
@@ -345,11 +352,26 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
 
 // ---------------- New user dialog ----------------
 
+const CHARSET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%";
+const generatePassword = (): string => {
+  const limit = 256 - (256 % CHARSET.length);
+  const result: string[] = [];
+  while (result.length < 12) {
+    const buf = new Uint8Array(24);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b < limit && result.length < 12) result.push(CHARSET[b % CHARSET.length]);
+    }
+  }
+  return result.join("");
+};
+
 type NewUserValues = {
   email: string;
   password: string;
   name: string | null;
   role: AdminUser["role"];
+  mustChangePassword: boolean;
 };
 
 function NewUserDialog({
@@ -363,19 +385,31 @@ function NewUserDialog({
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(() => generatePassword());
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [role, setRole] = useState<AdminUser["role"]>("member");
+  const [mustChangePassword, setMustChangePassword] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset form whenever the dialog opens.
   const handleOpenChange = (v: boolean) => {
     if (v) {
       setEmail("");
       setName("");
-      setPassword("");
+      setPassword(generatePassword());
+      setShowPassword(false);
+      setCopied(false);
       setRole("member");
+      setMustChangePassword(true);
     }
     onOpenChange(v);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(password).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -383,12 +417,7 @@ function NewUserDialog({
     if (submitting) return;
     setSubmitting(true);
     try {
-      await onSubmit({
-        email: email.trim(),
-        name: name.trim() || null,
-        password,
-        role,
-      });
+      await onSubmit({ email: email.trim(), name: name.trim() || null, password, role, mustChangePassword });
     } finally {
       setSubmitting(false);
     }
@@ -400,11 +429,22 @@ function NewUserDialog({
         <DialogHeader>
           <DialogTitle>New user</DialogTitle>
           <DialogDescription>
-            Accounts are admin-seeded. Pass the password to the user
-            out-of-band; they can sign in immediately.
+            A temporary password is generated automatically. Copy it and share
+            with the user out-of-band before closing this dialog.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nu-name">Full name (optional)</Label>
+            <Input
+              id="nu-name"
+              autoComplete="off"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="John Smith"
+              disabled={submitting}
+            />
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="nu-email">Email</Label>
             <Input
@@ -414,34 +454,57 @@ function NewUserDialog({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="someone@hogansmith.com"
-              disabled={submitting}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="nu-name">Name (optional)</Label>
-            <Input
-              id="nu-name"
-              autoComplete="off"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Jane Doe"
+              placeholder="john@hogansmith.com"
               disabled={submitting}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="nu-password">Password</Label>
-            <Input
-              id="nu-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              disabled={submitting}
-            />
+            <div className="flex gap-1.5">
+              <Input
+                id="nu-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                readOnly
+                value={password}
+                className="flex-1 font-mono"
+                disabled={submitting}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                disabled={submitting}
+              >
+                {showPassword
+                  ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  : <Eye className="h-4 w-4" aria-hidden="true" />}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => { setPassword(generatePassword()); setCopied(false); }}
+                aria-label="Regenerate password"
+                disabled={submitting}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleCopy}
+                aria-label="Copy password"
+                disabled={submitting}
+              >
+                {copied
+                  ? <Check className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                  : <Copy className="h-4 w-4" aria-hidden="true" />}
+              </Button>
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="nu-role">Role</Label>
@@ -460,6 +523,17 @@ function NewUserDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="flex items-center gap-2 pt-0.5">
+            <Checkbox
+              id="nu-force-pw"
+              checked={mustChangePassword}
+              onCheckedChange={(v) => setMustChangePassword(v === true)}
+              disabled={submitting}
+            />
+            <Label htmlFor="nu-force-pw" className="font-normal cursor-pointer">
+              Require password change on first login
+            </Label>
+          </div>
           <DialogFooter className="mt-2">
             <Button
               type="button"
@@ -470,7 +544,7 @@ function NewUserDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {submitting ? "Creating…" : "Create user"}
             </Button>
           </DialogFooter>
@@ -489,15 +563,29 @@ function ResetPasswordDialog({
 }: {
   target: AdminUser | null;
   onClose: () => void;
-  onSubmit: (password: string) => Promise<void>;
+  onSubmit: (password: string, mustChangePassword: boolean) => Promise<void>;
 }) {
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(() => generatePassword());
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Clear field when the target changes.
   const handleOpenChange = (v: boolean) => {
     if (!v) onClose();
-    if (v) setPassword("");
+    if (v) {
+      setPassword(generatePassword());
+      setShowPassword(false);
+      setCopied(false);
+      setMustChangePassword(true);
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(password).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -505,7 +593,7 @@ function ResetPasswordDialog({
     if (submitting) return;
     setSubmitting(true);
     try {
-      await onSubmit(password);
+      await onSubmit(password, mustChangePassword);
     } finally {
       setSubmitting(false);
     }
@@ -517,26 +605,70 @@ function ResetPasswordDialog({
         <DialogHeader>
           <DialogTitle>Reset password</DialogTitle>
           <DialogDescription>
-            Set a new password for{" "}
-            <span className="font-semibold">{target?.email}</span>. Share it
-            with them out-of-band — they can sign in immediately.
+            A new temporary password has been generated for{" "}
+            <span className="font-semibold">{target?.email}</span>. Copy it and
+            share out-of-band before closing.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="rp-password">New password</Label>
-            <Input
-              id="rp-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+            <div className="flex gap-1.5">
+              <Input
+                id="rp-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                readOnly
+                value={password}
+                className="flex-1 font-mono"
+                disabled={submitting}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                disabled={submitting}
+              >
+                {showPassword
+                  ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  : <Eye className="h-4 w-4" aria-hidden="true" />}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => { setPassword(generatePassword()); setCopied(false); }}
+                aria-label="Regenerate password"
+                disabled={submitting}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleCopy}
+                aria-label="Copy password"
+                disabled={submitting}
+              >
+                {copied
+                  ? <Check className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                  : <Copy className="h-4 w-4" aria-hidden="true" />}
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-0.5">
+            <Checkbox
+              id="rp-force-pw"
+              checked={mustChangePassword}
+              onCheckedChange={(v) => setMustChangePassword(v === true)}
               disabled={submitting}
-              autoFocus
             />
+            <Label htmlFor="rp-force-pw" className="font-normal cursor-pointer">
+              Require password change on first login
+            </Label>
           </div>
           <DialogFooter className="mt-2">
             <Button
@@ -548,7 +680,7 @@ function ResetPasswordDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {submitting ? "Saving…" : "Set password"}
             </Button>
           </DialogFooter>

@@ -18,28 +18,42 @@ export const authConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isOnLogin = nextUrl.pathname === "/login";
+      const isOnChangePassword = nextUrl.pathname === "/change-password";
+      const mustChange = auth?.user?.mustChangePassword ?? false;
 
       if (isOnLogin) {
-        // Already authenticated users shouldn't see the login page.
-        if (isLoggedIn) return Response.redirect(new URL("/", nextUrl));
+        if (isLoggedIn) {
+          const dest = mustChange ? "/change-password" : "/";
+          return Response.redirect(new URL(dest, nextUrl));
+        }
         return true;
+      }
+
+      if (isOnChangePassword) {
+        return isLoggedIn;
+      }
+
+      if (isLoggedIn && mustChange) {
+        return Response.redirect(new URL("/change-password", nextUrl));
       }
 
       return isLoggedIn;
     },
-    // Persist id/role onto the JWT at sign-in.
+    // Persist id/role/mustChangePassword onto the JWT at sign-in.
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.mustChangePassword = user.mustChangePassword ?? false;
       }
       return token;
     },
-    // Expose id/role on the session for client and server consumers.
+    // Expose id/role/mustChangePassword on the session for client and server consumers.
     session({ session, token }) {
       if (session.user) {
         if (token.id) session.user.id = token.id;
         if (token.role) session.user.role = token.role;
+        session.user.mustChangePassword = token.mustChangePassword ?? false;
       }
       return session;
     },
