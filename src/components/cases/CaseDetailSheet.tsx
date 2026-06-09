@@ -46,6 +46,30 @@ interface CaseDetailSheetProps {
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null | undefined) => (d ? fmtDate(d) : "—");
 
+type MyCaseData = {
+  caseStage: string | null;
+  approvalDate: string | null;
+  assignedTo: string | null;
+  winSheetStatus: string;
+  claimTypeLabel: string | null;
+  levelWon: string | null;
+  t16Retro: string;
+  t16FeeDue: string;
+  t16FeeReceived: string;
+  t16Pending: string;
+  t16FeeReceivedDate: string | null;
+  t2Retro: string;
+  t2FeeDue: string;
+  t2FeeReceived: string;
+  t2Pending: string;
+  t2FeeReceivedDate: string | null;
+  feesConfirmation: string | null;
+  t2Decision: string;
+  t16Decision: string;
+  notes: string | null;
+  chronicleLink: string | null;
+};
+
 function ClientDetailsSection({
   ud,
   textMuted,
@@ -156,30 +180,6 @@ export default function CaseDetailSheet({
   const t = themeClasses(dark);
   const router = useRouter();
 
-  type MyCaseData = {
-    caseStage: string | null;
-    approvalDate: string | null;
-    assignedTo: string | null;
-    winSheetStatus: string;
-    claimTypeLabel: string | null;
-    levelWon: string | null;
-    t16Retro: string;
-    t16FeeDue: string;
-    t16FeeReceived: string;
-    t16Pending: string;
-    t16FeeReceivedDate: string | null;
-    t2Retro: string;
-    t2FeeDue: string;
-    t2FeeReceived: string;
-    t2Pending: string;
-    t2FeeReceivedDate: string | null;
-    feesConfirmation: string | null;
-    t2Decision: string;
-    t16Decision: string;
-    notes: string | null;
-    chronicleLink: string | null;
-  };
-
   const [data, setData] = useState<CaseDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -266,6 +266,12 @@ export default function CaseDetailSheet({
   const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const val = `text-[13px] font-semibold ${t.text} mt-0.5`;
   const sectionCls = `p-4 border-b ${t.borderLight}`;
+
+  const chronicleLink = data
+    ? (myCaseData?.chronicleLink ?? (data.userDetails?.chronicleId != null
+        ? `https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}`
+        : null))
+    : null;
 
   return (
     <>
@@ -362,9 +368,9 @@ export default function CaseDetailSheet({
                   >
                     Documents <FileText aria-hidden="true" className="h-3 w-3" />
                   </button>
-                  {(myCaseData?.chronicleLink ?? (data.userDetails?.chronicleId != null ? `https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}` : null)) && (
+                  {chronicleLink && (
                     <a
-                      href={myCaseData?.chronicleLink ?? `https://app.chroniclelegal.com/dashboard/clients/${data.userDetails?.chronicleId}`}
+                      href={chronicleLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-sky-900/30 text-sky-400 hover:bg-sky-900/50" : "bg-sky-50 text-sky-600 hover:bg-sky-100"}`}
@@ -410,11 +416,15 @@ export default function CaseDetailSheet({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className={lbl}>T2 (SSDI) Decision</p>
-                  <p className={`${val} capitalize`}>{data.t2Decision?.replace(/_/g, " ") || "—"}</p>
+                  <p className={`${val} capitalize`}>
+                    {data.t2Decision && data.t2Decision !== "unknown" ? data.t2Decision.replace(/_/g, " ") : "—"}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className={lbl}>T16 (SSI) Decision</p>
-                  <p className={`${val} capitalize`}>{data.t16Decision?.replace(/_/g, " ") || "—"}</p>
+                  <p className={`${val} capitalize`}>
+                    {data.t16Decision && data.t16Decision !== "unknown" ? data.t16Decision.replace(/_/g, " ") : "—"}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className={lbl}>Win Sheet Status</p>
@@ -526,9 +536,15 @@ export default function CaseDetailSheet({
                   <span className={`text-[11px] ${t.textMuted}`}>Fetching from MyCase…</span>
                 </div>
               ) : myCaseError ? (
-                <div className={`flex items-start gap-2 rounded-md p-2 text-[11px] ${dark ? "bg-amber-900/20 text-amber-400" : "bg-amber-50 text-amber-700"}`}>
+                <div
+                  role="alert"
+                  className={`flex items-start gap-2 rounded-md p-2 text-[11px] ${dark ? "bg-amber-900/20 text-amber-400" : "bg-amber-50 text-amber-700"}`}
+                >
                   <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  <span>{myCaseError}</span>
+                  <span className="flex-1">{myCaseError}</span>
+                  <button onClick={fetchMyCaseData} className="shrink-0 underline font-semibold">
+                    Retry
+                  </button>
                 </div>
               ) : myCaseData ? (
                 <div className="space-y-3">

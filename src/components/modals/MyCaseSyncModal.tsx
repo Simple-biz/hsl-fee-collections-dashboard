@@ -130,9 +130,11 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
 
   const fetchControllerRef = useRef<AbortController | null>(null);
   const syncControllerRef = useRef<AbortController | null>(null);
+  const tagControllerRef = useRef<AbortController | null>(null);
   useEffect(() => () => {
     fetchControllerRef.current?.abort();
     syncControllerRef.current?.abort();
+    tagControllerRef.current?.abort();
   }, []);
 
   const handleFetch = async () => {
@@ -188,23 +190,29 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
       clientIds.forEach((id) => next.delete(id));
       return next;
     });
+    tagControllerRef.current?.abort();
+    const tagController = new AbortController();
+    tagControllerRef.current = tagController;
     try {
       const res = await fetch("/api/mycase/sync/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ myCaseCaseIds: clientIds }),
+        signal: tagController.signal,
       });
       if (!res.ok) {
         const json: Record<string, unknown> = await res.json().catch(() => ({}));
         throw new Error((json.error as string) ?? `Tag failed (${res.status})`);
       }
     } catch (e) {
+      const err = e as Error;
+      if (err.name === "AbortError") return;
       setViewedIds((prev) => {
         const next = new Set(prev);
         clientIds.forEach((id) => next.delete(id));
         return next;
       });
-      setError((e as Error).message);
+      setError(err.message);
     }
   };
 
@@ -214,19 +222,25 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
       clientIds.forEach((id) => next.delete(id));
       return next;
     });
+    tagControllerRef.current?.abort();
+    const tagController = new AbortController();
+    tagControllerRef.current = tagController;
     try {
       const res = await fetch("/api/mycase/sync/tags", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ myCaseCaseIds: clientIds }),
+        signal: tagController.signal,
       });
       if (!res.ok) {
         const json: Record<string, unknown> = await res.json().catch(() => ({}));
         throw new Error((json.error as string) ?? `Untag failed (${res.status})`);
       }
     } catch (e) {
+      const err = e as Error;
+      if (err.name === "AbortError") return;
       setViewedIds((prev) => new Set([...prev, ...clientIds]));
-      setError((e as Error).message);
+      setError(err.message);
     }
   };
 
