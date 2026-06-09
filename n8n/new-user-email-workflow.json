@@ -1,0 +1,92 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hsl-new-user-email",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "5f29bc21-af23-4b49-8c0d-dff848b956a4",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        128,
+        720
+      ],
+      "webhookId": "55555555-5555-5555-5555-555555555555"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? $input.first().json;\n\nconst ROLE_LABELS = {\n  system_admin: 'System Admin',\n  admin: 'Admin',\n  member: 'Member',\n};\n\nconst ROLE_BADGE_COLORS = {\n  system_admin: 'background-color:#fef3c7;color:#92400e;',\n  admin: 'background-color:#dbeafe;color:#1e40af;',\n  member: 'background-color:#e0e7ff;color:#3730a3;',\n};\n\nconst humanize = (s) => String(s).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');\n\nconst email       = body.email ?? '';\nconst password    = body.password ?? '';\nconst displayName = body.name || email;\nconst roleLabel   = ROLE_LABELS[body.role] ?? humanize(body.role || 'member');\nconst roleBadge   = ROLE_BADGE_COLORS[body.role] ?? 'background-color:#f1f5f9;color:#475569;';\n\nconst SIGN_IN_URL = 'https://hsl-fee-collections-dashboard-ten.vercel.app/';\n\nconst htmlBody = `<!DOCTYPE html>\n<html lang='en'>\n<head>\n  <meta charset='UTF-8'>\n  <meta name='viewport' content='width=device-width,initial-scale=1.0'>\n  <title>Your HSL Dashboard Access</title>\n</head>\n<body style='margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,Roboto,Oxygen,sans-serif;'>\n\n  <table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f1f5f9;padding:48px 16px;'>\n    <tr>\n      <td align='center'>\n        <table width='100%' cellpadding='0' cellspacing='0' style='max-width:560px;'>\n\n          <!-- Header -->\n          <tr>\n            <td style='background-color:#0f172a;border-radius:14px 14px 0 0;padding:36px 44px 32px;text-align:center;'>\n              <p style='margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#475569;'>Hogan Smith Legal</p>\n              <h1 style='margin:0 0 6px;font-size:22px;font-weight:700;color:#f8fafc;letter-spacing:-0.02em;line-height:1.2;'>Fee Collections Dashboard</h1>\n              <p style='margin:0;font-size:12px;color:#64748b;letter-spacing:0.02em;'>Account Access &nbsp;&middot;&nbsp; Welcome Email</p>\n            </td>\n          </tr>\n\n          <!-- Accent bar -->\n          <tr>\n            <td style='height:4px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#06b6d4 100%);'></td>\n          </tr>\n\n          <!-- Body -->\n          <tr>\n            <td style='background-color:#ffffff;padding:40px 44px 36px;'>\n\n              <h2 style='margin:0 0 8px;font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;'>Welcome, ${displayName}!</h2>\n              <p style='margin:0 0 32px;font-size:13.5px;color:#64748b;line-height:1.7;'>Your account on the <strong style='color:#0f172a;'>HSL Fee Collections Dashboard</strong> has been created and is ready to use. Find your account details below.</p>\n\n              <!-- Account details card -->\n              <table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;margin-bottom:32px;overflow:hidden;'>\n                <tr>\n                  <td style='padding:0;'>\n\n                    <!-- Card header -->\n                    <table width='100%' cellpadding='0' cellspacing='0'>\n                      <tr>\n                        <td style='background-color:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:12px 24px;'>\n                          <p style='margin:0;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8;'>Your Login Credentials</p>\n                        </td>\n                      </tr>\n                    </table>\n\n                    <!-- Email row -->\n                    <table width='100%' cellpadding='0' cellspacing='0'>\n                      <tr>\n                        <td style='padding:18px 24px 16px;border-bottom:1px solid #e2e8f0;'>\n                          <p style='margin:0 0 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;'>Email address</p>\n                          <p style='margin:0;font-size:14px;font-weight:600;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;'>${email}</p>\n                        </td>\n                      </tr>\n                    </table>\n\n                    <!-- Password row -->\n                    <table width='100%' cellpadding='0' cellspacing='0'>\n                      <tr>\n                        <td style='padding:16px 24px;border-bottom:1px solid #e2e8f0;'>\n                          <p style='margin:0 0 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;'>Password</p>\n                          <p style='margin:0;font-size:15px;font-weight:700;color:#1e293b;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0.08em;'>${password}</p>\n                        </td>\n                      </tr>\n                    </table>\n\n                    <!-- Role row -->\n                    <table width='100%' cellpadding='0' cellspacing='0'>\n                      <tr>\n                        <td style='padding:16px 24px;'>\n                          <p style='margin:0 0 8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;'>Role</p>\n                          <span style='display:inline-block;${roleBadge}font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:4px 12px;border-radius:9999px;'>${roleLabel}</span>\n                        </td>\n                      </tr>\n                    </table>\n\n                  </td>\n                </tr>\n              </table>\n\n              <!-- CTA button -->\n              <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:32px;'>\n                <tr>\n                  <td align='center'>\n                    <a href='${SIGN_IN_URL}'\n                       target='_blank'\n                       rel='noopener noreferrer'\n                       style='display:inline-block;background-color:#1e293b;color:#f8fafc;font-size:13px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:9px;letter-spacing:0.03em;'>\n                      Sign In to Dashboard &nbsp;&rarr;\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Note -->\n              <table width='100%' cellpadding='0' cellspacing='0'>\n                <tr>\n                  <td style='background-color:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px 18px;'>\n                    <table cellpadding='0' cellspacing='0'>\n                      <tr>\n                        <td style='padding-right:10px;vertical-align:top;padding-top:1px;'>\n                          <span style='font-size:15px;'>&#x26a0;&#xfe0f;</span>\n                        </td>\n                        <td>\n                          <p style='margin:0;font-size:12.5px;color:#78350f;line-height:1.65;'>\n                            <strong>Security reminder:</strong> Please change your password after your first sign-in. Never share your credentials with anyone.\n                          </p>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style='background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 14px 14px;padding:22px 44px;text-align:center;'>\n              <p style='margin:0 0 4px;font-size:11px;color:#94a3b8;line-height:1.6;'>This is an automated message from the <strong>HSL Fee Collections</strong> system.</p>\n              <p style='margin:0;font-size:11px;color:#cbd5e1;'>If you did not expect this email, please contact your system administrator.</p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>`;\n\nreturn [{ json: { email, displayName, htmlBody } }];"
+      },
+      "id": "e15a97a5-96e9-46ea-aba0-b8df25fce7ed",
+      "name": "Build Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "hearingdashboard@hogansmith.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Your HSL Fee Collections Account is Ready",
+        "html": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "796b4ab0-bcde-4788-aba1-e36d267aef7f",
+      "name": "Send an Email",
+      "type": "n8n-nodes-base.emailSend",
+      "maxTries": 3,
+      "position": [
+        608,
+        720
+      ],
+      "webhookId": "522063a0-d981-42e8-8d17-5ea6852264b8",
+      "retryOnFail": true,
+      "typeVersion": 2.1,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "smtp": {
+          "id": "jvnkR6FhSgBfd2EV",
+          "name": "hearingdashboard@hogansmith.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "11d1e5febe5cccf14212f53d0231fc2668bea5400c633d6171c207137b8bdf5f"
+  }
+}

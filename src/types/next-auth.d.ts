@@ -6,12 +6,14 @@ declare module "next-auth" {
   /** Returned by `authorize` and stored on the session user. */
   interface User {
     role?: UserRole;
+    mustChangePassword?: boolean;
   }
 
   interface Session {
     user: {
       id: string;
       role: UserRole;
+      mustChangePassword: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -22,5 +24,6 @@ declare module "@auth/core/jwt" {
   interface JWT {
     id?: string;
     role?: UserRole;
+    mustChangePassword?: boolean;
   }
 }

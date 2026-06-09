@@ -1,5 +1,5 @@
 {
-  "id": "c5089fd3-4a8d-4fcb-a1a1-1aa756e7bf11",
+  "id": "8fbb22e6-e793-4333-b78f-a87ba41027e4",
   "prevId": "6b80f5eb-140d-4892-aecd-e3197eb77c8a",
   "version": "7",
   "dialect": "postgresql",
@@ -1969,12 +1969,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "op_ltr_date": {
-          "name": "op_ltr_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
         "op_ltr_received": {
           "name": "op_ltr_received",
           "type": "date",
@@ -1994,12 +1988,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "''"
-        },
-        "region": {
-          "name": "region",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2512,6 +2500,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "must_change_password": {
+          "name": "must_change_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "last_login_at": {
           "name": "last_login_at",
