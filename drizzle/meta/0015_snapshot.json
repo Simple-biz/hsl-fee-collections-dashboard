@@ -1,6 +1,6 @@
 {
-  "id": "c5089fd3-4a8d-4fcb-a1a1-1aa756e7bf11",
-  "prevId": "6b80f5eb-140d-4892-aecd-e3197eb77c8a",
+  "id": "ff6ddc08-0b0a-4b62-909f-07073ec9bd69",
+  "prevId": "8fbb22e6-e793-4333-b78f-a87ba41027e4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1463,6 +1463,13 @@
           "notNull": true,
           "default": false
         },
+        "marked_overpaid": {
+          "name": "marked_overpaid",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "closed_at": {
           "name": "closed_at",
           "type": "timestamp with time zone",
@@ -1981,12 +1988,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "overpaid_amount": {
+          "name": "overpaid_amount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "checks_cleared": {
           "name": "checks_cleared",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "checks_cleared_at": {
+          "name": "checks_cleared_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "update_note": {
           "name": "update_note",
@@ -2512,6 +2531,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "must_change_password": {
+          "name": "must_change_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "last_login_at": {
           "name": "last_login_at",

@@ -1,6 +1,6 @@
 {
-  "id": "848dbbb9-403b-4640-afe2-e65a4e0ba399",
-  "prevId": "c5089fd3-4a8d-4fcb-a1a1-1aa756e7bf11",
+  "id": "e6e50f58-0fcf-48b2-a6af-6416f61ebb06",
+  "prevId": "ff6ddc08-0b0a-4b62-909f-07073ec9bd69",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -59,9 +59,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_activity_log_created_at": {
           "name": "idx_activity_log_created_at",
@@ -74,37 +74,37 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "activity_log_case_id_cases_client_id_fk": {
           "name": "activity_log_case_id_cases_client_id_fk",
           "tableFrom": "activity_log",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "activity_log_fee_record_id_fee_records_id_fk": {
           "name": "activity_log_fee_record_id_fee_records_id_fk",
           "tableFrom": "activity_log",
-          "tableTo": "fee_records",
           "columnsFrom": [
             "fee_record_id"
           ],
+          "tableTo": "fee_records",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -216,10 +216,10 @@
       "uniqueConstraints": {
         "approved_by_options_name_unique": {
           "name": "approved_by_options_name_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "name"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -653,9 +653,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_cases_external_id": {
           "name": "idx_cases_external_id",
@@ -668,9 +668,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_cases_claim_type_label": {
           "name": "idx_cases_claim_type_label",
@@ -683,9 +683,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_cases_approval_date": {
           "name": "idx_cases_approval_date",
@@ -698,9 +698,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_cases_last_name": {
           "name": "idx_cases_last_name",
@@ -713,9 +713,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -723,10 +723,10 @@
       "uniqueConstraints": {
         "cases_client_id_unique": {
           "name": "cases_client_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "client_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -818,35 +818,35 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "chronicle_documents_case_id_cases_client_id_fk": {
           "name": "chronicle_documents_case_id_cases_client_id_fk",
           "tableFrom": "chronicle_documents",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "chronicle_documents_case_id_chronicle_document_id_unique": {
           "name": "chronicle_documents_case_id_chronicle_document_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "case_id",
             "chronicle_document_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -931,9 +931,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_daily_metrics_date": {
           "name": "idx_daily_metrics_date",
@@ -946,24 +946,24 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "daily_metrics_agent_name_team_members_name_fk": {
           "name": "daily_metrics_agent_name_team_members_name_fk",
           "tableFrom": "daily_metrics",
-          "tableTo": "team_members",
           "columnsFrom": [
             "agent_name"
           ],
+          "tableTo": "team_members",
           "columnsTo": [
             "name"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1041,9 +1041,9 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_dropdown_options_category": {
           "name": "idx_dropdown_options_category",
@@ -1056,9 +1056,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -1110,10 +1110,10 @@
       "uniqueConstraints": {
         "fee_cap_history_effective_date_unique": {
           "name": "fee_cap_history_effective_date_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "effective_date"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1220,34 +1220,34 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "fee_petitions_case_id_cases_client_id_fk": {
           "name": "fee_petitions_case_id_cases_client_id_fk",
           "tableFrom": "fee_petitions",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "fee_petitions_case_id_unique": {
           "name": "fee_petitions_case_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "case_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1463,6 +1463,13 @@
           "notNull": true,
           "default": false
         },
+        "marked_overpaid": {
+          "name": "marked_overpaid",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "closed_at": {
           "name": "closed_at",
           "type": "timestamp with time zone",
@@ -1581,9 +1588,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_fee_records_assigned_to": {
           "name": "idx_fee_records_assigned_to",
@@ -1596,9 +1603,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_fee_records_win_sheet_status": {
           "name": "idx_fee_records_win_sheet_status",
@@ -1611,9 +1618,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_fee_records_sync_status": {
           "name": "idx_fee_records_sync_status",
@@ -1626,9 +1633,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_fee_records_pif": {
           "name": "idx_fee_records_pif",
@@ -1641,9 +1648,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_fee_records_is_closed": {
           "name": "idx_fee_records_is_closed",
@@ -1656,34 +1663,34 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "fee_records_case_id_cases_client_id_fk": {
           "name": "fee_records_case_id_cases_client_id_fk",
           "tableFrom": "fee_records",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "fee_records_case_id_unique": {
           "name": "fee_records_case_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "case_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1763,35 +1770,35 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "mycase_notice_documents_case_id_cases_client_id_fk": {
           "name": "mycase_notice_documents_case_id_cases_client_id_fk",
           "tableFrom": "mycase_notice_documents",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "mycase_notice_documents_case_id_mycase_document_id_unique": {
           "name": "mycase_notice_documents_case_id_mycase_document_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "case_id",
             "mycase_document_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1881,9 +1888,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_notifications_is_read": {
           "name": "idx_notifications_is_read",
@@ -1896,9 +1903,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_notifications_created_at": {
           "name": "idx_notifications_created_at",
@@ -1911,9 +1918,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_notifications_agent": {
           "name": "idx_notifications_agent",
@@ -1926,24 +1933,24 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "notifications_case_id_cases_client_id_fk": {
           "name": "notifications_case_id_cases_client_id_fk",
           "tableFrom": "notifications",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1978,6 +1985,12 @@
         "op_ltr_received": {
           "name": "op_ltr_received",
           "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "overpaid_amount": {
+          "name": "overpaid_amount",
+          "type": "numeric(12, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -2034,34 +2047,34 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "overpaid_cases_case_id_cases_client_id_fk": {
           "name": "overpaid_cases_case_id_cases_client_id_fk",
           "tableFrom": "overpaid_cases",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "overpaid_cases_case_id_unique": {
           "name": "overpaid_cases_case_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "case_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -2224,9 +2237,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -2280,10 +2293,10 @@
       "uniqueConstraints": {
         "team_members_name_unique": {
           "name": "team_members_name_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "name"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -2435,41 +2448,41 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "user_details_case_id_cases_client_id_fk": {
           "name": "user_details_case_id_cases_client_id_fk",
           "tableFrom": "user_details",
-          "tableTo": "cases",
           "columnsFrom": [
             "case_id"
           ],
+          "tableTo": "cases",
           "columnsTo": [
             "client_id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "user_details_case_id_unique": {
           "name": "user_details_case_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "case_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         },
         "user_details_chronicle_id_unique": {
           "name": "user_details_chronicle_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "chronicle_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -2519,6 +2532,13 @@
           "notNull": true,
           "default": true
         },
+        "must_change_password": {
+          "name": "must_change_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "last_login_at": {
           "name": "last_login_at",
           "type": "timestamp with time zone",
@@ -2552,9 +2572,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -2562,10 +2582,10 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -2668,10 +2688,10 @@
     }
   },
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},
