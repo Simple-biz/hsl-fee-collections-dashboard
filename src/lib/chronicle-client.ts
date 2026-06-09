@@ -297,3 +297,53 @@ export const fetchChronicleClient = async (
 
   return res.json();
 };
+
+// ============================================================================
+// SEARCH CHRONICLE CLIENTS
+// GET /api/clients?first_name=&last_name=&last_4_ssn=&full_ssn=&external_id=
+// Fields are ANDed together; returns an array of matching ClientData. This is
+// the reverse-lookup that lets us find a case's Chronicle client_id from data
+// we already store (last4 SSN + last name) — the basis for backfilling
+// user_details.chronicle_id.
+// ============================================================================
+
+export interface ChronicleSearchParams {
+  firstName?: string;
+  lastName?: string;
+  last4Ssn?: string;
+  fullSsn?: string;
+  externalId?: string;
+}
+
+export const searchChronicleClients = async (
+  params: ChronicleSearchParams,
+  apiUrl: string,
+  apiKey: string,
+): Promise<ChronicleApiResponse[]> => {
+  const qs = new URLSearchParams();
+  if (params.firstName) qs.set("first_name", params.firstName);
+  if (params.lastName) qs.set("last_name", params.lastName);
+  if (params.last4Ssn) qs.set("last_4_ssn", params.last4Ssn);
+  if (params.fullSsn) qs.set("full_ssn", params.fullSsn);
+  if (params.externalId) qs.set("external_id", params.externalId);
+
+  const res = await fetch(`${apiUrl}/api/clients?${qs.toString()}`, {
+    headers: {
+      "x-api-key": apiKey,
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Invalid Chronicle API key");
+    if (res.status === 403)
+      throw new Error("Access denied — check API permissions");
+    if (res.status === 422)
+      throw new Error("Invalid search parameters (Chronicle 422)");
+    throw new Error(`Chronicle API error: ${res.status} ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  // The endpoint returns an array; be defensive if a single object comes back.
+  return Array.isArray(data) ? data : data ? [data] : [];
+};
