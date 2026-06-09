@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import {
@@ -13,6 +13,8 @@ import {
   RotateCcw,
   Loader2,
   ExternalLink,
+  TrendingDown,
+  X,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -176,6 +178,59 @@ export const FeeRecordsTable = ({
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
   );
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [overpaidOverrides, setOverpaidOverrides] = useState<Record<number, boolean>>({});
+  const [batchLoading, setBatchLoading] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const toggleRowSelection = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
+    setSelectedIds(allSelected ? new Set() : new Set(filtered.map((c) => c.id)));
+  };
+
+  const handleBatchOverpaid = async (mark: boolean) => {
+    if (selectedIds.size === 0 || batchLoading) return;
+    const ids = Array.from(selectedIds);
+    setBatchLoading(true);
+    // Optimistic override only when marking — removing the flag should not
+    // immediately change the visual state in this table (it takes effect on
+    // the next data refresh so the row highlight isn't stripped mid-session).
+    if (mark) {
+      setOverpaidOverrides((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => { next[id] = true; });
+        return next;
+      });
+    }
+    try {
+      const res = await fetch("/api/cases/bulk-overpaid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseIds: ids, markedOverpaid: mark }),
+      });
+      if (!res.ok) throw new Error(`Failed to update overpaid flag (${res.status})`);
+      setSelectedIds(new Set());
+    } catch (err) {
+      if (mark) {
+        setOverpaidOverrides((prev) => {
+          const next = { ...prev };
+          ids.forEach((id) => { delete next[id]; });
+          return next;
+        });
+      }
+      window.alert((err as Error).message);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
 
   // Unique assignees for filter dropdown
   const assignees = useMemo(() => {
@@ -266,6 +321,14 @@ export const FeeRecordsTable = ({
     sortDir,
     dateRange,
   ]);
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
+    const someSelected = filtered.some((c) => selectedIds.has(c.id));
+    selectAllRef.current.checked = allSelected;
+    selectAllRef.current.indeterminate = !allSelected && someSelected;
+  }, [selectedIds, filtered]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -416,25 +479,27 @@ export const FeeRecordsTable = ({
   // Assigned freezes left only at sm+ (on mobile it keeps thBase's sticky-top
   // but scrolls horizontally). Corner cells use z-30 to cover both single-axis
   // sticky neighbors during scroll.
-  const stickyTh1 = `left-0 z-30 ${colNameW} ${nameDivider}`;
+  const stickyTh1 = `left-10 z-30 ${colNameW} ${nameDivider}`;
   // z-30 only at sm+ (where Assigned is a frozen corner). On mobile Assigned
   // scrolls, so it must stay at thBase's z-20 — BELOW the frozen Case Name
   // (z-30) — otherwise it paints over the frozen "front index" on scroll.
-  const stickyTh2 = `sm:left-48 sm:z-30 ${colAssignedW} ${stickyDivider}`;
+  const stickyTh2 = `sm:left-[14.5rem] sm:z-30 ${colAssignedW} ${stickyDivider}`;
   // "Case Info" group label is split into two cells so each part's freeze
   // matches the column beneath it: the label over Case Name freezes on all
   // screens (stickyGroup); the blank part over Assigned freezes only at sm+
   // (stickyGroup2). This keeps "Case Info" pinned over the frozen Case Name
   // column on mobile instead of letting T16/T2 labels slide over it.
-  const stickyGroup = `top-0! left-0 z-30 ${colNameW} ${nameDivider}`;
+  const stickyGroup = `top-0! left-10 z-30 ${colNameW} ${nameDivider}`;
   // Same as stickyTh2: z-30 only at sm+ so on mobile this scrolls below the
   // frozen "Case Info" label (z-30) instead of covering it.
-  const stickyGroup2 = `top-0! sm:left-48 sm:z-30 ${colAssignedW} ${stickyDivider}`;
-  const stickyTd1 = `sticky left-0 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
-  const stickyTd2 = `sm:sticky sm:left-48 sm:z-10 ${colAssignedW} ${stickyColBg} ${stickyDivider}`;
+  const stickyGroup2 = `top-0! sm:left-[14.5rem] sm:z-30 ${colAssignedW} ${stickyDivider}`;
+  const stickyTd1 = `sticky left-10 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
+  const stickyTd2 = `sm:sticky sm:left-[14.5rem] sm:z-10 ${colAssignedW} ${stickyColBg} ${stickyDivider}`;
+  const stickyCheckTh = `sticky top-0! left-0 z-30 w-10 min-w-10 ${stickyBg}`;
+  const stickyCheckTd = `sticky left-0 z-10 w-10 min-w-10 ${stickyBg} ${stickyHover}`;
 
   return (
-    <div className={`rounded-xl border ${t.card}`}>
+    <div className={`relative rounded-xl border ${t.card}`}>
       {/* Case Detail Side Panel */}
       {selectedCaseId && (
         <CaseDetailSheet 
@@ -516,6 +581,36 @@ export const FeeRecordsTable = ({
         </div>
       </div>
 
+      {/* Floating batch action pill — anchored to the bottom of the table card */}
+      {selectedIds.size > 0 && (
+        <div className="pointer-events-none absolute bottom-12 left-0 right-0 z-50 flex justify-center">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
+            <span className="text-[11px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={() => handleBatchOverpaid(true)}
+              disabled={batchLoading}
+              className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-gray-900 transition-colors disabled:opacity-50"
+            >
+              {batchLoading ? (
+                <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+              ) : (
+                <TrendingDown aria-hidden="true" className="h-3 w-3" />
+              )}
+              Mark as Overpaid
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              aria-label="Clear selection"
+              className="h-7 w-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-gray-300 transition-colors ml-1"
+            >
+              <X aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table — own scroll container (both axes). Vertical scroll lets the
           sticky <thead> rows pin; horizontal scroll keeps the frozen Case
           Name + Assigned columns. max-h caps it so the header stays in view
@@ -525,6 +620,16 @@ export const FeeRecordsTable = ({
           {/* Group headers */}
           <thead>
             <tr className={`border-b ${t.borderLight}`}>
+              {/* Select-all checkbox spans both header rows */}
+              <th rowSpan={2} className={`${stickyCheckTh} px-3 text-center`}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  onChange={toggleSelectAll}
+                  aria-label="Select all rows"
+                  className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                />
+              </th>
               {/* "Case Info" label is split per column so each part's freeze
                   matches the column below it: the label cell over Case Name
                   freezes on all screens; the blank cell over Assigned freezes
@@ -711,12 +816,24 @@ export const FeeRecordsTable = ({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c) => (
+            {filtered.map((c) => {
+              const isOverpaid = overpaidOverrides[c.id] ?? c.markedOverpaid;
+              return (
               <tr
                 key={c.id}
                 onClick={() => setSelectedCaseId(c.id)}
-                className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group`}
+                className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group ${isOverpaid ? "border-l-2 border-l-amber-500" : ""}`}
               >
+                {/* Checkbox */}
+                <td className={`${stickyCheckTd} px-3 text-center`} onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(c.id)}
+                    onChange={() => toggleRowSelection(c.id)}
+                    aria-label={`Select ${c.name}`}
+                    className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                  />
+                </td>
                 {/* Case Info — first two columns are frozen */}
                 <td
                   className={`${tdBase} ${t.text} font-semibold truncate ${stickyTd1}`}
@@ -1302,7 +1419,8 @@ export const FeeRecordsTable = ({
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -66,6 +66,7 @@ export interface CaseRow {
   feesConfirmation: string | null;
   caseStatus: string | null;
   isClosed: boolean;
+  markedOverpaid: boolean;
   closedAt: string | null;
   update: string;
   sync: SyncStatus;

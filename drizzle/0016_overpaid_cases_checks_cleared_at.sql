@@ -1,0 +1,1 @@
+ALTER TABLE "overpaid_cases" ADD COLUMN "checks_cleared_at" timestamp with time zone;
