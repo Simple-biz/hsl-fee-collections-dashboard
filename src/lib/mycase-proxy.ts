@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 
 /**
  * Calls the n8n webhook that proxies MyCase Open API. MyCase OAuth credentials
@@ -29,9 +30,7 @@ export type MyCaseCaseDetail = {
   }>;
 };
 
-export async function fetchCaseDetails(
-  caseId: number,
-): Promise<MyCaseCaseDetail> {
+async function _fetchCaseDetails(caseId: number): Promise<MyCaseCaseDetail> {
   if (!CASE_DETAIL_WEBHOOK_URL) {
     throw new Error(
       "MyCase case detail webhook is not configured (N8N_MYCASE_CASE_DETAIL_WEBHOOK_URL)",
@@ -54,6 +53,14 @@ export async function fetchCaseDetails(
 
   return res.json() as Promise<MyCaseCaseDetail>;
 }
+
+// Cache per caseId for 5 minutes — avoids hitting the n8n webhook on every
+// sheet open for cases whose chronicle link isn't in the mirror DB yet.
+export const fetchCaseDetails = unstable_cache(
+  _fetchCaseDetails,
+  ["mycase-case-details"],
+  { revalidate: 300 },
+);
 
 // Shape returned by MyCase's GET /v1/cases/{id}/documents endpoint.
 export type MyCaseDocument = {

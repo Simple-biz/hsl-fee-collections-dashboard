@@ -391,7 +391,7 @@ export default function CaseDetailSheet({
                 <div>
                   <p className={lbl}>Approval Date</p>
                   <p className={`${val} flex items-center gap-1`}>
-                    <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate ?? myCaseData?.approvalDate)}
+                    <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(myCaseData?.approvalDate ?? data.approvalDate)}
                   </p>
                 </div>
                 <div>
@@ -551,7 +551,7 @@ export default function CaseDetailSheet({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className={lbl}>Approval Date</p>
-                      <p className={val}>{dateStr(myCaseData.approvalDate ?? data?.approvalDate)}</p>
+                      <p className={val}>{dateStr(myCaseData.approvalDate)}</p>
                     </div>
                     <div>
                       <p className={lbl}>Case Stage</p>
