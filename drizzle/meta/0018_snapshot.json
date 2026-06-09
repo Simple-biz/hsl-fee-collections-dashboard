@@ -1,6 +1,6 @@
 {
-  "id": "848dbbb9-403b-4640-afe2-e65a4e0ba399",
-  "prevId": "c5089fd3-4a8d-4fcb-a1a1-1aa756e7bf11",
+  "id": "9cb05c3d-700d-459a-8b76-4cf9ac88cccd",
+  "prevId": "273bb877-7898-4916-9d5c-73907d330efa",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1463,6 +1463,13 @@
           "notNull": true,
           "default": false
         },
+        "marked_overpaid": {
+          "name": "marked_overpaid",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "closed_at": {
           "name": "closed_at",
           "type": "timestamp with time zone",
@@ -1978,6 +1985,12 @@
         "op_ltr_received": {
           "name": "op_ltr_received",
           "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "overpaid_amount": {
+          "name": "overpaid_amount",
+          "type": "numeric(12, 2)",
           "primaryKey": false,
           "notNull": false
         },

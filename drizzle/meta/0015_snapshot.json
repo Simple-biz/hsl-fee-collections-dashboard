@@ -1,6 +1,6 @@
 {
-  "id": "848dbbb9-403b-4640-afe2-e65a4e0ba399",
-  "prevId": "c5089fd3-4a8d-4fcb-a1a1-1aa756e7bf11",
+  "id": "c5089fd3-4a8d-4fcb-a1a1-1aa756e7bf11",
+  "prevId": "6b80f5eb-140d-4892-aecd-e3197eb77c8a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1987,12 +1987,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "checks_cleared_at": {
-          "name": "checks_cleared_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "update_note": {
           "name": "update_note",
