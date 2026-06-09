@@ -329,10 +329,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
     return false;
   };
 
-  const syncableCount = useMemo(
-    () => effectiveRows.filter((r) => r.status !== "viewed").length,
-    [effectiveRows],
-  );
+  const syncableCount = effectiveRows.length;
 
   const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
@@ -559,7 +556,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 <CategorySection status="missing" count={preview.summary.missing} description="In fee collections database · not found in MyCase with an approval date" dark={dark} t={t}>
                   <MissingRowsTable t={t} dark={dark} rows={preview.rows.missing} />
                 </CategorySection>
-                <CategorySection status="viewed" count={viewedRows.length} description="In MyCase · not yet in database · previously marked as viewed — skipped on sync" dark={dark} t={t}>
+                <CategorySection status="viewed" count={viewedRows.length} description="In MyCase · not yet in database · previously seen — can still be selected for sync" dark={dark} t={t}>
                   <SourceRowsTable t={t} dark={dark} rows={viewedRows.slice(0, 100)} truncated={viewedRows.length > 100} total={viewedRows.length} />
                 </CategorySection>
               </div>
@@ -606,7 +603,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                     setSelected(new Set([
                       ...selected,
                       ...filteredRows
-                        .filter((r) => r.status !== "missing" && r.status !== "viewed")
+                        .filter((r) => r.status !== "missing")
                         .map((r) => r.clientId),
                     ]))
                   }
@@ -618,7 +615,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                   onClick={() => {
                     const next = new Set(selected);
                     filteredRows
-                      .filter((r) => r.status !== "missing" && r.status !== "viewed")
+                      .filter((r) => r.status !== "missing")
                       .forEach((r) => next.delete(r.clientId));
                     setSelected(next);
                   }}
@@ -635,7 +632,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 selected={selected}
                 onToggle={(id) => {
                   const row = allRows.find((r) => r.clientId === id);
-                  if (!row || row.status === "missing" || row.status === "viewed") return;
+                  if (!row || row.status === "missing") return;
                   const next = new Set(selected);
                   if (next.has(id)) next.delete(id); else next.add(id);
                   setSelected(next);
@@ -924,19 +921,18 @@ const SelectionTable = ({
             const isMissing = r.status === "missing";
             const isViewed = r.status === "viewed";
             const isNew = r.status === "new";
-            const isSelectable = !isMissing && !isViewed;
             const checked = selected.has(r.clientId);
             return (
               <tr
                 key={r.clientId}
-                onClick={() => isSelectable && onToggle(r.clientId)}
-                className={`border-b ${t.borderLight} ${!isSelectable ? "cursor-default opacity-60" : "cursor-pointer"} ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
+                onClick={() => !isMissing && onToggle(r.clientId)}
+                className={`border-b ${t.borderLight} ${isMissing ? "cursor-default opacity-60" : "cursor-pointer"} ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
               >
                 <td className="px-3 py-1.5">
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={!isSelectable}
+                    disabled={isMissing}
                     onChange={() => onToggle(r.clientId)}
                     onClick={(e) => e.stopPropagation()}
                     className="h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
