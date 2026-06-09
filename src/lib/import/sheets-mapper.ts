@@ -235,6 +235,8 @@ export const mapSheetRows = (
       feesStatus: r["FEES STATUS"] ? String(r["FEES STATUS"]).trim() : null,
       weekAssignedToAgent: r["WEEK ASSIGNED TO AGENT"] ? String(r["WEEK ASSIGNED TO AGENT"]).trim() : null,
       monthAssignedToAgent: r["MONTH ASSIGNED TO AGENT"] ? String(r["MONTH ASSIGNED TO AGENT"]).trim() : null,
+      t2Decision: "unknown",
+      t16Decision: "unknown",
       notes: r["COLLECTION NOTES"] ? String(r["COLLECTION NOTES"]).trim() : null,
     });
   }

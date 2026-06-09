@@ -10,7 +10,50 @@ const WEBHOOK_URL = process.env.N8N_MYCASE_DOCS_WEBHOOK_URL;
 const WEBHOOK_TOKEN = process.env.N8N_MYCASE_DOCS_WEBHOOK_TOKEN;
 // Separate webhook for single-document downloads; shares the same auth token.
 const DOC_FILE_WEBHOOK_URL = process.env.N8N_MYCASE_DOC_FILE_WEBHOOK_URL;
+// Case detail webhook — no auth header; n8n uses auth: None.
+const CASE_DETAIL_WEBHOOK_URL = process.env.N8N_MYCASE_CASE_DETAIL_WEBHOOK_URL;
 const AUTH_HEADER = "Fee-Collections-Docs-App-Token";
+
+export type MyCaseCaseDetail = {
+  id: number;
+  name: string;
+  case_stage: string | null;
+  status: string;
+  opened_date: string | null;
+  closed_date: string | null;
+  custom_field_values: Array<{
+    custom_field: { id: number };
+    value: string | number | null;
+    created_at: string | null;
+    updated_at: string | null;
+  }>;
+};
+
+export async function fetchCaseDetails(
+  caseId: number,
+): Promise<MyCaseCaseDetail> {
+  if (!CASE_DETAIL_WEBHOOK_URL) {
+    throw new Error(
+      "MyCase case detail webhook is not configured (N8N_MYCASE_CASE_DETAIL_WEBHOOK_URL)",
+    );
+  }
+
+  const res = await fetch(CASE_DETAIL_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: caseId }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `MyCase case detail webhook returned ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`,
+    );
+  }
+
+  return res.json() as Promise<MyCaseCaseDetail>;
+}
 
 // Shape returned by MyCase's GET /v1/cases/{id}/documents endpoint.
 export type MyCaseDocument = {

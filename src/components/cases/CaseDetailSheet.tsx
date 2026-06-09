@@ -16,6 +16,8 @@ import {
   User,
   MapPin,
   Phone,
+  Database,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Sheet,
@@ -154,11 +156,39 @@ export default function CaseDetailSheet({
   const t = themeClasses(dark);
   const router = useRouter();
 
+  type MyCaseData = {
+    caseStage: string | null;
+    approvalDate: string | null;
+    assignedTo: string | null;
+    winSheetStatus: string;
+    claimTypeLabel: string | null;
+    levelWon: string | null;
+    t16Retro: string;
+    t16FeeDue: string;
+    t16FeeReceived: string;
+    t16Pending: string;
+    t16FeeReceivedDate: string | null;
+    t2Retro: string;
+    t2FeeDue: string;
+    t2FeeReceived: string;
+    t2Pending: string;
+    t2FeeReceivedDate: string | null;
+    feesConfirmation: string | null;
+    t2Decision: string;
+    t16Decision: string;
+    notes: string | null;
+    chronicleLink: string | null;
+  };
+
   const [data, setData] = useState<CaseDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [myCaseData, setMyCaseData] = useState<MyCaseData | null>(null);
+  const [myCaseLoading, setMyCaseLoading] = useState(false);
+  const [myCaseError, setMyCaseError] = useState<string | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const myCaseAbortRef = useRef<AbortController | null>(null);
 
   const fetchCase = useCallback(async () => {
     if (!caseId) return;
@@ -185,16 +215,53 @@ export default function CaseDetailSheet({
     }
   }, [caseId]);
 
+  const fetchMyCaseData = useCallback(async () => {
+    if (!caseId) return;
+    myCaseAbortRef.current?.abort();
+    const controller = new AbortController();
+    myCaseAbortRef.current = controller;
+
+    setMyCaseLoading(true);
+    setMyCaseError(null);
+    try {
+      const res = await fetch(`/api/mycase/cases/${caseId}/details`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error((json.error as string) || `Failed to load MyCase data (${res.status})`);
+      }
+      const json = await res.json();
+      setMyCaseData(json.data);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setMyCaseError((err as Error).message);
+    } finally {
+      if (myCaseAbortRef.current === controller) {
+        setMyCaseLoading(false);
+      }
+    }
+  }, [caseId]);
+
+  const handleRefresh = useCallback(() => {
+    fetchCase();
+    fetchMyCaseData();
+  }, [fetchCase, fetchMyCaseData]);
+
   useEffect(() => {
     if (isOpen) {
       fetchCase();
+      fetchMyCaseData();
     } else {
       setData(null);
+      setMyCaseData(null);
+      setMyCaseError(null);
     }
     return () => {
       abortRef.current?.abort();
+      myCaseAbortRef.current?.abort();
     };
-  }, [isOpen, fetchCase]);
+  }, [isOpen, fetchCase, fetchMyCaseData]);
 
   const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const val = `text-[13px] font-semibold ${t.text} mt-0.5`;
@@ -214,13 +281,23 @@ export default function CaseDetailSheet({
             <SheetTitle className={`text-sm font-bold ${t.text}`}>
               Win Sheet Quick Look
             </SheetTitle>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
-            >
-              <X aria-hidden="true" className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleRefresh}
+                disabled={loading || myCaseLoading}
+                aria-label="Refresh"
+                className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub} disabled:opacity-40`}
+              >
+                <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${(loading || myCaseLoading) ? "animate-spin" : ""}`} />
+              </button>
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <SheetDescription className={`text-[11px] ${t.textMuted}`}>
             Details needed for processing the win sheet for this case.
@@ -285,9 +362,9 @@ export default function CaseDetailSheet({
                   >
                     Documents <FileText aria-hidden="true" className="h-3 w-3" />
                   </button>
-                  {data.userDetails?.chronicleId != null && (
+                  {(myCaseData?.chronicleLink ?? (data.userDetails?.chronicleId != null ? `https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}` : null)) && (
                     <a
-                      href={`https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}`}
+                      href={myCaseData?.chronicleLink ?? `https://app.chroniclelegal.com/dashboard/clients/${data.userDetails?.chronicleId}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-sky-900/30 text-sky-400 hover:bg-sky-900/50" : "bg-sky-50 text-sky-600 hover:bg-sky-100"}`}
@@ -308,7 +385,7 @@ export default function CaseDetailSheet({
                 <div>
                   <p className={lbl}>Approval Date</p>
                   <p className={`${val} flex items-center gap-1`}>
-                    <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate)}
+                    <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate ?? myCaseData?.approvalDate)}
                   </p>
                 </div>
                 <div>
@@ -436,6 +513,107 @@ export default function CaseDetailSheet({
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Live from MyCase */}
+            <div className={sectionCls}>
+              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+                <Database aria-hidden="true" className="h-3 w-3" /> Live from MyCase
+              </h4>
+              {myCaseLoading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 animate-spin ${t.textMuted}`} />
+                  <span className={`text-[11px] ${t.textMuted}`}>Fetching from MyCase…</span>
+                </div>
+              ) : myCaseError ? (
+                <div className={`flex items-start gap-2 rounded-md p-2 text-[11px] ${dark ? "bg-amber-900/20 text-amber-400" : "bg-amber-50 text-amber-700"}`}>
+                  <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{myCaseError}</span>
+                </div>
+              ) : myCaseData ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className={lbl}>Approval Date</p>
+                      <p className={val}>{dateStr(myCaseData.approvalDate ?? data?.approvalDate)}</p>
+                    </div>
+                    <div>
+                      <p className={lbl}>Case Stage</p>
+                      <p className={`${val} text-[11px] leading-tight`}>{myCaseData.caseStage ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className={lbl}>Assigned To</p>
+                      <p className={val}>{myCaseData.assignedTo ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className={lbl}>Win Sheet Status</p>
+                      <p className={val}>{myCaseData.winSheetStatus.replace(/_/g, " ")}</p>
+                    </div>
+                    {myCaseData.claimTypeLabel && (
+                      <div>
+                        <p className={lbl}>Claim Type</p>
+                        <p className={val}>{myCaseData.claimTypeLabel.replace(/_/g, " / ")}</p>
+                      </div>
+                    )}
+                    {myCaseData.levelWon && (
+                      <div>
+                        <p className={lbl}>Level Won</p>
+                        <p className={val}>{myCaseData.levelWon.replace(/_/g, " ")}</p>
+                      </div>
+                    )}
+                  </div>
+                  {[
+                    { key: "t16", label: "T16 (SSI)", color: "text-indigo-500", retro: myCaseData.t16Retro, due: myCaseData.t16FeeDue, received: myCaseData.t16FeeReceived, pending: myCaseData.t16Pending, receivedDate: myCaseData.t16FeeReceivedDate },
+                    { key: "t2", label: "T2 (SSDI)", color: "text-blue-500", retro: myCaseData.t2Retro, due: myCaseData.t2FeeDue, received: myCaseData.t2FeeReceived, pending: myCaseData.t2Pending, receivedDate: myCaseData.t2FeeReceivedDate },
+                  ].map((b) => (
+                    <div key={b.key} className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
+                      <p className={`text-[11px] font-bold uppercase ${b.color} mb-2`}>{b.label}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { label: "Retro", val: b.retro },
+                          { label: "Fee Due", val: b.due },
+                          { label: "Received", val: b.received },
+                          { label: "Pending", val: b.pending },
+                        ].map((f) => (
+                          <div key={f.label}>
+                            <p className={lbl}>{f.label}</p>
+                            <p className="text-xs font-semibold">{Number(f.val) > 0 ? fmtFull(Number(f.val)) : "—"}</p>
+                          </div>
+                        ))}
+                        {b.receivedDate && (
+                          <div className="col-span-2">
+                            <p className={lbl}>Fee Received Date</p>
+                            <p className="text-xs font-semibold">{dateStr(b.receivedDate)}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "T2 Decision", val: myCaseData.t2Decision },
+                      { label: "T16 Decision", val: myCaseData.t16Decision },
+                    ].map((f) => f.val && f.val !== "unknown" ? (
+                      <div key={f.label}>
+                        <p className={lbl}>{f.label}</p>
+                        <p className={val}>{f.val.replace(/_/g, " ")}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                  {myCaseData.feesConfirmation && (
+                    <div>
+                      <p className={lbl}>Fees Confirmation</p>
+                      <p className={`${val} text-[11px] leading-snug`}>{myCaseData.feesConfirmation}</p>
+                    </div>
+                  )}
+                  {myCaseData.notes && (
+                    <div>
+                      <p className={lbl}>Collection Notes</p>
+                      <p className={`${val} text-[11px] leading-snug whitespace-pre-wrap`}>{myCaseData.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             {/* Actions */}
