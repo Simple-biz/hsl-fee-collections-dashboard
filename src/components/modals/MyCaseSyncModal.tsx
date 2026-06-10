@@ -314,7 +314,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
         .filter((r) => !selected.has(r.clientId))
         .map((r) => r.clientId);
       if (unselectedNewIds.length > 0) {
-        void handleTag(unselectedNewIds);
+        await handleTag(unselectedNewIds);
       }
       setResult(syncResult);
       try { await onSynced(); } catch { /* refresh failed; sync succeeded */ }

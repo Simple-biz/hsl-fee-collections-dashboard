@@ -347,6 +347,12 @@ export default function CaseDetailSheet({
                       {STATUS_LABELS_DETAIL[data.status] || data.status}
                     </span>
                   </div>
+                  {chronicleLink && (
+                    <div className="mt-2">
+                      <p className={lbl}>Chronicle ID</p>
+                      <p className={`${val} text-sky-500`}>{chronicleLink.split("/").pop() ?? "—"}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="text-right shrink-0 flex flex-col items-end gap-3">
                   <div>
