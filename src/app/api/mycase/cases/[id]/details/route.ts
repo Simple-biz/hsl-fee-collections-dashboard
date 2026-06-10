@@ -6,6 +6,7 @@ import { cases, userDetails } from "@/lib/db/schema";
 import { myCaseDb } from "@/lib/db/mycase";
 import { mapMyCaseRows, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
 import { fetchCaseDetails } from "@/lib/mycase-proxy";
+import { fetchChronicleClient, parseChronicleResponse } from "@/lib/chronicle-client";
 import { auth } from "@/auth";
 
 const CHRONICLE_LINK_FIELD_ID = 1101112;
@@ -21,7 +22,8 @@ const resolveId = async (context: {
 // Resolution order for each field:
 //   1. MyCase mirror DB (custom_fields_named)
 //   2. Live MyCase API via n8n webhook (only for chronicleLink)
-//   3. Local app DB (cases + user_details) — fills whatever is still null
+//   3. Chronicle API (only for t2/t16 decisions when mirror returns "unknown")
+//   4. Local app DB (cases + user_details) — fills whatever is still null
 export const GET = async (
   _req: NextRequest,
   context: { params: { id: string } | Promise<{ id: string }> },
@@ -107,8 +109,26 @@ export const GET = async (
     const approvalDate = r.approvalDate ?? local?.approvalDate ?? null;
     const claimTypeLabel = r.claimTypeLabel ?? local?.claimTypeLabel ?? null;
     const levelWon = r.levelWon ?? local?.levelWon ?? null;
-    const t2Decision = r.t2Decision !== "unknown" ? r.t2Decision : (local?.t2Decision ?? "unknown");
-    const t16Decision = r.t16Decision !== "unknown" ? r.t16Decision : (local?.t16Decision ?? "unknown");
+
+    // --- Decisions (mirror → Chronicle → local DB) ---
+    let t2Decision: string = r.t2Decision !== "unknown" ? r.t2Decision : "unknown";
+    let t16Decision: string = r.t16Decision !== "unknown" ? r.t16Decision : "unknown";
+
+    if ((t2Decision === "unknown" || t16Decision === "unknown") && local?.chronicleId != null) {
+      const apiUrl = process.env.CHRONICLE_API_URL ?? process.env.CHRONICLE_BASE_URL ?? "";
+      const apiKey = process.env.CHRONICLE_API_KEY ?? "";
+      if (apiUrl && apiKey) {
+        const raw = await fetchChronicleClient(local.chronicleId, apiUrl, apiKey).catch(() => null);
+        if (raw) {
+          const chr = parseChronicleResponse(raw);
+          if (t2Decision === "unknown" && chr.t2Decision) t2Decision = chr.t2Decision;
+          if (t16Decision === "unknown" && chr.t16Decision) t16Decision = chr.t16Decision;
+        }
+      }
+    }
+
+    if (t2Decision === "unknown") t2Decision = local?.t2Decision ?? "unknown";
+    if (t16Decision === "unknown") t16Decision = local?.t16Decision ?? "unknown";
 
     return NextResponse.json({
       data: {
