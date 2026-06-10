@@ -199,6 +199,18 @@ export default function CaseDetailSheet({
     claimTypeLabel: "",
     ssnLast4: "",
     chronicleId: "",
+    t16Retro: "",
+    t16FeeDue: "",
+    t16FeeReceived: "",
+    t16FeeReceivedDate: "",
+    t2Retro: "",
+    t2FeeDue: "",
+    t2FeeReceived: "",
+    t2FeeReceivedDate: "",
+    auxRetro: "",
+    auxFeeDue: "",
+    auxFeeReceived: "",
+    auxFeeReceivedDate: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -290,6 +302,18 @@ export default function CaseDetailSheet({
         claimTypeLabel: data.claim ?? "",
         ssnLast4: myCaseData?.ssnLast4 ?? "",
         chronicleId: data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "",
+        t16Retro: data.t16Retro > 0 ? String(data.t16Retro) : "",
+        t16FeeDue: data.t16FeeDue > 0 ? String(data.t16FeeDue) : "",
+        t16FeeReceived: data.t16FeeReceived > 0 ? String(data.t16FeeReceived) : "",
+        t16FeeReceivedDate: data.t16FeeReceivedDate ?? "",
+        t2Retro: data.t2Retro > 0 ? String(data.t2Retro) : "",
+        t2FeeDue: data.t2FeeDue > 0 ? String(data.t2FeeDue) : "",
+        t2FeeReceived: data.t2FeeReceived > 0 ? String(data.t2FeeReceived) : "",
+        t2FeeReceivedDate: data.t2FeeReceivedDate ?? "",
+        auxRetro: data.auxRetro > 0 ? String(data.auxRetro) : "",
+        auxFeeDue: data.auxFeeDue > 0 ? String(data.auxFeeDue) : "",
+        auxFeeReceived: data.auxFeeReceived > 0 ? String(data.auxFeeReceived) : "",
+        auxFeeReceivedDate: data.auxFeeReceivedDate ?? "",
       });
     }
   }, [data, myCaseData, isEditing]);
@@ -316,12 +340,39 @@ export default function CaseDetailSheet({
 
     const origChronicle = data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "";
     if (editValues.chronicleId !== origChronicle) {
-      userDetailsFields.chronicleId = editValues.chronicleId
-        ? Number(editValues.chronicleId)
-        : null;
+      const n = Number(editValues.chronicleId);
+      userDetailsFields.chronicleId = editValues.chronicleId && Number.isFinite(n) ? n : null;
     }
 
-    if (!Object.keys(caseFields).length && !Object.keys(userDetailsFields).length) {
+    const feeFields: Record<string, number | string | null> = {};
+    const feeNumFields = [
+      ["t16Retro", data.t16Retro],
+      ["t16FeeDue", data.t16FeeDue],
+      ["t16FeeReceived", data.t16FeeReceived],
+      ["t2Retro", data.t2Retro],
+      ["t2FeeDue", data.t2FeeDue],
+      ["t2FeeReceived", data.t2FeeReceived],
+      ["auxRetro", data.auxRetro],
+      ["auxFeeDue", data.auxFeeDue],
+      ["auxFeeReceived", data.auxFeeReceived],
+    ] as const;
+    for (const [key, orig] of feeNumFields) {
+      const edited = editValues[key];
+      const editedNum = edited === "" ? 0 : Number(edited);
+      if (!Number.isFinite(editedNum)) continue;
+      if (editedNum !== orig) feeFields[key] = editedNum;
+    }
+    const feeDateFields = [
+      ["t16FeeReceivedDate", data.t16FeeReceivedDate],
+      ["t2FeeReceivedDate", data.t2FeeReceivedDate],
+      ["auxFeeReceivedDate", data.auxFeeReceivedDate],
+    ] as const;
+    for (const [key, orig] of feeDateFields) {
+      const edited = editValues[key];
+      if (edited !== (orig ?? "")) feeFields[key] = edited || null;
+    }
+
+    if (!Object.keys(caseFields).length && !Object.keys(userDetailsFields).length && !Object.keys(feeFields).length) {
       setIsEditing(false);
       return;
     }
@@ -332,7 +383,7 @@ export default function CaseDetailSheet({
       const res = await fetch(`/api/cases/${caseId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseFields, userDetailsFields }),
+        body: JSON.stringify({ caseFields, feeFields, userDetailsFields }),
       });
       if (!res.ok) throw new Error(`Failed to save (${res.status})`);
       setIsEditing(false);
@@ -714,47 +765,69 @@ export default function CaseDetailSheet({
                 Fee Breakdown
               </h4>
               <div className="space-y-4">
-                {[
-                  {
-                    key: "t16",
-                    label: "T16 (SSI)",
-                    titleColor: "text-indigo-500",
-                    received: data.t16FeeReceived,
-                    retro: data.t16Retro,
-                    pending: data.t16Pending,
-                  },
-                  {
-                    key: "t2",
-                    label: "T2 (SSDI)",
-                    titleColor: "text-blue-500",
-                    received: data.t2FeeReceived,
-                    retro: data.t2Retro,
-                    pending: data.t2Pending,
-                  },
-                  {
-                    key: "aux",
-                    label: "AUX (Auxiliary)",
-                    titleColor: "text-violet-500",
-                    received: data.auxFeeReceived,
-                    retro: data.auxRetro,
-                    pending: data.auxPending,
-                  },
-                ].map((b) => (
+                {(
+                  [
+                    { key: "t16", label: "T16 (SSI)", titleColor: "text-indigo-500", received: data.t16FeeReceived, retro: data.t16Retro, pending: data.t16Pending, due: data.t16FeeDue, receivedDate: data.t16FeeReceivedDate },
+                    { key: "t2",  label: "T2 (SSDI)",  titleColor: "text-blue-500",    received: data.t2FeeReceived,  retro: data.t2Retro,  pending: data.t2Pending,  due: data.t2FeeDue,  receivedDate: data.t2FeeReceivedDate  },
+                    { key: "aux", label: "AUX",         titleColor: "text-violet-500",  received: data.auxFeeReceived, retro: data.auxRetro, pending: data.auxPending, due: data.auxFeeDue, receivedDate: data.auxFeeReceivedDate },
+                  ] as const
+                ).map((b) => (
                   <div key={b.key} className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className={`text-[11px] font-bold uppercase ${b.titleColor}`}>{b.label}</p>
-                      <p className="text-[10px] font-medium text-emerald-500">Rec: {currency(b.received)}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className={lbl}>Retro</p>
-                        <p className="text-xs font-semibold">{currency(b.retro)}</p>
+                    <p className={`text-[11px] font-bold uppercase ${b.titleColor} mb-2`}>{b.label}</p>
+                    {isEditing ? (
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                        {(
+                          [
+                            { label: "Retro",     field: `${b.key}Retro`            as keyof typeof editValues },
+                            { label: "Fee Due",   field: `${b.key}FeeDue`           as keyof typeof editValues },
+                            { label: "Received",  field: `${b.key}FeeReceived`      as keyof typeof editValues },
+                          ] as const
+                        ).map(({ label, field }) => (
+                          <div key={field}>
+                            <p className={lbl}>{label}</p>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editValues[field]}
+                              onChange={(e) => setEditValues((v) => ({ ...v, [field]: e.target.value }))}
+                              placeholder="0"
+                              className={inp}
+                            />
+                          </div>
+                        ))}
+                        <div>
+                          <p className={lbl}>Rec&apos;d Date</p>
+                          <input
+                            type="date"
+                            value={editValues[`${b.key}FeeReceivedDate` as keyof typeof editValues]}
+                            onChange={(e) => setEditValues((v) => ({ ...v, [`${b.key}FeeReceivedDate`]: e.target.value }))}
+                            className={inp}
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <p className={lbl}>Pending</p>
-                        <p className={`text-xs font-semibold ${b.pending > 0 ? "text-amber-500" : ""}`}>{currency(b.pending)}</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className={lbl}>Retro</p>
+                          <p className="text-xs font-semibold">{currency(b.retro)}</p>
+                        </div>
+                        <div>
+                          <p className={lbl}>Received</p>
+                          <p className="text-xs font-semibold text-emerald-500">{currency(b.received)}</p>
+                        </div>
+                        <div>
+                          <p className={lbl}>Pending</p>
+                          <p className={`text-xs font-semibold ${b.pending > 0 ? "text-amber-500" : ""}`}>{currency(b.pending)}</p>
+                        </div>
+                        {b.receivedDate && (
+                          <div>
+                            <p className={lbl}>Rec&apos;d Date</p>
+                            <p className="text-xs font-semibold">{dateStr(b.receivedDate)}</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -421,7 +421,12 @@ export const PATCH = async (
 
       if (updates.length > 0) {
         await db.execute(
-          sql`UPDATE user_details SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
+          sql`
+            INSERT INTO user_details (case_id, updated_at)
+            VALUES (${caseId}, NOW())
+            ON CONFLICT (case_id) DO UPDATE
+              SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
+          `,
         );
       }
     }
