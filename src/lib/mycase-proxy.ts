@@ -10,9 +10,18 @@ const WEBHOOK_URL = process.env.N8N_MYCASE_DOCS_WEBHOOK_URL;
 const WEBHOOK_TOKEN = process.env.N8N_MYCASE_DOCS_WEBHOOK_TOKEN;
 // Separate webhook for single-document downloads; shares the same auth token.
 const DOC_FILE_WEBHOOK_URL = process.env.N8N_MYCASE_DOC_FILE_WEBHOOK_URL;
+// Separate webhook that returns fully-favorable Notice-of-Decision documents
+// added on a given date (across cases); shares the same auth token.
+const NEW_DECISIONS_WEBHOOK_URL = process.env.N8N_MYCASE_NEW_DECISIONS_WEBHOOK_URL;
+// Separate webhook that fetches a single case's detail (office, practice
+// area, case stage) live from MyCase. Used by the new-decisions route to
+// verify case eligibility without depending on the mirror DB sync.
+const CASE_DETAIL_WEBHOOK_URL = process.env.N8N_MYCASE_CASE_DETAIL_WEBHOOK_URL;
 const AUTH_HEADER = "Fee-Collections-Docs-App-Token";
 
-// Shape returned by MyCase's GET /v1/cases/{id}/documents endpoint.
+// Shape returned by MyCase's GET /v1/cases/{id}/documents endpoint, plus an
+// optional `case.name` that the new-decisions n8n workflow attaches when it
+// joins the doc back to its parent case (the source endpoint only has `id`).
 export type MyCaseDocument = {
   id: number;
   name: string;
@@ -20,7 +29,7 @@ export type MyCaseDocument = {
   path: string | null;
   description: string | null;
   assigned_date: string | null;
-  case: { id: number } | null;
+  case: { id: number; name?: string | null } | null;
   created_at: string | null;
   updated_at: string | null;
   self_url: string | null;
@@ -71,6 +80,110 @@ export async function fetchCaseDocuments(
     return flattenFolderTree(json);
   }
   return [];
+}
+
+/**
+ * Pulls fully-favorable Notice-of-Decision documents added on `date`
+ * (YYYY-MM-DD) across cases, via the dedicated n8n webhook. The webhook does
+ * the MyCase querying + name/date filtering; this just relays the request and
+ * normalizes the response to a flat document list.
+ */
+export async function fetchNewDecisions(
+  date: string,
+): Promise<MyCaseDocument[]> {
+  if (!NEW_DECISIONS_WEBHOOK_URL || !WEBHOOK_TOKEN) {
+    throw new Error(
+      "MyCase new-decisions webhook is not configured (N8N_MYCASE_NEW_DECISIONS_WEBHOOK_URL / N8N_MYCASE_DOCS_WEBHOOK_TOKEN)",
+    );
+  }
+
+  const res = await fetch(NEW_DECISIONS_WEBHOOK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [AUTH_HEADER]: WEBHOOK_TOKEN,
+    },
+    // Send the date in two forms:
+    //  - `date` (YYYY-MM-DD) for n8n's Filter Code node to compare against
+    //    each doc's created_at.
+    //  - `updatedAfter` (full ISO timestamp) for the List Documents HTTP
+    //    node's `filter[updated_after]` query param. Pre-formatting it here
+    //    means the n8n value can be a bare `={{ $json.body.updatedAfter }}`
+    //    expression — no `... + 'T00:00:00Z'` concatenation, which n8n
+    //    sometimes mishandles and ships malformed (MyCase rejects it as
+    //    "filter[updated_after] is invalid").
+    body: JSON.stringify({ date, updatedAfter: `${date}T00:00:00Z` }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `MyCase new-decisions webhook returned ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`,
+    );
+  }
+
+  const json = await res.json();
+  if (Array.isArray(json)) return json as MyCaseDocument[];
+  if (Array.isArray(json?.data)) return json.data as MyCaseDocument[];
+  if (Array.isArray(json?.items)) return json.items as MyCaseDocument[];
+  return [];
+}
+
+// Subset of MyCase's case object that we care about for eligibility checks.
+// The case-detail webhook returns the full case but we only read these.
+export type MyCaseCase = {
+  id: number;
+  name?: string | null;
+  case_stage?: string | null;
+  practice_area?: string | null;
+  office?: { id: number; name?: string | null } | null;
+};
+
+/**
+ * Fetches a single case's detail (office / practice_area / case_stage) live
+ * from MyCase via the dedicated n8n webhook. Returns `null` when the case
+ * cannot be retrieved — callers treat that as "ineligible" so a transient
+ * MyCase failure doesn't leak an unverified case through the filter.
+ */
+export async function fetchCaseDetail(
+  caseId: number,
+): Promise<MyCaseCase | null> {
+  if (!CASE_DETAIL_WEBHOOK_URL || !WEBHOOK_TOKEN) {
+    throw new Error(
+      "MyCase case-detail webhook is not configured (N8N_MYCASE_CASE_DETAIL_WEBHOOK_URL / N8N_MYCASE_DOCS_WEBHOOK_TOKEN)",
+    );
+  }
+
+  const res = await fetch(CASE_DETAIL_WEBHOOK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [AUTH_HEADER]: WEBHOOK_TOKEN,
+    },
+    body: JSON.stringify({ id: caseId }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    console.error(
+      `MyCase case-detail webhook returned ${res.status} for case ${caseId}`,
+    );
+    return null;
+  }
+
+  const json = await res.json();
+  // Tolerate the case being returned bare or wrapped in `{data}` / `{case}`.
+  if (json && typeof json === "object") {
+    if (json.id != null) return json as MyCaseCase;
+    if (json.data && typeof json.data === "object" && json.data.id != null) {
+      return json.data as MyCaseCase;
+    }
+    if (json.case && typeof json.case === "object" && json.case.id != null) {
+      return json.case as MyCaseCase;
+    }
+  }
+  return null;
 }
 
 /**

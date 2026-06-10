@@ -37,27 +37,6 @@ export function MyCaseCases({ cases, error }: MyCaseCasesProps) {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <div className={`${sectionCard} p-4 md:p-5`}>
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-indigo-900/40" : "bg-indigo-50"}`}
-          >
-            <Scale
-              aria-hidden="true"
-              className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-            />
-          </div>
-          <div>
-            <h3 className={`text-sm font-bold ${t.text}`}>MyCase Cases</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-              Social Security · 10 Fully Favorable ALJ Hearing Decision · Hogan
-              Smith office — pulled from the MyCase database
-            </p>
-          </div>
-        </div>
-      </div>
-
       {error ? (
         <div
           role="alert"

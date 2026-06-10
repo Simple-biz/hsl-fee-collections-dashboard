@@ -15,7 +15,10 @@ export const fmtFull = (n: number) =>
 
 export const fmtDate = (d: string | null | undefined): string => {
   if (!d) return "—";
-  const [y, m, day] = d.split("-");
+  // Accept both plain dates ("2026-05-01") and ISO timestamps
+  // ("2026-05-01T17:38:02Z") — take the date part before any "T".
+  const [y, m, day] = d.split("T")[0].split("-");
+  if (!y || !m || !day) return d;
   return `${m}/${day}/${y}`;
 };
 
