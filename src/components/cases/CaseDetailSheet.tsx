@@ -68,6 +68,7 @@ type MyCaseData = {
   t16Decision: string;
   notes: string | null;
   chronicleLink: string | null;
+  ssnLast4: string | null;
 };
 
 function ClientDetailsSection({
@@ -351,6 +352,12 @@ export default function CaseDetailSheet({
                     <div className="mt-2">
                       <p className={lbl}>Chronicle ID</p>
                       <p className={`${val} text-sky-500`}>{chronicleLink.split("/").pop() ?? "—"}</p>
+                    </div>
+                  )}
+                  {myCaseData?.ssnLast4 && (
+                    <div className="mt-2">
+                      <p className={lbl}>SSN (last 4)</p>
+                      <p className={val}>***-**-{myCaseData.ssnLast4}</p>
                     </div>
                   )}
                 </div>

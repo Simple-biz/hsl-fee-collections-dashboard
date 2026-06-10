@@ -43,7 +43,7 @@ export const GET = async (
     const [rows, localRows] = await Promise.all([
       myCaseDb<MyCaseDbRow[]>`
         SELECT c.id, c.name, c.case_stage, c.status, c.opened_date, c.closed_date,
-               c.custom_fields_named,
+               c.custom_fields_named, c.case_number,
                cl.first_name AS client_first_name,
                cl.last_name  AS client_last_name
         FROM cases c
@@ -65,6 +65,7 @@ export const GET = async (
           t2Decision: cases.t2Decision,
           t16Decision: cases.t16Decision,
           chronicleId: userDetails.chronicleId,
+          ssnLast4: userDetails.ssnLast4,
         })
         .from(cases)
         .leftJoin(userDetails, eq(userDetails.caseId, cases.clientId))
@@ -110,19 +111,31 @@ export const GET = async (
     const claimTypeLabel = r.claimTypeLabel ?? local?.claimTypeLabel ?? null;
     const levelWon = r.levelWon ?? local?.levelWon ?? null;
 
+    // --- SSN last 4 (local DB → mirror → Chronicle) ---
+    let ssnLast4: string | null = local?.ssnLast4 ?? null;
+    if (!ssnLast4 && rows[0].case_number) {
+      const digits = rows[0].case_number.replace(/\D/g, "");
+      if (digits.length >= 4) ssnLast4 = digits.slice(-4);
+    }
+
     // --- Decisions (mirror → Chronicle → local DB) ---
     let t2Decision: string = r.t2Decision !== "unknown" ? r.t2Decision : "unknown";
     let t16Decision: string = r.t16Decision !== "unknown" ? r.t16Decision : "unknown";
 
-    if ((t2Decision === "unknown" || t16Decision === "unknown") && local?.chronicleId != null) {
+    const needsChronicle =
+      (t2Decision === "unknown" || t16Decision === "unknown" || !ssnLast4) &&
+      local?.chronicleId != null;
+
+    if (needsChronicle) {
       const apiUrl = process.env.CHRONICLE_API_URL ?? process.env.CHRONICLE_BASE_URL ?? "";
       const apiKey = process.env.CHRONICLE_API_KEY ?? "";
       if (apiUrl && apiKey) {
-        const raw = await fetchChronicleClient(local.chronicleId, apiUrl, apiKey).catch(() => null);
+        const raw = await fetchChronicleClient(local!.chronicleId!, apiUrl, apiKey).catch(() => null);
         if (raw) {
           const chr = parseChronicleResponse(raw);
           if (t2Decision === "unknown" && chr.t2Decision) t2Decision = chr.t2Decision;
           if (t16Decision === "unknown" && chr.t16Decision) t16Decision = chr.t16Decision;
+          if (!ssnLast4 && chr.last4Ssn) ssnLast4 = chr.last4Ssn;
         }
       }
     }
@@ -139,6 +152,7 @@ export const GET = async (
         claimTypeLabel,
         levelWon,
         chronicleLink,
+        ssnLast4,
         t16Retro: r.t16Retro,
         t16FeeDue: r.t16FeeDue,
         t16FeeReceived: r.t16FeeReceived,

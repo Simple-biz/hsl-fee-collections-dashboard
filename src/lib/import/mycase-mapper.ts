@@ -10,6 +10,7 @@ export type MyCaseDbRow = {
   custom_fields_named: Record<string, unknown> | null;
   client_first_name: string | null;
   client_last_name: string | null;
+  case_number: string | null;
 };
 
 const cf = (row: MyCaseDbRow, key: string): string | null => {
