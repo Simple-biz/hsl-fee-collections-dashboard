@@ -216,6 +216,7 @@ export default function CaseDetailSheet({
   const [saveError, setSaveError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const myCaseAbortRef = useRef<AbortController | null>(null);
+  const saveAbortRef = useRef<AbortController | null>(null);
 
   const fetchCase = useCallback(async () => {
     if (!caseId) return;
@@ -377,6 +378,10 @@ export default function CaseDetailSheet({
       return;
     }
 
+    saveAbortRef.current?.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -384,12 +389,14 @@ export default function CaseDetailSheet({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseFields, feeFields, userDetailsFields }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Failed to save (${res.status})`);
       setIsEditing(false);
       fetchCase();
       fetchMyCaseData();
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setSaveError((err as Error).message);
     } finally {
       setIsSaving(false);
