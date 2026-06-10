@@ -18,6 +18,8 @@ import {
   Phone,
   Database,
   AlertTriangle,
+  Pencil,
+  Check,
 } from "lucide-react";
 import {
   Sheet,
@@ -188,6 +190,18 @@ export default function CaseDetailSheet({
   const [myCaseLoading, setMyCaseLoading] = useState(false);
   const [myCaseError, setMyCaseError] = useState<string | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState({
+    approvalDate: "",
+    t2Decision: "",
+    t16Decision: "",
+    levelWon: "",
+    claimTypeLabel: "",
+    ssnLast4: "",
+    chronicleId: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const myCaseAbortRef = useRef<AbortController | null>(null);
 
@@ -257,6 +271,8 @@ export default function CaseDetailSheet({
       setData(null);
       setMyCaseData(null);
       setMyCaseError(null);
+      setIsEditing(false);
+      setSaveError(null);
     }
     return () => {
       abortRef.current?.abort();
@@ -264,8 +280,79 @@ export default function CaseDetailSheet({
     };
   }, [isOpen, fetchCase, fetchMyCaseData]);
 
+  useEffect(() => {
+    if (data && !isEditing) {
+      setEditValues({
+        approvalDate: data.approvalDate ?? "",
+        t2Decision: data.t2Decision ?? "",
+        t16Decision: data.t16Decision ?? "",
+        levelWon: data.level === "—" ? "" : (data.level ?? ""),
+        claimTypeLabel: data.claim ?? "",
+        ssnLast4: myCaseData?.ssnLast4 ?? "",
+        chronicleId: data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "",
+      });
+    }
+  }, [data, myCaseData, isEditing]);
+
+  const handleSave = useCallback(async () => {
+    if (!data) return;
+    const caseFields: Record<string, string | null> = {};
+    const userDetailsFields: Record<string, string | number | null> = {};
+
+    if (editValues.approvalDate !== (data.approvalDate ?? ""))
+      caseFields.approvalDate = editValues.approvalDate || null;
+    if (editValues.t2Decision !== (data.t2Decision ?? ""))
+      caseFields.t2Decision = editValues.t2Decision || null;
+    if (editValues.t16Decision !== (data.t16Decision ?? ""))
+      caseFields.t16Decision = editValues.t16Decision || null;
+    if (editValues.levelWon !== (data.level === "—" ? "" : (data.level ?? "")))
+      caseFields.levelWon = editValues.levelWon || null;
+    if (editValues.claimTypeLabel !== (data.claim ?? ""))
+      caseFields.claimTypeLabel = editValues.claimTypeLabel || null;
+
+    const origSsn = myCaseData?.ssnLast4 ?? "";
+    if (editValues.ssnLast4 !== origSsn)
+      userDetailsFields.ssnLast4 = editValues.ssnLast4 || null;
+
+    const origChronicle = data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "";
+    if (editValues.chronicleId !== origChronicle) {
+      userDetailsFields.chronicleId = editValues.chronicleId
+        ? Number(editValues.chronicleId)
+        : null;
+    }
+
+    if (!Object.keys(caseFields).length && !Object.keys(userDetailsFields).length) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/cases/${caseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseFields, userDetailsFields }),
+      });
+      if (!res.ok) throw new Error(`Failed to save (${res.status})`);
+      setIsEditing(false);
+      fetchCase();
+      fetchMyCaseData();
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [data, myCaseData, editValues, caseId, fetchCase, fetchMyCaseData]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setSaveError(null);
+  }, []);
+
   const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const val = `text-[13px] font-semibold ${t.text} mt-0.5`;
+  const inp = `mt-1 h-7 px-2 rounded border text-[12px] w-full outline-none ${t.inputBg}`;
   const sectionCls = `p-4 border-b ${t.borderLight}`;
 
   const chronicleLink = data
@@ -289,26 +376,63 @@ export default function CaseDetailSheet({
               Win Sheet Quick Look
             </SheetTitle>
             <div className="flex items-center gap-1">
-              <button
-                onClick={handleRefresh}
-                disabled={loading || myCaseLoading}
-                aria-label="Refresh"
-                className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub} disabled:opacity-40`}
-              >
-                <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${(loading || myCaseLoading) ? "animate-spin" : ""}`} />
-              </button>
-              <button
-                onClick={onClose}
-                aria-label="Close"
-                className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
-              >
-                <X aria-hidden="true" className="h-4 w-4" />
-              </button>
+              {!isEditing ? (
+                <>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={loading || myCaseLoading}
+                    aria-label="Refresh"
+                    className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub} disabled:opacity-40`}
+                  >
+                    <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${(loading || myCaseLoading) ? "animate-spin" : ""}`} />
+                  </button>
+                  {data && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      aria-label="Edit local details"
+                      className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                    >
+                      <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    aria-label="Save changes"
+                    className={`h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-semibold ${dark ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} disabled:opacity-50`}
+                  >
+                    <Check aria-hidden="true" className="h-3 w-3" />
+                    {isSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    aria-label="Cancel edit"
+                    className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                  >
+                    <X aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              {!isEditing && (
+                <button
+                  onClick={onClose}
+                  aria-label="Close"
+                  className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                >
+                  <X aria-hidden="true" className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
           <SheetDescription className={`text-[11px] ${t.textMuted}`}>
-            Details needed for processing the win sheet for this case.
+            {isEditing ? "Edit local DB fields — changes write to the app database." : "Details needed for processing the win sheet for this case."}
           </SheetDescription>
+          {saveError && (
+            <p role="alert" className="text-[11px] text-red-500 mt-1">{saveError}</p>
+          )}
         </SheetHeader>
 
         {loading ? (
@@ -348,16 +472,37 @@ export default function CaseDetailSheet({
                       {STATUS_LABELS_DETAIL[data.status] || data.status}
                     </span>
                   </div>
-                  {chronicleLink && (
+                  {(chronicleLink || isEditing) && (
                     <div className="mt-2">
                       <p className={lbl}>Chronicle ID</p>
-                      <p className={`${val} text-sky-500`}>{chronicleLink.split("/").pop() ?? "—"}</p>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editValues.chronicleId}
+                          onChange={(e) => setEditValues((v) => ({ ...v, chronicleId: e.target.value }))}
+                          placeholder="e.g. 12345"
+                          className={inp}
+                        />
+                      ) : (
+                        <p className={`${val} text-sky-500`}>{chronicleLink!.split("/").pop() ?? "—"}</p>
+                      )}
                     </div>
                   )}
-                  {myCaseData?.ssnLast4 && (
+                  {(myCaseData?.ssnLast4 || isEditing) && (
                     <div className="mt-2">
                       <p className={lbl}>SSN (last 4)</p>
-                      <p className={val}>***-**-{myCaseData.ssnLast4}</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          maxLength={4}
+                          value={editValues.ssnLast4}
+                          onChange={(e) => setEditValues((v) => ({ ...v, ssnLast4: e.target.value.replace(/\D/g, "") }))}
+                          placeholder="e.g. 1234"
+                          className={inp}
+                        />
+                      ) : (
+                        <p className={val}>***-**-{myCaseData!.ssnLast4}</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -403,9 +548,18 @@ export default function CaseDetailSheet({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className={lbl}>Approval Date</p>
-                  <p className={`${val} flex items-center gap-1`}>
-                    <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(myCaseData?.approvalDate ?? data.approvalDate)}
-                  </p>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={editValues.approvalDate}
+                      onChange={(e) => setEditValues((v) => ({ ...v, approvalDate: e.target.value }))}
+                      className={inp}
+                    />
+                  ) : (
+                    <p className={`${val} flex items-center gap-1`}>
+                      <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(myCaseData?.approvalDate ?? data.approvalDate)}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className={lbl}>Aging</p>
@@ -427,18 +581,86 @@ export default function CaseDetailSheet({
                 <FileText aria-hidden="true" className="h-3 w-3" /> Decisions
               </h4>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className={lbl}>T2 (SSDI) Decision</p>
-                  <p className={`${val} capitalize`}>
-                    {data.t2Decision && data.t2Decision !== "unknown" ? data.t2Decision.replace(/_/g, " ") : "—"}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className={lbl}>T16 (SSI) Decision</p>
-                  <p className={`${val} capitalize`}>
-                    {data.t16Decision && data.t16Decision !== "unknown" ? data.t16Decision.replace(/_/g, " ") : "—"}
-                  </p>
-                </div>
+                {isEditing ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className={lbl}>Claim Type</p>
+                      <select
+                        value={editValues.claimTypeLabel}
+                        onChange={(e) => setEditValues((v) => ({ ...v, claimTypeLabel: e.target.value }))}
+                        className={inp}
+                      >
+                        <option value="">—</option>
+                        <option value="T2">T2 (SSDI)</option>
+                        <option value="T16">T16 (SSI)</option>
+                        <option value="T2_T16">T2 + T16</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p className={lbl}>Level Won</p>
+                      <select
+                        value={editValues.levelWon}
+                        onChange={(e) => setEditValues((v) => ({ ...v, levelWon: e.target.value }))}
+                        className={inp}
+                      >
+                        <option value="">—</option>
+                        <option value="INITIAL">Initial</option>
+                        <option value="RECON">Reconsideration</option>
+                        <option value="HEARING">Hearing</option>
+                        <option value="AC">Appeals Council</option>
+                        <option value="FEDERAL_COURT">Federal Court</option>
+                        <option value="FEE_PETITION">Fee Petition</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p className={lbl}>T2 Decision</p>
+                      <select
+                        value={editValues.t2Decision}
+                        onChange={(e) => setEditValues((v) => ({ ...v, t2Decision: e.target.value }))}
+                        className={inp}
+                      >
+                        <option value="">—</option>
+                        <option value="fully_favorable">Fully Favorable</option>
+                        <option value="partially_favorable">Partially Favorable</option>
+                        <option value="unfavorable">Unfavorable</option>
+                        <option value="dismissed">Dismissed</option>
+                        <option value="remand">Remand</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p className={lbl}>T16 Decision</p>
+                      <select
+                        value={editValues.t16Decision}
+                        onChange={(e) => setEditValues((v) => ({ ...v, t16Decision: e.target.value }))}
+                        className={inp}
+                      >
+                        <option value="">—</option>
+                        <option value="fully_favorable">Fully Favorable</option>
+                        <option value="partially_favorable">Partially Favorable</option>
+                        <option value="unfavorable">Unfavorable</option>
+                        <option value="dismissed">Dismissed</option>
+                        <option value="remand">Remand</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <p className={lbl}>T2 (SSDI) Decision</p>
+                      <p className={`${val} capitalize`}>
+                        {data.t2Decision && data.t2Decision !== "unknown" ? data.t2Decision.replace(/_/g, " ") : "—"}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className={lbl}>T16 (SSI) Decision</p>
+                      <p className={`${val} capitalize`}>
+                        {data.t16Decision && data.t16Decision !== "unknown" ? data.t16Decision.replace(/_/g, " ") : "—"}
+                      </p>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center justify-between">
                   <p className={lbl}>Win Sheet Status</p>
                   <p className={val}>{STATUS_LABELS_DETAIL[data.status] || data.status}</p>

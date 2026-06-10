@@ -315,7 +315,7 @@ export const PATCH = async (
     }
 
     const body = await req.json();
-    const { caseFields, feeFields, logMessage, logAuthor } = body;
+    const { caseFields, feeFields, userDetailsFields, logMessage, logAuthor } = body;
 
     // Update case fields if provided
     if (caseFields && Object.keys(caseFields).length > 0) {
@@ -399,6 +399,29 @@ export const PATCH = async (
       if (updates.length > 0) {
         await db.execute(
           sql`UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
+        );
+      }
+    }
+
+    // Update user_details fields if provided
+    if (userDetailsFields && Object.keys(userDetailsFields).length > 0) {
+      const UD_FIELD_MAP: Record<string, string> = {
+        ssnLast4: "ssn_last4",
+        chronicleId: "chronicle_id",
+      };
+
+      const updates = Object.entries(userDetailsFields)
+        .filter(([k]) => UD_FIELD_MAP[k])
+        .map(([k, v]) => {
+          const col = UD_FIELD_MAP[k];
+          if (v === null) return `${col} = NULL`;
+          if (typeof v === "number") return `${col} = ${v}`;
+          return `${col} = '${String(v).replace(/'/g, "''")}'`;
+        });
+
+      if (updates.length > 0) {
+        await db.execute(
+          sql`UPDATE user_details SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
         );
       }
     }
