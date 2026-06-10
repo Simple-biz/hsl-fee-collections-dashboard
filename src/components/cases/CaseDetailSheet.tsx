@@ -319,6 +319,15 @@ export default function CaseDetailSheet({
     }
   }, [data, myCaseData, isEditing]);
 
+  // Backfill ssnLast4 if myCaseData arrives after the user already entered edit mode.
+  useEffect(() => {
+    if (!isEditing || !myCaseData?.ssnLast4) return;
+    setEditValues(prev => {
+      if (prev.ssnLast4 !== "") return prev;
+      return { ...prev, ssnLast4: myCaseData.ssnLast4! };
+    });
+  }, [isEditing, myCaseData]);
+
   const handleSave = useCallback(async () => {
     if (!data) return;
     const caseFields: Record<string, string | null> = {};
@@ -446,7 +455,7 @@ export default function CaseDetailSheet({
                   </button>
                   {data && (
                     <button
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => { setIsEditing(true); setSaveError(null); }}
                       aria-label="Edit local details"
                       className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
                     >

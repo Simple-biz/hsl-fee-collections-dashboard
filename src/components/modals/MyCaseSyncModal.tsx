@@ -697,9 +697,26 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
               {syncing ? "Syncing…" : `Sync Selected (${selected.size.toLocaleString()})`}
             </button>
           ) : (
-            <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn} transition-colors`}>
-              Done
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setResult(null);
+                  setPreview(null);
+                  setSelected(new Set());
+                  setViewedIds(new Set());
+                  setSearch("");
+                  setFilter("all");
+                  setError(null);
+                  setStep(1);
+                }}
+                className={`h-8 px-4 rounded-md border text-xs font-semibold ${t.outlineBtn} transition-colors`}
+              >
+                Sync Again
+              </button>
+              <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn} transition-colors`}>
+                Done
+              </button>
+            </div>
           )}
         </div>
       </div>
