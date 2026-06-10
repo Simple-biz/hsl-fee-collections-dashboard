@@ -40,6 +40,11 @@ interface DbOnlyRow {
   status: "fees_closed" | "missing";
 }
 
+interface NeedsLinkRow {
+  row: number;
+  caseLink: string;
+}
+
 type Step4Filter = "all" | "new" | "changed" | "unchanged" | "fees_closed" | "missing";
 
 type Step4PreviewRow =
@@ -56,12 +61,14 @@ interface SyncPreviewResponse {
     feesClosed: number;
     missing: number;
     synthetic: number;
+    needsLink: number;
     warnings: { row: number; message: string }[];
   };
   rows: {
     sheet: SheetPreviewRow[];
     feesClosed: DbOnlyRow[];
     missing: DbOnlyRow[];
+    needsLink: NeedsLinkRow[];
   };
 }
 
@@ -205,6 +212,10 @@ export default function SheetSyncModal({
   );
   const syntheticRows = useMemo(
     () => preview?.rows.sheet.filter((r) => r.isSynthetic) ?? [],
+    [preview],
+  );
+  const needsLinkRows = useMemo(
+    () => preview?.rows.needsLink ?? [],
     [preview],
   );
 
@@ -456,10 +467,10 @@ export default function SheetSyncModal({
                     />
                     <Stat
                       t={t}
-                      label="No URL"
-                      value={preview.summary.synthetic.toLocaleString()}
+                      label="Needs Link"
+                      value={preview.summary.needsLink.toLocaleString()}
                       accent={
-                        preview.summary.synthetic > 0
+                        preview.summary.needsLink > 0
                           ? dark ? "text-red-400" : "text-red-600"
                           : undefined
                       }
@@ -479,6 +490,23 @@ export default function SheetSyncModal({
                       </ul>
                       {preview.summary.warnings.length > 25 && (
                         <p className="mt-1 opacity-70">…and {preview.summary.warnings.length - 25} more</p>
+                      )}
+                    </div>
+                  )}
+                  {needsLinkRows.length > 0 && (
+                    <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800"}`}>
+                      <div className="flex items-center gap-1.5 font-semibold mb-1">
+                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                        {needsLinkRows.length} row{needsLinkRows.length === 1 ? "" : "s"} {needsLinkRows.length === 1 ? "has" : "have"} no MyCase link — skipped
+                      </div>
+                      <p className="opacity-80 mb-2">These rows will not be synced until a valid MyCase URL is added to the sheet.</p>
+                      <ul className="space-y-0.5 max-h-36 overflow-y-auto">
+                        {needsLinkRows.slice(0, 25).map((r, i) => (
+                          <li key={i}>Row {r.row}: {r.caseLink}</li>
+                        ))}
+                      </ul>
+                      {needsLinkRows.length > 25 && (
+                        <p className="mt-1 opacity-70">…and {needsLinkRows.length - 25} more</p>
                       )}
                     </div>
                   )}

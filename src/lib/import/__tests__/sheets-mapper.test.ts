@@ -168,20 +168,20 @@ describe("CASE LINK name parsing", () => {
 // ─── Synthetic ID assignment ──────────────────────────────────────────────────
 
 describe("synthetic ID", () => {
-  it("emits warning when CASE LINK_url is absent", () => {
-    const ws = warnings([row({ "CASE LINK_url": null })]);
-    const w = ws.find((w) => w.message.includes("No valid MyCase URL"));
-    expect(w).toBeDefined();
+  it("adds to needsLink when CASE LINK_url is absent", () => {
+    const { needsLink } = mapSheetRows([row({ "CASE LINK_url": null })]);
+    expect(needsLink).toHaveLength(1);
+    expect(needsLink[0].row).toBe(2);
   });
 
-  it("emits warning when URL does not contain a mycase.com court_cases path", () => {
-    const ws = warnings([row({ "CASE LINK_url": "https://example.com/case/99" })]);
-    expect(ws.some((w) => w.message.includes("No valid MyCase URL"))).toBe(true);
+  it("adds to needsLink when URL does not contain a mycase.com court_cases path", () => {
+    const { needsLink } = mapSheetRows([row({ "CASE LINK_url": "https://example.com/case/99" })]);
+    expect(needsLink).toHaveLength(1);
   });
 
-  it("assigns a clientId >= SYNTHETIC_ID_BASE when no URL", () => {
-    const [r] = parsed([row({ "CASE LINK_url": null })]);
-    expect(r.clientId).toBeGreaterThanOrEqual(SYNTHETIC_ID_BASE);
+  it("does not include no-URL rows in parsed output", () => {
+    const { rows } = mapSheetRows([row({ "CASE LINK_url": null })]);
+    expect(rows).toHaveLength(0);
   });
 
   it("emits duplicate-ID warning and assigns synthetic for second row with same MyCase id", () => {
@@ -236,33 +236,30 @@ describe("monetary amounts", () => {
 
 describe("warning row numbers", () => {
   it("row number is 1-indexed with header offset (first data row = row 2)", () => {
-    const ws = warnings([row({ "CASE LINK_url": null })]);
-    expect(ws[0].row).toBe(2);
+    const { needsLink } = mapSheetRows([row({ "CASE LINK_url": null })]);
+    expect(needsLink[0].row).toBe(2);
   });
 
   it("row number increments correctly for later rows", () => {
-    const ws = warnings([
+    const { needsLink } = mapSheetRows([
       row(),
       row({ "CASE LINK_url": null, "CASE LINK": "2024.02.01 Jones, Mary v. ALJ Smith" }),
     ]);
-    const w = ws.find((w) => w.message.includes("No valid MyCase URL"));
-    expect(w!.row).toBe(3);
+    expect(needsLink[0].row).toBe(3);
   });
 });
 
 // ─── Multiple issues in one row ───────────────────────────────────────────────
 
 describe("multiple malformed fields", () => {
-  it("collects all warnings for a single bad row", () => {
+  it("collects all warnings for a single bad row (with valid URL)", () => {
     const ws = warnings([
       row({
-        "CASE LINK_url": null,
         "APPROVAL DATE": "March 15 2024",
         "CLAIM TYPE": "UNKNOWN_TYPE",
         "CASE LINK": "2024.01.15 SmithJohn v. ALJ Doe",
       }),
     ]);
-    expect(ws.some((w) => w.message.includes("No valid MyCase URL"))).toBe(true);
     expect(ws.some((w) => w.message.includes("Approval date"))).toBe(true);
     expect(ws.some((w) => w.message.includes("Unrecognized claim type"))).toBe(true);
     expect(ws.some((w) => w.message.includes("Could not parse name"))).toBe(true);

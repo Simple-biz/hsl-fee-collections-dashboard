@@ -149,7 +149,7 @@ export const POST = async (req: NextRequest) => {
       ]);
       sheetCache = { masterRows: masterRaw, feesClosedRows: feesClosedRaw, ts: Date.now() };
 
-      const { rows: parsed, warnings } = mapSheetRows(masterRaw);
+      const { rows: parsed, warnings, needsLink } = mapSheetRows(masterRaw);
       const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
 
       // Build lookup sets
@@ -321,12 +321,14 @@ export const POST = async (req: NextRequest) => {
           feesClosed: feesClosedRows.length,
           missing: missingRows.length,
           synthetic: sheetRows.filter((r) => r.isSynthetic).length,
+          needsLink: needsLink.length,
           warnings,
         },
         rows: {
           sheet: sheetRows,
           feesClosed: feesClosedRows,
           missing: missingRows,
+          needsLink,
         },
       });
     }
