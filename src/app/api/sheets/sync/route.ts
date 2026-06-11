@@ -14,7 +14,7 @@ import { mapFeesClosedRows } from "@/lib/import/fees-closed-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const CHUNK = 500;
 const SHEET_CACHE_TTL = 5 * 60 * 1000;
