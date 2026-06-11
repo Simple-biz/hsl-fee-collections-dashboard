@@ -4,18 +4,20 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import {
   X,
   RefreshCw,
-  FileSpreadsheet,
+  Database,
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
   ArrowLeft,
   ArrowRight,
   CloudDownload,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
 
-interface SheetPreviewRow {
+interface SourceRow {
   clientId: number;
   caseName: string;
   caseLink: string;
@@ -23,86 +25,68 @@ interface SheetPreviewRow {
   approvalDate: string | null;
   assignedTo: string | null;
   winSheetStatus: string;
-  winSheetLink: string | null;
-  winSheetLinkText: string | null;
   totalExpected: number;
   hasNotes: boolean;
-  isSynthetic: boolean;
-  status: "new" | "changed" | "unchanged";
-  changedFields: { field: string; sheet: string; db: string }[];
+  status: "new" | "changed" | "unchanged" | "viewed";
+  changedFields: { field: string; mycase: string; db: string }[];
 }
 
-interface DbOnlyRow {
+interface MissingRow {
   clientId: number;
   caseName: string;
   caseLink: string;
   approvalDate: string | null;
-  status: "fees_closed" | "missing";
+  status: "missing";
 }
-
-interface NeedsLinkRow {
-  row: number;
-  caseLink: string;
-}
-
-type Step4Filter = "all" | "new" | "changed" | "unchanged" | "fees_closed" | "missing";
-
-type Step4PreviewRow =
-  | (SheetPreviewRow & { syncable: true })
-  | (DbOnlyRow & { syncable: boolean });
 
 interface SyncPreviewResponse {
-  usingMock: boolean;
   summary: {
     fetched: number;
     new: number;
     changed: number;
     unchanged: number;
-    feesClosed: number;
     missing: number;
-    synthetic: number;
-    needsLink: number;
+    viewed: number;
     warnings: { row: number; message: string }[];
   };
   rows: {
-    sheet: SheetPreviewRow[];
-    feesClosed: DbOnlyRow[];
-    missing: DbOnlyRow[];
-    needsLink: NeedsLinkRow[];
+    source: SourceRow[];
+    missing: MissingRow[];
   };
 }
 
-interface SheetSyncModalProps {
+interface MyCaseSyncModalProps {
   dark: boolean;
   onClose: () => void;
   onSynced: () => Promise<void> | void;
 }
 
 type Step = 1 | 2 | 3 | 4;
+type RowFilter = "all" | "new" | "changed" | "unchanged" | "missing" | "viewed";
 
 const STEPS: { n: Step; title: string; subtitle: string }[] = [
-  { n: 1, title: "Step 1", subtitle: "Fetch from Sheets" },
-  { n: 2, title: "Step 2", subtitle: "Map Columns" },
+  { n: 1, title: "Step 1", subtitle: "Fetch from MyCase" },
+  { n: 2, title: "Step 2", subtitle: "Field Map" },
   { n: 3, title: "Step 3", subtitle: "Compare & Preview" },
   { n: 4, title: "Step 4", subtitle: "Select & Sync" },
 ];
 
-const COLUMN_MAP = [
-  { sheet: "CASE LINK", db: "cases.first_name + last_name + external_id (URL)", required: true },
-  { sheet: "ASSIGNED TO", db: "fee_records.assigned_to", required: false },
-  { sheet: "CASE LEVEL", db: "cases.level_won", required: false },
-  { sheet: "CLAIM TYPE", db: "cases.claim_type_label", required: false },
-  { sheet: "APPROVAL DATE", db: "cases.approval_date", required: false },
-  { sheet: "WIN SHEET STATUS", db: "fee_records.win_sheet_status", required: false },
-  { sheet: "WIN SHEET LINK", db: "fee_records.win_sheet_link (URL)", required: false },
-  { sheet: "FEES CONFIRMATION", db: "fee_records.fees_confirmation", required: false },
-  { sheet: "CASE STATUS", db: "fee_records.case_status", required: false },
-  { sheet: "APPROVED BY (OK TO CLOSE)", db: "fee_records.approved_by", required: false },
-  { sheet: "T16 RETRO / FEE DUE / REC'D / PENDING / DATE", db: "fee_records.t16_*", required: false },
-  { sheet: "T2 RETRO / FEE DUE / REC'D / PENDING / DATE", db: "fee_records.t2_*", required: false },
-  { sheet: "RETRO AUX / AUX FEE DUE / REC'D / PENDING / DATE", db: "fee_records.aux_*", required: false },
-  { sheet: "COLLECTION NOTES", db: "activity_log.message (one entry per case)", required: false },
-  { sheet: "DATE ASSIGNED TO AGENT", db: "fee_records.date_assigned_to_agent", required: false },
+const FIELD_MAP = [
+  { source: "cases.name", db: "cases.case_link + first_name + last_name", required: true },
+  { source: "custom_fields['APPROVAL DATE']", db: "cases.approval_date", required: true },
+  { source: "custom_fields['CLAIM TYPE'] / 'What TYPE of CLAIM?'", db: "cases.claim_type_label", required: false },
+  { source: "custom_fields['Level of Win'] / 'STAGE PAID'", db: "cases.level_won", required: false },
+  { source: "custom_fields['CHRONICLE LINK']", db: "cases.external_id", required: false },
+  { source: "custom_fields['FEE ASSIGNMENT']", db: "fee_records.assigned_to", required: false },
+  { source: "custom_fields['T2 RETRO']", db: "fee_records.t2_retro", required: false },
+  { source: "custom_fields['T2 FEE DUE']", db: "fee_records.t2_fee_due", required: false },
+  { source: "custom_fields['T2 FEE PAID']", db: "fee_records.t2_fee_received", required: false },
+  { source: "custom_fields['DATE T2 FEE PAID']", db: "fee_records.t2_fee_received_date", required: false },
+  { source: "custom_fields['T16 RETRO']", db: "fee_records.t16_retro", required: false },
+  { source: "custom_fields['T16 FEE DUE']", db: "fee_records.t16_fee_due", required: false },
+  { source: "custom_fields['T16 FEE PAID']", db: "fee_records.t16_fee_received", required: false },
+  { source: "custom_fields['PAID IN FULL'] / case_stage", db: "fee_records.win_sheet_status", required: false },
+  { source: "custom_fields['COLLECTION NOTES']", db: "activity_log.message (new cases only)", required: false },
 ];
 
 const STATUS_PILL: Record<string, string> = {
@@ -116,42 +100,42 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<string, (dark: boolean) => string> = {
-  new: (dark) =>
-    dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700",
-  changed: (dark) =>
-    dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700",
-  unchanged: (dark) =>
-    dark ? "bg-neutral-800 text-neutral-400" : "bg-neutral-100 text-neutral-600",
-  fees_closed: (dark) =>
-    dark ? "bg-violet-900/40 text-violet-400" : "bg-violet-100 text-violet-700",
-  missing: (dark) =>
-    dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700",
+  new: (dark) => (dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700"),
+  changed: (dark) => (dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700"),
+  unchanged: (dark) => (dark ? "bg-neutral-800 text-neutral-400" : "bg-neutral-100 text-neutral-600"),
+  missing: (dark) => (dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700"),
+  viewed: (dark) => (dark ? "bg-violet-900/40 text-violet-400" : "bg-violet-100 text-violet-700"),
 };
 
 const STATUS_LABEL: Record<string, string> = {
   new: "NEW",
   changed: "CHANGED",
   unchanged: "UP TO DATE",
-  fees_closed: "FEES CLOSED",
   missing: "MISSING",
+  viewed: "VIEWED",
 };
 
-export default function SheetSyncModal({
-  dark,
-  onClose,
-  onSynced,
-}: SheetSyncModalProps) {
+export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncModalProps) {
   const t = themeClasses(dark);
   const [step, setStep] = useState<Step>(1);
   const [fetching, setFetching] = useState(false);
   const [preview, setPreview] = useState<SyncPreviewResponse | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [allowSynthetic, setAllowSynthetic] = useState(false);
+  const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ inserted: number; updated: number; closed: number } | null>(null);
+  const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Step4Filter>("all");
+  const [filter, setFilter] = useState<RowFilter>("all");
+
+  const fetchControllerRef = useRef<AbortController | null>(null);
+  const syncControllerRef = useRef<AbortController | null>(null);
+  const tagControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    fetchControllerRef.current?.abort();
+    syncControllerRef.current?.abort();
+    tagControllerRef.current?.abort();
+  }, []);
 
   const handleFetch = async () => {
     if (preview != null && selected.size > 0) {
@@ -166,7 +150,7 @@ export default function SheetSyncModal({
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 30_000);
     try {
-      const res = await fetch("/api/sheets/sync?mode=preview", {
+      const res = await fetch("/api/mycase/sync?mode=preview", {
         method: "POST",
         signal: controller.signal,
       });
@@ -176,14 +160,15 @@ export default function SheetSyncModal({
         throw new Error((json.error as string) || `Fetch failed (${res.status})`);
       const data = json as unknown as SyncPreviewResponse;
       setPreview(data);
-      setAllowSynthetic(false);
+      setViewedIds(
+        new Set(data.rows.source.filter((r) => r.status === "viewed").map((r) => r.clientId)),
+      );
       setSelected(
-        new Set([
-          ...data.rows.sheet
-            .filter((r) => (r.status === "new" || r.status === "changed") && !r.isSynthetic)
+        new Set(
+          data.rows.source
+            .filter((r) => r.status === "new" || r.status === "changed")
             .map((r) => r.clientId),
-          ...data.rows.feesClosed.map((r) => r.clientId),
-        ]),
+        ),
       );
     } catch (e) {
       const err = e as Error;
@@ -198,50 +183,93 @@ export default function SheetSyncModal({
     }
   };
 
-  const newRows = useMemo(
-    () => preview?.rows.sheet.filter((r) => r.status === "new") ?? [],
-    [preview],
-  );
-  const changedRows = useMemo(
-    () => preview?.rows.sheet.filter((r) => r.status === "changed") ?? [],
-    [preview],
-  );
-  const unchangedRows = useMemo(
-    () => preview?.rows.sheet.filter((r) => r.status === "unchanged") ?? [],
-    [preview],
-  );
-  const syntheticRows = useMemo(
-    () => preview?.rows.sheet.filter((r) => r.isSynthetic) ?? [],
-    [preview],
-  );
-  const needsLinkRows = useMemo(
-    () => preview?.rows.needsLink ?? [],
-    [preview],
-  );
-
-  useEffect(() => {
-    if (!allowSynthetic && syntheticRows.length > 0) {
-      setSelected((prev) => {
-        const syntheticIds = new Set(syntheticRows.map((r) => r.clientId));
+  const handleTag = async (clientIds: number[]) => {
+    setViewedIds((prev) => new Set([...prev, ...clientIds]));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      clientIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    tagControllerRef.current?.abort();
+    const tagController = new AbortController();
+    tagControllerRef.current = tagController;
+    try {
+      const res = await fetch("/api/mycase/sync/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ myCaseCaseIds: clientIds }),
+        signal: tagController.signal,
+      });
+      if (!res.ok) {
+        const json: Record<string, unknown> = await res.json().catch(() => ({}));
+        throw new Error((json.error as string) ?? `Tag failed (${res.status})`);
+      }
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === "AbortError") return;
+      setViewedIds((prev) => {
         const next = new Set(prev);
-        for (const id of syntheticIds) next.delete(id);
+        clientIds.forEach((id) => next.delete(id));
         return next;
       });
+      setError(err.message);
     }
-  }, [allowSynthetic, syntheticRows]);
+  };
 
-  const step4Rows = useMemo<Step4PreviewRow[]>(() => {
+  const handleUntag = async (clientIds: number[]) => {
+    setViewedIds((prev) => {
+      const next = new Set(prev);
+      clientIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    tagControllerRef.current?.abort();
+    const tagController = new AbortController();
+    tagControllerRef.current = tagController;
+    try {
+      const res = await fetch("/api/mycase/sync/tags", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ myCaseCaseIds: clientIds }),
+        signal: tagController.signal,
+      });
+      if (!res.ok) {
+        const json: Record<string, unknown> = await res.json().catch(() => ({}));
+        throw new Error((json.error as string) ?? `Untag failed (${res.status})`);
+      }
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === "AbortError") return;
+      setViewedIds((prev) => new Set([...prev, ...clientIds]));
+      setError(err.message);
+    }
+  };
+
+  // Apply local tag overrides on top of server response
+  const effectiveRows = useMemo(
+    () =>
+      preview?.rows.source.map((r): SourceRow => ({
+        ...r,
+        status: viewedIds.has(r.clientId)
+          ? "viewed"
+          : r.status === "viewed"
+          ? "new"
+          : r.status,
+      })) ?? [],
+    [preview, viewedIds],
+  );
+
+  const newRows = useMemo(() => effectiveRows.filter((r) => r.status === "new"), [effectiveRows]);
+  const changedRows = useMemo(() => effectiveRows.filter((r) => r.status === "changed"), [effectiveRows]);
+  const unchangedRows = useMemo(() => effectiveRows.filter((r) => r.status === "unchanged"), [effectiveRows]);
+  const viewedRows = useMemo(() => effectiveRows.filter((r) => r.status === "viewed"), [effectiveRows]);
+
+  const allRows = useMemo(() => {
     if (!preview) return [];
-    return [
-      ...preview.rows.sheet.map((r) => ({ ...r, syncable: true as const })),
-      ...preview.rows.feesClosed.map((r) => ({ ...r, syncable: true })),
-      ...preview.rows.missing.map((r) => ({ ...r, syncable: false as const })),
-    ];
-  }, [preview]);
+    return [...effectiveRows, ...preview.rows.missing];
+  }, [effectiveRows, preview]);
 
   const filteredRows = useMemo(() => {
-    if (!preview) return [];
-    let r = step4Rows;
+    let r = allRows;
     if (filter !== "all") r = r.filter((x) => x.status === filter);
     if (search) {
       const q = search.toLowerCase();
@@ -253,14 +281,7 @@ export default function SheetSyncModal({
       );
     }
     return r;
-  }, [preview, step4Rows, filter, search]);
-
-  const fetchControllerRef = useRef<AbortController | null>(null);
-  const syncControllerRef = useRef<AbortController | null>(null);
-  useEffect(() => () => {
-    fetchControllerRef.current?.abort();
-    syncControllerRef.current?.abort();
-  }, []);
+  }, [allRows, filter, search]);
 
   const runSync = async () => {
     if (!preview) return;
@@ -268,9 +289,9 @@ export default function SheetSyncModal({
     syncControllerRef.current = controller;
     setSyncing(true);
     setError(null);
-    let syncResult: { inserted: number; updated: number; closed: number } | null = null;
+    let syncResult: { inserted: number; updated: number } | null = null;
     try {
-      const res = await fetch("/api/sheets/sync?mode=upsert", {
+      const res = await fetch("/api/mycase/sync?mode=upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selectedClientIds: [...selected] }),
@@ -280,19 +301,21 @@ export default function SheetSyncModal({
       try { json = await res.json(); } catch { /* non-JSON body */ }
       if (!res.ok)
         throw new Error((json.error as string) || `Sync failed (${res.status})`);
-      syncResult = {
-        inserted: json.inserted as number,
-        updated: json.updated as number,
-        closed: (json.closed as number | undefined) ?? 0,
-      };
+      syncResult = { inserted: json.inserted as number, updated: json.updated as number };
     } catch (e) {
       const err = e as Error;
-      if (err.name !== "AbortError")
-        setError(err.message);
+      if (err.name !== "AbortError") setError(err.message);
     } finally {
       setSyncing(false);
     }
     if (syncResult) {
+      // Auto-tag new cases that were not selected — they won't appear as "new" on the next fetch
+      const unselectedNewIds = newRows
+        .filter((r) => !selected.has(r.clientId))
+        .map((r) => r.clientId);
+      if (unselectedNewIds.length > 0) {
+        await handleTag(unselectedNewIds);
+      }
       setResult(syncResult);
       try { await onSynced(); } catch { /* refresh failed; sync succeeded */ }
     }
@@ -306,13 +329,12 @@ export default function SheetSyncModal({
     return false;
   };
 
+  const syncableCount = effectiveRows.length;
+
   const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
         className={`relative w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col rounded-xl border ${t.card} mx-4`}
@@ -321,11 +343,11 @@ export default function SheetSyncModal({
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-3 border-b ${t.borderLight}`}>
           <div className="flex items-center gap-2">
-            <FileSpreadsheet
-              className={`h-4 w-4 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
+            <Database
+              className={`h-4 w-4 ${dark ? "text-indigo-400" : "text-indigo-600"}`}
               aria-hidden="true"
             />
-            <h3 className={`text-sm font-bold ${t.text}`}>Google Sheets Sync</h3>
+            <h3 className={`text-sm font-bold ${t.text}`}>MyCase Sync</h3>
           </div>
           <button
             onClick={onClose}
@@ -344,21 +366,13 @@ export default function SheetSyncModal({
             return (
               <button
                 key={s.n}
-                onClick={() => {
-                  if (s.n <= step || canAdvanceFromStep(step)) setStep(s.n);
-                }}
+                onClick={() => { if (s.n <= step || canAdvanceFromStep(step)) setStep(s.n); }}
                 className={`text-left px-3 py-2 rounded-md transition-colors ${
                   active
-                    ? dark
-                      ? "bg-neutral-100 text-neutral-900"
-                      : "bg-neutral-900 text-white"
+                    ? dark ? "bg-neutral-100 text-neutral-900" : "bg-neutral-900 text-white"
                     : completed
-                      ? dark
-                        ? "text-neutral-200 hover:bg-neutral-800"
-                        : "text-neutral-700 hover:bg-neutral-200"
-                      : dark
-                        ? "text-neutral-500"
-                        : "text-neutral-400"
+                      ? dark ? "text-neutral-200 hover:bg-neutral-800" : "text-neutral-700 hover:bg-neutral-200"
+                      : dark ? "text-neutral-500" : "text-neutral-400"
                 }`}
               >
                 <div className="text-[10px] font-bold uppercase tracking-wider">{s.title}</div>
@@ -376,10 +390,7 @@ export default function SheetSyncModal({
               className={`mb-4 rounded-md border p-3 text-xs flex items-start justify-between gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-700"}`}
             >
               <span>{error}</span>
-              <button
-                onClick={step === 1 ? handleFetch : runSync}
-                className="shrink-0 underline font-semibold"
-              >
+              <button onClick={step === 1 ? handleFetch : runSync} className="shrink-0 underline font-semibold">
                 Retry
               </button>
             </div>
@@ -390,26 +401,26 @@ export default function SheetSyncModal({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <CloudDownload className={`h-4 w-4 ${t.textSub}`} aria-hidden="true" />
-                <h4 className={`text-sm font-semibold ${t.text}`}>Fetch from Google Sheets</h4>
+                <h4 className={`text-sm font-semibold ${t.text}`}>Fetch from MyCase</h4>
               </div>
               <p className={`text-[11px] ${t.textMuted} mb-6`}>
-                Pulls the latest rows from the MASTER LIST and Fees Closed tabs via the sync
-                webhook and compares them against the cases database.
+                Queries the MyCase mirror database for all cases with an approval date and compares
+                them against the fee collections database.
               </p>
 
               {!preview && !fetching && (
                 <div className={`rounded-lg border-2 border-dashed p-12 text-center ${dark ? "border-neutral-700" : "border-neutral-300"}`}>
-                  <FileSpreadsheet className={`h-10 w-10 mx-auto mb-3 ${t.textMuted}`} aria-hidden="true" />
+                  <Database className={`h-10 w-10 mx-auto mb-3 ${t.textMuted}`} aria-hidden="true" />
                   <p className={`text-sm font-semibold ${t.text} mb-1`}>Ready to sync</p>
                   <p className={`text-[11px] ${t.textMuted} mb-5`}>
-                    Click the button below to pull the latest data from Google Sheets
+                    Click the button below to pull the latest data from the MyCase mirror database
                   </p>
                   <button
                     onClick={handleFetch}
                     className={`h-9 px-5 rounded-lg text-xs font-semibold flex items-center gap-2 mx-auto ${t.ctaBtn} transition-colors`}
                   >
                     <CloudDownload className="h-3.5 w-3.5" aria-hidden="true" />
-                    Fetch from Sheets
+                    Fetch from MyCase
                   </button>
                 </div>
               )}
@@ -417,71 +428,45 @@ export default function SheetSyncModal({
               {fetching && (
                 <div className="flex items-center justify-center py-16">
                   <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} aria-hidden="true" />
-                  <span className={`ml-2 text-sm ${t.textSub}`}>Fetching from Google Sheets…</span>
+                  <span className={`ml-2 text-sm ${t.textSub}`}>Fetching from MyCase…</span>
                 </div>
               )}
 
               {preview && !fetching && (
                 <div className="space-y-4">
-                  {preview.usingMock && (
-                    <div className={`rounded-md border p-3 flex items-center gap-2 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      Using mock data — set{" "}
-                      <code className="font-mono">SHEETS_SYNC_WEBHOOK_URL</code> in .env.local to
-                      connect a real sheet
-                    </div>
-                  )}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                     <Stat t={t} label="Rows fetched" value={preview.summary.fetched.toLocaleString()} />
                     <Stat
                       t={t}
                       label="New cases"
-                      value={preview.summary.new.toLocaleString()}
+                      value={newRows.length.toLocaleString()}
                       accent={dark ? "text-emerald-400" : "text-emerald-600"}
                     />
                     <Stat
                       t={t}
                       label="Changed"
-                      value={preview.summary.changed.toLocaleString()}
-                      accent={
-                        preview.summary.changed > 0
-                          ? dark ? "text-blue-400" : "text-blue-600"
-                          : undefined
-                      }
+                      value={changedRows.length.toLocaleString()}
+                      accent={changedRows.length > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined}
                     />
-                    <Stat
-                      t={t}
-                      label="Fees Closed"
-                      value={preview.summary.feesClosed.toLocaleString()}
-                      accent={dark ? "text-violet-400" : "text-violet-600"}
-                    />
+                    <Stat t={t} label="Up to date" value={unchangedRows.length.toLocaleString()} />
                     <Stat
                       t={t}
                       label="Missing"
                       value={preview.summary.missing.toLocaleString()}
-                      accent={
-                        preview.summary.missing > 0
-                          ? dark ? "text-amber-400" : "text-amber-600"
-                          : undefined
-                      }
+                      accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined}
                     />
                     <Stat
                       t={t}
-                      label="Needs Link"
-                      value={preview.summary.needsLink.toLocaleString()}
-                      accent={
-                        preview.summary.needsLink > 0
-                          ? dark ? "text-red-400" : "text-red-600"
-                          : undefined
-                      }
+                      label="Viewed"
+                      value={viewedRows.length.toLocaleString()}
+                      accent={viewedRows.length > 0 ? (dark ? "text-violet-400" : "text-violet-600") : undefined}
                     />
                   </div>
                   {preview.summary.warnings.length > 0 && (
                     <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
                       <div className="flex items-center gap-1.5 font-semibold mb-1">
                         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                        {preview.summary.warnings.length} warning
-                        {preview.summary.warnings.length === 1 ? "" : "s"}
+                        {preview.summary.warnings.length} warning{preview.summary.warnings.length === 1 ? "" : "s"}
                       </div>
                       <ul className="space-y-0.5 max-h-36 overflow-y-auto">
                         {preview.summary.warnings.slice(0, 25).map((w, i) => (
@@ -490,23 +475,6 @@ export default function SheetSyncModal({
                       </ul>
                       {preview.summary.warnings.length > 25 && (
                         <p className="mt-1 opacity-70">…and {preview.summary.warnings.length - 25} more</p>
-                      )}
-                    </div>
-                  )}
-                  {needsLinkRows.length > 0 && (
-                    <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800"}`}>
-                      <div className="flex items-center gap-1.5 font-semibold mb-1">
-                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                        {needsLinkRows.length} row{needsLinkRows.length === 1 ? "" : "s"} {needsLinkRows.length === 1 ? "has" : "have"} no MyCase link — skipped
-                      </div>
-                      <p className="opacity-80 mb-2">These rows will not be synced until a valid MyCase URL is added to the sheet.</p>
-                      <ul className="space-y-0.5 max-h-36 overflow-y-auto">
-                        {needsLinkRows.slice(0, 25).map((r, i) => (
-                          <li key={i}>Row {r.row}: {r.caseLink}</li>
-                        ))}
-                      </ul>
-                      {needsLinkRows.length > 25 && (
-                        <p className="mt-1 opacity-70">…and {needsLinkRows.length - 25} more</p>
                       )}
                     </div>
                   )}
@@ -522,27 +490,27 @@ export default function SheetSyncModal({
             </div>
           )}
 
-          {/* STEP 2: Map Columns */}
+          {/* STEP 2: Field Map */}
           {step === 2 && (
             <div>
-              <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Map Columns</h4>
+              <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Field Map</h4>
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
-                The mapping below defines how Google Sheet columns write to the database. No action
-                needed — all columns are mapped automatically.
+                How MyCase custom fields map to the fee collections database. All mappings are
+                automatic — no action needed.
               </p>
               <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
-                      <th className={`${lblCls} text-left px-3 py-2`}>Sheet column</th>
+                      <th className={`${lblCls} text-left px-3 py-2`}>MyCase field</th>
                       <th className={`${lblCls} text-left px-3 py-2`}>Maps to</th>
                       <th className={`${lblCls} text-center px-3 py-2 w-24`}>Required</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {COLUMN_MAP.map((m) => (
-                      <tr key={m.sheet} className={`border-b ${t.borderLight}`}>
-                        <td className={`${t.text} px-3 py-2 font-medium`}>{m.sheet}</td>
+                    {FIELD_MAP.map((m) => (
+                      <tr key={m.source} className={`border-b ${t.borderLight}`}>
+                        <td className={`${t.text} px-3 py-2 font-medium font-mono text-[11px]`}>{m.source}</td>
                         <td className={`${t.textSub} px-3 py-2 font-mono text-[11px]`}>{m.db}</td>
                         <td className="px-3 py-2 text-center">
                           {m.required ? (
@@ -566,84 +534,30 @@ export default function SheetSyncModal({
             <div>
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Compare & Preview</h4>
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
-                Four categories based on where each record exists.
+                Categories based on how each record compares between MyCase and the fee collections database.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
-                <Stat t={t} label="New" value={preview.summary.new.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
-                <Stat t={t} label="Changed" value={preview.summary.changed.toLocaleString()} accent={preview.summary.changed > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined} />
-                <Stat t={t} label="Up to date" value={preview.summary.unchanged.toLocaleString()} />
-                <Stat t={t} label="Fees Closed" value={preview.summary.feesClosed.toLocaleString()} accent={dark ? "text-violet-400" : "text-violet-600"} />
-                <Stat
-                  t={t}
-                  label="Missing"
-                  value={preview.summary.missing.toLocaleString()}
-                  accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined}
-                />
+                <Stat t={t} label="New" value={newRows.length.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
+                <Stat t={t} label="Changed" value={changedRows.length.toLocaleString()} accent={changedRows.length > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined} />
+                <Stat t={t} label="Up to date" value={unchangedRows.length.toLocaleString()} />
+                <Stat t={t} label="Missing" value={preview.summary.missing.toLocaleString()} accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined} />
+                <Stat t={t} label="Viewed" value={viewedRows.length.toLocaleString()} accent={viewedRows.length > 0 ? (dark ? "text-violet-400" : "text-violet-600") : undefined} />
               </div>
               <div className="space-y-5">
-                <CategorySection
-                  status="new"
-                  count={preview.summary.new}
-                  description="In sheet · not yet in database — will be inserted on sync"
-                  dark={dark}
-                  t={t}
-                >
-                  <SheetRowsTable
-                    t={t}
-                    dark={dark}
-                    rows={newRows.slice(0, 100)}
-                    truncated={newRows.length > 100}
-                    total={newRows.length}
-                  />
+                <CategorySection status="new" count={newRows.length} description="In MyCase · not yet in database — will be inserted on sync" dark={dark} t={t}>
+                  <SourceRowsTable t={t} dark={dark} rows={newRows.slice(0, 100)} truncated={newRows.length > 100} total={newRows.length} />
                 </CategorySection>
-                <CategorySection
-                  status="changed"
-                  count={preview.summary.changed}
-                  description="In sheet · already in database · values have changed — will be updated on sync"
-                  dark={dark}
-                  t={t}
-                >
-                  <SheetRowsTable
-                    t={t}
-                    dark={dark}
-                    rows={changedRows.slice(0, 100)}
-                    truncated={changedRows.length > 100}
-                    total={changedRows.length}
-                    showChangedFields
-                  />
+                <CategorySection status="changed" count={changedRows.length} description="In MyCase · already in database · values have changed — will be updated on sync" dark={dark} t={t}>
+                  <SourceRowsTable t={t} dark={dark} rows={changedRows.slice(0, 100)} truncated={changedRows.length > 100} total={changedRows.length} showChangedFields />
                 </CategorySection>
-                <CategorySection
-                  status="unchanged"
-                  count={preview.summary.unchanged}
-                  description="In sheet · already in database · no changes detected — skipped by default"
-                  dark={dark}
-                  t={t}
-                >
-                  <SheetRowsTable
-                    t={t}
-                    dark={dark}
-                    rows={unchangedRows.slice(0, 100)}
-                    truncated={unchangedRows.length > 100}
-                    total={unchangedRows.length}
-                  />
+                <CategorySection status="unchanged" count={unchangedRows.length} description="In MyCase · already in database · no changes detected — skipped by default" dark={dark} t={t}>
+                  <SourceRowsTable t={t} dark={dark} rows={unchangedRows.slice(0, 100)} truncated={unchangedRows.length > 100} total={unchangedRows.length} />
                 </CategorySection>
-                <CategorySection
-                  status="fees_closed"
-                  count={preview.summary.feesClosed}
-                  description="In database · removed from MASTER LIST · found in Fees Closed sheet"
-                  dark={dark}
-                  t={t}
-                >
-                  <DbOnlyTable t={t} dark={dark} rows={preview.rows.feesClosed} />
+                <CategorySection status="missing" count={preview.summary.missing} description="In fee collections database · not found in MyCase with an approval date" dark={dark} t={t}>
+                  <MissingRowsTable t={t} dark={dark} rows={preview.rows.missing} />
                 </CategorySection>
-                <CategorySection
-                  status="missing"
-                  count={preview.summary.missing}
-                  description="In database · not found in any sheet — may have been manually removed"
-                  dark={dark}
-                  t={t}
-                >
-                  <DbOnlyTable t={t} dark={dark} rows={preview.rows.missing} />
+                <CategorySection status="viewed" count={viewedRows.length} description="In MyCase · not yet in database · previously seen — can still be selected for sync" dark={dark} t={t}>
+                  <SourceRowsTable t={t} dark={dark} rows={viewedRows.slice(0, 100)} truncated={viewedRows.length > 100} total={viewedRows.length} />
                 </CategorySection>
               </div>
             </div>
@@ -656,13 +570,12 @@ export default function SheetSyncModal({
                 <div>
                   <h4 className={`text-sm font-semibold ${t.text}`}>Select & Sync</h4>
                   <p className={`text-[11px] ${t.textMuted}`}>
-                    Choose which rows to sync. MASTER LIST rows are inserted or updated; Fees Closed
-                    rows are marked closed and moved to the Fees Closed page.
+                    Choose which rows to import. New cases are inserted; existing cases are updated.
                   </p>
                 </div>
                 <div className={`text-[11px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
-                  {" "}/ {step4Rows.filter((r) => r.syncable).length.toLocaleString()} syncable selected
+                  {" "}/ {syncableCount.toLocaleString()} syncable selected
                 </div>
               </div>
 
@@ -682,19 +595,17 @@ export default function SheetSyncModal({
                   <option value="new">New only</option>
                   <option value="changed">Changed only</option>
                   <option value="unchanged">Up to date only</option>
-                  <option value="fees_closed">Fees Closed only</option>
                   <option value="missing">Missing only</option>
+                  <option value="viewed">Viewed only</option>
                 </select>
                 <button
                   onClick={() =>
-                    setSelected(
-                      new Set([
-                        ...selected,
-                        ...filteredRows
-                          .filter((r) => r.syncable && (allowSynthetic || !("isSynthetic" in r && r.isSynthetic)))
-                          .map((r) => r.clientId),
-                      ]),
-                    )
+                    setSelected(new Set([
+                      ...selected,
+                      ...filteredRows
+                        .filter((r) => r.status !== "missing")
+                        .map((r) => r.clientId),
+                    ]))
                   }
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
                 >
@@ -703,7 +614,9 @@ export default function SheetSyncModal({
                 <button
                   onClick={() => {
                     const next = new Set(selected);
-                    filteredRows.filter((r) => r.syncable).forEach((r) => next.delete(r.clientId));
+                    filteredRows
+                      .filter((r) => r.status !== "missing")
+                      .forEach((r) => next.delete(r.clientId));
                     setSelected(next);
                   }}
                   className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} transition-colors`}
@@ -712,54 +625,25 @@ export default function SheetSyncModal({
                 </button>
               </div>
 
-              {syntheticRows.length > 0 && (
-                <div className={`rounded-md border p-3 mb-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-                    <div className="flex-1">
-                      <p className="font-semibold mb-1">
-                        {syntheticRows.length} row{syntheticRows.length === 1 ? "" : "s"} {syntheticRows.length === 1 ? "has" : "have"} no valid MyCase URL
-                      </p>
-                      <p className="opacity-80 mb-2">
-                        These rows were assigned temporary IDs and will create a duplicate record on every re-sync. Check Step 1 warnings for details.
-                      </p>
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={allowSynthetic}
-                          onChange={(e) => setAllowSynthetic(e.target.checked)}
-                          className="h-3.5 w-3.5 cursor-pointer"
-                        />
-                        <span className="font-medium">Allow selection of rows without a valid MyCase link</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <SelectionTable
                 t={t}
                 dark={dark}
                 rows={filteredRows}
-                truncated={false}
-                total={filteredRows.length}
                 selected={selected}
-                allowSynthetic={allowSynthetic}
                 onToggle={(id) => {
-                  const row = step4Rows.find((r) => r.clientId === id);
-                  if (!row?.syncable) return;
-                  const isSynth = "isSynthetic" in row && row.isSynthetic;
-                  if (isSynth && !allowSynthetic) return;
+                  const row = allRows.find((r) => r.clientId === id);
+                  if (!row || row.status === "missing") return;
                   const next = new Set(selected);
-                  if (next.has(id)) next.delete(id);
-                  else next.add(id);
+                  if (next.has(id)) next.delete(id); else next.add(id);
                   setSelected(next);
                 }}
+                onTag={(id) => handleTag([id])}
+                onUntag={(id) => handleUntag([id])}
               />
             </div>
           )}
 
-          {/* STEP 4 result */}
+          {/* STEP 4: result */}
           {step === 4 && result && (
             <div className="py-12">
               <div className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
@@ -771,9 +655,7 @@ export default function SheetSyncModal({
                       <span className="font-semibold">{result.inserted.toLocaleString()}</span> new
                       case{result.inserted === 1 ? "" : "s"} inserted ·{" "}
                       <span className="font-semibold">{result.updated.toLocaleString()}</span>{" "}
-                      existing record{result.updated === 1 ? "" : "s"} updated ·{" "}
-                      <span className="font-semibold">{result.closed.toLocaleString()}</span>
-                      {" "}case{result.closed === 1 ? "" : "s"} marked closed.
+                      existing record{result.updated === 1 ? "" : "s"} updated.
                     </p>
                   </div>
                 </div>
@@ -785,10 +667,7 @@ export default function SheetSyncModal({
         {/* Footer */}
         <div className={`flex items-center justify-between px-5 py-3 border-t ${t.borderLight}`}>
           <button
-            onClick={() => {
-              if (step === 1) onClose();
-              else setStep((step - 1) as Step);
-            }}
+            onClick={() => { if (step === 1) onClose(); else setStep((step - 1) as Step); }}
             className={`h-8 px-3 text-xs font-medium ${t.textSub} hover:underline flex items-center gap-1`}
           >
             <ArrowLeft className="h-3 w-3" aria-hidden="true" />
@@ -813,14 +692,31 @@ export default function SheetSyncModal({
               {syncing ? (
                 <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
               ) : (
-                <FileSpreadsheet className="h-3 w-3" aria-hidden="true" />
+                <Database className="h-3 w-3" aria-hidden="true" />
               )}
               {syncing ? "Syncing…" : `Sync Selected (${selected.size.toLocaleString()})`}
             </button>
           ) : (
-            <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn} transition-colors`}>
-              Done
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setResult(null);
+                  setPreview(null);
+                  setSelected(new Set());
+                  setViewedIds(new Set());
+                  setSearch("");
+                  setFilter("all");
+                  setError(null);
+                  setStep(1);
+                }}
+                className={`h-8 px-4 rounded-md border text-xs font-semibold ${t.outlineBtn} transition-colors`}
+              >
+                Sync Again
+              </button>
+              <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn} transition-colors`}>
+                Done
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -853,7 +749,7 @@ const CategorySection = ({
   t,
   children,
 }: {
-  status: "new" | "changed" | "unchanged" | "fees_closed" | "missing";
+  status: "new" | "changed" | "unchanged" | "missing" | "viewed";
   count: number;
   description: string;
   dark: boolean;
@@ -865,22 +761,18 @@ const CategorySection = ({
       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE[status](dark)}`}>
         {STATUS_LABEL[status]}
       </span>
-      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>
-        {count.toLocaleString()}
-      </span>
+      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>{count.toLocaleString()}</span>
       <span className={`text-[11px] ${t.textMuted}`}>{description}</span>
     </div>
     {count === 0 ? (
-      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[11px] ${t.textMuted}`}>
-        None
-      </div>
+      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[11px] ${t.textMuted}`}>None</div>
     ) : (
       children
     )}
   </div>
 );
 
-const SheetRowsTable = ({
+const SourceRowsTable = ({
   t,
   dark,
   rows,
@@ -890,7 +782,7 @@ const SheetRowsTable = ({
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
-  rows: SheetPreviewRow[];
+  rows: SourceRow[];
   truncated: boolean;
   total: number;
   showChangedFields?: boolean;
@@ -901,10 +793,10 @@ const SheetRowsTable = ({
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             <Th>Case</Th>
-            {showChangedFields && <Th>Changed (sheet → db)</Th>}
+            {showChangedFields && <Th>Changed (MyCase → db)</Th>}
             <Th>Approved</Th>
             <Th>Assigned</Th>
-            <Th>Win Sheet</Th>
+            <Th>Win Sheet Status</Th>
             <Th alignRight>Expected</Th>
             <Th>Notes</Th>
           </tr>
@@ -933,7 +825,7 @@ const SheetRowsTable = ({
                       <div key={f.field} className="leading-tight">
                         <span className="font-semibold">{f.field}</span>
                         <span className={`ml-1 ${dark ? "text-neutral-400" : "text-neutral-500"}`}>
-                          {f.sheet || "∅"} → {f.db || "∅"}
+                          {f.mycase || "∅"} → {f.db || "∅"}
                         </span>
                       </div>
                     ))}
@@ -948,20 +840,9 @@ const SheetRowsTable = ({
               <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
               <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
               <td className="px-3 py-1.5">
-                {r.winSheetLink && r.winSheetLink.startsWith("http") ? (
-                  <a
-                    href={r.winSheetLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className={`text-[11px] underline ${dark ? "text-blue-400" : "text-blue-600"} inline-flex items-center gap-1`}
-                  >
-                    {r.winSheetLinkText ?? "Open"}
-                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                  </a>
-                ) : (
-                  <span className={`text-[11px] ${t.textMuted}`}>{r.winSheetLinkText ?? "—"}</span>
-                )}
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
+                  {r.winSheetStatus.replace(/_/g, " ")}
+                </span>
               </td>
               <td className={`${t.text} px-3 py-1.5 text-right tabular-nums font-medium`}>
                 {r.totalExpected > 0 ? fmtFull(r.totalExpected) : "—"}
@@ -986,14 +867,14 @@ const SheetRowsTable = ({
   </div>
 );
 
-const DbOnlyTable = ({
+const MissingRowsTable = ({
   t,
   dark,
   rows,
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
-  rows: DbOnlyRow[];
+  rows: MissingRow[];
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
@@ -1025,20 +906,18 @@ const SelectionTable = ({
   t,
   dark,
   rows,
-  truncated,
-  total,
   selected,
-  allowSynthetic,
   onToggle,
+  onTag,
+  onUntag,
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
-  rows: Step4PreviewRow[];
-  truncated: boolean;
-  total: number;
+  rows: (SourceRow | MissingRow)[];
   selected: Set<number>;
-  allowSynthetic: boolean;
   onToggle: (id: number) => void;
+  onTag: (id: number) => void;
+  onUntag: (id: number) => void;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
@@ -1051,41 +930,33 @@ const SelectionTable = ({
             <Th>Approved</Th>
             <Th>Assigned</Th>
             <Th>Win Sheet Status</Th>
+            <Th>{""}</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => {
+            const isMissing = r.status === "missing";
+            const isViewed = r.status === "viewed";
+            const isNew = r.status === "new";
             const checked = selected.has(r.clientId);
-            const isSynthetic = "isSynthetic" in r && r.isSynthetic === true;
-            const effectivelyDisabled = !r.syncable || (isSynthetic && !allowSynthetic);
             return (
               <tr
                 key={r.clientId}
-                onClick={() => !effectivelyDisabled && onToggle(r.clientId)}
-                className={`border-b ${t.borderLight} ${
-                  effectivelyDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
-                } ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
+                onClick={() => !isMissing && onToggle(r.clientId)}
+                className={`border-b ${t.borderLight} ${isMissing ? "cursor-default opacity-60" : "cursor-pointer"} ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
               >
                 <td className="px-3 py-1.5">
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={effectivelyDisabled}
+                    disabled={isMissing}
                     onChange={() => onToggle(r.clientId)}
                     onClick={(e) => e.stopPropagation()}
                     className="h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
                   />
                 </td>
                 <td className={`${t.text} px-3 py-1.5 font-medium max-w-80 truncate`} title={r.caseLink}>
-                  <span className="inline-flex items-center gap-1">
-                    {r.caseName}
-                    {isSynthetic && (
-                      <AlertTriangle
-                        className={`h-3 w-3 shrink-0 ${dark ? "text-amber-400" : "text-amber-500"}`}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </span>
+                  {r.caseName}
                 </td>
                 <td className="px-3 py-1.5">
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>
@@ -1093,7 +964,9 @@ const SelectionTable = ({
                   </span>
                 </td>
                 <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
-                <td className={`${t.textSub} px-3 py-1.5`}>{"assignedTo" in r ? (r.assignedTo ?? "—") : "—"}</td>
+                <td className={`${t.textSub} px-3 py-1.5`}>
+                  {"assignedTo" in r ? (r.assignedTo ?? "—") : "—"}
+                </td>
                 <td className="px-3 py-1.5">
                   {"winSheetStatus" in r ? (
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
@@ -1103,27 +976,38 @@ const SelectionTable = ({
                     <span className={`text-[10px] ${t.textMuted}`}>—</span>
                   )}
                 </td>
+                <td className="px-3 py-1.5 text-right">
+                  {isNew && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onTag(r.clientId); }}
+                      title="Mark as viewed — hide from future new cases"
+                      className={`h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-violet-400 hover:bg-violet-900/40" : "text-violet-600 hover:bg-violet-100"}`}
+                    >
+                      <Eye className="h-3 w-3" aria-hidden="true" />
+                      Mark Viewed
+                    </button>
+                  )}
+                  {isViewed && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onUntag(r.clientId); }}
+                      title="Unmark — restore to new"
+                      className={`h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-neutral-400 hover:bg-neutral-700" : "text-neutral-500 hover:bg-neutral-200"}`}
+                    >
+                      <EyeOff className="h-3 w-3" aria-hidden="true" />
+                      Unmark
+                    </button>
+                  )}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
-    {truncated && (
-      <div className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
-        Showing first 200 of {total.toLocaleString()} matching rows.
-      </div>
-    )}
   </div>
 );
 
-const Th = ({
-  children,
-  alignRight,
-}: {
-  children: React.ReactNode;
-  alignRight?: boolean;
-}) => (
+const Th = ({ children, alignRight }: { children: React.ReactNode; alignRight?: boolean }) => (
   <th className={`text-[10px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}>
     {children}
   </th>

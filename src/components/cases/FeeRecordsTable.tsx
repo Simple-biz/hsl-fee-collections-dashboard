@@ -10,6 +10,7 @@ import {
   MessageSquare,
   FileSpreadsheet,
   CloudUpload,
+  Database,
   RotateCcw,
   Loader2,
   ExternalLink,
@@ -31,6 +32,7 @@ import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
 import SheetSyncModal from "@/components/modals/SheetSyncModal";
 import SheetPushModal from "@/components/modals/SheetPushModal";
+import MyCaseSyncModal from "@/components/modals/MyCaseSyncModal";
 import NotesModal from "@/components/modals/NotesModal";
 import { AcknowledgeAndCloseDialog } from "./AcknowledgeAndCloseDialog";
 
@@ -182,6 +184,7 @@ export const FeeRecordsTable = ({
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [myCaseSyncOpen, setMyCaseSyncOpen] = useState(false);
   const [pushOpen, setPushOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
@@ -590,6 +593,12 @@ export const FeeRecordsTable = ({
                 className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Sync from Sheets
+              </button>
+              <button
+                onClick={() => setMyCaseSyncOpen(true)}
+                className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-indigo-700 hover:bg-indigo-600 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} transition-colors`}
+              >
+                <Database className="h-3.5 w-3.5" aria-hidden="true" /> Sync from MyCase
               </button>
               <button
                 onClick={() => setPushOpen(true)}
@@ -1540,6 +1549,16 @@ export const FeeRecordsTable = ({
         <SheetSyncModal
           dark={dark}
           onClose={() => setSyncOpen(false)}
+          onSynced={async () => {
+            if (onImported) await onImported();
+          }}
+        />
+      )}
+
+      {myCaseSyncOpen && (
+        <MyCaseSyncModal
+          dark={dark}
+          onClose={() => setMyCaseSyncOpen(false)}
           onSynced={async () => {
             if (onImported) await onImported();
           }}

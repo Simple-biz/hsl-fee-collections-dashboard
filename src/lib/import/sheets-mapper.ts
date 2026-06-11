@@ -114,11 +114,14 @@ const mapWinSheetStatus = (raw: unknown): ParsedCaseRow["winSheetStatus"] => {
   return "started";
 };
 
+export type NeedsLinkRow = { row: number; caseLink: string };
+
 export const mapSheetRows = (
   rows: SheetRow[],
-): { rows: ParsedCaseRow[]; warnings: { row: number; message: string }[] } => {
+): { rows: ParsedCaseRow[]; warnings: { row: number; message: string }[]; needsLink: NeedsLinkRow[] } => {
   const out: ParsedCaseRow[] = [];
   const warnings: { row: number; message: string }[] = [];
+  const needsLink: NeedsLinkRow[] = [];
   const seenIds = new Set<number>();
   let synthetic = SYNTHETIC_ID_BASE;
 
@@ -131,23 +134,21 @@ export const mapSheetRows = (
     const myCaseMatch = url?.match(MYCASE_URL_RE);
     const myCaseId = myCaseMatch ? Number(myCaseMatch[1]) : null;
 
+    if (!myCaseId) {
+      needsLink.push({ row: i + 2, caseLink: linkText });
+      continue;
+    }
+
     let clientId: number;
-    if (myCaseId && !seenIds.has(myCaseId)) {
+    if (!seenIds.has(myCaseId)) {
       clientId = myCaseId;
     } else {
       while (seenIds.has(synthetic)) synthetic++;
       clientId = synthetic++;
-      if (myCaseId) {
-        warnings.push({
-          row: i + 2,
-          message: `Duplicate MyCase id ${myCaseId} — using synthetic ${clientId}`,
-        });
-      } else {
-        warnings.push({
-          row: i + 2,
-          message: "No valid MyCase URL — synthetic ID assigned; row will create a duplicate on every re-sync",
-        });
-      }
+      warnings.push({
+        row: i + 2,
+        message: `Duplicate MyCase id ${myCaseId} — using synthetic ${clientId}`,
+      });
     }
     seenIds.add(clientId);
 
@@ -235,11 +236,13 @@ export const mapSheetRows = (
       feesStatus: r["FEES STATUS"] ? String(r["FEES STATUS"]).trim() : null,
       weekAssignedToAgent: r["WEEK ASSIGNED TO AGENT"] ? String(r["WEEK ASSIGNED TO AGENT"]).trim() : null,
       monthAssignedToAgent: r["MONTH ASSIGNED TO AGENT"] ? String(r["MONTH ASSIGNED TO AGENT"]).trim() : null,
+      t2Decision: "unknown",
+      t16Decision: "unknown",
       notes: r["COLLECTION NOTES"] ? String(r["COLLECTION NOTES"]).trim() : null,
     });
   }
 
-  return { rows: out, warnings };
+  return { rows: out, warnings, needsLink };
 };
 
 export const MOCK_SHEET_ROWS: SheetRow[] = [

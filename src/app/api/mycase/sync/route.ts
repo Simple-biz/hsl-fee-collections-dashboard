@@ -2,25 +2,16 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { inArray, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { myCaseDb } from "@/lib/db/mycase";
+import { cases, feeRecords, activityLog, myCaseSyncTags } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
-import {
-  mapSheetRows,
-  MOCK_SHEET_ROWS,
-  SYNTHETIC_ID_BASE,
-  type SheetRow,
-} from "@/lib/import/sheets-mapper";
-import { mapFeesClosedRows } from "@/lib/import/fees-closed-mapper";
+import { mapMyCaseRows, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const CHUNK = 500;
-const SHEET_CACHE_TTL = 5 * 60 * 1000;
-
-type SheetCache = { masterRows: SheetRow[]; feesClosedRows: SheetRow[]; ts: number };
-let sheetCache: SheetCache | null = null;
 
 const chunked = <T>(arr: T[], size: number): T[][] => {
   const out: T[][] = [];
@@ -28,46 +19,51 @@ const chunked = <T>(arr: T[], size: number): T[][] => {
   return out;
 };
 
-const fetchMasterListRows = async (): Promise<{
-  rows: SheetRow[];
-  usingMock: boolean;
-}> => {
-  const webhookUrl = process.env.SHEETS_SYNC_WEBHOOK_URL;
-  if (!webhookUrl) return { rows: MOCK_SHEET_ROWS, usingMock: true };
+const fetchAllMyCaseRows = async (): Promise<MyCaseDbRow[]> =>
+  myCaseDb<MyCaseDbRow[]>`
+    SELECT c.id, c.name, c.case_stage, c.status, c.opened_date, c.closed_date,
+           c.custom_fields_named,
+           cl.first_name AS client_first_name,
+           cl.last_name  AS client_last_name
+    FROM cases c
+    LEFT JOIN LATERAL (
+      SELECT first_name, last_name
+      FROM clients
+      WHERE id = ANY(c.clients) AND archived = false
+      ORDER BY id
+      LIMIT 1
+    ) cl ON true
+    WHERE (
+      c.case_stage ILIKE '10 %'
+      OR c.case_stage ILIKE '10A %'
+      OR c.case_stage ILIKE '10B %'
+      OR c.case_stage ILIKE '10C %'
+    )
+    ORDER BY c.id
+  `;
 
-  const res = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ trigger: "manual" }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!res.ok)
-    throw new Error(
-      `Sheets sync webhook failed (${res.status}): ${await res.text()}`,
-    );
-  const rows = (await res.json()) as SheetRow[];
-  if (!Array.isArray(rows))
-    throw new Error("Sheets sync webhook returned invalid response shape");
-  return { rows, usingMock: false };
-};
-
-const fetchFeesClosedSheetRows = async (): Promise<SheetRow[]> => {
-  const webhookUrl = process.env.FEES_CLOSED_SYNC_WEBHOOK_URL;
-  if (!webhookUrl) return [];
-  try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trigger: "manual" }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) return [];
-    const rows = (await res.json()) as SheetRow[];
-    return Array.isArray(rows) ? rows : [];
-  } catch {
-    return [];
-  }
-};
+const fetchMyCaseRowsByIds = async (ids: number[]): Promise<MyCaseDbRow[]> =>
+  myCaseDb<MyCaseDbRow[]>`
+    SELECT c.id, c.name, c.case_stage, c.status, c.opened_date, c.closed_date,
+           c.custom_fields_named,
+           cl.first_name AS client_first_name,
+           cl.last_name  AS client_last_name
+    FROM cases c
+    LEFT JOIN LATERAL (
+      SELECT first_name, last_name
+      FROM clients
+      WHERE id = ANY(c.clients) AND archived = false
+      ORDER BY id
+      LIMIT 1
+    ) cl ON true
+    WHERE c.id = ANY(${ids}::int[])
+      AND (
+        c.case_stage ILIKE '10 %'
+        OR c.case_stage ILIKE '10A %'
+        OR c.case_stage ILIKE '10B %'
+        OR c.case_stage ILIKE '10C %'
+      )
+  `;
 
 const toCaseInsert = (r: ParsedCaseRow) => ({
   clientId: r.clientId,
@@ -81,6 +77,8 @@ const toCaseInsert = (r: ParsedCaseRow) => ({
   claimTypeLabel: r.claimTypeLabel,
   aljFirstName: r.aljFirstName,
   aljLastName: r.aljLastName,
+  t2Decision: r.t2Decision,
+  t16Decision: r.t16Decision,
 });
 
 const toFeeInsert = (r: ParsedCaseRow) => ({
@@ -115,15 +113,9 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
   monthAssignedToAgent: r.monthAssignedToAgent,
 });
 
-const toClosedAt = (closedDate: string | null): Date | null => {
-  if (!closedDate) return null;
-  const parsed = new Date(`${closedDate}T12:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-// POST /api/sheets/sync
-//   mode=preview  → diff MASTER LIST + Fees Closed sheet vs DB; return all 4 categories
-//   mode=upsert   → import new rows, update existing, and mark Fees Closed rows closed
+// POST /api/mycase/sync
+//   mode=preview → diff MyCase DB against local fee collections DB
+//   mode=upsert  → body: { selectedClientIds: number[] }
 export const POST = async (req: NextRequest) => {
   try {
     const guard = await requireAdmin();
@@ -142,24 +134,9 @@ export const POST = async (req: NextRequest) => {
     const mode = modeParam;
 
     if (mode === "preview") {
-      // Fetch MASTER LIST and Fees Closed sheet in parallel
-      const [{ rows: masterRaw, usingMock }, feesClosedRaw] = await Promise.all([
-        fetchMasterListRows(),
-        fetchFeesClosedSheetRows(),
-      ]);
-      sheetCache = { masterRows: masterRaw, feesClosedRows: feesClosedRaw, ts: Date.now() };
+      const rawRows = await fetchAllMyCaseRows();
+      const { rows: parsed, warnings } = mapMyCaseRows(rawRows);
 
-      const { rows: parsed, warnings, needsLink } = mapSheetRows(masterRaw);
-      const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
-
-      // Build lookup sets
-      const sheetClientIdSet = new Set(parsed.map((r) => r.clientId));
-      const feesClosedCaseNameSet = new Set(
-        feesClosedParsed.map((r) => r.caseName.trim()),
-      );
-
-
-      // Pull all DB cases + their fee records for diff comparison
       const allDbCases = await db
         .select({
           clientId: cases.clientId,
@@ -176,8 +153,6 @@ export const POST = async (req: NextRequest) => {
           winSheetStatus: feeRecords.winSheetStatus,
           caseStatus: feeRecords.caseStatus,
           feesConfirmation: feeRecords.feesConfirmation,
-          dateAssignedToAgent: feeRecords.dateAssignedToAgent,
-          approvedBy: feeRecords.approvedBy,
           t16Retro: feeRecords.t16Retro,
           t16FeeDue: feeRecords.t16FeeDue,
           t16FeeReceived: feeRecords.t16FeeReceived,
@@ -199,68 +174,64 @@ export const POST = async (req: NextRequest) => {
         .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId));
 
       type DbRow = (typeof allDbCases)[number];
+      type ChangedField = { field: string; mycase: string; db: string };
 
-      type ChangedField = { field: string; sheet: string; db: string };
-
-      const getChangedFields = (r: ParsedCaseRow, db: DbRow): ChangedField[] => {
+      const getChangedFields = (r: ParsedCaseRow, dbRow: DbRow): ChangedField[] => {
         const f: ChangedField[] = [];
         const s = (field: string, a: string | null | undefined, b: string | null | undefined) => {
-          if ((a ?? null) !== (b ?? null)) f.push({ field, sheet: String(a ?? ""), db: String(b ?? "") });
+          if ((a ?? null) !== (b ?? null))
+            f.push({ field, mycase: String(a ?? ""), db: String(b ?? "") });
         };
-        // Compare monetary amounts with 1-cent tolerance. The sheet formula (0.25 × retro)
-        // produces sub-cent values like 4760.695. Postgres decimal(12,2) stores 4760.70 (rounds
-        // up), but JavaScript IEEE 754 stores 4760.695 as 4760.6949... and any JS rounding
-        // gives 4760.69 — so string/toFixed comparisons always diverge on the boundary.
-        // A difference < $0.01 is purely a precision artifact; any real change is ≥ $1.
-        const n = (field: string, sheet: string, db: string | null | undefined) => {
-          if (Math.abs(Number(sheet) - Number(db ?? "0")) >= 0.01)
-            f.push({ field, sheet, db: db ?? "" });
+        const n = (field: string, incoming: string, stored: string | null | undefined) => {
+          if (Math.abs(Number(incoming) - Number(stored ?? "0")) >= 0.01)
+            f.push({ field, mycase: incoming, db: stored ?? "" });
         };
-        const a = (field: string, arr: string[], dbArr: string[] | null | undefined) => {
-          if (JSON.stringify([...(arr ?? [])].sort()) !== JSON.stringify([...(dbArr ?? [])].sort()))
-            f.push({ field, sheet: arr.join(","), db: (dbArr ?? []).join(",") });
+        const ar = (field: string, arr: string[], dbArr: string[] | null | undefined) => {
+          if (
+            JSON.stringify([...(arr ?? [])].sort()) !==
+            JSON.stringify([...(dbArr ?? [])].sort())
+          )
+            f.push({ field, mycase: arr.join(","), db: (dbArr ?? []).join(",") });
         };
-        s("caseLink", r.caseLink, db.caseLink);
-        s("firstName", r.firstName, db.firstName);
-        s("lastName", r.lastName, db.lastName);
-        s("approvalDate", r.approvalDate, db.approvalDate);
-        s("levelWon", r.levelWon, db.levelWon);
-        a("claimType", r.claimType, db.claimType);
-        s("claimTypeLabel", r.claimTypeLabel, db.claimTypeLabel);
-        s("aljFirstName", r.aljFirstName, db.aljFirstName);
-        s("aljLastName", r.aljLastName, db.aljLastName);
-        s("assignedTo", r.assignedTo, db.assignedTo);
-        s("winSheetStatus", r.winSheetStatus, db.winSheetStatus ?? "not_started");
-        s("caseStatus", r.caseStatus, db.caseStatus);
-        s("feesConfirmation", r.feesConfirmation, db.feesConfirmation);
-        s("dateAssignedToAgent", r.dateAssignedToAgent, db.dateAssignedToAgent);
-        s("approvedBy", r.approvedBy, db.approvedBy);
-        n("t16Retro", r.t16Retro, db.t16Retro);
-        n("t16FeeDue", r.t16FeeDue, db.t16FeeDue);
-        n("t16FeeReceived", r.t16FeeReceived, db.t16FeeReceived);
-        // t16Pending excluded: sheet webhook doesn't reliably return this column;
-        // the DB value is preserved by CASE WHEN in the upsert.
-        s("t16FeeReceivedDate", r.t16FeeReceivedDate, db.t16FeeReceivedDate);
-        n("t2Retro", r.t2Retro, db.t2Retro);
-        n("t2FeeDue", r.t2FeeDue, db.t2FeeDue);
-        n("t2FeeReceived", r.t2FeeReceived, db.t2FeeReceived);
-        // t2Pending excluded — same reason as t16Pending above.
-        s("t2FeeReceivedDate", r.t2FeeReceivedDate, db.t2FeeReceivedDate);
-        n("auxRetro", r.auxRetro, db.auxRetro);
-        n("auxFeeDue", r.auxFeeDue, db.auxFeeDue);
-        n("auxFeeReceived", r.auxFeeReceived, db.auxFeeReceived);
-        // auxPending excluded — same reason as t16Pending above.
-        s("auxFeeReceivedDate", r.auxFeeReceivedDate, db.auxFeeReceivedDate);
+        s("caseLink", r.caseLink, dbRow.caseLink);
+        s("firstName", r.firstName, dbRow.firstName);
+        s("lastName", r.lastName, dbRow.lastName);
+        s("approvalDate", r.approvalDate, dbRow.approvalDate);
+        s("levelWon", r.levelWon, dbRow.levelWon);
+        ar("claimType", r.claimType, dbRow.claimType);
+        s("claimTypeLabel", r.claimTypeLabel, dbRow.claimTypeLabel);
+        s("aljFirstName", r.aljFirstName, dbRow.aljFirstName);
+        s("aljLastName", r.aljLastName, dbRow.aljLastName);
+        s("assignedTo", r.assignedTo, dbRow.assignedTo);
+        s("winSheetStatus", r.winSheetStatus, dbRow.winSheetStatus ?? "not_started");
+        s("caseStatus", r.caseStatus, dbRow.caseStatus);
+        n("t16Retro", r.t16Retro, dbRow.t16Retro);
+        n("t16FeeDue", r.t16FeeDue, dbRow.t16FeeDue);
+        n("t16FeeReceived", r.t16FeeReceived, dbRow.t16FeeReceived);
+        s("t16FeeReceivedDate", r.t16FeeReceivedDate, dbRow.t16FeeReceivedDate);
+        n("t2Retro", r.t2Retro, dbRow.t2Retro);
+        n("t2FeeDue", r.t2FeeDue, dbRow.t2FeeDue);
+        n("t2FeeReceived", r.t2FeeReceived, dbRow.t2FeeReceived);
+        s("t2FeeReceivedDate", r.t2FeeReceivedDate, dbRow.t2FeeReceivedDate);
         return f;
       };
 
-      const dbMap = new Map(allDbCases.map((c) => [c.clientId, c]));
+      const [tagRows] = await Promise.all([
+        db.select({ myCaseCaseId: myCaseSyncTags.myCaseCaseId, tag: myCaseSyncTags.tag })
+          .from(myCaseSyncTags),
+      ]);
+      const tagMap = new Map(tagRows.map((t) => [t.myCaseCaseId, t.tag]));
 
-      // Category 1 & 2: sheet rows — new vs changed vs unchanged
-      const sheetRows = parsed.map((r) => {
+      const dbMap = new Map(allDbCases.map((c) => [c.clientId, c]));
+      const myCaseIdSet = new Set(parsed.map((r) => r.clientId));
+
+      const sourceRows = parsed.map((r) => {
         const dbEntry = dbMap.get(r.clientId);
         const changedFields = dbEntry ? getChangedFields(r, dbEntry) : [];
-        const status = !dbEntry ? "new" : changedFields.length > 0 ? "changed" : "unchanged";
+        const isTagged = tagMap.has(r.clientId);
+        const status = !dbEntry
+          ? (isTagged ? "viewed" : "new")
+          : changedFields.length > 0 ? "changed" : "unchanged";
         return {
           clientId: r.clientId,
           caseName: `${r.lastName}, ${r.firstName}`,
@@ -269,36 +240,15 @@ export const POST = async (req: NextRequest) => {
           approvalDate: r.approvalDate,
           assignedTo: r.assignedTo,
           winSheetStatus: r.winSheetStatus,
-          winSheetLink: r.winSheetLink,
-          winSheetLinkText: r.winSheetLinkText,
-          totalExpected:
-            (Number(r.t16FeeDue) || 0) +
-            (Number(r.t2FeeDue) || 0) +
-            (Number(r.auxFeeDue) || 0),
+          totalExpected: (Number(r.t16FeeDue) || 0) + (Number(r.t2FeeDue) || 0),
           hasNotes: !!r.notes,
-          isSynthetic: r.clientId >= SYNTHETIC_ID_BASE,
           status,
           changedFields,
         };
       });
 
-      // Category 3 & 4: DB-only rows (cases table entries not in the sheet)
-      const dbOnlyCases = allDbCases.filter(
-        (c) => !sheetClientIdSet.has(c.clientId),
-      );
-
-      const feesClosedRows = dbOnlyCases
-        .filter((c) => !c.isClosed && c.caseLink && feesClosedCaseNameSet.has(c.caseLink.trim()))
-        .map((c) => ({
-          clientId: c.clientId,
-          caseName: `${c.lastName}, ${c.firstName}`,
-          caseLink: c.caseLink ?? "",
-          approvalDate: c.approvalDate,
-          status: "fees_closed" as const,
-        }));
-
-      const missingRows = dbOnlyCases
-        .filter((c) => !c.isClosed && (!c.caseLink || !feesClosedCaseNameSet.has(c.caseLink.trim())))
+      const missingRows = allDbCases
+        .filter((c) => !c.isClosed && !myCaseIdSet.has(c.clientId))
         .map((c) => ({
           clientId: c.clientId,
           caseName: `${c.lastName}, ${c.firstName}`,
@@ -307,28 +257,24 @@ export const POST = async (req: NextRequest) => {
           status: "missing" as const,
         }));
 
-      const newCount = sheetRows.filter((r) => r.status === "new").length;
-      const changedCount = sheetRows.filter((r) => r.status === "changed").length;
+      const newCount = sourceRows.filter((r) => r.status === "new").length;
+      const changedCount = sourceRows.filter((r) => r.status === "changed").length;
+      const viewedCount = sourceRows.filter((r) => r.status === "viewed").length;
 
       return NextResponse.json({
         mode,
-        usingMock,
         summary: {
           fetched: parsed.length,
           new: newCount,
           changed: changedCount,
-          unchanged: parsed.length - newCount - changedCount,
-          feesClosed: feesClosedRows.length,
+          unchanged: parsed.length - newCount - changedCount - viewedCount,
+          viewed: viewedCount,
           missing: missingRows.length,
-          synthetic: sheetRows.filter((r) => r.isSynthetic).length,
-          needsLink: needsLink.length,
           warnings,
         },
         rows: {
-          sheet: sheetRows,
-          feesClosed: feesClosedRows,
+          source: sourceRows,
           missing: missingRows,
-          needsLink,
         },
       });
     }
@@ -353,7 +299,6 @@ export const POST = async (req: NextRequest) => {
       );
     }
     const ids = Array.from(new Set((body.selectedClientIds as unknown[]).map(Number)));
-
     if (ids.some((n) => !Number.isInteger(n))) {
       return NextResponse.json(
         { error: "selectedClientIds must contain only integers" },
@@ -361,59 +306,21 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    const rawRows = await fetchMyCaseRowsByIds(ids);
+    const { rows: parsed } = mapMyCaseRows(rawRows);
+
     const selectedSet = new Set(ids);
+    const candidates = parsed.filter((r) => selectedSet.has(r.clientId));
 
-    const cached = sheetCache && Date.now() - sheetCache.ts < SHEET_CACHE_TTL ? sheetCache : null;
-    const [{ rows: rawRows }, feesClosedRaw] = cached
-      ? [{ rows: cached.masterRows }, cached.feesClosedRows]
-      : await Promise.all([fetchMasterListRows(), fetchFeesClosedSheetRows()]);
-    if (!cached) sheetCache = { masterRows: rawRows, feesClosedRows: feesClosedRaw, ts: Date.now() };
-    const { rows: parsed } = mapSheetRows(rawRows);
-    const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
-
-    const seenCandidates = new Set<number>();
-
-    const candidates = parsed.filter((r) => {
-      if (!selectedSet.has(r.clientId)) return false;
-      if (seenCandidates.has(r.clientId)) return false;
-
-      seenCandidates.add(r.clientId);
-      return true;
-    });
-
-    const sheetClientIdSet = new Set(parsed.map((r) => r.clientId));
-    const feesClosedByCaseName = new Map(
-      feesClosedParsed.map((r) => [r.caseName.trim(), r]),
-    );
-
-    const selectedDbCases =
-      ids.length > 0
-        ? await db
-            .select({ clientId: cases.clientId, caseLink: cases.caseLink })
-            .from(cases)
-            .where(inArray(cases.clientId, ids))
-        : [];
-
-    const feesClosedMatches = selectedDbCases.flatMap((c) => {
-      if (sheetClientIdSet.has(c.clientId) || !c.caseLink) return [];
-      const feesClosedRow = feesClosedByCaseName.get(c.caseLink.trim());
-      return feesClosedRow
-        ? [{ clientId: c.clientId, closedAt: toClosedAt(feesClosedRow.closedDate) }]
-        : [];
-    });
-
-    if (candidates.length === 0 && feesClosedMatches.length === 0) {
-      return NextResponse.json({ inserted: 0, updated: 0, closed: 0 });
+    if (candidates.length === 0) {
+      return NextResponse.json({ inserted: 0, updated: 0 });
     }
 
     const incomingIds = candidates.map((r) => r.clientId);
-    const existing =
-      incomingIds.length > 0
-        ? await db
-            .select({ clientId: cases.clientId })
-            .from(cases)
-            .where(inArray(cases.clientId, incomingIds))
-        : [];
+    const existing = await db
+      .select({ clientId: cases.clientId })
+      .from(cases)
+      .where(inArray(cases.clientId, incomingIds));
     const existingSet = new Set(existing.map((e) => e.clientId));
 
     const newRows = candidates.filter((r) => !existingSet.has(r.clientId));
@@ -421,29 +328,23 @@ export const POST = async (req: NextRequest) => {
 
     let inserted = 0;
     let updated = 0;
-    let closed = 0;
 
     await db.transaction(async (tx) => {
       for (const batch of chunked(newRows, CHUNK)) {
         const insertedCases = await tx
           .insert(cases)
           .values(batch.map(toCaseInsert))
-          .onConflictDoNothing({
-            target: cases.clientId,
-          })
+          .onConflictDoNothing({ target: cases.clientId })
           .returning({ clientId: cases.clientId });
 
         const insertedClientIds = new Set(insertedCases.map((r) => r.clientId));
         const insertedRows = batch.filter((r) => insertedClientIds.has(r.clientId));
-
         if (insertedRows.length === 0) continue;
 
         await tx
           .insert(feeRecords)
           .values(insertedRows.map(toFeeInsert))
-          .onConflictDoNothing({
-            target: feeRecords.caseId,
-          });
+          .onConflictDoNothing({ target: feeRecords.caseId });
 
         const withNotes = insertedRows.filter((r) => r.notes);
         if (withNotes.length > 0) {
@@ -451,48 +352,12 @@ export const POST = async (req: NextRequest) => {
             withNotes.map((r) => ({
               caseId: r.clientId,
               message: r.notes!,
-              createdBy: "Sheet Sync",
+              createdBy: "MyCase Sync",
             })),
           );
         }
 
         inserted += insertedRows.length;
-      }
-      for (const batch of chunked(feesClosedMatches, CHUNK)) {
-        if (batch.length === 0) continue;
-
-        for (const row of batch) {
-          await tx
-            .insert(feeRecords)
-            .values({
-              caseId: row.clientId,
-              isClosed: true,
-              closedAt: row.closedAt,
-              winSheetStatus: "closed",
-              syncStatus: "synced",
-              syncedAt: new Date(),
-            })
-            .onConflictDoUpdate({
-              target: feeRecords.caseId,
-              set: {
-                isClosed: true,
-                closedAt: row.closedAt,
-                winSheetStatus: "closed",
-                syncStatus: "synced",
-                syncedAt: new Date(),
-                updatedAt: new Date(),
-              },
-            });
-        }
-
-        await tx.insert(activityLog).values(
-          batch.map((row) => ({
-            caseId: row.clientId,
-            message: "Marked closed from Fees Closed sheet during Google Sheets sync.",
-            createdBy: "Sheet Sync",
-          })),
-        );
-        closed += batch.length;
       }
     });
 
@@ -511,9 +376,12 @@ export const POST = async (req: NextRequest) => {
               claim_type_label   = v.claim_type_label,
               alj_first_name     = v.alj_first_name,
               alj_last_name      = v.alj_last_name,
+              t2_decision        = v.t2_decision::decision_outcome_enum,
+              t16_decision       = v.t16_decision::decision_outcome_enum,
               updated_at         = now()
             FROM (VALUES ${sql.join(
-              batch.map((r) => sql`(
+              batch.map(
+                (r) => sql`(
                 ${r.clientId},
                 ${r.externalId},
                 ${r.caseLink},
@@ -521,17 +389,19 @@ export const POST = async (req: NextRequest) => {
                 ${r.lastName},
                 ${r.approvalDate},
                 ${r.levelWon},
-                ${'{' + r.claimType.join(',') + '}'},
+                ${"{" + r.claimType.join(",") + "}"},
                 ${r.claimTypeLabel},
                 ${r.aljFirstName},
-                ${r.aljLastName}
-              )`),
+                ${r.aljLastName},
+                ${r.t2Decision},
+                ${r.t16Decision}
+              )`,
+              ),
               sql`,`,
-            )}) AS v(client_id, external_id, case_link, first_name, last_name, approval_date, level_won, claim_type, claim_type_label, alj_first_name, alj_last_name)
+            )}) AS v(client_id, external_id, case_link, first_name, last_name, approval_date, level_won, claim_type, claim_type_label, alj_first_name, alj_last_name, t2_decision, t16_decision)
             WHERE cases.client_id = v.client_id::int
-          `),
-          // Upsert fee_records so cases that somehow have no fee_record row still get written.
-          // COALESCE preserves the existing DB win_sheet_link rather than overwriting it.
+          `,
+          ),
           db.execute(sql`
             INSERT INTO fee_records (
               case_id, assigned_to, win_sheet_status, win_sheet_link, win_sheet_link_text,
@@ -543,7 +413,8 @@ export const POST = async (req: NextRequest) => {
               week_assigned_to_agent, month_assigned_to_agent
             )
             VALUES ${sql.join(
-              batch.map((r) => sql`(
+              batch.map(
+                (r) => sql`(
                 ${r.clientId},
                 ${r.assignedTo},
                 ${r.winSheetStatus},
@@ -573,18 +444,19 @@ export const POST = async (req: NextRequest) => {
                 ${r.feesStatus},
                 ${r.weekAssignedToAgent},
                 ${r.monthAssignedToAgent}
-              )`),
+              )`,
+              ),
               sql`,`,
             )}
             ON CONFLICT (case_id) DO UPDATE SET
               assigned_to              = EXCLUDED.assigned_to,
               win_sheet_status         = EXCLUDED.win_sheet_status,
               win_sheet_link           = COALESCE(fee_records.win_sheet_link, EXCLUDED.win_sheet_link),
-              win_sheet_link_text      = EXCLUDED.win_sheet_link_text,
+              win_sheet_link_text      = COALESCE(fee_records.win_sheet_link_text, EXCLUDED.win_sheet_link_text),
               case_status              = EXCLUDED.case_status,
               fees_confirmation        = EXCLUDED.fees_confirmation,
-              date_assigned_to_agent   = EXCLUDED.date_assigned_to_agent,
-              approved_by              = EXCLUDED.approved_by,
+              date_assigned_to_agent   = COALESCE(fee_records.date_assigned_to_agent, EXCLUDED.date_assigned_to_agent),
+              approved_by              = COALESCE(fee_records.approved_by, EXCLUDED.approved_by),
               t16_retro                = EXCLUDED.t16_retro,
               t16_fee_due              = EXCLUDED.t16_fee_due,
               t16_fee_received         = EXCLUDED.t16_fee_received,
@@ -602,19 +474,17 @@ export const POST = async (req: NextRequest) => {
               aux_fee_received_date    = EXCLUDED.aux_fee_received_date,
               days_after_approval      = EXCLUDED.days_after_approval,
               approval_category        = EXCLUDED.approval_category,
-              fees_status              = EXCLUDED.fees_status,
-              week_assigned_to_agent   = EXCLUDED.week_assigned_to_agent,
-              month_assigned_to_agent  = EXCLUDED.month_assigned_to_agent,
               updated_at               = now()
-          `),
+          `,
+          ),
         ]);
       }
       updated = updateRows.length;
     }
 
-    return NextResponse.json({ inserted, updated, closed });
+    return NextResponse.json({ inserted, updated });
   } catch (error) {
-    console.error("POST /api/sheets/sync error:", error);
+    console.error("POST /api/mycase/sync error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },

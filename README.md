@@ -14,35 +14,17 @@ This is a [Next.js](https://nextjs.org) dashboard for HSL Fee Collection, using 
 
 2. **Configure environment variables:**
 
-   Create a `.env.local` file in the project root with:
+   Copy `.env.example` to `.env.local` and fill in the values:
 
-   ```env
-   # Database (Neon / PostgreSQL)
-   DATABASE_URL=your_postgres_connection_string
-
-   # Auth (NextAuth v5)
-   AUTH_SECRET=your_auth_secret
-
-   # Chronicle API
-   CHRONICLE_API_URL=https://api.chroniclelegal.com
-   CHRONICLE_BASE_URL=https://app.chroniclelegal.com
-   CHRONICLE_API_KEY=your_chronicle_api_key
-
-   # MyCase
-   MYCASE_API_URL=your_mycase_api_url
-   MYCASE_API_KEY=your_mycase_api_key
-   MYCASE_DB_URL=your_mycase_db_connection_string
-
-   # Webhooks
-   SHEETS_SYNC_WEBHOOK_URL=your_sheets_sync_webhook_url
-   SHEETS_PUSH_WEBHOOK_URL=your_sheets_push_webhook_url
-   FEES_CLOSED_SYNC_WEBHOOK_URL=your_fees_closed_sync_webhook_url
-
-   # Misc
-   CALLTOOLS_API_KEY=your_calltools_api_key
+   ```bash
+   cp .env.example .env.local
    ```
 
-   _Do not commit secrets!_
+   Required vars: `DATABASE_URL`, `MYCASE_DB_URL`, `AUTH_SECRET`, `CHRONICLE_API_URL`, `CHRONICLE_API_KEY`, and the n8n webhook URLs. See `.env.example` for the full list with descriptions.
+
+   Optional (used by the settings/connections page): `CHRONICLE_BASE_URL`, `MYCASE_API_URL`, `MYCASE_API_KEY`, `CALLTOOLS_API_KEY`.
+
+   _Do not commit `.env.local`._
 
 3. **Run the development server:**
 
