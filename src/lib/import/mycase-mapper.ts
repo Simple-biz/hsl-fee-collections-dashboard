@@ -99,7 +99,7 @@ const mapLevelWon = (raw: string | null): ParsedCaseRow["levelWon"] => {
   return null;
 };
 
-const mapDecision = (raw: string | null): ParsedCaseRow["t2Decision"] => {
+export const mapDecision = (raw: string | null): ParsedCaseRow["t2Decision"] => {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return "unknown";
   if (s.includes("partially favorable")) return "partially_favorable";

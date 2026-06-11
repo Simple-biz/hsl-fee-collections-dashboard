@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, userDetails } from "@/lib/db/schema";
 import { myCaseDb } from "@/lib/db/mycase";
-import { mapMyCaseRows, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
+import { mapMyCaseRows, mapDecision, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
 import { fetchCaseDetails } from "@/lib/mycase-proxy";
 import { fetchChronicleClient, parseChronicleResponse } from "@/lib/chronicle-client";
 import { auth } from "@/auth";
@@ -146,6 +146,20 @@ export const GET = async (
           if (t2Decision === "unknown" && chr.t2Decision) t2Decision = chr.t2Decision;
           if (t16Decision === "unknown" && chr.t16Decision) t16Decision = chr.t16Decision;
           if (!ssnLast4 && chr.last4Ssn) ssnLast4 = chr.last4Ssn;
+
+          // Persist normalized decisions back to local DB so future loads skip Chronicle.
+          const normT2 = mapDecision(chr.t2Decision);
+          const normT16 = mapDecision(chr.t16Decision);
+          const decUpdate: { t2Decision?: typeof normT2; t16Decision?: typeof normT16 } = {};
+          if (normT2 !== "unknown" && (!local?.t2Decision || local.t2Decision === "unknown")) {
+            decUpdate.t2Decision = normT2;
+          }
+          if (normT16 !== "unknown" && (!local?.t16Decision || local.t16Decision === "unknown")) {
+            decUpdate.t16Decision = normT16;
+          }
+          if (Object.keys(decUpdate).length > 0) {
+            await db.update(cases).set(decUpdate).where(eq(cases.clientId, caseId)).catch(() => null);
+          }
         }
       }
     }
