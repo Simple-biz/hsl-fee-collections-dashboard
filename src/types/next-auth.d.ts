@@ -1,12 +1,15 @@
 import type { DefaultSession } from "next-auth";
+import type { PageKey } from "@/lib/access/pages";
 
-type UserRole = "admin" | "member" | "system_admin";
+type UserRole = "admin" | "lead" | "member" | "system_admin";
 
 declare module "next-auth" {
   /** Returned by `authorize` and stored on the session user. */
   interface User {
     role?: UserRole;
     mustChangePassword?: boolean;
+    /** Effective page-access set, resolved at sign-in. */
+    pages?: PageKey[];
   }
 
   interface Session {
@@ -14,6 +17,7 @@ declare module "next-auth" {
       id: string;
       role: UserRole;
       mustChangePassword: boolean;
+      pages: PageKey[];
     } & DefaultSession["user"];
   }
 }
@@ -25,5 +29,6 @@ declare module "@auth/core/jwt" {
     id?: string;
     role?: UserRole;
     mustChangePassword?: boolean;
+    pages?: PageKey[];
   }
 }

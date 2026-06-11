@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { resolveEffectivePages } from "@/lib/access/server";
+import { rolePageDefaults } from "@/lib/access/role-defaults";
 import authConfig from "@/auth.config";
 
 const credentialsSchema = z.object({
@@ -56,6 +58,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           /* non-critical */
         }
 
+        // Resolve effective page access (role default ⊕ overrides) once at
+        // sign-in and bake it into the token so the edge gate needs no DB.
+        // On any failure (e.g. overrides table missing), degrade to the role
+        // DEFAULTS — never to an empty set, which would lock the user out.
+        const pages = await resolveEffectivePages(user.id, user.role).catch(
+          () => rolePageDefaults(user.role),
+        );
+
         return {
           // NextAuth expects a string id; users.id is an integer.
           id: String(user.id),
@@ -63,6 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           mustChangePassword: user.mustChangePassword,
+          pages,
         };
       },
     }),

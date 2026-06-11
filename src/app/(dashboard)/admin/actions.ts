@@ -5,8 +5,15 @@ import { eq, and, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, userAccessOverrides } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { PAGE_KEYS, type PageKey } from "@/lib/access/pages";
+import { rolePageDefaults } from "@/lib/access/role-defaults";
+import {
+  effectivePages,
+  type AccessOverrides,
+  type PageOverrides,
+} from "@/lib/access/resolve";
 
 type ActionResult<T = void> = T extends void
   ? { ok: true; warning?: string } | { ok: false; error: string }
@@ -14,7 +21,7 @@ type ActionResult<T = void> = T extends void
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MIN_PASSWORD_LEN = 8;
-const ROLES = ["admin", "member", "system_admin"] as const;
+const ROLES = ["admin", "lead", "member", "system_admin"] as const;
 type Role = (typeof ROLES)[number];
 
 const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
@@ -220,6 +227,101 @@ export async function resetUserPassword(input: {
     return { ok: true };
   } catch (error) {
     console.error("resetUserPassword error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
+// ---- Access overrides (page-level) -----------------------------------------
+
+/** Load a user's page access for the admin modal: role default, the stored
+ *  deviations, and the resolved effective set. */
+export async function getUserAccess(input: {
+  userId: number;
+}): Promise<
+  ActionResult<{
+    role: Role;
+    defaultPages: PageKey[];
+    overrides: PageOverrides;
+    effectivePages: PageKey[];
+  }>
+> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  if (!Number.isFinite(input.userId)) {
+    return { ok: false, error: "Invalid user id" };
+  }
+
+  try {
+    const [user] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+    if (!user) return { ok: false, error: "User not found" };
+
+    const [ov] = await db
+      .select({ overrides: userAccessOverrides.overrides })
+      .from(userAccessOverrides)
+      .where(eq(userAccessOverrides.userId, input.userId))
+      .limit(1);
+
+    const pageOverrides = ((ov?.overrides as AccessOverrides) ?? {}).pages ?? {};
+    return {
+      ok: true,
+      role: user.role as Role,
+      defaultPages: rolePageDefaults(user.role),
+      overrides: pageOverrides,
+      effectivePages: effectivePages(user.role, { pages: pageOverrides }),
+    };
+  } catch (error) {
+    console.error("getUserAccess error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
+/** Save a user's page access. The client sends the full grant map (pageKey →
+ *  granted); we persist ONLY deviations from the role default, so "Apply Role
+ *  Defaults" (all-matching) stores an empty override. Takes effect on the
+ *  user's next login (access is baked into their token at sign-in). */
+export async function updateUserAccess(input: {
+  userId: number;
+  pages: Record<string, boolean>;
+}): Promise<ActionResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  if (!Number.isFinite(input.userId)) {
+    return { ok: false, error: "Invalid user id" };
+  }
+
+  try {
+    const [user] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+    if (!user) return { ok: false, error: "User not found" };
+
+    const defaults = new Set(rolePageDefaults(user.role));
+    const deviations: PageOverrides = {};
+    for (const key of PAGE_KEYS) {
+      const granted = input.pages[key];
+      if (granted === undefined) continue;
+      if (granted !== defaults.has(key)) deviations[key] = granted;
+    }
+
+    const overrides: AccessOverrides = { pages: deviations };
+    await db
+      .insert(userAccessOverrides)
+      .values({ userId: input.userId, overrides })
+      .onConflictDoUpdate({
+        target: userAccessOverrides.userId,
+        set: { overrides, updatedAt: new Date() },
+      });
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (error) {
+    console.error("updateUserAccess error:", error);
     return { ok: false, error: "Server error" };
   }
 }

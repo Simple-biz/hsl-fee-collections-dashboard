@@ -62,9 +62,14 @@ async function main() {
     process.exit(1);
   }
 
-  if (role !== "admin" && role !== "member" && role !== "system_admin") {
+  if (
+    role !== "admin" &&
+    role !== "lead" &&
+    role !== "member" &&
+    role !== "system_admin"
+  ) {
     console.error(
-      `Invalid role: ${role} (expected "admin", "member", or "system_admin")`,
+      `Invalid role: ${role} (expected "admin", "lead", "member", or "system_admin")`,
     );
     process.exit(1);
   }
