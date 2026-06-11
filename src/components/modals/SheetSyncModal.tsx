@@ -199,7 +199,7 @@ export default function SheetSyncModal({
     const controller = new AbortController();
     fetchControllerRef.current = controller;
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 30_000);
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 60_000);
     try {
       const [mainRes, fcRes] = await Promise.all([
         fetch("/api/sheets/sync?mode=preview", { method: "POST", signal: controller.signal }),
