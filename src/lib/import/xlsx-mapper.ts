@@ -62,6 +62,9 @@ export interface ParsedCaseRow {
   weekAssignedToAgent: string | null;
   monthAssignedToAgent: string | null;
 
+  t2Decision: "fully_favorable" | "partially_favorable" | "unfavorable" | "dismissed" | "remand" | "unknown";
+  t16Decision: "fully_favorable" | "partially_favorable" | "unfavorable" | "dismissed" | "remand" | "unknown";
+
   // Notes — entire raw blob, stored as one activity_log entry per case
   notes: string | null;
 }
@@ -344,6 +347,8 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
       feesStatus: null,
       weekAssignedToAgent: null,
       monthAssignedToAgent: null,
+      t2Decision: "unknown",
+      t16Decision: "unknown",
       notes: row[C.notes] ? String(row[C.notes]).trim() : null,
     });
   }

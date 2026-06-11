@@ -98,8 +98,6 @@ export const GET = async (
         feesStatus: feeRecords.feesStatus,
         weekAssignedToAgent: feeRecords.weekAssignedToAgent,
         monthAssignedToAgent: feeRecords.monthAssignedToAgent,
-        feeRecordUpdatedAt: feeRecords.updatedAt,
-
         // user_details fields
         udChronicleId: userDetails.chronicleId,
         udFullName: userDetails.fullName,
@@ -315,7 +313,7 @@ export const PATCH = async (
     }
 
     const body = await req.json();
-    const { caseFields, feeFields, logMessage, logAuthor } = body;
+    const { caseFields, feeFields, userDetailsFields, logMessage, logAuthor } = body;
 
     // Update case fields if provided
     if (caseFields && Object.keys(caseFields).length > 0) {
@@ -399,6 +397,39 @@ export const PATCH = async (
       if (updates.length > 0) {
         await db.execute(
           sql`UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
+        );
+      }
+    }
+
+    // Update user_details fields if provided
+    if (userDetailsFields && Object.keys(userDetailsFields).length > 0) {
+      const UD_FIELD_MAP: Record<string, string> = {
+        ssnLast4: "ssn_last4",
+        chronicleId: "chronicle_id",
+      };
+
+      const colDefs: { col: string; sqlVal: string }[] = [];
+      for (const [k, v] of Object.entries(userDetailsFields)) {
+        const col = UD_FIELD_MAP[k];
+        if (!col) continue;
+        let sqlVal: string;
+        if (v === null) sqlVal = "NULL";
+        else if (typeof v === "number") sqlVal = String(v);
+        else sqlVal = `'${String(v).replace(/'/g, "''")}'`;
+        colDefs.push({ col, sqlVal });
+      }
+
+      if (colDefs.length > 0) {
+        const insertCols = colDefs.map((d) => d.col).join(", ");
+        const insertVals = colDefs.map((d) => d.sqlVal).join(", ");
+        const conflictSet = colDefs.map((d) => `${d.col} = ${d.sqlVal}`).join(", ");
+        await db.execute(
+          sql`
+            INSERT INTO user_details (case_id, ${sql.raw(insertCols)}, updated_at)
+            VALUES (${caseId}, ${sql.raw(insertVals)}, NOW())
+            ON CONFLICT (case_id) DO UPDATE
+              SET ${sql.raw(conflictSet)}, updated_at = NOW()
+          `,
         );
       }
     }
