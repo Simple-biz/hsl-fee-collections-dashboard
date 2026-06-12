@@ -2,8 +2,13 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userAccessOverrides } from "@/lib/db/schema";
-import { effectivePages, type AccessOverrides } from "./resolve";
+import {
+  effectivePages,
+  effectiveCapabilities,
+  type AccessOverrides,
+} from "./resolve";
 import type { PageKey } from "./pages";
+import type { CapabilityKey } from "./capabilities";
 
 // ============================================================================
 // Server-only access helpers — the DB-reading side of the access layer.
@@ -29,4 +34,19 @@ export const resolveEffectivePages = async (
 ): Promise<PageKey[]> => {
   const overrides = await loadAccessOverrides(userId);
   return effectivePages(role, overrides);
+};
+
+/**
+ * Resolve both the effective page set AND capability set in a single override
+ * read — used at sign-in so the JWT can carry both without two DB round-trips.
+ */
+export const resolveAccess = async (
+  userId: number,
+  role: string,
+): Promise<{ pages: PageKey[]; capabilities: CapabilityKey[] }> => {
+  const overrides = await loadAccessOverrides(userId);
+  return {
+    pages: effectivePages(role, overrides),
+    capabilities: effectiveCapabilities(role, overrides),
+  };
 };

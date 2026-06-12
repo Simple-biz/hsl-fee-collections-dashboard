@@ -10,9 +10,16 @@ import { requireAdmin } from "@/lib/auth-helpers";
 import { PAGE_KEYS, type PageKey } from "@/lib/access/pages";
 import { rolePageDefaults } from "@/lib/access/role-defaults";
 import {
+  CAPABILITY_KEYS,
+  roleCapabilityDefaults,
+  type CapabilityKey,
+} from "@/lib/access/capabilities";
+import {
   effectivePages,
+  effectiveCapabilities,
   type AccessOverrides,
   type PageOverrides,
+  type CapabilityOverrides,
 } from "@/lib/access/resolve";
 
 type ActionResult<T = void> = T extends void
@@ -243,6 +250,8 @@ export async function getUserAccess(input: {
     defaultPages: PageKey[];
     overrides: PageOverrides;
     effectivePages: PageKey[];
+    defaultCapabilities: CapabilityKey[];
+    effectiveCapabilities: CapabilityKey[];
   }>
 > {
   const guard = await requireAdmin();
@@ -265,13 +274,19 @@ export async function getUserAccess(input: {
       .where(eq(userAccessOverrides.userId, input.userId))
       .limit(1);
 
-    const pageOverrides = ((ov?.overrides as AccessOverrides) ?? {}).pages ?? {};
+    const stored = (ov?.overrides as AccessOverrides) ?? {};
+    const pageOverrides = stored.pages ?? {};
+    const capOverrides = stored.capabilities ?? {};
     return {
       ok: true,
       role: user.role as Role,
       defaultPages: rolePageDefaults(user.role),
       overrides: pageOverrides,
       effectivePages: effectivePages(user.role, { pages: pageOverrides }),
+      defaultCapabilities: roleCapabilityDefaults(user.role),
+      effectiveCapabilities: effectiveCapabilities(user.role, {
+        capabilities: capOverrides,
+      }),
     };
   } catch (error) {
     console.error("getUserAccess error:", error);
@@ -286,6 +301,7 @@ export async function getUserAccess(input: {
 export async function updateUserAccess(input: {
   userId: number;
   pages: Record<string, boolean>;
+  capabilities?: Record<string, boolean>;
 }): Promise<ActionResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
@@ -301,15 +317,26 @@ export async function updateUserAccess(input: {
       .limit(1);
     if (!user) return { ok: false, error: "User not found" };
 
-    const defaults = new Set(rolePageDefaults(user.role));
+    const pageDefaults = new Set(rolePageDefaults(user.role));
     const deviations: PageOverrides = {};
     for (const key of PAGE_KEYS) {
       const granted = input.pages[key];
       if (granted === undefined) continue;
-      if (granted !== defaults.has(key)) deviations[key] = granted;
+      if (granted !== pageDefaults.has(key)) deviations[key] = granted;
     }
 
-    const overrides: AccessOverrides = { pages: deviations };
+    const capDefaults = new Set(roleCapabilityDefaults(user.role));
+    const capDeviations: CapabilityOverrides = {};
+    for (const key of CAPABILITY_KEYS) {
+      const granted = input.capabilities?.[key];
+      if (granted === undefined) continue;
+      if (granted !== capDefaults.has(key)) capDeviations[key] = granted;
+    }
+
+    const overrides: AccessOverrides = {
+      pages: deviations,
+      capabilities: capDeviations,
+    };
     await db
       .insert(userAccessOverrides)
       .values({ userId: input.userId, overrides })

@@ -67,6 +67,7 @@ export const authConfig = {
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword ?? false;
         token.pages = user.pages ?? [];
+        token.capabilities = user.capabilities ?? [];
       }
       return token;
     },
@@ -77,6 +78,7 @@ export const authConfig = {
         if (token.role) session.user.role = token.role;
         session.user.mustChangePassword = token.mustChangePassword ?? false;
         session.user.pages = token.pages ?? [];
+        session.user.capabilities = token.capabilities ?? [];
       }
       return session;
     },

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
+import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+
+// Fee fields that count as "finalizing" a case — gated by case.finalize rather
+// than the broader case.update (members can record payments but not close,
+// reopen, mark overpaid, or sign off "OK to close").
+const FINALIZE_FEE_FIELDS = ["isClosed", "markedOverpaid", "approvedBy"] as const;
 
 const resolveParams = async (context: {
   params: { id: string } | Promise<{ id: string }>;
@@ -315,6 +321,41 @@ export const PATCH = async (
     const body = await req.json();
     const { caseFields, feeFields, userDetailsFields, logMessage, logAuthor } = body;
 
+    // Authorize: any update needs case.update. Finalizing fields (close/reopen,
+    // mark overpaid, approvedBy) additionally need case.finalize, and editing
+    // client PII (user_details) needs case.editPii. Admins can grant any of
+    // these to a member per-user via the access overrides modal.
+    const update = await requireCapability("case.update");
+    if (!update.ok) {
+      return NextResponse.json(
+        { error: update.error },
+        { status: guardStatus(update.error) },
+      );
+    }
+
+    const touchesFinalize =
+      feeFields &&
+      FINALIZE_FEE_FIELDS.some((k) => k in feeFields);
+    if (touchesFinalize) {
+      const fin = await requireCapability("case.finalize");
+      if (!fin.ok) {
+        return NextResponse.json(
+          { error: "You don't have permission to close, reopen, mark overpaid, or approve cases." },
+          { status: guardStatus(fin.error) },
+        );
+      }
+    }
+
+    if (userDetailsFields && Object.keys(userDetailsFields).length > 0) {
+      const pii = await requireCapability("case.editPii");
+      if (!pii.ok) {
+        return NextResponse.json(
+          { error: "You don't have permission to edit client PII." },
+          { status: guardStatus(pii.error) },
+        );
+      }
+    }
+
     // Update case fields if provided
     if (caseFields && Object.keys(caseFields).length > 0) {
       const CASE_FIELD_MAP: Record<string, string> = {
@@ -462,6 +503,15 @@ export const POST = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    // Adding an activity note is an update-level action.
+    const guard = await requireCapability("case.update");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const caseId = await resolveParams(context);
     if (isNaN(caseId)) {
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
@@ -512,6 +562,15 @@ export const DELETE = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    // Deleting cases is admin-only by default (overridable per-user).
+    const guard = await requireCapability("case.delete");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const caseId = await resolveParams(context);
     if (isNaN(caseId)) {
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });

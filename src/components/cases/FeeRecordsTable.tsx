@@ -15,6 +15,7 @@ import {
   Loader2,
   ExternalLink,
   TrendingDown,
+  Plus,
   X,
 } from "lucide-react";
 
@@ -28,8 +29,10 @@ import {
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
+import AddCaseModal from "@/components/modals/AddCaseModal";
 import SheetSyncModal from "@/components/modals/SheetSyncModal";
 import SheetPushModal from "@/components/modals/SheetPushModal";
 import MyCaseSyncModal from "@/components/modals/MyCaseSyncModal";
@@ -132,6 +135,9 @@ export const FeeRecordsTable = ({
   const t = themeClasses(dark);
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "system_admin";
+  const { can } = useCapabilities();
+  const canCreate = can("case.create");
+  const canFinalize = can("case.finalize");
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -183,6 +189,7 @@ export const FeeRecordsTable = ({
   const [isPending, startTransition] = useTransition();
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [myCaseSyncOpen, setMyCaseSyncOpen] = useState(false);
   const [pushOpen, setPushOpen] = useState(false);
@@ -609,9 +616,17 @@ export const FeeRecordsTable = ({
               </button>
             </>
           )}
+          {mode !== "closed" && canCreate && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add Case
+            </button>
+          )}
           <button
             onClick={() => setImportOpen(true)}
-            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
+            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.outlineBtn}`}
           >
             <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Import
           </button>
@@ -619,7 +634,7 @@ export const FeeRecordsTable = ({
       </div>
 
       {/* Floating batch action pill — anchored to the bottom of the table card */}
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && canFinalize && (
         <div className="pointer-events-none absolute bottom-12 left-0 right-0 z-50 flex justify-center">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
             <span className="text-[11px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
@@ -1222,7 +1237,7 @@ export const FeeRecordsTable = ({
                   className={`${tdBase} ${t.textSub}`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {mode === "closed" ? (
+                  {mode === "closed" || !canFinalize ? (
                     cellValue(c, "approvedBy") || "—"
                   ) : (
                     <select
@@ -1281,7 +1296,11 @@ export const FeeRecordsTable = ({
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         const next = e.target.value;
+                        // "Paid In Full" prompts the close flow, which is a
+                        // finalize action — only offer it to users who can
+                        // finalize. Others just set the field value.
                         if (
+                          canFinalize &&
                           next &&
                           next.toLowerCase() === "paid in full" &&
                           next !== cellValue(c, "feesConfirmation")
@@ -1437,23 +1456,27 @@ export const FeeRecordsTable = ({
                     className={`${tdBase} text-center`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleReopen(c);
-                      }}
-                      disabled={reopeningId !== null}
-                      className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn} disabled:opacity-40`}
-                      title="Move this case back to the active dashboard and clear Fees Confirmation"
-                    >
-                      {reopeningId === c.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RotateCcw className="h-3 w-3" />
-                      )}
-                      Reopen
-                    </button>
+                    {canFinalize ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReopen(c);
+                        }}
+                        disabled={reopeningId !== null}
+                        className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn} disabled:opacity-40`}
+                        title="Move this case back to the active dashboard and clear Fees Confirmation"
+                      >
+                        {reopeningId === c.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3 w-3" />
+                        )}
+                        Reopen
+                      </button>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 )}
               </tr>
@@ -1541,6 +1564,17 @@ export const FeeRecordsTable = ({
           dark={dark}
           onClose={() => setImportOpen(false)}
           onImported={async () => {
+            if (onImported) await onImported();
+          }}
+        />
+      )}
+
+      {addOpen && (
+        <AddCaseModal
+          dark={dark}
+          dropdownOptions={dropdownOptions}
+          onClose={() => setAddOpen(false)}
+          onCreated={async () => {
             if (onImported) await onImported();
           }}
         />
