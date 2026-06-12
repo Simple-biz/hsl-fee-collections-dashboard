@@ -14,7 +14,7 @@ import { mapFeesClosedRows } from "@/lib/import/fees-closed-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const CHUNK = 500;
 const SHEET_CACHE_TTL = 5 * 60 * 1000;
@@ -39,7 +39,7 @@ const fetchMasterListRows = async (): Promise<{
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ trigger: "manual" }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(55_000),
   });
   if (!res.ok)
     throw new Error(
@@ -59,7 +59,7 @@ const fetchFeesClosedSheetRows = async (): Promise<SheetRow[]> => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trigger: "manual" }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(55_000),
     });
     if (!res.ok) return [];
     const rows = (await res.json()) as SheetRow[];

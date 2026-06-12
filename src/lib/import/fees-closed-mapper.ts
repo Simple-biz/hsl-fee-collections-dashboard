@@ -1,5 +1,7 @@
 import type { SheetRow } from "./sheets-mapper";
 
+const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
+
 const num = (v: unknown): string => {
   if (v === null || v === undefined || v === "") return "0";
   const n = typeof v === "number" ? v : Number(String(v).replace(/[, $]/g, ""));
@@ -22,6 +24,7 @@ const dateOnly = (v: unknown): string | null => {
 
 export type ParsedFeesClosedRow = {
   caseName: string;
+  myCaseId: number | null;
   closedDate: string | null;
   assignedTo: string | null;
   caseLevel: string | null;
@@ -64,6 +67,10 @@ export const mapFeesClosedRows = (
     const caseName = String(r["CASE NAME"] ?? "").trim();
     if (!caseName) continue;
 
+    const caseUrl = r["CASE NAME_url"] ? String(r["CASE NAME_url"]).trim() : null;
+    const myCaseMatch = caseUrl?.match(MYCASE_URL_RE);
+    const myCaseId = myCaseMatch ? Number(myCaseMatch[1]) : null;
+
     const winSheetLink = r["WIN SHEET LINK_url"]
       ? String(r["WIN SHEET LINK_url"]).trim()
       : r["WIN SHEET LINK"]
@@ -72,6 +79,7 @@ export const mapFeesClosedRows = (
 
     out.push({
       caseName,
+      myCaseId,
       closedDate: dateOnly(r["date"]),
       assignedTo: r["ASSIGNED TO"] ? String(r["ASSIGNED TO"]).trim() : null,
       caseLevel: r["CASE LEVEL"] ? String(r["CASE LEVEL"]).trim() : null,
