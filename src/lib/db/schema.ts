@@ -699,6 +699,7 @@ export const overpaidCases = pgTable(
 
 export const userRoleEnum = pgEnum("user_role_enum", [
   "admin",
+  "lead",
   "member",
   "system_admin",
 ]);
@@ -723,6 +724,24 @@ export const users = pgTable(
   },
   (table) => [index("idx_users_email").on(table.email)],
 );
+
+// Per-user access overrides — stores ONLY deviations from the user's role
+// default (see src/lib/access). `overrides` is { pages?: { [pageKey]: bool } }
+// today; a `fields` map will be added in Phase 2.
+export const userAccessOverrides = pgTable("user_access_overrides", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  overrides: jsonb("overrides").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // ============================================================================
 // RELATIONS

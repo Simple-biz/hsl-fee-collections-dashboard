@@ -14,12 +14,13 @@ import {
   RefreshCw,
   Copy,
   Check,
+  ShieldCheck,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -36,6 +37,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AccessOverridesDialog } from "./AccessOverridesDialog";
+import { EditUserDialog } from "./EditUserDialog";
 import { themeClasses } from "@/lib/theme-classes";
 import {
   createUser,
@@ -48,7 +51,7 @@ export type AdminUser = {
   id: number;
   email: string;
   name: string | null;
-  role: "admin" | "member" | "system_admin";
+  role: "admin" | "lead" | "member" | "system_admin";
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -57,6 +60,7 @@ export type AdminUser = {
 const ROLE_LABELS: Record<AdminUser["role"], string> = {
   system_admin: "System Admin",
   admin: "Admin",
+  lead: "Lead",
   member: "Member",
 };
 
@@ -66,6 +70,7 @@ const ROLE_VARIANTS: Record<
 > = {
   system_admin: "default",
   admin: "secondary",
+  lead: "secondary",
   member: "outline",
 };
 
@@ -103,6 +108,8 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
   const [banner, setBanner] = useState<Banner>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [accessTarget, setAccessTarget] = useState<AdminUser | null>(null);
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
 
   const run = async (
     userId: number | null,
@@ -121,21 +128,31 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
     }
   };
 
-  const handleRoleChange = (user: AdminUser, role: AdminUser["role"]) => {
-    if (role === user.role) return;
-    run(
-      user.id,
-      () => updateUserRole({ userId: user.id, role }),
-      `Role updated to ${ROLE_LABELS[role]}`,
-    );
-  };
-
-  const handleActiveChange = (user: AdminUser, isActive: boolean) => {
-    run(
-      user.id,
-      () => setUserActive({ userId: user.id, isActive }),
-      isActive ? "User activated" : "User deactivated",
-    );
+  // Applies role + active changes from the Edit modal (only the fields that
+  // actually changed), then closes on success.
+  const handleEditSubmit = async (
+    user: AdminUser,
+    role: AdminUser["role"],
+    isActive: boolean,
+  ) => {
+    let ok = true;
+    if (role !== user.role) {
+      const r = await run(
+        user.id,
+        () => updateUserRole({ userId: user.id, role }),
+        `Role updated to ${ROLE_LABELS[role]}`,
+      );
+      ok = r.ok;
+    }
+    if (ok && isActive !== user.isActive) {
+      const r = await run(
+        user.id,
+        () => setUserActive({ userId: user.id, isActive }),
+        isActive ? "User activated" : "User deactivated",
+      );
+      ok = r.ok;
+    }
+    if (ok) setEditTarget(null);
   };
 
   const sectionCard = `rounded-xl border ${t.card}`;
@@ -193,7 +210,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-180">
+        <table className="w-full min-w-180 select-text">
           <thead>
             <tr className={`border-b ${t.borderLight}`}>
               <th className={`${thBase} text-left`}>User</th>
@@ -252,38 +269,14 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                       </div>
                     </td>
                     <td className={tdBase}>
-                      {isSelf ? (
-                        <Badge variant={ROLE_VARIANTS[user.role]}>
-                          {ROLE_LABELS[user.role]}
-                        </Badge>
-                      ) : (
-                        <Select
-                          value={user.role}
-                          onValueChange={(v) =>
-                            handleRoleChange(user, v as AdminUser["role"])
-                          }
-                          disabled={rowBusy}
-                        >
-                          <SelectTrigger className="h-7 w-36 text-[11px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="system_admin">
-                              System Admin
-                            </SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="member">Member</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <Badge variant={ROLE_VARIANTS[user.role]}>
+                        {ROLE_LABELS[user.role]}
+                      </Badge>
                     </td>
                     <td className={`${tdBase} text-center`}>
-                      <Switch
-                        checked={user.isActive}
-                        onCheckedChange={(v) => handleActiveChange(user, v)}
-                        disabled={isSelf || rowBusy}
-                        aria-label={`${user.isActive ? "Deactivate" : "Activate"} ${user.email}`}
-                      />
+                      <Badge variant={user.isActive ? "secondary" : "outline"}>
+                        {user.isActive ? "Active" : "Inactive"}
+                      </Badge>
                     </td>
                     <td className={`${tdBase} ${t.textMuted}`}>
                       {formatRelative(user.lastLoginAt)}
@@ -299,6 +292,18 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                             className={`h-3 w-3 animate-spin ${t.textMuted}`}
                           />
                         )}
+                        {!isSelf && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditTarget(user)}
+                            disabled={rowBusy}
+                            className="h-7 text-[11px]"
+                          >
+                            <Pencil className="h-3 w-3" aria-hidden="true" />
+                            Edit
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -308,6 +313,16 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                         >
                           <KeyRound className="h-3 w-3" aria-hidden="true" />
                           Reset password
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAccessTarget(user)}
+                          disabled={rowBusy}
+                          className="h-7 text-[11px]"
+                        >
+                          <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                          Access
                         </Button>
                       </div>
                     </td>
@@ -332,6 +347,22 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
         }}
       />
 
+
+      <EditUserDialog
+        target={editTarget}
+        isSelf={editTarget?.id === currentUserId}
+        onClose={() => setEditTarget(null)}
+        onSubmit={(role, isActive) =>
+          editTarget
+            ? handleEditSubmit(editTarget, role, isActive)
+            : Promise.resolve()
+        }
+      />
+
+      <AccessOverridesDialog
+        target={accessTarget}
+        onClose={() => setAccessTarget(null)}
+      />
 
       <ResetPasswordDialog
         target={resetTarget}
@@ -519,6 +550,7 @@ function NewUserDialog({
               <SelectContent>
                 <SelectItem value="system_admin">System Admin</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="lead">Lead</SelectItem>
                 <SelectItem value="member">Member</SelectItem>
               </SelectContent>
             </Select>

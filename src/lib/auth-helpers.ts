@@ -1,6 +1,9 @@
 import "server-only";
 import { auth } from "@/auth";
 import type { Session } from "next-auth";
+import type { CapabilityKey } from "@/lib/access/capabilities";
+import { roleCapabilityDefaults } from "@/lib/access/capabilities";
+import { hasCapability } from "@/lib/access/resolve";
 
 type AdminRole = "admin" | "system_admin";
 
@@ -28,3 +31,31 @@ export async function requireAdmin(): Promise<AdminGuard> {
 
 export const isAdminRole = (role: string | undefined | null): role is AdminRole =>
   role === "admin" || role === "system_admin";
+
+export type CapabilityGuard =
+  | { ok: true; session: Session }
+  | { ok: false; error: "Unauthenticated" | "Forbidden" };
+
+/**
+ * Server-side guard for a capability (e.g. "case.create"). Reads the effective
+ * capability set baked into the session at sign-in. Tokens minted before
+ * capabilities existed have no `capabilities` array — for those we fall back to
+ * the role defaults so existing sessions behave correctly until next login.
+ */
+export async function requireCapability(
+  capability: CapabilityKey,
+): Promise<CapabilityGuard> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Unauthenticated" };
+
+  const caps =
+    session.user.capabilities ?? roleCapabilityDefaults(session.user.role);
+  if (!hasCapability(caps, capability)) {
+    return { ok: false, error: "Forbidden" };
+  }
+  return { ok: true, session };
+}
+
+/** HTTP status for a failed capability/admin guard. */
+export const guardStatus = (error: "Unauthenticated" | "Forbidden"): number =>
+  error === "Unauthenticated" ? 401 : 403;

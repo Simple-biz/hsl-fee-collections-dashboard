@@ -127,6 +127,20 @@
       "when": 1781027880813,
       "tag": "0017_mycase_sync_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781193964515,
+      "tag": "0018_add_lead_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1781195209448,
+      "tag": "0019_user_access_overrides",
+      "breakpoints": true
     }
   ]
 }
