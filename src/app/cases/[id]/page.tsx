@@ -39,6 +39,7 @@ import {
 } from "@/lib/formatters";
 import type { WinSheetStatus } from "@/types";
 import FeeEditModal from "@/components/cases/FeeEditModal";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 // ============================================================================
 // Types
@@ -400,6 +401,8 @@ const CaseDetailPage = () => {
   useEffect(() => setMounted(true), []);
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+  const { can } = useCapabilities();
+  const canDelete = can("case.delete");
 
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -791,12 +794,14 @@ const CaseDetailPage = () => {
                     >
                       <DollarSign className="h-3 w-3" /> Edit Fees
                     </button>
-                    <button
-                      onClick={() => setDeleteConfirm(true)}
-                      className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-red-800 text-red-400 hover:bg-red-900/30" : "border-red-200 text-red-600 hover:bg-red-50"}`}
-                    >
-                      <Trash2 className="h-3 w-3" /> Delete
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => setDeleteConfirm(true)}
+                        className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-red-800 text-red-400 hover:bg-red-900/30" : "border-red-200 text-red-600 hover:bg-red-50"}`}
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -1482,13 +1487,13 @@ const CaseDetailPage = () => {
               ) : (
                 <div className="relative">
                   <div
-                    className={`absolute left-[11px] top-2 bottom-2 w-px ${dark ? "bg-neutral-800" : "bg-neutral-200"}`}
+                    className={`absolute left-2.75 top-2 bottom-2 w-px ${dark ? "bg-neutral-800" : "bg-neutral-200"}`}
                   />
                   <div className="space-y-4">
                     {caseData.activities.map((a) => (
                       <div key={a.id} className="flex gap-3 relative">
                         <div
-                          className={`w-[23px] h-[23px] rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-300"}`}
+                          className={`w-5.75 h-5.75 rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-300"}`}
                         >
                           <div
                             className={`w-2 h-2 rounded-full ${dark ? "bg-neutral-500" : "bg-neutral-400"}`}

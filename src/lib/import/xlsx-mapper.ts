@@ -103,7 +103,21 @@ const dateOnly = (v: unknown): string | null => {
   return null;
 };
 
-// Parse "YYYY.MM.DD Lastname, Firstname v. ALJ NAME" → names
+// Strip one or more trailing annotation groups from a segment — e.g.
+// " (SSI case)", " [VIA PHONE]", or both stacked: "Detherage (Remand) [PHONE]".
+const stripTrailingAnnotations = (s: string): string => {
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/\s*[([][^)\]]*[)\]]\s*$/, "").trim();
+  } while (s !== prev);
+  return s;
+};
+
+// Parse "YYYY.MM.DD Lastname, Firstname v. ALJ NAME (annotations)" → names.
+// The separator is forgiving: it matches "v.", "vs", "vs.", or a BARE "v"
+// (e.g. "Roy v ALJ Detherage"), each case-insensitively. The left side may be
+// "Last, First" or "First Last", and trailing "(...)"/"[...]" notes are dropped.
 const parseCaseLink = (
   link: string,
 ): {
@@ -115,24 +129,29 @@ const parseCaseLink = (
   let s = link.trim();
   // Strip leading date "YYYY.MM.DD "
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
-  // Split on " v. " / " vs " / " V. " (case-insensitive)
-  const parts = s.split(/\s+v(?:s|\.)\s+/i);
+  // Split on the claimant-vs-respondent separator. "vs?" allows a bare "v";
+  // "(?:[.,]\s*|\s+)" consumes a trailing "." / "," or the following space.
+  const parts = s.split(/\s+vs?(?:[.,]\s*|\s+)/i);
   const left = parts[0] || "";
   const right = parts[1] || "";
 
-  // Left: "Lastname, Firstname" — strip trailing parens like " (SSI CASE)"
-  const leftClean = left.replace(/\s*\([^)]*\)\s*$/, "").trim();
-  const [lastRaw, firstRaw] = leftClean.split(/,\s*/);
+  // Left: "Lastname, Firstname" — or "Firstname Lastname" when no comma.
+  const leftClean = stripTrailingAnnotations(left);
+  let lastRaw: string, firstRaw: string;
+  if (leftClean.includes(",")) {
+    [lastRaw, firstRaw] = leftClean.split(/,\s*/);
+  } else {
+    const tokens = leftClean.split(/\s+/);
+    lastRaw = tokens[0] ?? leftClean;
+    firstRaw = tokens.slice(1).join(" ");
+  }
   const lastName = (lastRaw || leftClean).trim();
   const firstName = (firstRaw || "").trim();
 
   // Right: "ALJ FIRST LAST" — strip "ALJ " prefix, then split into first/last
   let aljFirstName: string | null = null;
   let aljLastName: string | null = null;
-  const aljClean = right
-    .replace(/^ALJ\s+/i, "")
-    .replace(/\s*\([^)]*\)\s*$/, "")
-    .trim();
+  const aljClean = stripTrailingAnnotations(right.replace(/^ALJ\s+/i, ""));
   if (aljClean && !/^SSA$/i.test(aljClean)) {
     const tokens = aljClean.split(/\s+/);
     if (tokens.length >= 2) {
