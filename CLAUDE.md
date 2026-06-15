@@ -93,6 +93,16 @@ sidebar/gate pick it up automatically.
 
 ## Patterns to follow
 
+- **TypeScript strict mode is on** (`tsconfig.json` → `"strict": true`). Keep it
+  that way — don't relax compiler flags to make code pass.
+- **Never use `any`.** Prefer precise types; reach for `unknown` + narrowing,
+  generics, or a Zod-inferred type at boundaries. If a third-party type is
+  missing, type the shape you actually use rather than widening to `any`.
+- **Follow the existing folder structure** (see Project layout above). Put new
+  code where its siblings live — routes under `src/app/`, feature components by
+  domain in `src/components/<domain>/`, non-UI logic in `src/lib/`, shared types
+  in `src/types/`. Reuse a shared helper (e.g. extract to `src/lib/`) instead of
+  duplicating logic across files.
 - **Server components fetch directly** from the DB/server helpers; **client
   components** call `/api` via `src/services/api.ts`.
 - Validate inputs with **Zod** at boundaries (server actions, route handlers,
