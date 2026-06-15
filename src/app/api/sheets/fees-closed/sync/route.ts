@@ -1,5 +1,6 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
@@ -9,6 +10,7 @@ import {
   mapFeesClosedRows,
   type ParsedFeesClosedRow,
 } from "@/lib/import/fees-closed-mapper";
+import { parseCaseLink, SYNTHETIC_ID_BASE } from "@/lib/import/sheets-mapper";
 import type { SheetRow } from "@/lib/import/sheets-mapper";
 
 export const runtime = "nodejs";
@@ -25,17 +27,6 @@ const chunk = <T>(arr: T[], size: number): T[][] => {
 const FC_CACHE_TTL = 5 * 60 * 1000;
 let fcCache: { rows: SheetRow[]; ts: number } | null = null;
 
-// "2026.03.24 Coronel, Angelica v. ALJ Smith" → { firstName: "Angelica", lastName: "Coronel" }
-const parseNameFromCaseLink = (caseLink: string): { firstName: string; lastName: string } => {
-  const withoutDate = caseLink.replace(/^\d{4}[.\-]\d{2}[.\-]\d{2}\s+/, "");
-  const clientPart = withoutDate.split(/\s+vs?\.\s+/i)[0].trim();
-  const commaIdx = clientPart.indexOf(",");
-  if (commaIdx === -1) return { firstName: "Unknown", lastName: clientPart || "Unknown" };
-  return {
-    lastName: clientPart.slice(0, commaIdx).trim() || "Unknown",
-    firstName: clientPart.slice(commaIdx + 1).trim() || "Unknown",
-  };
-};
 
 const parseClaimType = (raw: string | null): string[] => {
   if (!raw) return [];
@@ -106,6 +97,8 @@ const fetchFeesClosedRows = async (): Promise<{
   return { rows, usingMock: false };
 };
 
+const UpsertBody = z.object({ selectedCaseNames: z.array(z.string()) });
+
 // POST /api/sheets/fees-closed/sync
 //   mode=preview  → fetch, resolve IDs from CASE NAME_url, return preview (no writes)
 //   mode=upsert   → use cached rows, upsert cases + feeRecords with real MyCase IDs
@@ -130,20 +123,22 @@ export const POST = async (req: NextRequest) => {
     const { rows: parsed, warnings } = mapFeesClosedRows(rawRows);
 
     // Resolve IDs: prefer CASE NAME_url; fall back to mirror DB by name.
+    // Normalize whitespace so minor formatting differences don't cause silent misses.
+    const normName = (s: string) => s.trim().replace(/\s+/g, " ");
     const noUrlNames = parsed.filter((r) => r.myCaseId == null).map((r) => r.caseName);
     const mirrorRows = noUrlNames.length > 0
       ? await myCaseDb<{ id: string | number; name: string }[]>`
-          SELECT id, name FROM cases WHERE name = ANY(${noUrlNames})
+          SELECT id, TRIM(name) AS name FROM cases WHERE TRIM(name) = ANY(${noUrlNames.map(normName)})
         `.catch(() => [] as { id: string | number; name: string }[])
       : [];
-    const mirrorMap = new Map(mirrorRows.map((r) => [r.name, Number(r.id)]));
+    const mirrorMap = new Map(mirrorRows.map((r) => [normName(r.name), Number(r.id)]));
 
     const resolveId = (r: ParsedFeesClosedRow): number | null =>
-      r.myCaseId ?? mirrorMap.get(r.caseName) ?? null;
+      r.myCaseId ?? mirrorMap.get(normName(r.caseName)) ?? null;
 
     // matchedInDb = already has a closed feeRecord in the local DB.
     const resolvedIds = parsed.map(resolveId).filter((id): id is number => id !== null);
-    const alreadyClosed = resolvedIds.length > 0
+    const existingInDb = resolvedIds.length > 0
       ? await db
           .select({ caseId: feeRecords.caseId })
           .from(feeRecords)
@@ -166,7 +161,7 @@ export const POST = async (req: NextRequest) => {
       return {
         caseName: r.caseName,
         clientId,
-        matchedInDb: clientId !== null && alreadyClosed.has(clientId),
+        matchedInDb: clientId !== null && existingInDb.has(clientId),
         closedDate: r.closedDate,
         assignedTo: r.assignedTo,
         claimType: r.claimType,
@@ -190,20 +185,12 @@ export const POST = async (req: NextRequest) => {
     }
 
     // upsert mode
-    let body: { selectedCaseNames: unknown };
-    try {
-      body = (await req.json()) as { selectedCaseNames: unknown };
-    } catch {
+    const parsed2 = UpsertBody.safeParse(await req.json().catch(() => null));
+    if (!parsed2.success) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    if (!Array.isArray(body.selectedCaseNames)) {
-      return NextResponse.json(
-        { error: "selectedCaseNames must be an array" },
-        { status: 400 },
-      );
-    }
 
-    const selectedSet = new Set(body.selectedCaseNames as string[]);
+    const selectedSet = new Set(parsed2.data.selectedCaseNames);
     const candidates = parsed.filter((r) => selectedSet.has(r.caseName));
 
     if (candidates.length === 0) {
@@ -215,7 +202,7 @@ export const POST = async (req: NextRequest) => {
       .map((r) => {
         const clientId = resolveId(r);
         if (clientId == null) return null;
-        const { firstName, lastName } = parseNameFromCaseLink(r.caseName);
+        const { firstName, lastName } = parseCaseLink(r.caseName);
         return { ...r, clientId, firstName, lastName };
       })
       .filter((r): r is ParsedFeesClosedRow & { clientId: number; firstName: string; lastName: string } => r !== null);
@@ -223,19 +210,20 @@ export const POST = async (req: NextRequest) => {
     const withoutRealId = candidates.filter((r) => resolveId(r) == null);
 
     let created = 0;
+    let updated = 0;
 
     await db.transaction(async (tx) => {
       let syntheticRows: (ParsedFeesClosedRow & { clientId: number; firstName: string; lastName: string })[] = [];
 
       if (withoutRealId.length > 0) {
-        const [{ minNeg }] = await tx
-          .select({ minNeg: sql<number>`COALESCE(MIN(client_id), 0)::int` })
+        const [{ maxSynthetic }] = await tx
+          .select({ maxSynthetic: sql<number>`COALESCE(MAX(client_id), ${SYNTHETIC_ID_BASE - 1})::int` })
           .from(cases)
-          .where(sql`client_id < 0`);
-        let nextId = Math.min(minNeg, 0) - 1;
+          .where(sql`client_id >= ${SYNTHETIC_ID_BASE}`);
+        let nextId = Math.max(maxSynthetic, SYNTHETIC_ID_BASE - 1) + 1;
         syntheticRows = withoutRealId.map((r) => {
-          const { firstName, lastName } = parseNameFromCaseLink(r.caseName);
-          return { ...r, clientId: nextId--, firstName, lastName };
+          const { firstName, lastName } = parseCaseLink(r.caseName);
+          return { ...r, clientId: nextId++, firstName, lastName };
         });
       }
 
@@ -310,10 +298,12 @@ export const POST = async (req: NextRequest) => {
           });
       }
 
-      const allCaseIds = allRows.map((r) => r.clientId);
-      if (allCaseIds.length > 0) {
+      const newCaseIds = allRows
+        .map((r) => r.clientId)
+        .filter((id) => !existingInDb.has(id));
+      if (newCaseIds.length > 0) {
         await tx.insert(activityLog).values(
-          allCaseIds.map((caseId) => ({
+          newCaseIds.map((caseId) => ({
             caseId,
             message: "Marked closed from Fees Closed sheet during sync.",
             createdBy: "Sheet Sync",
@@ -321,10 +311,11 @@ export const POST = async (req: NextRequest) => {
         );
       }
 
-      created = syntheticRows.length;
+      created = newCaseIds.length;
+      updated = allRows.length - newCaseIds.length;
     });
 
-    return NextResponse.json({ upserted: withRealId.length, created });
+    return NextResponse.json({ upserted: updated, created });
   } catch (error) {
     const cause = (error as { cause?: unknown })?.cause;
     console.error("POST /api/sheets/fees-closed/sync error:", cause ?? error);
