@@ -124,13 +124,9 @@ export const GET = async (
 
     // user_details.chronicle_id may not be backfilled yet; fall back to the ID
     // embedded in the chronicle link sourced from the mirror's CHRONICLE LINK field.
+    const linkMatch = chronicleLink?.match(/\/clients\/(\d+)/);
     const chronicleIdForDecisions: number | null =
-      local?.chronicleId ??
-      (() => {
-        if (!chronicleLink) return null;
-        const m = chronicleLink.match(/\/clients\/(\d+)/);
-        return m ? parseInt(m[1]) : null;
-      })();
+      local?.chronicleId ?? (linkMatch ? Number(linkMatch[1]) : null);
 
     const needsChronicle =
       (t2Decision === "unknown" || t16Decision === "unknown" || !ssnLast4) &&
@@ -143,19 +139,18 @@ export const GET = async (
         const raw = await fetchChronicleClient(chronicleIdForDecisions!, apiUrl, apiKey).catch(() => null);
         if (raw) {
           const chr = parseChronicleResponse(raw);
-          if (t2Decision === "unknown" && chr.t2Decision) t2Decision = chr.t2Decision;
-          if (t16Decision === "unknown" && chr.t16Decision) t16Decision = chr.t16Decision;
+          if (t2Decision === "unknown" && chr.t2Decision) t2Decision = mapDecision(chr.t2Decision);
+          if (t16Decision === "unknown" && chr.t16Decision) t16Decision = mapDecision(chr.t16Decision);
           if (!ssnLast4 && chr.last4Ssn) ssnLast4 = chr.last4Ssn;
 
           // Persist normalized decisions back to local DB so future loads skip Chronicle.
-          const normT2 = mapDecision(chr.t2Decision);
-          const normT16 = mapDecision(chr.t16Decision);
-          const decUpdate: { t2Decision?: typeof normT2; t16Decision?: typeof normT16 } = {};
-          if (normT2 !== "unknown" && (!local?.t2Decision || local.t2Decision === "unknown")) {
-            decUpdate.t2Decision = normT2;
+          type DecisionValue = ReturnType<typeof mapDecision>;
+          const decUpdate: { t2Decision?: DecisionValue; t16Decision?: DecisionValue } = {};
+          if (t2Decision !== "unknown" && (!local?.t2Decision || local.t2Decision === "unknown")) {
+            decUpdate.t2Decision = t2Decision as DecisionValue;
           }
-          if (normT16 !== "unknown" && (!local?.t16Decision || local.t16Decision === "unknown")) {
-            decUpdate.t16Decision = normT16;
+          if (t16Decision !== "unknown" && (!local?.t16Decision || local.t16Decision === "unknown")) {
+            decUpdate.t16Decision = t16Decision as DecisionValue;
           }
           if (Object.keys(decUpdate).length > 0) {
             await db.update(cases).set(decUpdate).where(eq(cases.clientId, caseId)).catch(() => null);

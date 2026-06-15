@@ -47,6 +47,10 @@ interface CaseDetailSheetProps {
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null | undefined) => (d ? fmtDate(d) : "—");
+const displayDecision = (mc?: string | null, local?: string | null) => {
+  const d = mc && mc !== "unknown" ? mc : local;
+  return d && d !== "unknown" ? d.replace(/_/g, " ") : "—";
+};
 
 type MyCaseData = {
   caseStage: string | null;
@@ -724,10 +728,7 @@ export default function CaseDetailSheet({
                           <RefreshCw aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                         ) : (
                           <p className={`${val} capitalize`}>
-                            {(() => {
-                              const d = (row.mc && row.mc !== "unknown") ? row.mc : row.local;
-                              return d && d !== "unknown" ? d.replace(/_/g, " ") : "—";
-                            })()}
+                            {displayDecision(row.mc, row.local)}
                           </p>
                         )}
                       </div>
