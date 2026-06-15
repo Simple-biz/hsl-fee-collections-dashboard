@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { feeRecords } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
+import { requireCapability, guardStatus } from "@/lib/auth-helpers";
 
 export const POST = async (req: NextRequest) => {
   try {
+    // Marking cases overpaid is a finalize action (lead/admin by default).
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const body = await req.json();
     const { caseIds, markedOverpaid } = body;
 

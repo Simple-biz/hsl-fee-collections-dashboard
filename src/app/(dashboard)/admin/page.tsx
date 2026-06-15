@@ -34,7 +34,14 @@ export default async function AdminRoute() {
     .from(users)
     .orderBy(desc(users.createdAt));
 
-  const userList: AdminUser[] = rows.map((r) => ({
+  // Only system_admins can see system_admin accounts. Regular admins get a
+  // list with those rows filtered out (server-side, so they're never sent).
+  const canSeeSystemAdmins = guard.session.user.role === "system_admin";
+  const visibleRows = canSeeSystemAdmins
+    ? rows
+    : rows.filter((r) => r.role !== "system_admin");
+
+  const userList: AdminUser[] = visibleRows.map((r) => ({
     id: r.id,
     email: r.email,
     name: r.name,

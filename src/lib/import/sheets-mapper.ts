@@ -29,13 +29,24 @@ const dateOnly = (v: unknown): string | null => {
   return null;
 };
 
+// Strip one or more trailing annotation groups — e.g. " (SSI case)",
+// " [VIA PHONE]", or both stacked: "Detherage (Remand) [PHONE]".
+const stripTrailingAnnotations = (s: string): string => {
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/\s*[([][^)\]]*[)\]]\s*$/, "").trim();
+  } while (s !== prev);
+  return s;
+};
+
 export const parseCaseLink = (link: string) => {
   let s = link.trim();
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
   const parts = s.split(/\s+vs?(?:[.,]\s*|\s+)/i);
   const left = parts[0] || "";
   const right = parts[1] || "";
-  const leftClean = left.replace(/\s*\([^)]*\)?$/, "").trim();
+  const leftClean = stripTrailingAnnotations(left);
   let lastRaw: string, firstRaw: string;
   if (leftClean.includes(",")) {
     [lastRaw, firstRaw] = leftClean.split(/,\s*/);
@@ -48,10 +59,7 @@ export const parseCaseLink = (link: string) => {
   const firstName = (firstRaw || "").trim();
   let aljFirstName: string | null = null;
   let aljLastName: string | null = null;
-  const aljClean = right
-    .replace(/^ALJ\s+/i, "")
-    .replace(/\s*\([^)]*\)?$/, "")
-    .trim();
+  const aljClean = stripTrailingAnnotations(right.replace(/^ALJ\s+/i, ""));
   if (aljClean && !/^SSA$/i.test(aljClean)) {
     const tokens = aljClean.split(/\s+/);
     if (tokens.length >= 2) {

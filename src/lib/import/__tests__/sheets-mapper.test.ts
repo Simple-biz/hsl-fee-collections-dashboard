@@ -163,6 +163,40 @@ describe("CASE LINK name parsing", () => {
     const ws = warnings([row()]);
     expect(ws.some((w) => w.message.includes("Could not parse name"))).toBe(false);
   });
+
+  it("parses a bare 'v' separator (no period)", () => {
+    const [r] = parsed([row({ "CASE LINK": "2025.02.27 King, Janet v SSA" })]);
+    expect(r.lastName).toBe("King");
+    expect(r.firstName).toBe("Janet");
+  });
+
+  it("strips a trailing (annotation) from the first name", () => {
+    const [r] = parsed([
+      row({ "CASE LINK": "2024.11.29 Davis, Velta v SSA (SSI case)" }),
+    ]);
+    expect(r.lastName).toBe("Davis");
+    expect(r.firstName).toBe("Velta");
+  });
+
+  it("strips stacked (paren) and [bracket] annotations across name and ALJ", () => {
+    const [r] = parsed([
+      row({
+        "CASE LINK":
+          "2025.10.08 Schautteet, Roy v ALJ Detherage (Federal Remand) [VIA PHONE]",
+      }),
+    ]);
+    expect(r.lastName).toBe("Schautteet");
+    expect(r.firstName).toBe("Roy");
+    expect(r.aljLastName).toBe("Detherage");
+  });
+
+  it("keeps a multi-word first name intact", () => {
+    const [r] = parsed([
+      row({ "CASE LINK": "2026.04.06 Jones, Solomon James v ALJ PAUL MCADAM (SSDI)" }),
+    ]);
+    expect(r.lastName).toBe("Jones");
+    expect(r.firstName).toBe("Solomon James");
+  });
 });
 
 // ─── Synthetic ID assignment ──────────────────────────────────────────────────

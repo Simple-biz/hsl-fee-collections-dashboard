@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { pageKeyForPath } from "@/lib/access/pages";
 
 /**
  * Edge-safe Auth.js configuration.
@@ -37,7 +38,27 @@ export const authConfig = {
         return Response.redirect(new URL("/change-password", nextUrl));
       }
 
-      return isLoggedIn;
+      if (!isLoggedIn) return false;
+
+      // Page-access gate. `pages` is the effective set baked into the token at
+      // sign-in. Only enforce for recognized page paths (null = api/asset/etc.,
+      // left to their own auth). Overview is never gated so the redirect target
+      // can't loop. Tokens minted before this feature have no `pages` array —
+      // skip the gate for them so existing sessions aren't locked out until
+      // their next login.
+      const pageKey = pageKeyForPath(nextUrl.pathname);
+      const pages = auth?.user?.pages;
+      if (
+        pageKey &&
+        pageKey !== "overview" &&
+        Array.isArray(pages) &&
+        pages.length > 0 &&
+        !pages.includes(pageKey)
+      ) {
+        return Response.redirect(new URL("/", nextUrl));
+      }
+
+      return true;
     },
     // Persist id/role/mustChangePassword onto the JWT at sign-in.
     jwt({ token, user }) {
@@ -45,6 +66,8 @@ export const authConfig = {
         token.id = user.id;
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword ?? false;
+        token.pages = user.pages ?? [];
+        token.capabilities = user.capabilities ?? [];
       }
       return token;
     },
@@ -54,6 +77,8 @@ export const authConfig = {
         if (token.id) session.user.id = token.id;
         if (token.role) session.user.role = token.role;
         session.user.mustChangePassword = token.mustChangePassword ?? false;
+        session.user.pages = token.pages ?? [];
+        session.user.capabilities = token.capabilities ?? [];
       }
       return session;
     },
