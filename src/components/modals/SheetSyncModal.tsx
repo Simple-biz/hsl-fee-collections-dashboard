@@ -196,55 +196,77 @@ export default function SheetSyncModal({
     setFcPreview(null);
     setFcPreviewError(null);
 
-    const controller = new AbortController();
-    fetchControllerRef.current = controller;
-    let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 60_000);
+    const mainController = new AbortController();
+    const fcController = new AbortController();
+    fetchControllerRef.current = mainController;
+    fcFetchControllerRef.current = fcController;
+    let mainTimedOut = false;
+    let fcTimedOut = false;
+    const mainTimer = setTimeout(() => { mainTimedOut = true; mainController.abort(); }, 60_000);
+    const fcTimer = setTimeout(() => { fcTimedOut = true; fcController.abort(); }, 60_000);
     try {
-      const [mainRes, fcRes] = await Promise.all([
-        fetch("/api/sheets/sync?mode=preview", { method: "POST", signal: controller.signal }),
-        fetch("/api/sheets/fees-closed/sync?mode=preview", { method: "POST", signal: controller.signal }),
+      const [mainResult, fcResult] = await Promise.allSettled([
+        fetch("/api/sheets/sync?mode=preview", { method: "POST", signal: mainController.signal }),
+        fetch("/api/sheets/fees-closed/sync?mode=preview", { method: "POST", signal: fcController.signal }),
       ]);
 
-      let json: Record<string, unknown> = {};
-      try { json = await mainRes.json(); } catch { /* non-JSON body */ }
-      if (!mainRes.ok)
-        throw new Error((json.error as string) || `Fetch failed (${mainRes.status})`);
-      const data = json as unknown as SyncPreviewResponse;
-      setPreview(data);
-      setAllowSynthetic(false);
-      setSelected(
-        new Set([
-          ...data.rows.sheet
-            .filter((r) => (r.status === "new" || r.status === "changed") && !r.isSynthetic)
-            .map((r) => r.clientId),
-          ...data.rows.feesClosed.map((r) => r.clientId),
-        ]),
-      );
-
-      // Fees Closed preview
-      if (fcRes.ok) {
-        try {
-          const fcJson = await fcRes.json() as FeesClosedPreviewResponse;
-          setFcPreview(fcJson);
-          setSelectedFcNames(
-            new Set(fcJson.rows.filter((r) => !r.matchedInDb).map((r) => r.caseName)),
-          );
-        } catch { /* malformed response — ignore */ }
+      // Main preview — failure here is fatal for the modal flow
+      if (mainResult.status === "fulfilled") {
+        const mainRes = mainResult.value;
+        let json: Record<string, unknown> = {};
+        try { json = await mainRes.json(); } catch { /* non-JSON body */ }
+        if (!mainRes.ok)
+          throw new Error((json.error as string) || `Fetch failed (${mainRes.status})`);
+        const data = json as unknown as SyncPreviewResponse;
+        setPreview(data);
+        setAllowSynthetic(false);
+        setSelected(
+          new Set([
+            ...data.rows.sheet
+              .filter((r) => (r.status === "new" || r.status === "changed") && !r.isSynthetic)
+              .map((r) => r.clientId),
+            ...data.rows.feesClosed.map((r) => r.clientId),
+          ]),
+        );
       } else {
-        let fcErrMsg = `Fees Closed preview failed (${fcRes.status})`;
-        try { const b = await fcRes.json() as Record<string, unknown>; if (b.error) fcErrMsg = String(b.error); } catch { /* non-JSON */ }
-        setFcPreviewError(fcErrMsg);
+        const err = mainResult.reason as Error;
+        if (err.name === "AbortError") {
+          if (mainTimedOut) setError("Fetch timed out — please try again.");
+        } else {
+          setError(err.message);
+        }
+      }
+
+      // Fees Closed preview — failure is isolated; master list is unaffected
+      if (fcResult.status === "fulfilled") {
+        const fcRes = fcResult.value;
+        if (fcRes.ok) {
+          try {
+            const fcJson = await fcRes.json() as FeesClosedPreviewResponse;
+            setFcPreview(fcJson);
+            setSelectedFcNames(
+              new Set(fcJson.rows.filter((r) => !r.matchedInDb).map((r) => r.caseName)),
+            );
+          } catch { /* malformed response — ignore */ }
+        } else {
+          let fcErrMsg = `Fees Closed preview failed (${fcRes.status})`;
+          try { const b = await fcRes.json() as Record<string, unknown>; if (b.error) fcErrMsg = String(b.error); } catch { /* non-JSON */ }
+          setFcPreviewError(fcErrMsg);
+        }
+      } else {
+        const err = fcResult.reason as Error;
+        if (err.name === "AbortError") {
+          if (fcTimedOut) setFcPreviewError("Fees Closed preview timed out — you can still sync the master list.");
+        } else {
+          setFcPreviewError(`Fees Closed preview failed: ${err.message}`);
+        }
       }
     } catch (e) {
       const err = e as Error;
-      if (err.name === "AbortError") {
-        if (timedOut) setError("Fetch timed out — please try again.");
-      } else {
-        setError(err.message);
-      }
+      setError(err.message);
     } finally {
-      clearTimeout(timer);
+      clearTimeout(mainTimer);
+      clearTimeout(fcTimer);
       setFetching(false);
     }
   };
@@ -328,12 +350,14 @@ export default function SheetSyncModal({
   }, [preview, step4Rows, filter, search]);
 
   const fetchControllerRef = useRef<AbortController | null>(null);
+  const fcFetchControllerRef = useRef<AbortController | null>(null);
   const syncControllerRef = useRef<AbortController | null>(null);
   const fcControllerRef = useRef<AbortController | null>(null);
   const syncTimedOutRef = useRef(false);
   const fcTimedOutRef = useRef(false);
   useEffect(() => () => {
     fetchControllerRef.current?.abort();
+    fcFetchControllerRef.current?.abort();
     syncControllerRef.current?.abort();
     fcControllerRef.current?.abort();
   }, []);
