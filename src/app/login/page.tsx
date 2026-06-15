@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { CheckCircle2, DollarSign } from "lucide-react";
+import Image from "next/image";
+import { CheckCircle2 } from "lucide-react";
 import { LoginForm } from "./login-form";
+import { TestAccountsHint } from "./test-accounts-hint";
 import {
   Card,
   CardContent,
@@ -8,6 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+const SHOW_TEST_LOGINS = process.env.NEXT_PUBLIC_SHOW_TEST_LOGINS === "true";
 
 export const metadata: Metadata = {
   title: "Sign in · SSA Fee Collections",
@@ -21,31 +25,41 @@ export default async function LoginPage({
   const { changed } = await searchParams;
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900">
-            <DollarSign className="h-5 w-5 text-white" aria-hidden="true" />
+    <main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-linear-to-b from-neutral-50 to-neutral-100 px-4 dark:from-neutral-950 dark:to-neutral-900">
+      {/* Soft decorative glow behind the card. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-neutral-300/40 blur-3xl dark:bg-neutral-700/30"
+      />
+
+      <div className="relative w-full max-w-sm">
+        <div className="mb-7 flex flex-col items-center gap-3 text-center">
+          <div className="relative h-16 w-56">
+            <Image
+              src="/HSL_Logo.png"
+              alt="Hogan Smith Law"
+              fill
+              priority
+              sizes="224px"
+              className="object-contain"
+            />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-neutral-900">
-              Fee Collections
-            </h1>
-            <p className="text-xs text-neutral-500">Hogan Smith Law</p>
-          </div>
+          <h1 className="text-sm font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
+            Fee Collections
+          </h1>
         </div>
 
         {changed === "1" && (
           <div
             role="alert"
-            className="mb-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700"
+            className="mb-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
           >
             <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             Password updated — please sign in with your new password.
           </div>
         )}
 
-        <Card>
+        <Card className="shadow-xl shadow-black/5 dark:shadow-black/30">
           <CardHeader>
             <CardTitle>Sign in</CardTitle>
             <CardDescription>
@@ -57,10 +71,16 @@ export default async function LoginPage({
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-center text-xs text-neutral-400">
+        <p className="mt-6 text-center text-xs text-neutral-400 dark:text-neutral-500">
           Access is restricted to authorized staff. Contact an administrator if
           you need an account.
         </p>
+
+        {SHOW_TEST_LOGINS && (
+          <div className="mt-3 flex justify-center">
+            <TestAccountsHint />
+          </div>
+        )}
       </div>
     </main>
   );

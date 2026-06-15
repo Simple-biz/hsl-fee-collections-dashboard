@@ -42,8 +42,6 @@ const dateOnly = (v: string | null): string | null => {
   return null;
 };
 
-const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
-
 const parseCaseLink = (name: string) => {
   let s = name.trim();
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
@@ -63,7 +61,10 @@ const parseCaseLink = (name: string) => {
   const firstName = (firstRaw || "").trim();
   let aljFirstName: string | null = null;
   let aljLastName: string | null = null;
-  const aljClean = right.replace(/^ALJ\s+/i, "").replace(/\s*\([^)]*\)?$/, "").trim();
+  const aljClean = right
+    .replace(/^ALJ\s+/i, "")
+    .replace(/\s*\([^)]*\)?$/, "")
+    .trim();
   if (aljClean && !/^SSA$/i.test(aljClean)) {
     const tokens = aljClean.split(/\s+/);
     if (tokens.length >= 2) {
@@ -78,7 +79,11 @@ const parseCaseLink = (name: string) => {
 
 const mapClaimType = (raw: string | null) => {
   const s = (raw ?? "").trim().toUpperCase();
-  if (!s) return { claimType: [] as string[], claimTypeLabel: null as "T2" | "T16" | "T2_T16" | null };
+  if (!s)
+    return {
+      claimType: [] as string[],
+      claimTypeLabel: null as "T2" | "T16" | "T2_T16" | null,
+    };
   if (s.includes("CONC") || (s.includes("T2") && s.includes("T16")))
     return { claimType: ["T2", "T16"], claimTypeLabel: "T2_T16" as const };
   if (s.includes("T16") || s.includes("SSI"))
@@ -104,21 +109,33 @@ export const mapDecision = (raw: string | null): ParsedCaseRow["t2Decision"] => 
   if (!s) return "unknown";
   if (s.includes("partially favorable")) return "partially_favorable";
   if (s.includes("favorable")) return "fully_favorable";
-  if (s.includes("unfavorable") || s.includes("denied") || s === "ufd") return "unfavorable";
+  if (s.includes("unfavorable") || s.includes("denied") || s === "ufd")
+    return "unfavorable";
   if (s.includes("dismiss")) return "dismissed";
   if (s.includes("remand")) return "remand";
   return "unknown";
 };
 
-const mapWinSheetStatus = (row: MyCaseDbRow): ParsedCaseRow["winSheetStatus"] => {
+const mapWinSheetStatus = (
+  row: MyCaseDbRow,
+): ParsedCaseRow["winSheetStatus"] => {
   const pif = (cf(row, "PAID IN FULL") ?? "").toLowerCase();
   if (pif === "yes") return "paid_in_full";
 
   const stage = (row.case_stage ?? "").toLowerCase();
-  if (stage.includes("fees paid") || stage.includes("fee paid")) return "paid_in_full";
-  if (stage.includes("pending fees") || stage.includes("fee due") || stage.includes("pending fee"))
+  if (stage.includes("fees paid") || stage.includes("fee paid"))
+    return "paid_in_full";
+  if (
+    stage.includes("pending fees") ||
+    stage.includes("fee due") ||
+    stage.includes("pending fee")
+  )
     return "pending_payment";
-  if (stage.includes("closed") || stage.includes("turndown") || stage.includes("withdraw"))
+  if (
+    stage.includes("closed") ||
+    stage.includes("turndown") ||
+    stage.includes("withdraw")
+  )
     return "closed";
 
   const t2Received = Number(cf(row, "T2 FEE PAID") ?? "0");
@@ -149,11 +166,15 @@ export const mapMyCaseRows = (
 
     const caseLink = r.name?.trim() ?? "";
     if (!caseLink) {
-      warnings.push({ row: i + 1, message: `Row ${r.id}: no case name — skipped` });
+      warnings.push({
+        row: i + 1,
+        message: `Row ${r.id}: no case name — skipped`,
+      });
       continue;
     }
 
-    const { firstName, lastName, aljFirstName, aljLastName } = parseCaseLink(caseLink);
+    const { firstName, lastName, aljFirstName, aljLastName } =
+      parseCaseLink(caseLink);
 
     const resolvedFirst = firstName || r.client_first_name?.trim() || "Unknown";
     const resolvedLast = lastName || r.client_last_name?.trim() || "Unknown";
@@ -161,20 +182,29 @@ export const mapMyCaseRows = (
     const approvalDate = dateOnly(cf(r, "APPROVAL DATE"));
 
     const daysAfterApproval = approvalDate
-      ? Math.floor((Date.now() - new Date(approvalDate).getTime()) / (1000 * 60 * 60 * 24))
+      ? Math.floor(
+          (Date.now() - new Date(approvalDate).getTime()) /
+            (1000 * 60 * 60 * 24),
+        )
       : null;
 
-    const ct = mapClaimType(cf(r, "CLAIM TYPE") ?? cf(r, "What TYPE of CLAIM?"));
+    const ct = mapClaimType(
+      cf(r, "CLAIM TYPE") ?? cf(r, "What TYPE of CLAIM?"),
+    );
 
     const t2Retro = num(cf(r, "T2 RETRO"));
     const t2FeeDue = num(cf(r, "T2 FEE DUE"));
     const t2FeeReceived = num(cf(r, "T2 FEE PAID") ?? cf(r, "FEE RECEIVED"));
-    const t2Pending = String(Math.max(0, Number(t2FeeDue) - Number(t2FeeReceived)));
+    const t2Pending = String(
+      Math.max(0, Number(t2FeeDue) - Number(t2FeeReceived)),
+    );
 
     const t16Retro = num(cf(r, "T16 RETRO"));
     const t16FeeDue = num(cf(r, "T16 FEE DUE"));
     const t16FeeReceived = num(cf(r, "T16 FEE PAID"));
-    const t16Pending = String(Math.max(0, Number(t16FeeDue) - Number(t16FeeReceived)));
+    const t16Pending = String(
+      Math.max(0, Number(t16FeeDue) - Number(t16FeeReceived)),
+    );
 
     const chronicleLinkRaw = cf(r, "CHRONICLE LINK");
     const chronicleMatch = chronicleLinkRaw?.match(/\/clients\/(\d+)/);
@@ -214,7 +244,9 @@ export const mapMyCaseRows = (
       t2FeeDue,
       t2FeeReceived,
       t2Pending,
-      t2FeeReceivedDate: dateOnly(cf(r, "DATE T2 FEE PAID") ?? cf(r, "T2 FEE REC'D DATE")),
+      t2FeeReceivedDate: dateOnly(
+        cf(r, "DATE T2 FEE PAID") ?? cf(r, "T2 FEE REC'D DATE"),
+      ),
 
       auxRetro: "0",
       auxFeeDue: "0",

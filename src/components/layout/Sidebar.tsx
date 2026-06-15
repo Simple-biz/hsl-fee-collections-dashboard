@@ -5,6 +5,8 @@ import { useTheme } from "next-themes";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { pageKeyForPath } from "@/lib/access/pages";
+import { rolePageDefaults } from "@/lib/access/role-defaults";
 import {
   Home,
   Users,
@@ -90,7 +92,14 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const isAdmin = role === "admin" || role === "system_admin";
+  // Effective page set drives which nav items show. Fall back to role
+  // defaults if the token predates the access feature (no `pages`) OR carries
+  // an empty set (a failed resolution) — never hide everything.
+  const sessionPages = session?.user?.pages;
+  const accessiblePages =
+    sessionPages && sessionPages.length > 0
+      ? sessionPages
+      : rolePageDefaults(role);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -265,9 +274,10 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-1">
           {NAV_ITEMS.map((group) => {
-            const items = group.items.filter(
-              (item) => !item.adminOnly || isAdmin,
-            );
+            const items = group.items.filter((item) => {
+              const key = pageKeyForPath(item.path);
+              return !key || accessiblePages.includes(key);
+            });
             if (items.length === 0) return null;
             return (
             <div key={group.section}>
@@ -488,7 +498,12 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                       label: "Chronicle Sync",
                     },
                     { path: "/reports", icon: FileText, label: "Reports" },
-                  ].map((item) => (
+                  ]
+                    .filter((item) => {
+                      const key = pageKeyForPath(item.path);
+                      return !key || accessiblePages.includes(key);
+                    })
+                    .map((item) => (
                     <Link
                       key={item.path}
                       href={item.path}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { eq, ilike, sql, desc } from "drizzle-orm";
+import { requireCapability, guardStatus } from "@/lib/auth-helpers";
 
 // GET /api/cases — List cases with fee records + latest activity
 export const GET = async (req: NextRequest) => {
@@ -229,6 +231,109 @@ export const GET = async (req: NextRequest) => {
     return NextResponse.json({ data, page, limit, total });
   } catch (error) {
     console.error("GET /api/cases error:", error);
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 },
+    );
+  }
+};
+
+// ============================================================================
+// POST /api/cases — Create a new case (+ its fee record) manually
+// ============================================================================
+
+// Trim strings and coerce blanks to undefined so optional fields stay null.
+const optionalText = z
+  .string()
+  .trim()
+  .transform((v) => (v === "" ? undefined : v))
+  .optional();
+
+const createCaseSchema = z.object({
+  // The MyCase client id; doubles as the join key for fee_records/activity_log.
+  clientId: z.coerce.number().int().positive(),
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: z.string().trim().min(1, "Last name is required"),
+  externalId: optionalText,
+  claimTypeLabel: optionalText,
+  levelWon: optionalText,
+  // HTML date input gives YYYY-MM-DD; the `date` column stores it verbatim.
+  approvalDate: optionalText,
+  officeWithJurisdiction: optionalText,
+  aljFirstName: optionalText,
+  aljLastName: optionalText,
+  assignedTo: optionalText,
+  winSheetStatus: optionalText,
+});
+
+export const POST = async (req: NextRequest) => {
+  try {
+    // Creating cases is admin-only by default (overridable per-user).
+    const guard = await requireCapability("case.create");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
+    const parsed = createCaseSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 },
+      );
+    }
+    const input = parsed.data;
+
+    // clientId is unique — reject a duplicate up front with a clear message
+    // rather than surfacing a raw Postgres constraint error.
+    const [existing] = await db
+      .select({ clientId: cases.clientId })
+      .from(cases)
+      .where(eq(cases.clientId, input.clientId))
+      .limit(1);
+    if (existing) {
+      return NextResponse.json(
+        { error: `A case with Client ID ${input.clientId} already exists.` },
+        { status: 409 },
+      );
+    }
+
+    // Insert the case then its fee record (FK references cases.client_id).
+    // Not wrapped in a txn: the unique check above makes a partial insert
+    // unlikely, and the fee record can be backfilled if the second write fails.
+    await db.insert(cases).values({
+      clientId: input.clientId,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      externalId: input.externalId,
+      claimTypeLabel: input.claimTypeLabel,
+      levelWon: input.levelWon,
+      approvalDate: input.approvalDate,
+      officeWithJurisdiction: input.officeWithJurisdiction,
+      aljFirstName: input.aljFirstName,
+      aljLastName: input.aljLastName,
+    });
+
+    await db.insert(feeRecords).values({
+      caseId: input.clientId,
+      assignedTo: input.assignedTo,
+      winSheetStatus: input.winSheetStatus ?? "not_started",
+    });
+
+    await db.insert(activityLog).values({
+      caseId: input.clientId,
+      message: "Case created manually",
+      createdBy: "System",
+    });
+
+    return NextResponse.json(
+      { status: "ok", clientId: input.clientId },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("POST /api/cases error:", error);
     return NextResponse.json(
       { error: (error as Error).message },
       { status: 500 },

@@ -1,22 +1,81 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { inArray } from "drizzle-orm";
+import { z } from "zod";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cases } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { myCaseDb } from "@/lib/db/mycase";
 import { requireAdmin } from "@/lib/auth-helpers";
 import {
   mapFeesClosedRows,
   type ParsedFeesClosedRow,
 } from "@/lib/import/fees-closed-mapper";
+import { parseCaseLink, SYNTHETIC_ID_BASE } from "@/lib/import/sheets-mapper";
 import type { SheetRow } from "@/lib/import/sheets-mapper";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+const chunk = <T>(arr: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
+
+// Cache fetched rows for 5 minutes so preview and upsert use the same data
+// without triggering the webhook twice (webhook may dequeue on each POST).
+const FC_CACHE_TTL = 5 * 60 * 1000;
+let fcCache: { rows: SheetRow[]; ts: number } | null = null;
+
+
+const parseClaimType = (raw: string | null): string[] => {
+  if (!raw) return [];
+  const s = raw.trim().toUpperCase();
+  if (s.includes("T2") && s.includes("T16")) return ["T2", "T16"];
+  if (s === "T2") return ["T2"];
+  if (s === "T16") return ["T16"];
+  return [s];
+};
+
+const toFeeRecordValues = (r: ParsedFeesClosedRow, clientId: number, closedAt: Date) => ({
+  caseId: clientId,
+  isClosed: true,
+  closedAt,
+  winSheetStatus: "closed",
+  syncStatus: "synced" as const,
+  syncedAt: new Date(),
+  assignedTo: r.assignedTo ?? null,
+  winSheetLink: r.winSheetLink ?? null,
+  feesConfirmation: r.feesConfirmation ?? null,
+  caseStatus: r.caseStatus ?? null,
+  approvedBy: r.approvedBy ?? null,
+  t16Retro: r.t16Retro,
+  t16FeeDue: r.t16FeeDue,
+  t16FeeReceived: r.t16FeeReceived,
+  t16Pending: r.t16Pending,
+  t16FeeReceivedDate: r.t16FeeReceivedDate ?? null,
+  t2Retro: r.t2Retro,
+  t2FeeDue: r.t2FeeDue,
+  t2FeeReceived: r.t2FeeReceived,
+  t2Pending: r.t2Pending,
+  t2FeeReceivedDate: r.t2FeeReceivedDate ?? null,
+  auxRetro: r.auxRetro,
+  auxFeeDue: r.auxFeeDue,
+  auxFeeReceived: r.auxFeeReceived,
+  auxPending: r.auxPending,
+  auxFeeReceivedDate: r.auxFeeReceivedDate ?? null,
+  totalRetroDue: r.totalRetroDue,
+  totalFeesExpected: r.totalFeesExpected,
+  totalFeesPaid: r.totalFeesPaid,
+});
 
 const fetchFeesClosedRows = async (): Promise<{
   rows: SheetRow[];
   usingMock: boolean;
 }> => {
+  const cached = fcCache && Date.now() - fcCache.ts < FC_CACHE_TTL ? fcCache : null;
+  if (cached) return { rows: cached.rows, usingMock: false };
+
   const webhookUrl = process.env.FEES_CLOSED_SYNC_WEBHOOK_URL;
   if (!webhookUrl) return { rows: [], usingMock: true };
 
@@ -24,7 +83,7 @@ const fetchFeesClosedRows = async (): Promise<{
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ trigger: "manual" }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(55_000),
   });
   if (!res.ok)
     throw new Error(
@@ -33,12 +92,16 @@ const fetchFeesClosedRows = async (): Promise<{
   const rows = (await res.json()) as SheetRow[];
   if (!Array.isArray(rows))
     throw new Error("Fees Closed sync webhook returned invalid response shape");
+
+  fcCache = { rows, ts: Date.now() };
   return { rows, usingMock: false };
 };
 
+const UpsertBody = z.object({ selectedCaseNames: z.array(z.string()) });
+
 // POST /api/sheets/fees-closed/sync
-//   mode=preview  → fetch, match to DB by caseLink, return preview (no writes)
-//   mode=upsert   → re-fetch, insert/update fees_closed rows by clientId
+//   mode=preview  → fetch, resolve IDs from CASE NAME_url, return preview (no writes)
+//   mode=upsert   → use cached rows, upsert cases + feeRecords with real MyCase IDs
 export const POST = async (req: NextRequest) => {
   try {
     const guard = await requireAdmin();
@@ -59,20 +122,29 @@ export const POST = async (req: NextRequest) => {
     const { rows: rawRows, usingMock } = await fetchFeesClosedRows();
     const { rows: parsed, warnings } = mapFeesClosedRows(rawRows);
 
-    // Match sheet rows to cases in DB by caseLink (CASE NAME → cases.case_link).
-    // When CLIENT_ID is added to the Fees Closed tab, switch to matching by clientId.
-    const caseNames = parsed.map((r) => r.caseName);
-    const matchedCases =
-      caseNames.length > 0
-        ? await db
-            .select({ clientId: cases.clientId, caseLink: cases.caseLink })
-            .from(cases)
-            .where(inArray(cases.caseLink, caseNames))
-        : [];
+    // Resolve IDs: prefer CASE NAME_url; fall back to mirror DB by name.
+    // Normalize whitespace so minor formatting differences don't cause silent misses.
+    const normName = (s: string) => s.trim().replace(/\s+/g, " ");
+    const noUrlNames = parsed.filter((r) => r.myCaseId == null).map((r) => r.caseName);
+    const mirrorRows = noUrlNames.length > 0
+      ? await myCaseDb<{ id: string | number; name: string }[]>`
+          SELECT id, TRIM(name) AS name FROM cases WHERE TRIM(name) = ANY(${noUrlNames.map(normName)})
+        `.catch(() => [] as { id: string | number; name: string }[])
+      : [];
+    const mirrorMap = new Map(mirrorRows.map((r) => [normName(r.name), Number(r.id)]));
 
-    const caseLinkToClientId = new Map(
-      matchedCases.map((c) => [c.caseLink, c.clientId]),
-    );
+    const resolveId = (r: ParsedFeesClosedRow): number | null =>
+      r.myCaseId ?? mirrorMap.get(normName(r.caseName)) ?? null;
+
+    // matchedInDb = already has a closed feeRecord in the local DB.
+    const resolvedIds = parsed.map(resolveId).filter((id): id is number => id !== null);
+    const existingInDb = resolvedIds.length > 0
+      ? await db
+          .select({ caseId: feeRecords.caseId })
+          .from(feeRecords)
+          .where(inArray(feeRecords.caseId, resolvedIds))
+          .then((rows) => new Set(rows.map((r) => r.caseId)))
+      : new Set<number>();
 
     type PreviewRow = {
       caseName: string;
@@ -85,11 +157,11 @@ export const POST = async (req: NextRequest) => {
     };
 
     const previewRows: PreviewRow[] = parsed.map((r) => {
-      const clientId = caseLinkToClientId.get(r.caseName) ?? null;
+      const clientId = resolveId(r);
       return {
         caseName: r.caseName,
         clientId,
-        matchedInDb: clientId !== null,
+        matchedInDb: clientId !== null && existingInDb.has(clientId),
         closedDate: r.closedDate,
         assignedTo: r.assignedTo,
         claimType: r.claimType,
@@ -113,62 +185,143 @@ export const POST = async (req: NextRequest) => {
     }
 
     // upsert mode
-    let body: { selectedCaseNames: unknown };
-    try {
-      body = (await req.json()) as { selectedCaseNames: unknown };
-    } catch {
+    const parsed2 = UpsertBody.safeParse(await req.json().catch(() => null));
+    if (!parsed2.success) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    if (!Array.isArray(body.selectedCaseNames)) {
-      return NextResponse.json(
-        { error: "selectedCaseNames must be an array" },
-        { status: 400 },
-      );
-    }
 
-    const selectedSet = new Set(body.selectedCaseNames as string[]);
+    const selectedSet = new Set(parsed2.data.selectedCaseNames);
     const candidates = parsed.filter((r) => selectedSet.has(r.caseName));
 
     if (candidates.length === 0) {
-      return NextResponse.json({ upserted: 0 });
+      return NextResponse.json({ upserted: 0, created: 0 });
     }
 
-    // Resolve clientIds for selected rows
-    const selectedNames = candidates.map((r) => r.caseName);
-    const resolved =
-      selectedNames.length > 0
-        ? await db
-            .select({ clientId: cases.clientId, caseLink: cases.caseLink })
-            .from(cases)
-            .where(inArray(cases.caseLink, selectedNames))
-        : [];
-    const resolvedMap = new Map(resolved.map((c) => [c.caseLink, c.clientId]));
+    // Resolve IDs: CASE NAME_url first, then mirror DB, then synthetic.
+    const withRealId = candidates
+      .map((r) => {
+        const clientId = resolveId(r);
+        if (clientId == null) return null;
+        const { firstName, lastName } = parseCaseLink(r.caseName);
+        return { ...r, clientId, firstName, lastName };
+      })
+      .filter((r): r is ParsedFeesClosedRow & { clientId: number; firstName: string; lastName: string } => r !== null);
 
-    const withClientId = candidates
-      .map((r) => ({ ...r, clientId: resolvedMap.get(r.caseName) ?? null }))
-      .filter((r): r is ParsedFeesClosedRow & { clientId: number } => r.clientId !== null);
+    const withoutRealId = candidates.filter((r) => resolveId(r) == null);
 
-    if (withClientId.length === 0) {
-      return NextResponse.json({ upserted: 0 });
-    }
+    let created = 0;
+    let updated = 0;
 
-    // TODO: insert/update fees_closed table once Sir Jeru's schema lands.
-    // Each row in withClientId has clientId + all ParsedFeesClosedRow fields.
-    // Expected shape:
-    //   db.insert(feesClosedTable).values(withClientId.map(toFeesClosedInsert))
-    //     .onConflictDoUpdate({ target: feesClosedTable.caseId, set: ... })
-    //
-    // Uncomment and implement once fees_closed is added to schema.ts and migrations run.
+    await db.transaction(async (tx) => {
+      let syntheticRows: (ParsedFeesClosedRow & { clientId: number; firstName: string; lastName: string })[] = [];
 
-    return NextResponse.json({
-      upserted: withClientId.length,
-      note: "fees_closed table not yet available — upsert is a no-op until schema is ready",
+      if (withoutRealId.length > 0) {
+        const [{ maxSynthetic }] = await tx
+          .select({ maxSynthetic: sql<number>`COALESCE(MAX(client_id), ${SYNTHETIC_ID_BASE - 1})::int` })
+          .from(cases)
+          .where(sql`client_id >= ${SYNTHETIC_ID_BASE}`);
+        let nextId = Math.max(maxSynthetic, SYNTHETIC_ID_BASE - 1) + 1;
+        syntheticRows = withoutRealId.map((r) => {
+          const { firstName, lastName } = parseCaseLink(r.caseName);
+          return { ...r, clientId: nextId++, firstName, lastName };
+        });
+      }
+
+      // Deduplicate by clientId — two sheet rows can resolve to the same mirror ID.
+      // Last occurrence wins (most recent data in the sheet).
+      const allRowsMap = new Map<number, typeof withRealId[number]>();
+      for (const r of [...withRealId, ...syntheticRows]) allRowsMap.set(r.clientId, r);
+      const allRows = Array.from(allRowsMap.values());
+
+      // Upsert cases — onConflictDoNothing preserves existing win-sheet data.
+      for (const batch of chunk(allRows, 100)) {
+        await tx
+          .insert(cases)
+          .values(
+            batch.map((r) => ({
+              clientId: r.clientId,
+              firstName: r.firstName,
+              lastName: r.lastName,
+              caseLink: r.caseName,
+              approvalDate: r.approvalDate ?? undefined,
+              claimType: parseClaimType(r.claimType),
+              claimTypeLabel: r.claimType?.slice(0, 50) ?? undefined,
+              levelWon: r.caseLevel?.slice(0, 50) ?? undefined,
+            })),
+          )
+          .onConflictDoNothing();
+      }
+
+      // Upsert feeRecords — always overwrite with latest sheet values.
+      for (const batch of chunk(allRows, 100)) {
+        await tx
+          .insert(feeRecords)
+          .values(
+            batch.map((r) => {
+              const closedAt = r.closedDate ? new Date(r.closedDate) : new Date();
+              return toFeeRecordValues(r, r.clientId, closedAt);
+            }),
+          )
+          .onConflictDoUpdate({
+            target: feeRecords.caseId,
+            set: {
+              isClosed: sql`excluded.is_closed`,
+              closedAt: sql`excluded.closed_at`,
+              winSheetStatus: sql`excluded.win_sheet_status`,
+              syncStatus: sql`excluded.sync_status`,
+              syncedAt: sql`excluded.synced_at`,
+              assignedTo: sql`excluded.assigned_to`,
+              winSheetLink: sql`excluded.win_sheet_link`,
+              feesConfirmation: sql`excluded.fees_confirmation`,
+              caseStatus: sql`excluded.case_status`,
+              approvedBy: sql`excluded.approved_by`,
+              t16Retro: sql`excluded.t16_retro`,
+              t16FeeDue: sql`excluded.t16_fee_due`,
+              t16FeeReceived: sql`excluded.t16_fee_received`,
+              t16Pending: sql`excluded.t16_pending`,
+              t16FeeReceivedDate: sql`excluded.t16_fee_received_date`,
+              t2Retro: sql`excluded.t2_retro`,
+              t2FeeDue: sql`excluded.t2_fee_due`,
+              t2FeeReceived: sql`excluded.t2_fee_received`,
+              t2Pending: sql`excluded.t2_pending`,
+              t2FeeReceivedDate: sql`excluded.t2_fee_received_date`,
+              auxRetro: sql`excluded.aux_retro`,
+              auxFeeDue: sql`excluded.aux_fee_due`,
+              auxFeeReceived: sql`excluded.aux_fee_received`,
+              auxPending: sql`excluded.aux_pending`,
+              auxFeeReceivedDate: sql`excluded.aux_fee_received_date`,
+              totalRetroDue: sql`excluded.total_retro_due`,
+              totalFeesExpected: sql`excluded.total_fees_expected`,
+              totalFeesPaid: sql`excluded.total_fees_paid`,
+              updatedAt: sql`NOW()`,
+            },
+          });
+      }
+
+      const newCaseIds = allRows
+        .map((r) => r.clientId)
+        .filter((id) => !existingInDb.has(id));
+      if (newCaseIds.length > 0) {
+        await tx.insert(activityLog).values(
+          newCaseIds.map((caseId) => ({
+            caseId,
+            message: "Marked closed from Fees Closed sheet during sync.",
+            createdBy: "Sheet Sync",
+          })),
+        );
+      }
+
+      created = newCaseIds.length;
+      updated = allRows.length - newCaseIds.length;
     });
+
+    return NextResponse.json({ upserted: updated, created });
   } catch (error) {
-    console.error("POST /api/sheets/fees-closed/sync error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
-    );
+    const cause = (error as { cause?: unknown })?.cause;
+    console.error("POST /api/sheets/fees-closed/sync error:", cause ?? error);
+    const msg = cause instanceof Error ? cause.message
+      : error instanceof Error ? error.message
+      : String(error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 };

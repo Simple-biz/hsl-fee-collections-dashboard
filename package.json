@@ -11,6 +11,7 @@
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate --config=./src/drizzle.config.ts",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio --config=./src/drizzle.config.ts",
     "user:create": "dotenv -e .env.local -- tsx scripts/create-user.ts",
+    "seed:test-users": "dotenv -e .env.local -- tsx scripts/seed-test-users.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
