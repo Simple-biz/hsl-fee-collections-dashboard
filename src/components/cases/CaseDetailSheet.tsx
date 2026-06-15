@@ -47,6 +47,10 @@ interface CaseDetailSheetProps {
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null | undefined) => (d ? fmtDate(d) : "—");
+const displayDecision = (mc?: string | null, local?: string | null) => {
+  const d = mc && mc !== "unknown" ? mc : local;
+  return d && d !== "unknown" ? d.replace(/_/g, " ") : "—";
+};
 
 type MyCaseData = {
   caseStage: string | null;
@@ -714,18 +718,21 @@ export default function CaseDetailSheet({
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center justify-between">
-                      <p className={lbl}>T2 (SSDI) Decision</p>
-                      <p className={`${val} capitalize`}>
-                        {data.t2Decision && data.t2Decision !== "unknown" ? data.t2Decision.replace(/_/g, " ") : "—"}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className={lbl}>T16 (SSI) Decision</p>
-                      <p className={`${val} capitalize`}>
-                        {data.t16Decision && data.t16Decision !== "unknown" ? data.t16Decision.replace(/_/g, " ") : "—"}
-                      </p>
-                    </div>
+                    {[
+                      { label: "T2 (SSDI) Decision", mc: myCaseData?.t2Decision, local: data.t2Decision },
+                      { label: "T16 (SSI) Decision", mc: myCaseData?.t16Decision, local: data.t16Decision },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between">
+                        <p className={lbl}>{row.label}</p>
+                        {myCaseLoading ? (
+                          <RefreshCw aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                        ) : (
+                          <p className={`${val} capitalize`}>
+                            {displayDecision(row.mc, row.local)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </>
                 )}
                 <div className="flex items-center justify-between">
