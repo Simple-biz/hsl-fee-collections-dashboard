@@ -45,6 +45,27 @@ interface NeedsLinkRow {
   caseLink: string;
 }
 
+interface FeesClosedNewRow {
+  caseName: string;
+  clientId: number | null;
+  matchedInDb: boolean;
+  closedDate: string | null;
+  assignedTo: string | null;
+  claimType: string | null;
+  totalFeesPaid: string;
+}
+
+interface FeesClosedPreviewResponse {
+  usingMock: boolean;
+  summary: {
+    fetched: number;
+    matchedInDb: number;
+    unmatchedInDb: number;
+    warnings: { row: number; message: string }[];
+  };
+  rows: FeesClosedNewRow[];
+}
+
 type Step4Filter = "all" | "new" | "changed" | "unchanged" | "fees_closed" | "missing";
 
 type Step4PreviewRow =
@@ -124,6 +145,8 @@ const STATUS_BADGE: Record<string, (dark: boolean) => string> = {
     dark ? "bg-neutral-800 text-neutral-400" : "bg-neutral-100 text-neutral-600",
   fees_closed: (dark) =>
     dark ? "bg-violet-900/40 text-violet-400" : "bg-violet-100 text-violet-700",
+  fees_closed_new: (dark) =>
+    dark ? "bg-teal-900/40 text-teal-400" : "bg-teal-100 text-teal-700",
   missing: (dark) =>
     dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700",
 };
@@ -133,8 +156,11 @@ const STATUS_LABEL: Record<string, string> = {
   changed: "CHANGED",
   unchanged: "UP TO DATE",
   fees_closed: "FEES CLOSED",
+  fees_closed_new: "FEES CLOSED NEW",
   missing: "MISSING",
 };
+
+const SYNC_TIMEOUT_MS = 240_000;
 
 export default function SheetSyncModal({
   dark,
@@ -148,8 +174,15 @@ export default function SheetSyncModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [allowSynthetic, setAllowSynthetic] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncElapsed, setSyncElapsed] = useState(0);
+  const [fcSyncing, setFcSyncing] = useState(false);
+  const [fcSyncElapsed, setFcSyncElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: number; updated: number; closed: number } | null>(null);
+  const [fcResult, setFcResult] = useState<{ upserted: number; created: number } | null>(null);
+  const [fcPreview, setFcPreview] = useState<FeesClosedPreviewResponse | null>(null);
+  const [fcPreviewError, setFcPreviewError] = useState<string | null>(null);
+  const [selectedFcNames, setSelectedFcNames] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Step4Filter>("all");
 
@@ -160,40 +193,80 @@ export default function SheetSyncModal({
     setFetching(true);
     setError(null);
     setPreview(null);
+    setFcPreview(null);
+    setFcPreviewError(null);
 
-    const controller = new AbortController();
-    fetchControllerRef.current = controller;
-    let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 30_000);
+    const mainController = new AbortController();
+    const fcController = new AbortController();
+    fetchControllerRef.current = mainController;
+    fcFetchControllerRef.current = fcController;
+    let mainTimedOut = false;
+    let fcTimedOut = false;
+    const mainTimer = setTimeout(() => { mainTimedOut = true; mainController.abort(); }, 60_000);
+    const fcTimer = setTimeout(() => { fcTimedOut = true; fcController.abort(); }, 60_000);
     try {
-      const res = await fetch("/api/sheets/sync?mode=preview", {
-        method: "POST",
-        signal: controller.signal,
-      });
-      let json: Record<string, unknown> = {};
-      try { json = await res.json(); } catch { /* non-JSON body */ }
-      if (!res.ok)
-        throw new Error((json.error as string) || `Fetch failed (${res.status})`);
-      const data = json as unknown as SyncPreviewResponse;
-      setPreview(data);
-      setAllowSynthetic(false);
-      setSelected(
-        new Set([
-          ...data.rows.sheet
-            .filter((r) => (r.status === "new" || r.status === "changed") && !r.isSynthetic)
-            .map((r) => r.clientId),
-          ...data.rows.feesClosed.map((r) => r.clientId),
-        ]),
-      );
+      const [mainResult, fcResult] = await Promise.allSettled([
+        fetch("/api/sheets/sync?mode=preview", { method: "POST", signal: mainController.signal }),
+        fetch("/api/sheets/fees-closed/sync?mode=preview", { method: "POST", signal: fcController.signal }),
+      ]);
+
+      // Main preview — failure here is fatal for the modal flow
+      if (mainResult.status === "fulfilled") {
+        const mainRes = mainResult.value;
+        let json: Record<string, unknown> = {};
+        try { json = await mainRes.json(); } catch { /* non-JSON body */ }
+        if (!mainRes.ok)
+          throw new Error((json.error as string) || `Fetch failed (${mainRes.status})`);
+        const data = json as unknown as SyncPreviewResponse;
+        setPreview(data);
+        setAllowSynthetic(false);
+        setSelected(
+          new Set([
+            ...data.rows.sheet
+              .filter((r) => (r.status === "new" || r.status === "changed") && !r.isSynthetic)
+              .map((r) => r.clientId),
+            ...data.rows.feesClosed.map((r) => r.clientId),
+          ]),
+        );
+      } else {
+        const err = mainResult.reason as Error;
+        if (err.name === "AbortError") {
+          if (mainTimedOut) setError("Fetch timed out — please try again.");
+        } else {
+          setError(err.message);
+        }
+      }
+
+      // Fees Closed preview — failure is isolated; master list is unaffected
+      if (fcResult.status === "fulfilled") {
+        const fcRes = fcResult.value;
+        if (fcRes.ok) {
+          try {
+            const fcJson = await fcRes.json() as FeesClosedPreviewResponse;
+            setFcPreview(fcJson);
+            setSelectedFcNames(
+              new Set(fcJson.rows.filter((r) => !r.matchedInDb).map((r) => r.caseName)),
+            );
+          } catch { /* malformed response — ignore */ }
+        } else {
+          let fcErrMsg = `Fees Closed preview failed (${fcRes.status})`;
+          try { const b = await fcRes.json() as Record<string, unknown>; if (b.error) fcErrMsg = String(b.error); } catch { /* non-JSON */ }
+          setFcPreviewError(fcErrMsg);
+        }
+      } else {
+        const err = fcResult.reason as Error;
+        if (err.name === "AbortError") {
+          if (fcTimedOut) setFcPreviewError("Fees Closed preview timed out — you can still sync the master list.");
+        } else {
+          setFcPreviewError(`Fees Closed preview failed: ${err.message}`);
+        }
+      }
     } catch (e) {
       const err = e as Error;
-      if (err.name === "AbortError") {
-        if (timedOut) setError("Fetch timed out — please try again.");
-      } else {
-        setError(err.message);
-      }
+      setError(err.message);
     } finally {
-      clearTimeout(timer);
+      clearTimeout(mainTimer);
+      clearTimeout(fcTimer);
       setFetching(false);
     }
   };
@@ -218,6 +291,27 @@ export default function SheetSyncModal({
     () => preview?.rows.needsLink ?? [],
     [preview],
   );
+
+  const fcNewRows = useMemo(() => {
+    const seen = new Set<string>();
+    return (fcPreview?.rows ?? []).filter((r) => {
+      if (r.matchedInDb || seen.has(r.caseName)) return false;
+      seen.add(r.caseName);
+      return true;
+    });
+  }, [fcPreview]);
+
+  useEffect(() => {
+    if (!syncing) { setSyncElapsed(0); return; }
+    const id = setInterval(() => setSyncElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [syncing]);
+
+  useEffect(() => {
+    if (!fcSyncing) { setFcSyncElapsed(0); return; }
+    const id = setInterval(() => setFcSyncElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [fcSyncing]);
 
   useEffect(() => {
     if (!allowSynthetic && syntheticRows.length > 0) {
@@ -256,16 +350,24 @@ export default function SheetSyncModal({
   }, [preview, step4Rows, filter, search]);
 
   const fetchControllerRef = useRef<AbortController | null>(null);
+  const fcFetchControllerRef = useRef<AbortController | null>(null);
   const syncControllerRef = useRef<AbortController | null>(null);
+  const fcControllerRef = useRef<AbortController | null>(null);
+  const syncTimedOutRef = useRef(false);
+  const fcTimedOutRef = useRef(false);
   useEffect(() => () => {
     fetchControllerRef.current?.abort();
+    fcFetchControllerRef.current?.abort();
     syncControllerRef.current?.abort();
+    fcControllerRef.current?.abort();
   }, []);
 
   const runSync = async () => {
     if (!preview) return;
     const controller = new AbortController();
     syncControllerRef.current = controller;
+    syncTimedOutRef.current = false;
+    const timer = setTimeout(() => { syncTimedOutRef.current = true; controller.abort(); }, SYNC_TIMEOUT_MS);
     setSyncing(true);
     setError(null);
     let syncResult: { inserted: number; updated: number; closed: number } | null = null;
@@ -280,6 +382,7 @@ export default function SheetSyncModal({
       try { json = await res.json(); } catch { /* non-JSON body */ }
       if (!res.ok)
         throw new Error((json.error as string) || `Sync failed (${res.status})`);
+
       syncResult = {
         inserted: json.inserted as number,
         updated: json.updated as number,
@@ -287,9 +390,15 @@ export default function SheetSyncModal({
       };
     } catch (e) {
       const err = e as Error;
-      if (err.name !== "AbortError")
+      if (err.name === "AbortError") {
+        setError(syncTimedOutRef.current
+          ? `Sync timed out after ${SYNC_TIMEOUT_MS / 1000}s — the server may still be processing. Check the database before retrying.`
+          : "Sync was cancelled.");
+      } else {
         setError(err.message);
+      }
     } finally {
+      clearTimeout(timer);
       setSyncing(false);
     }
     if (syncResult) {
@@ -298,11 +407,50 @@ export default function SheetSyncModal({
     }
   };
 
+  const runFcSync = async () => {
+    if (selectedFcNames.size === 0) return;
+    const controller = new AbortController();
+    fcControllerRef.current = controller;
+    fcTimedOutRef.current = false;
+    const timer = setTimeout(() => { fcTimedOutRef.current = true; controller.abort(); }, SYNC_TIMEOUT_MS);
+    setFcSyncing(true);
+    setError(null);
+    try {
+      const fcRes = await fetch("/api/sheets/fees-closed/sync?mode=upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedCaseNames: [...selectedFcNames] }),
+        signal: controller.signal,
+      });
+      let fcJson: Record<string, unknown> = {};
+      try { fcJson = await fcRes.json(); } catch { /* non-JSON body */ }
+      if (!fcRes.ok)
+        throw new Error((fcJson.error as string) || `Fees Closed sync failed (${fcRes.status})`);
+      setFcResult({
+        upserted: (fcJson.upserted as number | undefined) ?? 0,
+        created: (fcJson.created as number | undefined) ?? 0,
+      });
+      try { await onSynced(); } catch { /* refresh failed; sync succeeded */ }
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === "AbortError") {
+        setError(fcTimedOutRef.current
+          ? `Fees Closed sync timed out after ${SYNC_TIMEOUT_MS / 1000}s — the server may still be processing.`
+          : "Fees Closed sync was cancelled.");
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      clearTimeout(timer);
+      setFcSyncing(false);
+    }
+  };
+
   const canAdvanceFromStep = (s: Step): boolean => {
     if (s === 1) return !!preview;
     if (s === 2) return !!preview;
     if (s === 3) return !!preview;
-    if (s === 4) return selected.size > 0;
+    if (s === 4) return selected.size > 0 || selectedFcNames.size > 0;
     return false;
   };
 
@@ -475,6 +623,12 @@ export default function SheetSyncModal({
                           : undefined
                       }
                     />
+                    <Stat
+                      t={t}
+                      label="Fees Closed New"
+                      value={fcNewRows.length.toLocaleString()}
+                      accent={dark ? "text-teal-400" : "text-teal-600"}
+                    />
                   </div>
                   {preview.summary.warnings.length > 0 && (
                     <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
@@ -508,6 +662,18 @@ export default function SheetSyncModal({
                       {needsLinkRows.length > 25 && (
                         <p className="mt-1 opacity-70">…and {needsLinkRows.length - 25} more</p>
                       )}
+                    </div>
+                  )}
+                  {fcPreviewError && (
+                    <div
+                      role="alert"
+                      className={`rounded-md border p-3 text-[11px] flex items-start gap-2 ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>
+                        <span className="font-semibold">Fees Closed preview failed</span> — Fees Closed New cases will not be synced this run. Re-fetch to retry.
+                        {" "}<span className="opacity-70">{fcPreviewError}</span>
+                      </span>
                     </div>
                   )}
                   <button
@@ -568,7 +734,7 @@ export default function SheetSyncModal({
               <p className={`text-[11px] ${t.textMuted} mb-4`}>
                 Four categories based on where each record exists.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-5">
                 <Stat t={t} label="New" value={preview.summary.new.toLocaleString()} accent={dark ? "text-emerald-400" : "text-emerald-600"} />
                 <Stat t={t} label="Changed" value={preview.summary.changed.toLocaleString()} accent={preview.summary.changed > 0 ? (dark ? "text-blue-400" : "text-blue-600") : undefined} />
                 <Stat t={t} label="Up to date" value={preview.summary.unchanged.toLocaleString()} />
@@ -579,6 +745,7 @@ export default function SheetSyncModal({
                   value={preview.summary.missing.toLocaleString()}
                   accent={preview.summary.missing > 0 ? (dark ? "text-amber-400" : "text-amber-600") : undefined}
                 />
+                <Stat t={t} label="Fees Closed New" value={fcNewRows.length.toLocaleString()} accent={dark ? "text-teal-400" : "text-teal-600"} />
               </div>
               <div className="space-y-5">
                 <CategorySection
@@ -645,12 +812,21 @@ export default function SheetSyncModal({
                 >
                   <DbOnlyTable t={t} dark={dark} rows={preview.rows.missing} />
                 </CategorySection>
+                <CategorySection
+                  status="fees_closed_new"
+                  count={fcNewRows.length}
+                  description="In Fees Closed sheet · not yet in database — will be created with isClosed=true on sync"
+                  dark={dark}
+                  t={t}
+                >
+                  <FcNewTable t={t} dark={dark} rows={fcNewRows.slice(0, 100)} />
+                </CategorySection>
               </div>
             </div>
           )}
 
           {/* STEP 4: Select & Sync */}
-          {step === 4 && preview && !result && (
+          {step === 4 && preview && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div>
@@ -661,8 +837,8 @@ export default function SheetSyncModal({
                   </p>
                 </div>
                 <div className={`text-[11px] ${t.textSub}`}>
-                  <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
-                  {" "}/ {step4Rows.filter((r) => r.syncable).length.toLocaleString()} syncable selected
+                  <span className={`font-bold ${t.text}`}>{(selected.size + selectedFcNames.size).toLocaleString()}</span>
+                  {" "}/ {(step4Rows.filter((r) => r.syncable).length + fcNewRows.length).toLocaleString()} syncable selected
                 </div>
               </div>
 
@@ -756,28 +932,68 @@ export default function SheetSyncModal({
                   setSelected(next);
                 }}
               />
+
+              {fcNewRows.length > 0 && (
+                <div className="mt-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE.fees_closed_new(dark)}`}>
+                        FEES CLOSED NEW
+                      </span>
+                      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>{fcNewRows.length.toLocaleString()}</span>
+                      <span className={`text-[11px] ${t.textMuted}`}>
+                        Not yet in database — will be created with isClosed=true
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedFcNames(new Set(fcNewRows.map((r) => r.caseName)))}
+                        className={`h-7 px-2.5 rounded border text-[11px] font-medium ${t.outlineBtn} transition-colors`}
+                      >
+                        Select all
+                      </button>
+                      <button
+                        onClick={() => setSelectedFcNames(new Set())}
+                        className={`h-7 px-2.5 rounded border text-[11px] font-medium ${t.outlineBtn} transition-colors`}
+                      >
+                        Deselect all
+                      </button>
+                    </div>
+                  </div>
+                  <FcNewTable
+                    t={t}
+                    dark={dark}
+                    rows={fcNewRows}
+                    selectedNames={selectedFcNames}
+                    onToggle={(name) => {
+                      const next = new Set(selectedFcNames);
+                      if (next.has(name)) next.delete(name);
+                      else next.add(name);
+                      setSelectedFcNames(next);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {/* STEP 4 result */}
+          {/* STEP 4 inline results */}
           {step === 4 && result && (
-            <div className="py-12">
-              <div className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
-                  <div className="text-[13px]">
-                    <p className="font-bold">Sync complete.</p>
-                    <p className="opacity-90 mt-1">
-                      <span className="font-semibold">{result.inserted.toLocaleString()}</span> new
-                      case{result.inserted === 1 ? "" : "s"} inserted ·{" "}
-                      <span className="font-semibold">{result.updated.toLocaleString()}</span>{" "}
-                      existing record{result.updated === 1 ? "" : "s"} updated ·{" "}
-                      <span className="font-semibold">{result.closed.toLocaleString()}</span>
-                      {" "}case{result.closed === 1 ? "" : "s"} marked closed.
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div role="alert" className={`mt-4 rounded-lg border p-3 flex items-start gap-2.5 text-[12px] ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-semibold">Master list synced.</span>{" "}
+                {result.inserted.toLocaleString()} inserted · {result.updated.toLocaleString()} updated · {result.closed.toLocaleString()} marked closed.
+              </span>
+            </div>
+          )}
+          {step === 4 && fcResult && (
+            <div role="alert" className={`mt-3 rounded-lg border p-3 flex items-start gap-2.5 text-[12px] ${dark ? "bg-teal-900/20 border-teal-800 text-teal-300" : "bg-teal-50 border-teal-200 text-teal-800"}`}>
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-semibold">Fees Closed synced.</span>{" "}
+                {fcResult.created.toLocaleString()} created · {fcResult.upserted.toLocaleString()} updated.
+              </span>
             </div>
           )}
         </div>
@@ -804,23 +1020,32 @@ export default function SheetSyncModal({
               Next: {STEPS[step].subtitle}
               <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </button>
-          ) : !result ? (
-            <button
-              onClick={runSync}
-              disabled={syncing || selected.size === 0}
-              className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} transition-colors disabled:opacity-50`}
-            >
-              {syncing ? (
-                <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
-              ) : (
-                <FileSpreadsheet className="h-3 w-3" aria-hidden="true" />
-              )}
-              {syncing ? "Syncing…" : `Sync Selected (${selected.size.toLocaleString()})`}
-            </button>
           ) : (
-            <button onClick={onClose} className={`h-8 px-4 rounded-md text-xs font-semibold ${t.ctaBtn} transition-colors`}>
-              Done
-            </button>
+            <div className="flex items-center gap-2">
+              {selected.size > 0 && (
+                <button
+                  onClick={runSync}
+                  disabled={syncing || fcSyncing}
+                  className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} transition-colors disabled:opacity-50`}
+                >
+                  {syncing ? <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" /> : <FileSpreadsheet className="h-3 w-3" aria-hidden="true" />}
+                  {syncing ? `Syncing… ${syncElapsed}s` : `Sync (${selected.size.toLocaleString()})`}
+                </button>
+              )}
+              {selectedFcNames.size > 0 && (
+                <button
+                  onClick={runFcSync}
+                  disabled={fcSyncing || syncing}
+                  className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-teal-700 hover:bg-teal-600 text-white" : "bg-teal-600 hover:bg-teal-500 text-white"} transition-colors disabled:opacity-50`}
+                >
+                  {fcSyncing ? <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3 w-3" aria-hidden="true" />}
+                  {fcSyncing ? `Syncing… ${fcSyncElapsed}s` : `Sync Fees Closed (${selectedFcNames.size.toLocaleString()})`}
+                </button>
+              )}
+              <button onClick={onClose} className={`h-8 px-3 rounded-md text-xs font-medium ${t.outlineBtn} transition-colors`}>
+                Done
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -853,7 +1078,7 @@ const CategorySection = ({
   t,
   children,
 }: {
-  status: "new" | "changed" | "unchanged" | "fees_closed" | "missing";
+  status: "new" | "changed" | "unchanged" | "fees_closed" | "fees_closed_new" | "missing";
   count: number;
   description: string;
   dark: boolean;
@@ -1114,6 +1339,67 @@ const SelectionTable = ({
         Showing first 200 of {total.toLocaleString()} matching rows.
       </div>
     )}
+  </div>
+);
+
+const FcNewTable = ({
+  t,
+  dark,
+  rows,
+  selectedNames,
+  onToggle,
+}: {
+  t: ReturnType<typeof themeClasses>;
+  dark: boolean;
+  rows: FeesClosedNewRow[];
+  selectedNames?: Set<string>;
+  onToggle?: (name: string) => void;
+}) => (
+  <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
+    <div className="overflow-x-auto">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
+            {selectedNames && <Th>{""}</Th>}
+            <Th>Case</Th>
+            <Th>Closed Date</Th>
+            <Th>Assigned</Th>
+            <Th>Claim Type</Th>
+            <Th alignRight>Fees Paid</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr
+              key={r.caseName}
+              onClick={() => onToggle?.(r.caseName)}
+              className={`border-b ${t.borderLight} ${onToggle ? "cursor-pointer" : ""} ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}`}
+            >
+              {selectedNames && (
+                <td className="px-3 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedNames.has(r.caseName)}
+                    onChange={() => onToggle?.(r.caseName)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 cursor-pointer"
+                  />
+                </td>
+              )}
+              <td className={`${t.text} px-3 py-1.5 font-medium max-w-72 truncate`} title={r.caseName}>
+                {r.caseName}
+              </td>
+              <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.closedDate)}</td>
+              <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
+              <td className={`${t.textSub} px-3 py-1.5`}>{r.claimType ?? "—"}</td>
+              <td className={`${t.text} px-3 py-1.5 text-right tabular-nums font-medium`}>
+                {r.totalFeesPaid !== "0" ? `$${Number(r.totalFeesPaid).toLocaleString()}` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </div>
 );
 

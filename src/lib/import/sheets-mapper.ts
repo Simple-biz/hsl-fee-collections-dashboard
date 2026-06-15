@@ -40,7 +40,7 @@ const stripTrailingAnnotations = (s: string): string => {
   return s;
 };
 
-const parseCaseLink = (link: string) => {
+export const parseCaseLink = (link: string) => {
   let s = link.trim();
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
   const parts = s.split(/\s+vs?(?:[.,]\s*|\s+)/i);
