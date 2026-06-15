@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
@@ -17,17 +17,21 @@ export default function FeesClosedPage() {
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const fetchClosed = useCallback(async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cases?isClosed=true&limit=2000");
-      if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+      const res = await fetch("/api/cases?isClosed=true&limit=2000", { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to load closed fees (${res.status})`);
       const json = await res.json();
       setCases(json.data || []);
     } catch (e) {
-      setError((e as Error).message);
+      if ((e as Error).name !== "AbortError") setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -35,6 +39,7 @@ export default function FeesClosedPage() {
 
   useEffect(() => {
     fetchClosed();
+    return () => { controllerRef.current?.abort(); };
   }, [fetchClosed]);
 
   const sectionCard = `rounded-xl border ${t.card}`;
