@@ -569,6 +569,7 @@ export const FeeRecordsTable = ({
           caseId={selectedCaseId}
           isOpen={true}
           onClose={() => setSelectedCaseId(null)}
+          dropdownOptions={dropdownOptions}
         />
       )}
 

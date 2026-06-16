@@ -37,10 +37,29 @@ import {
   STATUS_LABELS_DETAIL,
   getStatusColor,
 } from "@/lib/formatters";
-import type { WinSheetStatus } from "@/types";
+import type { WinSheetStatus, ApprovedByOption } from "@/types";
+import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import FeeEditModal from "@/components/cases/FeeEditModal";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useSession } from "next-auth/react";
+
+// Render <option>s from an admin-managed list, keeping the current value as a
+// fallback option when it's not in the (active) list.
+const dropdownOptionEls = (options: ApprovedByOption[], current: string) => (
+  <>
+    <option value="">—</option>
+    {current && !options.some((o) => o.name === current) && (
+      <option value={current}>{current}</option>
+    )}
+    {options
+      .filter((o) => o.isActive || o.name === current)
+      .map((o) => (
+        <option key={o.id} value={o.name}>
+          {o.name}
+        </option>
+      ))}
+  </>
+);
 
 // ============================================================================
 // Types
@@ -454,6 +473,13 @@ const CaseDetailPage = () => {
   const [postingNote, setPostingNote] = useState(false);
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
+  // Admin-managed dropdown options (case_level, win_sheet_status, …) so the
+  // edit dropdowns match the dashboard table rather than hardcoding values.
+  const [dropdownOptions, setDropdownOptions] =
+    useState<DropdownOptionsByCategory>({});
+  const caseLevelOptions = dropdownOptions.case_level ?? [];
+  const winSheetStatusOptions = dropdownOptions.win_sheet_status ?? [];
+
   // ---- Fetch ----
 
   const fetchCase = useCallback(async () => {
@@ -500,6 +526,19 @@ const CaseDetailPage = () => {
       .then((d) =>
         setTeamMembers((d.data || []).map((m: { name: string }) => m.name)),
       )
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    fetch("/api/settings/dropdown-options")
+      .then((r) => r.json())
+      .then((d) => {
+        const all: (ApprovedByOption & { category: string })[] = d.data || [];
+        const grouped: DropdownOptionsByCategory = {};
+        for (const o of all) {
+          (grouped[o.category as keyof DropdownOptionsByCategory] ||= []).push(o);
+        }
+        setDropdownOptions(grouped);
+      })
       .catch(() => {});
   }, []);
 
@@ -993,12 +1032,7 @@ const CaseDetailPage = () => {
                         onChange={(e) => setEditLevel(e.target.value)}
                         className={inp}
                       >
-                        <option value="">—</option>
-                        <option value="INITIAL">Initial</option>
-                        <option value="RECON">Reconsideration</option>
-                        <option value="HEARING">Hearing</option>
-                        <option value="AC">Appeals Council</option>
-                        <option value="FEDERAL_COURT">Federal Court</option>
+                        {dropdownOptionEls(caseLevelOptions, editLevel)}
                       </select>
                     ) : (
                       <p className={val}>{caseData.level || "—"}</p>
@@ -1087,13 +1121,7 @@ const CaseDetailPage = () => {
                         onChange={(e) => setEditStatus(e.target.value)}
                         className={inp}
                       >
-                        <option value="not_started">Not Started</option>
-                        <option value="started">Started</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="pending_payment">Pending Payment</option>
-                        <option value="partially_paid">Partially Paid</option>
-                        <option value="paid_in_full">Paid in Full</option>
-                        <option value="closed">Closed</option>
+                        {dropdownOptionEls(winSheetStatusOptions, editStatus)}
                       </select>
                     ) : (
                       <p className={val}>
