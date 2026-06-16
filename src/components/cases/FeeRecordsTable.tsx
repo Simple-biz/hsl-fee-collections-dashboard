@@ -498,9 +498,12 @@ export const FeeRecordsTable = ({
   // inherit the row's hover from the <tr> (which carries `group`). The
   // second frozen column gets a right divider marking the freeze boundary.
   const stickyBg = dark ? "bg-neutral-900" : "bg-white";
+  // Frozen-cell hover MUST be opaque: a translucent tint (e.g. /40) lets the
+  // horizontally-scrolling columns bleed through the frozen Case Name/checkbox
+  // cells in dark mode. Light mode's near-white tint hid the issue.
   const stickyHover = dark
-    ? "group-hover:bg-neutral-800/40"
-    : "group-hover:bg-neutral-50/80";
+    ? "group-hover:bg-neutral-800"
+    : "group-hover:bg-neutral-50";
   // Divider + the Assigned column's frozen styling apply only at sm+ — on
   // mobile Assigned scrolls so the 352px of frozen columns don't crowd out
   // the data. `stickyColBg` is the desktop-only opaque bg for the Assigned
@@ -515,8 +518,8 @@ export const FeeRecordsTable = ({
     ? "border-r border-neutral-700/60 sm:border-r-0"
     : "border-r border-neutral-200 sm:border-r-0";
   const stickyColBg = dark
-    ? "sm:bg-neutral-900 sm:group-hover:bg-neutral-800/40"
-    : "sm:bg-white sm:group-hover:bg-neutral-50/80";
+    ? "sm:bg-neutral-900 sm:group-hover:bg-neutral-800"
+    : "sm:bg-white sm:group-hover:bg-neutral-50";
   // Frozen-column widths: Case Name stays frozen on all screens (narrower on
   // mobile); Assigned is 160px on desktop. The desktop left-48 offset below
   // assumes Case Name's sm width (w-48 = 192px).
