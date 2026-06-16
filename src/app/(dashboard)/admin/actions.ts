@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/lib/db";
 import { users, userAccessOverrides } from "@/lib/db/schema";
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdmin, type AdminSession } from "@/lib/auth-helpers";
+import { logAdminActivity, type AdminActor } from "@/lib/admin-activity";
 import { PAGE_KEYS, type PageKey } from "@/lib/access/pages";
 import { rolePageDefaults } from "@/lib/access/role-defaults";
 import {
@@ -32,6 +33,12 @@ const ROLES = ["admin", "lead", "member", "system_admin"] as const;
 type Role = (typeof ROLES)[number];
 
 const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
+
+/** The signed-in admin performing the action, for the audit trail. */
+const actorFromGuard = (session: AdminSession): AdminActor => ({
+  id: Number(session.user.id) || null,
+  email: session.user.email ?? null,
+});
 
 /** Returns true iff `targetId` is the last enabled system_admin in the DB. */
 async function isLastSystemAdmin(targetId: number): Promise<boolean> {
@@ -76,12 +83,23 @@ export async function createUser(input: {
     }
 
     const passwordHash = await bcrypt.hash(input.password, 12);
-    await db.insert(users).values({
-      email,
-      name: input.name?.trim() || null,
-      passwordHash,
-      role: input.role,
-      mustChangePassword: input.mustChangePassword ?? true,
+    const [created] = await db
+      .insert(users)
+      .values({
+        email,
+        name: input.name?.trim() || null,
+        passwordHash,
+        role: input.role,
+        mustChangePassword: input.mustChangePassword ?? true,
+      })
+      .returning({ id: users.id });
+
+    await logAdminActivity({
+      actor: actorFromGuard(guard.session),
+      action: "user.create",
+      targetUserId: created?.id ?? null,
+      targetEmail: email,
+      summary: `Created ${input.role} account ${email}`,
     });
 
     revalidatePath("/admin");
@@ -134,7 +152,12 @@ export async function updateUserRole(input: {
 
   try {
     const [target] = await db
-      .select({ id: users.id, role: users.role, isActive: users.isActive })
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+      })
       .from(users)
       .where(eq(users.id, input.userId))
       .limit(1);
@@ -153,6 +176,15 @@ export async function updateUserRole(input: {
       .update(users)
       .set({ role: input.role, updatedAt: new Date() })
       .where(eq(users.id, input.userId));
+
+    await logAdminActivity({
+      actor: actorFromGuard(guard.session),
+      action: "user.role_change",
+      targetUserId: target.id,
+      targetEmail: target.email,
+      summary: `Changed role of ${target.email} from ${target.role} to ${input.role}`,
+      metadata: { from: target.role, to: input.role },
+    });
 
     revalidatePath("/admin");
     return { ok: true };
@@ -178,7 +210,12 @@ export async function setUserActive(input: {
 
   try {
     const [target] = await db
-      .select({ id: users.id, role: users.role, isActive: users.isActive })
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+      })
       .from(users)
       .where(eq(users.id, input.userId))
       .limit(1);
@@ -197,6 +234,14 @@ export async function setUserActive(input: {
       .update(users)
       .set({ isActive: input.isActive, updatedAt: new Date() })
       .where(eq(users.id, input.userId));
+
+    await logAdminActivity({
+      actor: actorFromGuard(guard.session),
+      action: input.isActive ? "user.activate" : "user.deactivate",
+      targetUserId: target.id,
+      targetEmail: target.email,
+      summary: `${input.isActive ? "Reactivated" : "Deactivated"} account ${target.email}`,
+    });
 
     revalidatePath("/admin");
     return { ok: true };
@@ -220,15 +265,27 @@ export async function resetUserPassword(input: {
   }
 
   try {
+    const [target] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+    if (!target) return { ok: false, error: "User not found" };
+
     const passwordHash = await bcrypt.hash(input.password, 12);
-    const result = await db
+    await db
       .update(users)
       .set({ passwordHash, mustChangePassword: input.mustChangePassword ?? true, updatedAt: new Date() })
       .where(eq(users.id, input.userId));
 
-    if (result.length === 0) {
-      // postgres-js doesn't return rowCount on UPDATE the same as pg; check separately.
-    }
+    await logAdminActivity({
+      actor: actorFromGuard(guard.session),
+      action: "user.password_reset",
+      targetUserId: target.id,
+      targetEmail: target.email,
+      // Never log the password itself.
+      summary: `Reset password for ${target.email}`,
+    });
 
     revalidatePath("/admin");
     return { ok: true };
@@ -311,7 +368,7 @@ export async function updateUserAccess(input: {
 
   try {
     const [user] = await db
-      .select({ role: users.role })
+      .select({ email: users.email, role: users.role })
       .from(users)
       .where(eq(users.id, input.userId))
       .limit(1);
@@ -344,6 +401,20 @@ export async function updateUserAccess(input: {
         target: userAccessOverrides.userId,
         set: { overrides, updatedAt: new Date() },
       });
+
+    const pageDeviationCount = Object.keys(deviations).length;
+    const capDeviationCount = Object.keys(capDeviations).length;
+    await logAdminActivity({
+      actor: actorFromGuard(guard.session),
+      action: "user.access_update",
+      targetUserId: input.userId,
+      targetEmail: user.email,
+      summary:
+        pageDeviationCount + capDeviationCount === 0
+          ? `Reset ${user.email} to role defaults`
+          : `Updated access for ${user.email} (${pageDeviationCount} page, ${capDeviationCount} capability override${pageDeviationCount + capDeviationCount === 1 ? "" : "s"})`,
+      metadata: { pages: deviations, capabilities: capDeviations },
+    });
 
     revalidatePath("/admin");
     return { ok: true };

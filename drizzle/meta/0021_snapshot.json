@@ -1,6 +1,6 @@
 {
-  "id": "ef8f8f1e-0add-41cd-b789-0ab54a5511e7",
-  "prevId": "6dab96e6-2dc9-4f5c-af3c-076bd88faf86",
+  "id": "47447252-5003-4f0f-b11e-9f7e09447726",
+  "prevId": "ef8f8f1e-0add-41cd-b789-0ab54a5511e7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2810,6 +2810,128 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.case_archive": {
+      "name": "case_archive",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "original_client_id": {
+          "name": "original_client_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "case_name": {
+          "name": "case_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "case_link": {
+          "name": "case_link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approval_date": {
+          "name": "approval_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archived_source": {
+          "name": "archived_source",
+          "type": "archived_source_enum",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "archived_by": {
+          "name": "archived_by",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "case_snapshot": {
+          "name": "case_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fee_record_snapshot": {
+          "name": "fee_record_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_case_archive_client_id": {
+          "name": "idx_case_archive_client_id",
+          "columns": [
+            {
+              "expression": "original_client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_case_archive_source": {
+          "name": "idx_case_archive_source",
+          "columns": [
+            {
+              "expression": "archived_source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_case_archive_archived_at": {
+          "name": "idx_case_archive_archived_at",
+          "columns": [
+            {
+              "expression": "archived_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -2904,6 +3026,14 @@
         "partially_paid",
         "paid_in_full",
         "closed"
+      ]
+    },
+    "public.archived_source_enum": {
+      "name": "archived_source_enum",
+      "schema": "public",
+      "values": [
+        "active_sheet",
+        "fees_closed_sheet"
       ]
     }
   },
