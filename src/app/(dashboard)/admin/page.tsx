@@ -69,7 +69,7 @@ export default async function AdminRoute() {
     })
     .from(adminActivityLog)
     .orderBy(desc(adminActivityLog.createdAt))
-    .limit(100);
+    .limit(300);
 
   const activity: AdminActivityEntry[] = logRows.map((r) => ({
     id: r.id,
@@ -95,7 +95,7 @@ export default async function AdminRoute() {
     .from(activityLog)
     .leftJoin(cases, eq(cases.clientId, activityLog.caseId))
     .orderBy(desc(activityLog.createdAt))
-    .limit(100);
+    .limit(300);
 
   const caseActivity: CaseActivityEntry[] = caseLogRows.map((r) => ({
     id: r.id,
