@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { X, RefreshCw, Plus, CheckCircle2, ExternalLink } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { parseCaseLink, extractMyCaseId } from "@/lib/import/case-link";
+import {
+  parseCaseLink,
+  extractMyCaseId,
+  extractChronicleId,
+} from "@/lib/import/case-link";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 
 interface AddCaseModalProps {
@@ -21,6 +25,10 @@ interface FormState {
   firstName: string;
   lastName: string;
   externalId: string;
+  // Chronicle deep link: `chronicleUrl` is the raw input shown to the user;
+  // `chronicleId` is the numeric id extracted from it (what the API persists).
+  chronicleUrl: string;
+  chronicleId: string;
   aljFirstName: string;
   aljLastName: string;
   claimTypeLabel: string;
@@ -37,6 +45,8 @@ const EMPTY: FormState = {
   firstName: "",
   lastName: "",
   externalId: "",
+  chronicleUrl: "",
+  chronicleId: "",
   aljFirstName: "",
   aljLastName: "",
   claimTypeLabel: "",
@@ -87,6 +97,17 @@ export default function AddCaseModal({
       ...f,
       externalId: value,
       clientId: id ? String(id) : f.clientId,
+    }));
+  };
+
+  // Paste a Chronicle URL (or a bare client id); we store the raw value for
+  // display and the extracted numeric id as what the API persists.
+  const onChronicleUrl = (value: string) => {
+    const id = extractChronicleId(value);
+    setForm((f) => ({
+      ...f,
+      chronicleUrl: value,
+      chronicleId: id ? String(id) : "",
     }));
   };
 
@@ -213,6 +234,32 @@ export default function AddCaseModal({
                     </a>
                   )}
                 </div>
+                <label className={`${lblCls} mt-3`}>Chronicle Link</label>
+                <div className="relative">
+                  <input
+                    value={form.chronicleUrl}
+                    onChange={(e) => onChronicleUrl(e.target.value)}
+                    placeholder="https://app.chroniclelegal.com/dashboard/clients/12345"
+                    className={`${inputCls} pr-9`}
+                  />
+                  {form.chronicleId && (
+                    <a
+                      href={`https://app.chroniclelegal.com/dashboard/clients/${form.chronicleId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 ${t.textSub} hover:opacity-80`}
+                      title="Open in Chronicle"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+                {form.chronicleUrl.trim() !== "" && !form.chronicleId && (
+                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                    Couldn’t read a Chronicle client id from that — paste the
+                    full client URL or just the numeric id.
+                  </p>
+                )}
                 {caseLinkMissingAlj && (
                   <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
                     No “v.” separator found — ALJ wasn’t captured. Add it as

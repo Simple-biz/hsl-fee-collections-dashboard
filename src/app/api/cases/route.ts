@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, ilike, sql, desc } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
 
@@ -86,9 +86,14 @@ export const GET = async (req: NextRequest) => {
         caseStatus: feeRecords.caseStatus,
         winSheetLink: feeRecords.winSheetLink,
         winSheetLinkText: feeRecords.winSheetLinkText,
+
+        // Chronicle id (from user_details) — powers the Chronicle link in the
+        // name column. one-to-one join, so it can't multiply rows.
+        udChronicleId: userDetails.chronicleId,
       })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
+      .leftJoin(userDetails, eq(userDetails.caseId, cases.clientId))
       .where(whereClause)
       .orderBy(desc(cases.approvalDate))
       .limit(limit)
@@ -166,6 +171,10 @@ export const GET = async (req: NextRequest) => {
       return {
         id: r.clientId,
         name: `${r.lastName}, ${r.firstName}`,
+        // MyCase case URL (stored on import); makes the name a deep link.
+        externalId: r.externalId ?? null,
+        // Chronicle client id → builds the Chronicle deep link in the name cell.
+        chronicleId: r.udChronicleId ?? null,
         assigned: r.assignedTo || "—",
         level: r.levelWon || "—",
         claim: r.claimTypeLabel === "T2_T16" ? "CONC" : r.claimTypeLabel || "—",
@@ -264,6 +273,12 @@ const createCaseSchema = z.object({
   aljLastName: optionalText,
   assignedTo: optionalText,
   winSheetStatus: optionalText,
+  // Chronicle client id → persisted to user_details so the dashboard can deep
+  // link to Chronicle. Blank/absent stays undefined.
+  chronicleId: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().positive().optional(),
+  ),
 });
 
 export const POST = async (req: NextRequest) => {
@@ -321,6 +336,18 @@ export const POST = async (req: NextRequest) => {
       assignedTo: input.assignedTo,
       winSheetStatus: input.winSheetStatus ?? "not_started",
     });
+
+    // Best-effort: persist the Chronicle id so the case deep-links to Chronicle.
+    // onConflictDoNothing guards the case_id unique key; the .catch swallows a
+    // chronicle_id unique collision (another case already owns it) so a bad id
+    // never fails an otherwise-successful case creation.
+    if (input.chronicleId != null) {
+      await db
+        .insert(userDetails)
+        .values({ caseId: input.clientId, chronicleId: input.chronicleId })
+        .onConflictDoNothing()
+        .catch(() => null);
+    }
 
     await db.insert(activityLog).values({
       caseId: input.clientId,

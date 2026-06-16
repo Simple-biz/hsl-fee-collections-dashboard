@@ -37,9 +37,29 @@ import {
   STATUS_LABELS_DETAIL,
   getStatusColor,
 } from "@/lib/formatters";
-import type { WinSheetStatus } from "@/types";
+import type { WinSheetStatus, ApprovedByOption } from "@/types";
+import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import FeeEditModal from "@/components/cases/FeeEditModal";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { useSession } from "next-auth/react";
+
+// Render <option>s from an admin-managed list, keeping the current value as a
+// fallback option when it's not in the (active) list.
+const dropdownOptionEls = (options: ApprovedByOption[], current: string) => (
+  <>
+    <option value="">—</option>
+    {current && !options.some((o) => o.name === current) && (
+      <option value={current}>{current}</option>
+    )}
+    {options
+      .filter((o) => o.isActive || o.name === current)
+      .map((o) => (
+        <option key={o.id} value={o.name}>
+          {o.name}
+        </option>
+      ))}
+  </>
+);
 
 // ============================================================================
 // Types
@@ -244,7 +264,6 @@ const FeeSection = memo(
           body: JSON.stringify({
             feeFields,
             logMessage: changes.join("; ") + ".",
-            logAuthor: "Thomas",
           }),
         });
         setInlineEdit(false);
@@ -403,6 +422,9 @@ const CaseDetailPage = () => {
   const t = themeClasses(dark);
   const { can } = useCapabilities();
   const canDelete = can("case.delete");
+  const { data: session } = useSession();
+  // Activity-log entries are attributed to the signed-in user.
+  const currentUser = session?.user?.name?.trim() || "Unknown";
 
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -448,9 +470,15 @@ const CaseDetailPage = () => {
 
   // Activity
   const [newNote, setNewNote] = useState("");
-  const [noteAuthor, setNoteAuthor] = useState("Thomas");
   const [postingNote, setPostingNote] = useState(false);
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
+
+  // Admin-managed dropdown options (case_level, win_sheet_status, …) so the
+  // edit dropdowns match the dashboard table rather than hardcoding values.
+  const [dropdownOptions, setDropdownOptions] =
+    useState<DropdownOptionsByCategory>({});
+  const caseLevelOptions = dropdownOptions.case_level ?? [];
+  const winSheetStatusOptions = dropdownOptions.win_sheet_status ?? [];
 
   // ---- Fetch ----
 
@@ -498,6 +526,19 @@ const CaseDetailPage = () => {
       .then((d) =>
         setTeamMembers((d.data || []).map((m: { name: string }) => m.name)),
       )
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    fetch("/api/settings/dropdown-options")
+      .then((r) => r.json())
+      .then((d) => {
+        const all: (ApprovedByOption & { category: string })[] = d.data || [];
+        const grouped: DropdownOptionsByCategory = {};
+        for (const o of all) {
+          (grouped[o.category as keyof DropdownOptionsByCategory] ||= []).push(o);
+        }
+        setDropdownOptions(grouped);
+      })
       .catch(() => {});
   }, []);
 
@@ -577,7 +618,6 @@ const CaseDetailPage = () => {
             Object.keys(caseFields).length > 0 ? caseFields : undefined,
           feeFields: Object.keys(feeFields).length > 0 ? feeFields : undefined,
           logMessage: changes.join(". ") + ".",
-          logAuthor: "Thomas",
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -609,7 +649,6 @@ const CaseDetailPage = () => {
         body: JSON.stringify({
           feeFields: { pifReadyToClose: true, winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
-          logAuthor: "Thomas",
         }),
       });
       await fetchCase();
@@ -630,7 +669,6 @@ const CaseDetailPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: newNote.trim(),
-          createdBy: noteAuthor,
         }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -657,8 +695,10 @@ const CaseDetailPage = () => {
   // ---- Render ----
 
   return (
+    // select-text overrides the app-wide select-none (globals.css body) so the
+    // entire case detail view can be highlighted/copied.
     <div
-      className={`min-h-screen ${dark ? "bg-neutral-950" : "bg-neutral-50"}`}
+      className={`min-h-screen select-text ${dark ? "bg-neutral-950" : "bg-neutral-50"}`}
     >
       {/* Fee Modal */}
       {feeModalOpen && caseData && (
@@ -994,12 +1034,7 @@ const CaseDetailPage = () => {
                         onChange={(e) => setEditLevel(e.target.value)}
                         className={inp}
                       >
-                        <option value="">—</option>
-                        <option value="INITIAL">Initial</option>
-                        <option value="RECON">Reconsideration</option>
-                        <option value="HEARING">Hearing</option>
-                        <option value="AC">Appeals Council</option>
-                        <option value="FEDERAL_COURT">Federal Court</option>
+                        {dropdownOptionEls(caseLevelOptions, editLevel)}
                       </select>
                     ) : (
                       <p className={val}>{caseData.level || "—"}</p>
@@ -1088,13 +1123,7 @@ const CaseDetailPage = () => {
                         onChange={(e) => setEditStatus(e.target.value)}
                         className={inp}
                       >
-                        <option value="not_started">Not Started</option>
-                        <option value="started">Started</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="pending_payment">Pending Payment</option>
-                        <option value="partially_paid">Partially Paid</option>
-                        <option value="paid_in_full">Paid in Full</option>
-                        <option value="closed">Closed</option>
+                        {dropdownOptionEls(winSheetStatusOptions, editStatus)}
                       </select>
                     ) : (
                       <p className={val}>
@@ -1443,21 +1472,12 @@ const CaseDetailPage = () => {
               <div
                 className={`mb-4 rounded-lg border p-3 ${dark ? "bg-neutral-800/40 border-neutral-700" : "bg-neutral-50 border-neutral-200"}`}
               >
-                <div className="flex gap-2 mb-2">
-                  <select
-                    value={noteAuthor}
-                    onChange={(e) => setNoteAuthor(e.target.value)}
-                    className={`h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
-                  >
-                    <option value="Thomas">Thomas</option>
-                    {teamMembers.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                    <option value="System">System</option>
-                  </select>
-                </div>
+                <p className={`text-[10px] ${t.textMuted} mb-2`}>
+                  Posting as{" "}
+                  <span className={`font-semibold ${t.textSub}`}>
+                    {currentUser}
+                  </span>
+                </p>
                 <div className="flex gap-2">
                   <input
                     value={newNote}
@@ -1520,7 +1540,7 @@ const CaseDetailPage = () => {
                             </span>
                           </div>
                           <p
-                            className={`text-[12px] ${t.textSub} mt-0.5 leading-relaxed`}
+                            className={`text-[12px] ${t.textSub} mt-0.5 leading-relaxed break-words`}
                           >
                             {a.message}
                           </p>

@@ -19,12 +19,44 @@ export const fmtDate = (d: string | null | undefined): string => {
   return `${m}/${day}/${y}`;
 };
 
+// Timestamp for notes/activity — e.g. "May 3, 8:00 PM". Takes a full ISO
+// timestamp (with time), unlike fmtDate which takes a date-only string.
+export const fmtDateTime = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 // Claim type display: T2_T16 → CONC, T2/T16 → CONC.
 // Worksheet-style values (CONC, DWB, DAC, AUX) pass through unchanged so
 // rows saved directly via the dashboard dropdowns render verbatim.
 export const fmtClaim = (claim: string): string => {
   if (claim === "T2_T16" || claim === "T2/T16") return "CONC";
   return claim;
+};
+
+// Long-form claim labels for the case-name sub-line:
+//   T2 → Title II, T16 → Title XVI, T2_T16/CONC → Concurrent.
+// Anything else (DWB, DAC, AUX, "—", …) passes through unchanged.
+export const fmtClaimLong = (claim: string): string => {
+  switch (claim) {
+    case "T2":
+      return "Title II";
+    case "T16":
+      return "Title XVI";
+    case "T2_T16":
+    case "T2/T16":
+    case "CONC":
+      return "Concurrent";
+    default:
+      return claim;
+  }
 };
 
 // Win sheet status labels matching the spreadsheet.
