@@ -855,6 +855,7 @@ export const caseArchive = pgTable(
     archivedBy: varchar("archived_by", { length: 100 }),
     caseSnapshot: jsonb("case_snapshot").notNull(),
     feeRecordSnapshot: jsonb("fee_record_snapshot"),
+    relatedSnapshots: jsonb("related_snapshots"),
   },
   (t) => [
     index("idx_case_archive_client_id").on(t.originalClientId),

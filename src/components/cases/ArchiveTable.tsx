@@ -3,6 +3,7 @@
 import { Fragment, useState, useRef } from "react";
 import { RotateCcw, X, AlertCircle } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { fmtDate, fmtDateTime } from "@/lib/formatters";
 
 export type ArchiveRow = {
   id: string;
@@ -21,17 +22,6 @@ interface ArchiveTableProps {
   t: ReturnType<typeof themeClasses>;
   onReopened: () => void;
 }
-
-const fmtDate = (val: string | null): string => {
-  if (!val) return "—";
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? val : d.toLocaleDateString();
-};
-
-const fmtDateTime = (val: string): string => {
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? val : d.toLocaleString();
-};
 
 const SourceBadge = ({ source, dark }: { source: ArchiveRow["archivedSource"]; dark: boolean }) => {
   const label = source === "active_sheet" ? "Active Sheet" : "Fees Closed";
