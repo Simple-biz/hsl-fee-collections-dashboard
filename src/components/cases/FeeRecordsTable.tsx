@@ -30,6 +30,11 @@ import {
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
 import AddCaseModal from "@/components/modals/AddCaseModal";
@@ -1406,11 +1411,26 @@ export const FeeRecordsTable = ({
                     </select>
                   )}
                 </td>
-                <td
-                  className={`${tdBase} ${t.textSub} max-w-65 truncate`}
-                  title={c.update}
-                >
-                  {c.update}
+                <td className={`${tdBase} ${t.textSub} max-w-65`}>
+                  {c.update && c.update !== "—" ? (
+                    <HoverCard openDelay={150} closeDelay={50}>
+                      <HoverCardTrigger asChild>
+                        <span className="block truncate">{c.update}</span>
+                      </HoverCardTrigger>
+                      {/* Portaled + collision-aware so a long update can't
+                          run off the viewport in windowed mode; capped to
+                          90vw so it always fits. */}
+                      <HoverCardContent
+                        align="start"
+                        collisionPadding={12}
+                        className="w-auto max-w-[min(28rem,90vw)] p-3 text-[12px] leading-relaxed whitespace-pre-wrap break-words"
+                      >
+                        {c.update}
+                      </HoverCardContent>
+                    </HoverCard>
+                  ) : (
+                    <span className="block truncate">{c.update}</span>
+                  )}
                 </td>
                 <td className={`${tdBase} text-center`}>
                   <button
@@ -1614,6 +1634,7 @@ export const FeeRecordsTable = ({
           caseId={notesFor.id}
           caseName={notesFor.name}
           onClose={() => setNotesFor(null)}
+          onChanged={() => onImported?.()}
         />
       )}
 

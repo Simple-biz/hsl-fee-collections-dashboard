@@ -319,7 +319,10 @@ export const PATCH = async (
     }
 
     const body = await req.json();
-    const { caseFields, feeFields, userDetailsFields, logMessage, logAuthor } = body;
+    // NOTE: any client-supplied author is intentionally ignored — the activity
+    // author is stamped from the authenticated session below so it can't be
+    // spoofed.
+    const { caseFields, feeFields, userDetailsFields, logMessage } = body;
 
     // Authorize: any update needs case.update. Finalizing fields (close/reopen,
     // mark overpaid, approvedBy) additionally need case.finalize, and editing
@@ -475,12 +478,12 @@ export const PATCH = async (
       }
     }
 
-    // Log activity if message provided
+    // Log activity if message provided. Author is the authenticated user.
     if (logMessage) {
       await db.insert(activityLog).values({
         caseId,
         message: logMessage,
-        createdBy: logAuthor || "System",
+        createdBy: update.session.user?.name?.trim() || "Unknown",
       });
     }
 
@@ -517,7 +520,10 @@ export const POST = async (
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
     }
 
-    const { message, createdBy } = await req.json();
+    // Author is stamped from the session — a client-supplied author is ignored
+    // so notes can't be attributed to someone else.
+    const author = guard.session.user?.name?.trim() || "Unknown";
+    const { message } = await req.json();
 
     if (!message?.trim()) {
       return NextResponse.json(
@@ -531,7 +537,7 @@ export const POST = async (
       .values({
         caseId,
         message: message.trim(),
-        createdBy: createdBy || "System",
+        createdBy: author,
       })
       .returning({ id: activityLog.id, createdAt: activityLog.createdAt });
 
@@ -540,7 +546,7 @@ export const POST = async (
       activity: {
         id: entry.id,
         message: message.trim(),
-        createdBy: createdBy || "System",
+        createdBy: author,
         createdAt: entry.createdAt,
       },
     });

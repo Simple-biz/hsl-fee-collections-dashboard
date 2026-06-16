@@ -40,6 +40,7 @@ import {
 import type { WinSheetStatus } from "@/types";
 import FeeEditModal from "@/components/cases/FeeEditModal";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { useSession } from "next-auth/react";
 
 // ============================================================================
 // Types
@@ -149,6 +150,7 @@ interface FeeSectionProps {
   feeCap: number;
   caseId: string;
   dark: boolean;
+  author: string;
   onSaved: () => Promise<void>;
 }
 
@@ -165,6 +167,7 @@ const FeeSection = memo(
     feeCap,
     caseId,
     dark,
+    author,
     onSaved,
   }: FeeSectionProps) => {
     const t = themeClasses(dark);
@@ -244,7 +247,7 @@ const FeeSection = memo(
           body: JSON.stringify({
             feeFields,
             logMessage: changes.join("; ") + ".",
-            logAuthor: "Thomas",
+            logAuthor: author,
           }),
         });
         setInlineEdit(false);
@@ -403,6 +406,9 @@ const CaseDetailPage = () => {
   const t = themeClasses(dark);
   const { can } = useCapabilities();
   const canDelete = can("case.delete");
+  const { data: session } = useSession();
+  // Activity-log entries are attributed to the signed-in user.
+  const currentUser = session?.user?.name?.trim() || "Unknown";
 
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -448,7 +454,6 @@ const CaseDetailPage = () => {
 
   // Activity
   const [newNote, setNewNote] = useState("");
-  const [noteAuthor, setNoteAuthor] = useState("Thomas");
   const [postingNote, setPostingNote] = useState(false);
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
@@ -577,7 +582,7 @@ const CaseDetailPage = () => {
             Object.keys(caseFields).length > 0 ? caseFields : undefined,
           feeFields: Object.keys(feeFields).length > 0 ? feeFields : undefined,
           logMessage: changes.join(". ") + ".",
-          logAuthor: "Thomas",
+          logAuthor: currentUser,
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -609,7 +614,7 @@ const CaseDetailPage = () => {
         body: JSON.stringify({
           feeFields: { pifReadyToClose: true, winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
-          logAuthor: "Thomas",
+          logAuthor: currentUser,
         }),
       });
       await fetchCase();
@@ -630,7 +635,7 @@ const CaseDetailPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: newNote.trim(),
-          createdBy: noteAuthor,
+          createdBy: currentUser,
         }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -1397,6 +1402,7 @@ const CaseDetailPage = () => {
                 dateReceived={caseData.t16FeeReceivedDate}
                 feeCap={caseData.applicableFeeCap}
                 caseId={id}
+                author={currentUser}
                 onSaved={fetchCase}
               />
               <FeeSection
@@ -1411,6 +1417,7 @@ const CaseDetailPage = () => {
                 dateReceived={caseData.t2FeeReceivedDate}
                 feeCap={caseData.applicableFeeCap}
                 caseId={id}
+                author={currentUser}
                 onSaved={fetchCase}
               />
               <FeeSection
@@ -1425,6 +1432,7 @@ const CaseDetailPage = () => {
                 dateReceived={caseData.auxFeeReceivedDate}
                 feeCap={caseData.applicableFeeCap}
                 caseId={id}
+                author={currentUser}
                 onSaved={fetchCase}
               />
             </div>
@@ -1443,21 +1451,12 @@ const CaseDetailPage = () => {
               <div
                 className={`mb-4 rounded-lg border p-3 ${dark ? "bg-neutral-800/40 border-neutral-700" : "bg-neutral-50 border-neutral-200"}`}
               >
-                <div className="flex gap-2 mb-2">
-                  <select
-                    value={noteAuthor}
-                    onChange={(e) => setNoteAuthor(e.target.value)}
-                    className={`h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
-                  >
-                    <option value="Thomas">Thomas</option>
-                    {teamMembers.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                    <option value="System">System</option>
-                  </select>
-                </div>
+                <p className={`text-[10px] ${t.textMuted} mb-2`}>
+                  Posting as{" "}
+                  <span className={`font-semibold ${t.textSub}`}>
+                    {currentUser}
+                  </span>
+                </p>
                 <div className="flex gap-2">
                   <input
                     value={newNote}
