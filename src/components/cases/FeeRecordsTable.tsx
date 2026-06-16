@@ -139,7 +139,8 @@ export const FeeRecordsTable = ({
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "system_admin";
+  const isAdmin =
+    session?.user?.role === "admin" || session?.user?.role === "system_admin";
   const { can } = useCapabilities();
   const canCreate = can("case.create");
   const canFinalize = can("case.finalize");
@@ -202,7 +203,9 @@ export const FeeRecordsTable = ({
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [overpaidOverrides, setOverpaidOverrides] = useState<Record<number, boolean>>({});
+  const [overpaidOverrides, setOverpaidOverrides] = useState<
+    Record<number, boolean>
+  >({});
   const [batchLoading, setBatchLoading] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
@@ -216,8 +219,11 @@ export const FeeRecordsTable = ({
   };
 
   const toggleSelectAll = () => {
-    const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
-    setSelectedIds(allSelected ? new Set() : new Set(filtered.map((c) => c.id)));
+    const allSelected =
+      filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
+    setSelectedIds(
+      allSelected ? new Set() : new Set(filtered.map((c) => c.id)),
+    );
   };
 
   const handleBatchOverpaid = async (mark: boolean) => {
@@ -230,7 +236,9 @@ export const FeeRecordsTable = ({
     if (mark) {
       setOverpaidOverrides((prev) => {
         const next = { ...prev };
-        ids.forEach((id) => { next[id] = true; });
+        ids.forEach((id) => {
+          next[id] = true;
+        });
         return next;
       });
     }
@@ -240,13 +248,16 @@ export const FeeRecordsTable = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseIds: ids, markedOverpaid: mark }),
       });
-      if (!res.ok) throw new Error(`Failed to update overpaid flag (${res.status})`);
+      if (!res.ok)
+        throw new Error(`Failed to update overpaid flag (${res.status})`);
       setSelectedIds(new Set());
     } catch (err) {
       if (mark) {
         setOverpaidOverrides((prev) => {
           const next = { ...prev };
-          ids.forEach((id) => { delete next[id]; });
+          ids.forEach((id) => {
+            delete next[id];
+          });
           return next;
         });
       }
@@ -363,11 +374,20 @@ export const FeeRecordsTable = ({
   // Reset to the first page whenever the result set or page size changes.
   useEffect(() => {
     setPageIndex(0);
-  }, [search, statusFilter, assignedFilter, sortKey, sortDir, pageSize, dateRange]);
+  }, [
+    search,
+    statusFilter,
+    assignedFilter,
+    sortKey,
+    sortDir,
+    pageSize,
+    dateRange,
+  ]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;
-    const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
+    const allSelected =
+      filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
     const someSelected = filtered.some((c) => selectedIds.has(c.id));
     selectAllRef.current.checked = allSelected;
     selectAllRef.current.indeterminate = !allSelected && someSelected;
@@ -545,10 +565,10 @@ export const FeeRecordsTable = ({
     <div className={`relative rounded-xl border ${t.card}`}>
       {/* Case Detail Side Panel */}
       {selectedCaseId && (
-        <CaseDetailSheet 
-          caseId={selectedCaseId} 
-          isOpen={true} 
-          onClose={() => setSelectedCaseId(null)} 
+        <CaseDetailSheet
+          caseId={selectedCaseId}
+          isOpen={true}
+          onClose={() => setSelectedCaseId(null)}
         />
       )}
 
@@ -605,19 +625,22 @@ export const FeeRecordsTable = ({
                 onClick={() => setSyncOpen(true)}
                 className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} transition-colors`}
               >
-                <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Sync from Sheets
+                <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                Sync from Sheets
               </button>
               <button
                 onClick={() => setMyCaseSyncOpen(true)}
                 className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-indigo-700 hover:bg-indigo-600 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} transition-colors`}
               >
-                <Database className="h-3.5 w-3.5" aria-hidden="true" /> Sync from MyCase
+                <Database className="h-3.5 w-3.5" aria-hidden="true" /> Sync
+                from MyCase
               </button>
               <button
                 onClick={() => setPushOpen(true)}
                 className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-blue-700 hover:bg-blue-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"} transition-colors`}
               >
-                <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push to Sheets
+                <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push
+                to Sheets
               </button>
             </>
           )}
@@ -674,836 +697,851 @@ export const FeeRecordsTable = ({
           on long lists. */}
       <div className="relative">
         <div className="overflow-auto max-h-[75vh]">
-        <table className="w-full min-w-400">
-          {/* Group headers */}
-          <thead>
-            <tr className={`border-b ${t.borderLight}`}>
-              {/* Select-all checkbox spans both header rows */}
-              <th rowSpan={2} className={`${stickyCheckTh} px-3 text-center`}>
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  onChange={toggleSelectAll}
-                  aria-label="Select all rows"
-                  className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-                />
-              </th>
-              {/* "Case Info" label is split per column so each part's freeze
+          <table className="w-full min-w-400">
+            {/* Group headers */}
+            <thead>
+              <tr className={`border-b ${t.borderLight}`}>
+                {/* Select-all checkbox spans both header rows */}
+                <th rowSpan={2} className={`${stickyCheckTh} px-3 text-center`}>
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    onChange={toggleSelectAll}
+                    aria-label="Select all rows"
+                    className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                  />
+                </th>
+                {/* "Case Info" label is split per column so each part's freeze
                   matches the column below it: the label cell over Case Name
                   freezes on all screens; the blank cell over Assigned freezes
                   only at sm+. Then a scrolling 4-col spacer covers Level /
                   Claim / Approval / Status. */}
-              <th
-                className={`${thBase} ${t.textSub} text-left ${stickyGroup}`}
-              >
-                Case Info
-              </th>
-              <th
-                aria-hidden="true"
-                className={`${thBase} ${t.textSub} text-left ${stickyGroup2}`}
-              />
-              <th
-                colSpan={5}
-                aria-hidden="true"
-                className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
-              />
-
-              <th
-                colSpan={5}
-                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-              >
-                T16
-              </th>
-              <th
-                colSpan={5}
-                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-blue-400" : "text-blue-600"}`}
-              >
-                T2
-              </th>
-              <th
-                colSpan={5}
-                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-violet-400" : "text-violet-600"}`}
-              >
-                AUX
-              </th>
-              <th
-                colSpan={3}
-                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
-              >
-                Totals
-              </th>
-              <th
-                colSpan={mode === "closed" ? 8 : 7}
-                className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
-              >
-                Workflow
-              </th>
-            </tr>
-            {/* Column headers */}
-            <tr className={`border-b ${t.borderLight}`}>
-              <th
-                className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh1}`}
-                onClick={() => toggleSort("name")}
-              >
-                <span className="flex items-center gap-1">
-                  Case Name <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </th>
-              <th
-                className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh2}`}
-                onClick={() => toggleSort("assigned")}
-                title="Sort to group rows by assignee"
-              >
-                <span className="flex items-center gap-1">
-                  Assigned <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
-              <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
-              <th
-                className={`${thBase} ${t.textSub} text-left cursor-pointer`}
-                onClick={() => toggleSort("date")}
-              >
-                <span className="flex items-center gap-1">
-                  Approval <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>Status</th>
-              <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet</th>
-
-              {/* T16 */}
-              <th
-                className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-              >
-                Retro
-              </th>
-              <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
-              <th className={`${thBase} ${t.textSub} text-right`}>
-                Rec&apos;d
-              </th>
-              <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Date Rec&apos;d
-              </th>
-
-              {/* T2 */}
-              <th
-                className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-              >
-                Retro
-              </th>
-              <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
-              <th className={`${thBase} ${t.textSub} text-right`}>
-                Rec&apos;d
-              </th>
-              <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Date Rec&apos;d
-              </th>
-
-              {/* AUX */}
-              <th
-                className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-              >
-                Retro
-              </th>
-              <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
-              <th className={`${thBase} ${t.textSub} text-right`}>
-                Rec&apos;d
-              </th>
-              <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Date Rec&apos;d
-              </th>
-
-              {/* Totals */}
-              <th
-                className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-              >
-                Retro Due
-              </th>
-              <th
-                className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                onClick={() => toggleSort("expected")}
-              >
-                <span className="flex items-center justify-end gap-1">
-                  Expected <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </th>
-              <th
-                className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                onClick={() => toggleSort("paid")}
-              >
-                <span className="flex items-center justify-end gap-1">
-                  Paid <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </th>
-
-              {/* Workflow */}
-              <th
-                className={`${thBase} ${t.textSub} text-center ${groupBorder}`}
-              >
-                PIF
-              </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Approved By
-              </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Fees Conf
-              </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Case Status
-              </th>
-              <th className={`${thBase} ${t.textSub} text-left`}>
-                Recent Update
-              </th>
-              <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
-              <th
-                className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                onClick={() => toggleSort("daysAfterApproval")}
-              >
-                <span className="flex items-center justify-end gap-1">
-                  Days <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </th>
-              {mode === "closed" && (
-                <th className={`${thBase} ${t.textSub} text-center`}>
-                  Action
+                <th
+                  className={`${thBase} ${t.textSub} text-left ${stickyGroup}`}
+                >
+                  Case Info
                 </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((c) => {
-              const isOverpaid = overpaidOverrides[c.id] ?? c.markedOverpaid;
-              return (
-              <tr
-                key={c.id}
-                onClick={() => setSelectedCaseId(c.id)}
-                className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group ${isOverpaid ? "border-l-2 border-l-amber-500" : ""}`}
-              >
-                {/* Checkbox */}
-                <td className={`${stickyCheckTd} px-3 text-center`} onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(c.id)}
-                    onChange={() => toggleRowSelection(c.id)}
-                    aria-label={`Select ${c.name}`}
-                    className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-                  />
-                </td>
-                {/* Case Info — first two columns are frozen */}
-                <td
-                  className={`${tdBase} ${t.text} font-semibold truncate ${stickyTd1}`}
-                  title={c.name}
-                >
-                  {c.name}
-                </td>
-                <td
-                  className={`${tdBase} ${t.textSub} ${stickyTd2}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {mode === "closed" ? (
-                    c.assigned
-                  ) : (
-                    <select
-                      value={cellValue(c, "assigned")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleVarcharChange(
-                          c,
-                          "fee",
-                          "assignedTo",
-                          "assigned",
-                          "Assigned To",
-                          e.target.value,
-                        )
-                      }
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        assignedOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "assigned");
-                        return (
-                          v &&
-                          !assignedOptions.some((o) => o.name === v) && (
-                            <option value={v}>{v}</option>
-                          )
-                        );
-                      })()}
-                      {assignedOptions
-                        .filter(
-                          (o) =>
-                            o.isActive ||
-                            o.name === cellValue(c, "assigned"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
-                {/* Level — varchar; lives on the cases row. */}
-                <td
-                  className={`${tdBase}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {mode === "closed" ? (
-                    <span
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
-                    >
-                      {cellValue(c, "level") || "—"}
-                    </span>
-                  ) : (
-                    <select
-                      value={cellValue(c, "level")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleVarcharChange(
-                          c,
-                          "case",
-                          "levelWon",
-                          "level",
-                          "Case Level",
-                          e.target.value,
-                        )
-                      }
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        caseLevelOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "level");
-                        return (
-                          v &&
-                          !caseLevelOptions.some((o) => o.name === v) && (
-                            <option value={v}>{v}</option>
-                          )
-                        );
-                      })()}
-                      {caseLevelOptions
-                        .filter(
-                          (o) =>
-                            o.isActive || o.name === cellValue(c, "level"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
-                {/* Claim — varchar; lives on the cases row. */}
-                <td
-                  className={`${tdBase}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {mode === "closed" ? (
-                    <span
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
-                    >
-                      {fmtClaim(cellValue(c, "claim")) || "—"}
-                    </span>
-                  ) : (
-                    <select
-                      value={cellValue(c, "claim")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleVarcharChange(
-                          c,
-                          "case",
-                          "claimTypeLabel",
-                          "claim",
-                          "Claim Type",
-                          e.target.value,
-                        )
-                      }
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        claimTypeOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "claim");
-                        return (
-                          v &&
-                          !claimTypeOptions.some((o) => o.name === v) && (
-                            <option value={v}>{v}</option>
-                          )
-                        );
-                      })()}
-                      {claimTypeOptions
-                        .filter(
-                          (o) =>
-                            o.isActive || o.name === cellValue(c, "claim"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
-                <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                  {dateStr(c.date)}
-                </td>
-                {/* Win-sheet Status — varchar; lives on fee_records. */}
-                <td
-                  className={`${tdBase}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {mode === "closed" ? (
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(cellValue(c, "status"), dark)}`}
-                    >
-                      {STATUS_LABELS[cellValue(c, "status")] ||
-                        cellValue(c, "status") ||
-                        "—"}
-                    </span>
-                  ) : (
-                    <select
-                      value={cellValue(c, "status")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleVarcharChange(
-                          c,
-                          "fee",
-                          "winSheetStatus",
-                          "status",
-                          "Win Sheet Status",
-                          e.target.value,
-                        )
-                      }
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        winSheetStatusOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "status");
-                        return (
-                          v &&
-                          !winSheetStatusOptions.some(
-                            (o) => o.name === v,
-                          ) && <option value={v}>{v}</option>
-                        );
-                      })()}
-                      {winSheetStatusOptions
-                        .filter(
-                          (o) =>
-                            o.isActive || o.name === cellValue(c, "status"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
+                <th
+                  aria-hidden="true"
+                  className={`${thBase} ${t.textSub} text-left ${stickyGroup2}`}
+                />
+                <th
+                  colSpan={5}
+                  aria-hidden="true"
+                  className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
+                />
 
-                {/* Win Sheet Link */}
-                <td
-                  className={`${tdBase}`}
-                  onClick={(e) => e.stopPropagation()}
+                <th
+                  colSpan={5}
+                  className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
                 >
-                  {c.winSheetLink ? (
-                    <a
-                      href={c.winSheetLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                      {c.winSheetLinkText || "Open"}
-                    </a>
-                  ) : (
-                    <span className={`text-[11px] ${t.textMuted}`}>—</span>
-                  )}
-                </td>
+                  T16
+                </th>
+                <th
+                  colSpan={5}
+                  className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-blue-400" : "text-blue-600"}`}
+                >
+                  T2
+                </th>
+                <th
+                  colSpan={5}
+                  className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-violet-400" : "text-violet-600"}`}
+                >
+                  AUX
+                </th>
+                <th
+                  colSpan={3}
+                  className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
+                >
+                  Totals
+                </th>
+                <th
+                  colSpan={mode === "closed" ? 8 : 7}
+                  className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
+                >
+                  Workflow
+                </th>
+              </tr>
+              {/* Column headers */}
+              <tr className={`border-b ${t.borderLight}`}>
+                <th
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh1}`}
+                  onClick={() => toggleSort("name")}
+                >
+                  <span className="flex items-center gap-1">
+                    Case Name <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </th>
+                <th
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh2}`}
+                  onClick={() => toggleSort("assigned")}
+                  title="Sort to group rows by assignee"
+                >
+                  <span className="flex items-center gap-1">
+                    Assigned <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
+                <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
+                <th
+                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
+                  onClick={() => toggleSort("date")}
+                >
+                  <span className="flex items-center gap-1">
+                    Approval <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>Status</th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Win Sheet
+                </th>
 
                 {/* T16 */}
-                <td
-                  className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                <th
+                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
                 >
-                  {currency(c.t16Retro)}
-                </td>
-                <td className={`${tdBase} text-right tabular-nums ${t.text}`}>
-                  {currency(c.t16FeeDue)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                >
-                  {currency(c.t16FeeReceived)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                >
-                  {currency(c.t16Pending)}
-                </td>
-                <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                  {dateStr(c.t16FeeReceivedDate)}
-                </td>
+                  Retro
+                </th>
+                <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
+                <th className={`${thBase} ${t.textSub} text-right`}>
+                  Rec&apos;d
+                </th>
+                <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Date Rec&apos;d
+                </th>
 
                 {/* T2 */}
-                <td
-                  className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                <th
+                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
                 >
-                  {currency(c.t2Retro)}
-                </td>
-                <td className={`${tdBase} text-right tabular-nums ${t.text}`}>
-                  {currency(c.t2FeeDue)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                >
-                  {currency(c.t2FeeReceived)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                >
-                  {currency(c.t2Pending)}
-                </td>
-                <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                  {dateStr(c.t2FeeReceivedDate)}
-                </td>
+                  Retro
+                </th>
+                <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
+                <th className={`${thBase} ${t.textSub} text-right`}>
+                  Rec&apos;d
+                </th>
+                <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Date Rec&apos;d
+                </th>
 
                 {/* AUX */}
-                <td
-                  className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                <th
+                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
                 >
-                  {currency(c.auxRetro)}
-                </td>
-                <td className={`${tdBase} text-right tabular-nums ${t.text}`}>
-                  {currency(c.auxFeeDue)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                >
-                  {currency(c.auxFeeReceived)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                >
-                  {currency(c.auxPending)}
-                </td>
-                <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                  {dateStr(c.auxFeeReceivedDate)}
-                </td>
+                  Retro
+                </th>
+                <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
+                <th className={`${thBase} ${t.textSub} text-right`}>
+                  Rec&apos;d
+                </th>
+                <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Date Rec&apos;d
+                </th>
 
                 {/* Totals */}
-                <td
-                  className={`${tdBase} text-right tabular-nums font-medium ${t.text} ${groupBorder}`}
+                <th
+                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
                 >
-                  {currency(c.totalRetroDue)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums font-semibold ${t.text}`}
+                  Retro Due
+                </th>
+                <th
+                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
+                  onClick={() => toggleSort("expected")}
                 >
-                  {currency(c.expected)}
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums font-semibold ${c.paid > 0 ? "text-emerald-500" : t.textMuted}`}
+                  <span className="flex items-center justify-end gap-1">
+                    Expected <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </th>
+                <th
+                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
+                  onClick={() => toggleSort("paid")}
                 >
-                  {currency(c.paid)}
-                </td>
+                  <span className="flex items-center justify-end gap-1">
+                    Paid <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </th>
 
                 {/* Workflow */}
-                <td className={`${tdBase} text-center ${groupBorder}`}>
-                  {c.pif && (
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${PIF_COLORS(c.pif, dark)}`}
-                    >
-                      {c.pif}
-                    </span>
-                  )}
-                </td>
-                <td
-                  className={`${tdBase} ${t.textSub}`}
-                  onClick={(e) => e.stopPropagation()}
+                <th
+                  className={`${thBase} ${t.textSub} text-center ${groupBorder}`}
                 >
-                  {mode === "closed" || !canFinalize ? (
-                    cellValue(c, "approvedBy") || "—"
-                  ) : (
-                    <select
-                      value={cellValue(c, "approvedBy")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleVarcharChange(
-                          c,
-                          "fee",
-                          "approvedBy",
-                          "approvedBy",
-                          "Approved By",
-                          e.target.value,
-                        )
-                      }
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        approvedByOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "approvedBy");
-                        return (
-                          v &&
-                          !approvedByOptions.some((o) => o.name === v) && (
-                            <option value={v}>{v}</option>
-                          )
-                        );
-                      })()}
-                      {approvedByOptions
-                        .filter(
-                          (o) =>
-                            o.isActive || o.name === cellValue(c, "approvedBy"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
-                {/* Fees Confirmation */}
-                <td
-                  className={`${tdBase} ${t.textSub}`}
-                  onClick={(e) => e.stopPropagation()}
+                  PIF
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Approved By
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Fees Conf
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Case Status
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Recent Update
+                </th>
+                <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
+                <th
+                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
+                  onClick={() => toggleSort("daysAfterApproval")}
                 >
-                  {mode === "closed" ? (
-                    cellValue(c, "feesConfirmation") || "—"
-                  ) : (
-                    <select
-                      value={cellValue(c, "feesConfirmation")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        // "Paid In Full" prompts the close flow, which is a
-                        // finalize action — only offer it to users who can
-                        // finalize. Others just set the field value.
-                        if (
-                          canFinalize &&
-                          next &&
-                          next.toLowerCase() === "paid in full" &&
-                          next !== cellValue(c, "feesConfirmation")
-                        ) {
-                          setAckTarget({
-                            caseId: c.id,
-                            caseName: c.name,
-                            triggerField: "feesConfirmation",
-                            triggerValue: next,
-                            triggerLabel: "Fees Confirmation",
-                          });
-                          return;
-                        }
-                        handleVarcharChange(
-                          c,
-                          "fee",
-                          "feesConfirmation",
-                          "feesConfirmation",
-                          "Fees Confirmation",
-                          next,
-                        );
-                      }}
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        feesConfirmationOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "feesConfirmation");
-                        return (
-                          v &&
-                          !feesConfirmationOptions.some(
-                            (o) => o.name === v,
-                          ) && <option value={v}>{v}</option>
-                        );
-                      })()}
-                      {feesConfirmationOptions
-                        .filter(
-                          (o) =>
-                            o.isActive ||
-                            o.name === cellValue(c, "feesConfirmation"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
-                {/* Case Status */}
-                <td
-                  className={`${tdBase} ${t.textSub}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {mode === "closed" ? (
-                    cellValue(c, "caseStatus") || "—"
-                  ) : (
-                    <select
-                      value={cellValue(c, "caseStatus")}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleVarcharChange(
-                          c,
-                          "fee",
-                          "caseStatus",
-                          "caseStatus",
-                          "Case Status",
-                          e.target.value,
-                        )
-                      }
-                      className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                      title={
-                        caseStatusOptions.length === 0
-                          ? "No options configured — add them in Settings"
-                          : undefined
-                      }
-                    >
-                      <option value="">— Select —</option>
-                      {(() => {
-                        const v = cellValue(c, "caseStatus");
-                        return (
-                          v &&
-                          !caseStatusOptions.some((o) => o.name === v) && (
-                            <option value={v}>{v}</option>
-                          )
-                        );
-                      })()}
-                      {caseStatusOptions
-                        .filter(
-                          (o) =>
-                            o.isActive ||
-                            o.name === cellValue(c, "caseStatus"),
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.name}>
-                            {o.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </td>
-                <td className={`${tdBase} ${t.textSub} max-w-65`}>
-                  {c.update && c.update !== "—" ? (
-                    <HoverCard openDelay={150} closeDelay={50}>
-                      <HoverCardTrigger asChild>
-                        <span className="block truncate">{c.update}</span>
-                      </HoverCardTrigger>
-                      {/* Portaled + collision-aware so a long update can't
-                          run off the viewport in windowed mode; capped to
-                          90vw so it always fits. */}
-                      <HoverCardContent
-                        align="start"
-                        collisionPadding={12}
-                        className="w-auto max-w-[min(28rem,90vw)] p-3 text-[12px] leading-relaxed whitespace-pre-wrap break-words"
-                      >
-                        {c.update}
-                      </HoverCardContent>
-                    </HoverCard>
-                  ) : (
-                    <span className="block truncate">{c.update}</span>
-                  )}
-                </td>
-                <td className={`${tdBase} text-center`}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNotesFor({ id: c.id, name: c.name });
-                    }}
-                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                      c.notesCount > 0
-                        ? dark
-                          ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
-                          : "bg-blue-50 text-blue-700 hover:bg-blue-100"
-                        : dark
-                          ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
-                          : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
-                    }`}
-                    title={
-                      c.notesCount > 0
-                        ? `View ${c.notesCount} note${c.notesCount === 1 ? "" : "s"}`
-                        : "No notes yet"
-                    }
-                  >
-                    <MessageSquare className="h-3 w-3" />
-                    {c.notesCount}
-                  </button>
-                </td>
-                <td
-                  className={`${tdBase} text-right tabular-nums font-medium ${AGING_COLORS(c.approvalCategory, dark)}`}
-                >
-                  {c.daysAfterApproval !== null ? (
-                    <span>
-                      {c.daysAfterApproval}d{" "}
-                      <span className="text-[9px] opacity-70">
-                        {c.approvalCategory}
-                      </span>
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
+                  <span className="flex items-center justify-end gap-1">
+                    Days <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </th>
                 {mode === "closed" && (
-                  <td
-                    className={`${tdBase} text-center`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {canFinalize ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReopen(c);
-                        }}
-                        disabled={reopeningId !== null}
-                        className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn} disabled:opacity-40`}
-                        title="Move this case back to the active dashboard and clear Fees Confirmation"
-                      >
-                        {reopeningId === c.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RotateCcw className="h-3 w-3" />
-                        )}
-                        Reopen
-                      </button>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
+                  <th className={`${thBase} ${t.textSub} text-center`}>
+                    Action
+                  </th>
                 )}
               </tr>
-              );
-            })}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {paged.map((c) => {
+                const isOverpaid = overpaidOverrides[c.id] ?? c.markedOverpaid;
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelectedCaseId(c.id)}
+                    className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group ${isOverpaid ? "border-l-2 border-l-amber-500" : ""}`}
+                  >
+                    {/* Checkbox */}
+                    <td
+                      className={`${stickyCheckTd} px-3 text-center`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(c.id)}
+                        onChange={() => toggleRowSelection(c.id)}
+                        aria-label={`Select ${c.name}`}
+                        className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                      />
+                    </td>
+                    {/* Case Info — first two columns are frozen */}
+                    <td
+                      className={`${tdBase} ${t.text} font-semibold truncate ${stickyTd1}`}
+                      title={c.name}
+                    >
+                      {c.name}
+                    </td>
+                    <td
+                      className={`${tdBase} ${t.textSub} ${stickyTd2}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" ? (
+                        c.assigned
+                      ) : (
+                        <select
+                          value={cellValue(c, "assigned")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "assignedTo",
+                              "assigned",
+                              "Assigned To",
+                              e.target.value,
+                            )
+                          }
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            assignedOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "assigned");
+                            return (
+                              v &&
+                              !assignedOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {assignedOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "assigned"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    {/* Level — varchar; lives on the cases row. */}
+                    <td
+                      className={`${tdBase}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" ? (
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                        >
+                          {cellValue(c, "level") || "—"}
+                        </span>
+                      ) : (
+                        <select
+                          value={cellValue(c, "level")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleVarcharChange(
+                              c,
+                              "case",
+                              "levelWon",
+                              "level",
+                              "Case Level",
+                              e.target.value,
+                            )
+                          }
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            caseLevelOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "level");
+                            return (
+                              v &&
+                              !caseLevelOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {caseLevelOptions
+                            .filter(
+                              (o) =>
+                                o.isActive || o.name === cellValue(c, "level"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    {/* Claim — varchar; lives on the cases row. */}
+                    <td
+                      className={`${tdBase}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" ? (
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                        >
+                          {fmtClaim(cellValue(c, "claim")) || "—"}
+                        </span>
+                      ) : (
+                        <select
+                          value={cellValue(c, "claim")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleVarcharChange(
+                              c,
+                              "case",
+                              "claimTypeLabel",
+                              "claim",
+                              "Claim Type",
+                              e.target.value,
+                            )
+                          }
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            claimTypeOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "claim");
+                            return (
+                              v &&
+                              !claimTypeOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {claimTypeOptions
+                            .filter(
+                              (o) =>
+                                o.isActive || o.name === cellValue(c, "claim"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
+                      {dateStr(c.date)}
+                    </td>
+                    {/* Win-sheet Status — varchar; lives on fee_records. */}
+                    <td
+                      className={`${tdBase}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" ? (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(cellValue(c, "status"), dark)}`}
+                        >
+                          {STATUS_LABELS[cellValue(c, "status")] ||
+                            cellValue(c, "status") ||
+                            "—"}
+                        </span>
+                      ) : (
+                        <select
+                          value={cellValue(c, "status")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "winSheetStatus",
+                              "status",
+                              "Win Sheet Status",
+                              e.target.value,
+                            )
+                          }
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            winSheetStatusOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "status");
+                            return (
+                              v &&
+                              !winSheetStatusOptions.some(
+                                (o) => o.name === v,
+                              ) && <option value={v}>{v}</option>
+                            );
+                          })()}
+                          {winSheetStatusOptions
+                            .filter(
+                              (o) =>
+                                o.isActive || o.name === cellValue(c, "status"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+
+                    {/* Win Sheet Link */}
+                    <td
+                      className={`${tdBase}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {c.winSheetLink ? (
+                        <a
+                          href={c.winSheetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
+                        >
+                          <ExternalLink
+                            className="h-3 w-3"
+                            aria-hidden="true"
+                          />
+                          {c.winSheetLinkText || "Open"}
+                        </a>
+                      ) : (
+                        <span className={`text-[11px] ${t.textMuted}`}>—</span>
+                      )}
+                    </td>
+
+                    {/* T16 */}
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                    >
+                      {currency(c.t16Retro)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${t.text}`}
+                    >
+                      {currency(c.t16FeeDue)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
+                    >
+                      {currency(c.t16FeeReceived)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
+                    >
+                      {currency(c.t16Pending)}
+                    </td>
+                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
+                      {dateStr(c.t16FeeReceivedDate)}
+                    </td>
+
+                    {/* T2 */}
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                    >
+                      {currency(c.t2Retro)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${t.text}`}
+                    >
+                      {currency(c.t2FeeDue)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
+                    >
+                      {currency(c.t2FeeReceived)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
+                    >
+                      {currency(c.t2Pending)}
+                    </td>
+                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
+                      {dateStr(c.t2FeeReceivedDate)}
+                    </td>
+
+                    {/* AUX */}
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                    >
+                      {currency(c.auxRetro)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${t.text}`}
+                    >
+                      {currency(c.auxFeeDue)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
+                    >
+                      {currency(c.auxFeeReceived)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
+                    >
+                      {currency(c.auxPending)}
+                    </td>
+                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
+                      {dateStr(c.auxFeeReceivedDate)}
+                    </td>
+
+                    {/* Totals */}
+                    <td
+                      className={`${tdBase} text-right tabular-nums font-medium ${t.text} ${groupBorder}`}
+                    >
+                      {currency(c.totalRetroDue)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums font-semibold ${t.text}`}
+                    >
+                      {currency(c.expected)}
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums font-semibold ${c.paid > 0 ? "text-emerald-500" : t.textMuted}`}
+                    >
+                      {currency(c.paid)}
+                    </td>
+
+                    {/* Workflow */}
+                    <td className={`${tdBase} text-center ${groupBorder}`}>
+                      {c.pif && (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${PIF_COLORS(c.pif, dark)}`}
+                        >
+                          {c.pif}
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      className={`${tdBase} ${t.textSub}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" || !canFinalize ? (
+                        cellValue(c, "approvedBy") || "—"
+                      ) : (
+                        <select
+                          value={cellValue(c, "approvedBy")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "approvedBy",
+                              "approvedBy",
+                              "Approved By",
+                              e.target.value,
+                            )
+                          }
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            approvedByOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "approvedBy");
+                            return (
+                              v &&
+                              !approvedByOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {approvedByOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "approvedBy"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    {/* Fees Confirmation */}
+                    <td
+                      className={`${tdBase} ${t.textSub}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" ? (
+                        cellValue(c, "feesConfirmation") || "—"
+                      ) : (
+                        <select
+                          value={cellValue(c, "feesConfirmation")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            // "Paid In Full" prompts the close flow, which is a
+                            // finalize action — only offer it to users who can
+                            // finalize. Others just set the field value.
+                            if (
+                              canFinalize &&
+                              next &&
+                              next.toLowerCase() === "paid in full" &&
+                              next !== cellValue(c, "feesConfirmation")
+                            ) {
+                              setAckTarget({
+                                caseId: c.id,
+                                caseName: c.name,
+                                triggerField: "feesConfirmation",
+                                triggerValue: next,
+                                triggerLabel: "Fees Confirmation",
+                              });
+                              return;
+                            }
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "feesConfirmation",
+                              "feesConfirmation",
+                              "Fees Confirmation",
+                              next,
+                            );
+                          }}
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            feesConfirmationOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "feesConfirmation");
+                            return (
+                              v &&
+                              !feesConfirmationOptions.some(
+                                (o) => o.name === v,
+                              ) && <option value={v}>{v}</option>
+                            );
+                          })()}
+                          {feesConfirmationOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "feesConfirmation"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    {/* Case Status */}
+                    <td
+                      className={`${tdBase} ${t.textSub}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" ? (
+                        cellValue(c, "caseStatus") || "—"
+                      ) : (
+                        <select
+                          value={cellValue(c, "caseStatus")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "caseStatus",
+                              "caseStatus",
+                              "Case Status",
+                              e.target.value,
+                            )
+                          }
+                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            caseStatusOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "caseStatus");
+                            return (
+                              v &&
+                              !caseStatusOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {caseStatusOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "caseStatus"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className={`${tdBase} ${t.textSub} max-w-65`}>
+                      {c.update && c.update !== "—" ? (
+                        <HoverCard openDelay={150} closeDelay={50}>
+                          <HoverCardTrigger asChild>
+                            <span className="block truncate">{c.update}</span>
+                          </HoverCardTrigger>
+                          {/* Portaled + collision-aware so a long update can't
+                          run off the viewport in windowed mode; capped to
+                          90vw so it always fits. */}
+                          <HoverCardContent
+                            align="start"
+                            collisionPadding={12}
+                            className="w-auto max-w-[min(28rem,90vw)] p-3 text-[12px] leading-relaxed whitespace-pre-wrap wrap-break-word"
+                          >
+                            {c.update}
+                          </HoverCardContent>
+                        </HoverCard>
+                      ) : (
+                        <span className="block truncate">{c.update}</span>
+                      )}
+                    </td>
+                    <td className={`${tdBase} text-center`}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNotesFor({ id: c.id, name: c.name });
+                        }}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          c.notesCount > 0
+                            ? dark
+                              ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
+                              : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            : dark
+                              ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
+                              : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
+                        }`}
+                        title={
+                          c.notesCount > 0
+                            ? `View ${c.notesCount} note${c.notesCount === 1 ? "" : "s"}`
+                            : "No notes yet"
+                        }
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                        {c.notesCount}
+                      </button>
+                    </td>
+                    <td
+                      className={`${tdBase} text-right tabular-nums font-medium ${AGING_COLORS(c.approvalCategory, dark)}`}
+                    >
+                      {c.daysAfterApproval !== null ? (
+                        <span>
+                          {c.daysAfterApproval}d{" "}
+                          <span className="text-[9px] opacity-70">
+                            {c.approvalCategory}
+                          </span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    {mode === "closed" && (
+                      <td
+                        className={`${tdBase} text-center`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canFinalize ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReopen(c);
+                            }}
+                            disabled={reopeningId !== null}
+                            className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn} disabled:opacity-40`}
+                            title="Move this case back to the active dashboard and clear Fees Confirmation"
+                          >
+                            {reopeningId === c.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-3 w-3" />
+                            )}
+                            Reopen
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
         {isPending && (
           <div
@@ -1554,7 +1592,9 @@ export const FeeRecordsTable = ({
                 >
                   Prev
                 </button>
-                <span className={`text-[11px] ${t.textSub} px-1 whitespace-nowrap`}>
+                <span
+                  className={`text-[11px] ${t.textSub} px-1 whitespace-nowrap`}
+                >
                   Page {currentPage + 1} of {pageCount}
                 </span>
                 <button

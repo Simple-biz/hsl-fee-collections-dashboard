@@ -121,7 +121,9 @@ export default function NotesModal({
         <div className="flex items-start justify-between mb-5">
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Case Notes</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5 truncate max-w-md`}>
+            <p
+              className={`text-[11px] ${t.textMuted} mt-0.5 truncate max-w-md`}
+            >
               {caseName}
             </p>
           </div>
@@ -135,9 +137,7 @@ export default function NotesModal({
 
         {/* Add New Note */}
         <div className="mb-6">
-          <label
-            className={`block text-[11px] font-semibold ${t.text} mb-1.5`}
-          >
+          <label className={`block text-[11px] font-semibold ${t.text} mb-1.5`}>
             Add New Note
           </label>
           <textarea
@@ -172,7 +172,9 @@ export default function NotesModal({
         </h4>
 
         {notes === null && !error && (
-          <div className={`flex items-center justify-center py-12 ${t.textMuted}`}>
+          <div
+            className={`flex items-center justify-center py-12 ${t.textMuted}`}
+          >
             <RefreshCw className="h-4 w-4 animate-spin mr-2" />
             <span className="text-xs">Loading notes…</span>
           </div>
@@ -245,7 +247,7 @@ export default function NotesModal({
                       </button>
                     ))}
                 </div>
-                <p className={`${t.text} whitespace-pre-wrap break-words`}>
+                <p className={`${t.text} whitespace-pre-wrap wrap-break-word`}>
                   {n.message}
                 </p>
               </div>
