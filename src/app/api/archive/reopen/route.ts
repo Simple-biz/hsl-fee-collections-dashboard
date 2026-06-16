@@ -8,6 +8,20 @@ import { requireAdmin } from "@/lib/auth-helpers";
 
 export const runtime = "nodejs";
 
+// ISO datetime strings (with a time component) come out of JSONB as plain
+// strings; Drizzle calls .toISOString() when serializing timestamp columns,
+// so they must be converted back to Date objects before insert. Date-only
+// strings ("YYYY-MM-DD") have no T separator and are left untouched — those
+// map to Drizzle `date` columns which accept strings.
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T[\d:.Z+-]/;
+const rehydrateDates = (obj: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [
+      k,
+      typeof v === "string" && ISO_DATETIME_RE.test(v) ? new Date(v) : v,
+    ]),
+  );
+
 const bodySchema = z.object({
   archiveId: z.string().uuid(),
   destination: z.enum(["master_list", "fees_closed"]),
@@ -60,15 +74,15 @@ export const POST = async (req: NextRequest) => {
 
     // Strip DB-managed serial PK and auto timestamps — DB will re-assign them.
     const skipCase = new Set(["id", "createdAt", "updatedAt"]);
-    const caseInsert = Object.fromEntries(
-      Object.entries(caseSnap).filter(([k]) => !skipCase.has(k)),
+    const caseInsert = rehydrateDates(
+      Object.fromEntries(Object.entries(caseSnap).filter(([k]) => !skipCase.has(k))),
     );
 
     let feeInsert: Record<string, unknown> | null = null;
     if (feeSnap) {
       const skipFee = new Set(["id", "caseId", "createdAt", "updatedAt"]);
-      const feeBase = Object.fromEntries(
-        Object.entries(feeSnap).filter(([k]) => !skipFee.has(k)),
+      const feeBase = rehydrateDates(
+        Object.fromEntries(Object.entries(feeSnap).filter(([k]) => !skipFee.has(k))),
       );
       feeInsert = {
         ...feeBase,
