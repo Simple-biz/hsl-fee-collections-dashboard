@@ -28,6 +28,10 @@ export type PifStatus = "YES" | "NO" | "PENDING" | null;
 export interface CaseRow {
   id: number;
   name: string;
+  // MyCase case URL (from cases.external_id); null when not imported with a link.
+  externalId: string | null;
+  // Chronicle client id (from user_details); null when not backfilled.
+  chronicleId: number | null;
   assigned: string;
   level: string;
   claim: string;

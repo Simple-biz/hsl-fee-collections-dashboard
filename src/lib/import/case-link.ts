@@ -22,6 +22,23 @@ export const extractMyCaseId = (url: string | null | undefined): number | null =
   return m ? Number(m[1]) : null;
 };
 
+// Chronicle client URLs look like
+//   https://app.chroniclelegal.com/dashboard/clients/12345
+// The path segment before /clients/ can vary, so allow any prefix.
+export const CHRONICLE_URL_RE = /chroniclelegal\.com\/(?:[^/]+\/)*clients\/(\d+)/i;
+
+/**
+ * Pull the numeric Chronicle client id from a Chronicle URL, or null.
+ * Also accepts a bare numeric id (the user may paste just the number).
+ */
+export const extractChronicleId = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  const m = trimmed.match(CHRONICLE_URL_RE);
+  return m ? Number(m[1]) : null;
+};
+
 /** Parse a leading "YYYY.MM.DD" (also accepts - or /) into ISO YYYY-MM-DD. */
 export const parseLeadingDate = (text: string): string | null => {
   const m = text.trim().match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\b/);
