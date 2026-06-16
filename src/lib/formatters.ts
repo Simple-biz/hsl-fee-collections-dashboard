@@ -41,6 +41,24 @@ export const fmtClaim = (claim: string): string => {
   return claim;
 };
 
+// Long-form claim labels for the case-name sub-line:
+//   T2 → Title II, T16 → Title XVI, T2_T16/CONC → Concurrent.
+// Anything else (DWB, DAC, AUX, "—", …) passes through unchanged.
+export const fmtClaimLong = (claim: string): string => {
+  switch (claim) {
+    case "T2":
+      return "Title II";
+    case "T16":
+      return "Title XVI";
+    case "T2_T16":
+    case "T2/T16":
+    case "CONC":
+      return "Concurrent";
+    default:
+      return claim;
+  }
+};
+
 // Win sheet status labels matching the spreadsheet.
 // The DB used to enforce a 7-state enum; it's now varchar so the dropdown
 // values from /settings can be saved directly. The lookup covers BOTH the
