@@ -195,10 +195,7 @@ export default function SheetSyncModal({
   const [selectedMissingClosed, setSelectedMissingClosed] = useState<Set<number>>(new Set());
   const [archiving, setArchiving] = useState<"active" | "closed" | null>(null);
 
-  const handleFetch = async () => {
-    if (preview != null && selected.size > 0) {
-      if (!window.confirm("Re-fetching will reset your current selection. Continue?")) return;
-    }
+  const doFetch = async () => {
     setFetching(true);
     setError(null);
     setPreview(null);
@@ -282,27 +279,35 @@ export default function SheetSyncModal({
     }
   };
 
+  const handleFetch = async () => {
+    if (preview != null && selected.size > 0) {
+      if (!window.confirm("Re-fetching will reset your current selection. Continue?")) return;
+    }
+    await doFetch();
+  };
+
   const handleArchive = async (
     source: "active_sheet" | "fees_closed_sheet",
     clientIds: number[],
   ) => {
     const key = source === "active_sheet" ? "active" : "closed";
     setArchiving(key);
+    const controller = new AbortController();
     try {
       const res = await fetch("/api/archive/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientIds, source }),
+        signal: controller.signal,
       });
       const json = (await res.json()) as { archived?: number; error?: string };
       if (!res.ok) throw new Error(json.error ?? `Archive failed (${res.status})`);
       if (source === "active_sheet") setSelectedMissing(new Set());
       else setSelectedMissingClosed(new Set());
-      // Re-fetch preview to reflect removed rows
-      await handleFetch();
+      await doFetch();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Archive failed";
-      setError(msg);
+      if (e instanceof Error && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Archive failed");
     } finally {
       setArchiving(null);
     }
@@ -883,7 +888,7 @@ export default function SheetSyncModal({
                     onToggle={(id) =>
                       setSelectedMissing((prev) => {
                         const next = new Set(prev);
-                        next.has(id) ? next.delete(id) : next.add(id);
+                        if (next.has(id)) next.delete(id); else next.add(id);
                         return next;
                       })
                     }
@@ -932,7 +937,7 @@ export default function SheetSyncModal({
                     onToggle={(id) =>
                       setSelectedMissingClosed((prev) => {
                         const next = new Set(prev);
-                        next.has(id) ? next.delete(id) : next.add(id);
+                        if (next.has(id)) next.delete(id); else next.add(id);
                         return next;
                       })
                     }

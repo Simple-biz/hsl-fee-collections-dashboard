@@ -1,6 +1,6 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { inArray, eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, caseArchive } from "@/lib/db/schema";
