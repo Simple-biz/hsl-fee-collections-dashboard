@@ -743,6 +743,32 @@ export const userAccessOverrides = pgTable("user_access_overrides", {
     .defaultNow(),
 });
 
+// Audit trail of admin actions (user create, role/active changes, password
+// resets, access-override edits). Actor/target ids use ON DELETE SET NULL and
+// we snapshot emails so the log stays readable even after an account is
+// removed. `metadata` holds optional structured detail (e.g. role from→to).
+export const adminActivityLog = pgTable(
+  "admin_activity_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorId: integer("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    actorEmail: varchar("actor_email", { length: 255 }),
+    action: varchar("action", { length: 50 }).notNull(),
+    targetUserId: integer("target_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    targetEmail: varchar("target_email", { length: 255 }),
+    summary: text("summary").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_admin_activity_created_at").on(table.createdAt)],
+);
+
 // ============================================================================
 // RELATIONS
 // ============================================================================

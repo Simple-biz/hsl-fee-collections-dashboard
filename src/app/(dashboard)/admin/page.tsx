@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, adminActivityLog, activityLog, cases } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
-import { AdminPage, type AdminUser } from "@/components/admin/AdminPage";
+import {
+  AdminPage,
+  type AdminUser,
+  type AdminActivityEntry,
+  type CaseActivityEntry,
+} from "@/components/admin/AdminPage";
 
 // Auth-gated, data depends on cookies → never prerender.
 export const dynamic = "force-dynamic";
@@ -51,9 +56,64 @@ export default async function AdminRoute() {
     createdAt: r.createdAt.toISOString(),
   }));
 
+  // Most recent admin actions for the Activity Logs tab. Emails are snapshots
+  // on the row, so no joins are needed and entries survive account deletion.
+  const logRows = await db
+    .select({
+      id: adminActivityLog.id,
+      actorEmail: adminActivityLog.actorEmail,
+      action: adminActivityLog.action,
+      targetEmail: adminActivityLog.targetEmail,
+      summary: adminActivityLog.summary,
+      createdAt: adminActivityLog.createdAt,
+    })
+    .from(adminActivityLog)
+    .orderBy(desc(adminActivityLog.createdAt))
+    .limit(100);
+
+  const activity: AdminActivityEntry[] = logRows.map((r) => ({
+    id: r.id,
+    actorEmail: r.actorEmail,
+    action: r.action,
+    targetEmail: r.targetEmail,
+    summary: r.summary,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
+  // Recent edits across all cases (case-scoped activity_log) for the admin
+  // "Case Activity" sub-tab. Left join to cases for a readable name.
+  const caseLogRows = await db
+    .select({
+      id: activityLog.id,
+      caseId: activityLog.caseId,
+      firstName: cases.firstName,
+      lastName: cases.lastName,
+      message: activityLog.message,
+      createdBy: activityLog.createdBy,
+      createdAt: activityLog.createdAt,
+    })
+    .from(activityLog)
+    .leftJoin(cases, eq(cases.clientId, activityLog.caseId))
+    .orderBy(desc(activityLog.createdAt))
+    .limit(100);
+
+  const caseActivity: CaseActivityEntry[] = caseLogRows.map((r) => ({
+    id: r.id,
+    caseId: r.caseId,
+    caseName:
+      r.lastName || r.firstName
+        ? `${r.lastName ?? ""}, ${r.firstName ?? ""}`.replace(/^, |, $/g, "")
+        : `Case ${r.caseId}`,
+    message: r.message,
+    createdBy: r.createdBy,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
   return (
     <AdminPage
       users={userList}
+      activity={activity}
+      caseActivity={caseActivity}
       currentUserId={Number(guard.session.user.id)}
     />
   );
