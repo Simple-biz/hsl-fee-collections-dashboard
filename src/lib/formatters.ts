@@ -19,6 +19,20 @@ export const fmtDate = (d: string | null | undefined): string => {
   return `${m}/${day}/${y}`;
 };
 
+// Timestamp for notes/activity — e.g. "May 3, 8:00 PM". Takes a full ISO
+// timestamp (with time), unlike fmtDate which takes a date-only string.
+export const fmtDateTime = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 // Claim type display: T2_T16 → CONC, T2/T16 → CONC.
 // Worksheet-style values (CONC, DWB, DAC, AUX) pass through unchanged so
 // rows saved directly via the dashboard dropdowns render verbatim.
