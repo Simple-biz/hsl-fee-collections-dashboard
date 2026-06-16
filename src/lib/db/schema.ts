@@ -805,3 +805,34 @@ export const myCaseSyncTags = pgTable("mycase_sync_tags", {
   taggedAt: timestamp("tagged_at", { withTimezone: true }).notNull().defaultNow(),
   taggedBy: varchar("tagged_by", { length: 255 }),
 });
+
+// ============================================================================
+// Case archive — records moved out of cases/fee_records when they are missing
+// from the sheet reconciliation (active or fees-closed).
+// No FK on originalClientId — the source row is deleted on archive.
+// ============================================================================
+export const archivedSourceEnum = pgEnum("archived_source_enum", [
+  "active_sheet",
+  "fees_closed_sheet",
+]);
+
+export const caseArchive = pgTable(
+  "case_archive",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    originalClientId: integer("original_client_id").notNull(),
+    caseName: varchar("case_name", { length: 200 }),
+    caseLink: text("case_link"),
+    approvalDate: date("approval_date"),
+    archivedSource: archivedSourceEnum("archived_source").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }).notNull().defaultNow(),
+    archivedBy: varchar("archived_by", { length: 100 }),
+    caseSnapshot: jsonb("case_snapshot").notNull(),
+    feeRecordSnapshot: jsonb("fee_record_snapshot"),
+  },
+  (t) => [
+    index("idx_case_archive_client_id").on(t.originalClientId),
+    index("idx_case_archive_source").on(t.archivedSource),
+    index("idx_case_archive_archived_at").on(t.archivedAt),
+  ],
+);

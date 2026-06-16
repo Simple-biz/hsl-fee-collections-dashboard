@@ -141,6 +141,13 @@
       "when": 1781195209448,
       "tag": "0019_user_access_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781625209544,
+      "tag": "0020_case_archive",
+      "breakpoints": true
     }
   ]
 }

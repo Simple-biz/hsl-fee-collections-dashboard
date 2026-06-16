@@ -307,6 +307,22 @@ export const POST = async (req: NextRequest) => {
           status: "missing" as const,
         }));
 
+      // Closed DB cases whose caseLink is not in the Fees Closed sheet
+      const missingClosedRows = allDbCases
+        .filter(
+          (c) =>
+            c.isClosed &&
+            !sheetClientIdSet.has(c.clientId) &&
+            (!c.caseLink || !feesClosedCaseNameSet.has(c.caseLink.trim())),
+        )
+        .map((c) => ({
+          clientId: c.clientId,
+          caseName: `${c.lastName}, ${c.firstName}`,
+          caseLink: c.caseLink ?? "",
+          approvalDate: c.approvalDate,
+          status: "missing_closed" as const,
+        }));
+
       const newCount = sheetRows.filter((r) => r.status === "new").length;
       const changedCount = sheetRows.filter((r) => r.status === "changed").length;
 
@@ -320,6 +336,7 @@ export const POST = async (req: NextRequest) => {
           unchanged: parsed.length - newCount - changedCount,
           feesClosed: feesClosedRows.length,
           missing: missingRows.length,
+          missingClosed: missingClosedRows.length,
           synthetic: sheetRows.filter((r) => r.isSynthetic).length,
           needsLink: needsLink.length,
           warnings,
@@ -328,6 +345,7 @@ export const POST = async (req: NextRequest) => {
           sheet: sheetRows,
           feesClosed: feesClosedRows,
           missing: missingRows,
+          missingClosed: missingClosedRows,
           needsLink,
         },
       });
