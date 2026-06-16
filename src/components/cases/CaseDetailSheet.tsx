@@ -37,16 +37,43 @@ import {
   STATUS_LABELS_DETAIL,
   getStatusColor,
 } from "@/lib/formatters";
-import type { WinSheetStatus, CaseDetailData, UserDetails } from "@/types";
+import type {
+  WinSheetStatus,
+  CaseDetailData,
+  UserDetails,
+  ApprovedByOption,
+} from "@/types";
+import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 
 interface CaseDetailSheetProps {
   caseId: number;
   isOpen: boolean;
   onClose: () => void;
+  // Admin-managed option lists (claim_type, case_level, …) so the edit
+  // dropdowns match the dashboard table instead of hardcoding values.
+  dropdownOptions?: DropdownOptionsByCategory;
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null | undefined) => (d ? fmtDate(d) : "—");
+
+// Render <option>s from an admin-managed list, preserving the row's current
+// value as a fallback option when it isn't in the (active) list.
+const dropdownOptionEls = (options: ApprovedByOption[], current: string) => (
+  <>
+    <option value="">—</option>
+    {current && !options.some((o) => o.name === current) && (
+      <option value={current}>{current}</option>
+    )}
+    {options
+      .filter((o) => o.isActive || o.name === current)
+      .map((o) => (
+        <option key={o.id} value={o.name}>
+          {o.name}
+        </option>
+      ))}
+  </>
+);
 const displayDecision = (mc?: string | null, local?: string | null) => {
   const d = mc && mc !== "unknown" ? mc : local;
   return d && d !== "unknown" ? d.replace(/_/g, " ") : "—";
@@ -181,11 +208,15 @@ export default function CaseDetailSheet({
   caseId,
   isOpen,
   onClose,
+  dropdownOptions = {},
 }: CaseDetailSheetProps) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
   const router = useRouter();
+
+  const claimTypeOptions = dropdownOptions.claim_type ?? [];
+  const caseLevelOptions = dropdownOptions.case_level ?? [];
 
   const [data, setData] = useState<CaseDetailData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -661,10 +692,7 @@ export default function CaseDetailSheet({
                         onChange={(e) => setEditValues((v) => ({ ...v, claimTypeLabel: e.target.value }))}
                         className={inp}
                       >
-                        <option value="">—</option>
-                        <option value="T2">T2 (SSDI)</option>
-                        <option value="T16">T16 (SSI)</option>
-                        <option value="T2_T16">T2 + T16</option>
+                        {dropdownOptionEls(claimTypeOptions, editValues.claimTypeLabel)}
                       </select>
                     </div>
                     <div>
@@ -674,13 +702,7 @@ export default function CaseDetailSheet({
                         onChange={(e) => setEditValues((v) => ({ ...v, levelWon: e.target.value }))}
                         className={inp}
                       >
-                        <option value="">—</option>
-                        <option value="INITIAL">Initial</option>
-                        <option value="RECON">Reconsideration</option>
-                        <option value="HEARING">Hearing</option>
-                        <option value="AC">Appeals Council</option>
-                        <option value="FEDERAL_COURT">Federal Court</option>
-                        <option value="FEE_PETITION">Fee Petition</option>
+                        {dropdownOptionEls(caseLevelOptions, editValues.levelWon)}
                       </select>
                     </div>
                     <div>
