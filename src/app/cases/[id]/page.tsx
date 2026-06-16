@@ -695,8 +695,10 @@ const CaseDetailPage = () => {
   // ---- Render ----
 
   return (
+    // select-text overrides the app-wide select-none (globals.css body) so the
+    // entire case detail view can be highlighted/copied.
     <div
-      className={`min-h-screen ${dark ? "bg-neutral-950" : "bg-neutral-50"}`}
+      className={`min-h-screen select-text ${dark ? "bg-neutral-950" : "bg-neutral-50"}`}
     >
       {/* Fee Modal */}
       {feeModalOpen && caseData && (
@@ -1538,7 +1540,7 @@ const CaseDetailPage = () => {
                             </span>
                           </div>
                           <p
-                            className={`text-[12px] ${t.textSub} mt-0.5 leading-relaxed`}
+                            className={`text-[12px] ${t.textSub} mt-0.5 leading-relaxed break-words`}
                           >
                             {a.message}
                           </p>
