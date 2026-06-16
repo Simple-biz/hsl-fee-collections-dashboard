@@ -1,12 +1,48 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { inArray } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, caseArchive } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
 
 export const runtime = "nodejs";
+
+export const GET = async (req: NextRequest) => {
+  try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get("limit");
+    const limit = Math.min(parseInt(limitParam ?? "", 10) || 500, 1000);
+
+    const rows = await db
+      .select({
+        id: caseArchive.id,
+        originalClientId: caseArchive.originalClientId,
+        caseName: caseArchive.caseName,
+        caseLink: caseArchive.caseLink,
+        approvalDate: caseArchive.approvalDate,
+        archivedSource: caseArchive.archivedSource,
+        archivedAt: caseArchive.archivedAt,
+        archivedBy: caseArchive.archivedBy,
+      })
+      .from(caseArchive)
+      .orderBy(desc(caseArchive.archivedAt))
+      .limit(limit);
+
+    return NextResponse.json({ data: rows, total: rows.length });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unexpected error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+};
 
 const bodySchema = z.object({
   clientIds: z.array(z.number().int().positive()).min(1),

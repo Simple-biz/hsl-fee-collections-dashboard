@@ -17,6 +17,7 @@ import {
   TrendingDown,
   Plus,
   X,
+  Archive,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -204,6 +205,8 @@ export const FeeRecordsTable = ({
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const archiveControllerRef = useRef<AbortController | null>(null);
   const [overpaidOverrides, setOverpaidOverrides] = useState<
     Record<number, boolean>
   >({});
@@ -265,6 +268,42 @@ export const FeeRecordsTable = ({
       window.alert((err as Error).message);
     } finally {
       setBatchLoading(false);
+    }
+  };
+
+  const handleBatchArchive = async () => {
+    if (selectedIds.size === 0 || archiveLoading) return;
+    const source = mode === "closed" ? "fees_closed_sheet" : "active_sheet";
+    const count = selectedIds.size;
+    if (
+      !window.confirm(
+        `Archive ${count} case${count === 1 ? "" : "s"}? They will be removed from this view and moved to the Archive.`,
+      )
+    )
+      return;
+    const ids = Array.from(selectedIds);
+    archiveControllerRef.current?.abort();
+    const controller = new AbortController();
+    archiveControllerRef.current = controller;
+    setArchiveLoading(true);
+    try {
+      const res = await fetch("/api/archive/cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientIds: ids, source }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error ?? `Archive failed (${res.status})`);
+      }
+      setSelectedIds(new Set());
+      await onImported?.();
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      window.alert((err as Error).message);
+    } finally {
+      setArchiveLoading(false);
     }
   };
 
@@ -667,24 +706,40 @@ export const FeeRecordsTable = ({
       </div>
 
       {/* Floating batch action pill — anchored to the bottom of the table card */}
-      {selectedIds.size > 0 && canFinalize && (
+      {selectedIds.size > 0 && (canFinalize || isAdmin) && (
         <div className="pointer-events-none absolute bottom-12 left-0 right-0 z-50 flex justify-center">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
             <span className="text-[11px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
             </span>
-            <button
-              onClick={() => handleBatchOverpaid(true)}
-              disabled={batchLoading}
-              className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-gray-900 transition-colors disabled:opacity-50"
-            >
-              {batchLoading ? (
-                <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-              ) : (
-                <TrendingDown aria-hidden="true" className="h-3 w-3" />
-              )}
-              Mark as Overpaid
-            </button>
+            {canFinalize && (
+              <button
+                onClick={() => handleBatchOverpaid(true)}
+                disabled={batchLoading || archiveLoading}
+                className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-gray-900 transition-colors disabled:opacity-50"
+              >
+                {batchLoading ? (
+                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                ) : (
+                  <TrendingDown aria-hidden="true" className="h-3 w-3" />
+                )}
+                Mark as Overpaid
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleBatchArchive}
+                disabled={batchLoading || archiveLoading}
+                className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
+              >
+                {archiveLoading ? (
+                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Archive aria-hidden="true" className="h-3 w-3" />
+                )}
+                Archive
+              </button>
+            )}
             <button
               onClick={() => setSelectedIds(new Set())}
               aria-label="Clear selection"
