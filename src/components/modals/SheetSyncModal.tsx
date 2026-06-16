@@ -82,7 +82,7 @@ interface SyncPreviewResponse {
     unchanged: number;
     feesClosed: number;
     missing: number;
-    missingClosed: number;
+    missingClosed?: number;
     synthetic: number;
     needsLink: number;
     warnings: { row: number; message: string }[];
@@ -91,7 +91,7 @@ interface SyncPreviewResponse {
     sheet: SheetPreviewRow[];
     feesClosed: DbOnlyRow[];
     missing: DbOnlyRow[];
-    missingClosed: DbOnlyRow[];
+    missingClosed?: DbOnlyRow[];
     needsLink: NeedsLinkRow[];
   };
 }
