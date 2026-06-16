@@ -150,7 +150,6 @@ interface FeeSectionProps {
   feeCap: number;
   caseId: string;
   dark: boolean;
-  author: string;
   onSaved: () => Promise<void>;
 }
 
@@ -167,7 +166,6 @@ const FeeSection = memo(
     feeCap,
     caseId,
     dark,
-    author,
     onSaved,
   }: FeeSectionProps) => {
     const t = themeClasses(dark);
@@ -247,7 +245,6 @@ const FeeSection = memo(
           body: JSON.stringify({
             feeFields,
             logMessage: changes.join("; ") + ".",
-            logAuthor: author,
           }),
         });
         setInlineEdit(false);
@@ -582,7 +579,6 @@ const CaseDetailPage = () => {
             Object.keys(caseFields).length > 0 ? caseFields : undefined,
           feeFields: Object.keys(feeFields).length > 0 ? feeFields : undefined,
           logMessage: changes.join(". ") + ".",
-          logAuthor: currentUser,
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -614,7 +610,6 @@ const CaseDetailPage = () => {
         body: JSON.stringify({
           feeFields: { pifReadyToClose: true, winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
-          logAuthor: currentUser,
         }),
       });
       await fetchCase();
@@ -635,7 +630,6 @@ const CaseDetailPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: newNote.trim(),
-          createdBy: currentUser,
         }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -1402,7 +1396,6 @@ const CaseDetailPage = () => {
                 dateReceived={caseData.t16FeeReceivedDate}
                 feeCap={caseData.applicableFeeCap}
                 caseId={id}
-                author={currentUser}
                 onSaved={fetchCase}
               />
               <FeeSection
@@ -1417,7 +1410,6 @@ const CaseDetailPage = () => {
                 dateReceived={caseData.t2FeeReceivedDate}
                 feeCap={caseData.applicableFeeCap}
                 caseId={id}
-                author={currentUser}
                 onSaved={fetchCase}
               />
               <FeeSection
@@ -1432,7 +1424,6 @@ const CaseDetailPage = () => {
                 dateReceived={caseData.auxFeeReceivedDate}
                 feeCap={caseData.applicableFeeCap}
                 caseId={id}
-                author={currentUser}
                 onSaved={fetchCase}
               />
             </div>
