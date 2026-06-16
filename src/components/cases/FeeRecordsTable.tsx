@@ -24,6 +24,7 @@ import {
   fmtFull,
   fmtDate,
   fmtClaim,
+  fmtClaimLong,
   STATUS_LABELS,
   getStatusColor,
 } from "@/lib/formatters";
@@ -921,12 +922,60 @@ export const FeeRecordsTable = ({
                         className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                       />
                     </td>
-                    {/* Case Info — first two columns are frozen */}
-                    <td
-                      className={`${tdBase} ${t.text} font-semibold truncate ${stickyTd1}`}
-                      title={c.name}
-                    >
-                      {c.name}
+                    {/* Case Info — first two columns are frozen.
+                        Name deep-links to MyCase (external_id); a Chronicle
+                        link and the long-form claim label sit on a sub-line. */}
+                    <td className={`${tdBase} ${stickyTd1}`} title={c.name}>
+                      {/* overflow-hidden keeps the sub-line from spilling past
+                          the frozen column onto Assigned during h-scroll. */}
+                      <div className="flex flex-col gap-0.5 overflow-hidden">
+                        {c.externalId ? (
+                          <a
+                            href={c.externalId}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`inline-flex items-center gap-1 max-w-full ${t.text} font-semibold hover:underline`}
+                          >
+                            <span className="truncate">{c.name}</span>
+                            <ExternalLink
+                              className="h-3 w-3 shrink-0 opacity-50"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        ) : (
+                          <span className={`${t.text} font-semibold truncate`}>
+                            {c.name}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2 text-[11px] leading-none min-w-0">
+                          {(() => {
+                            // Mirror the Claim column's optimistic value so the
+                            // sub-line updates the instant the dropdown changes.
+                            const claim = cellValue(c, "claim");
+                            return claim && claim !== "—" ? (
+                              <span className={`${t.textMuted} truncate`}>
+                                {fmtClaimLong(claim)}
+                              </span>
+                            ) : null;
+                          })()}
+                          {c.chronicleId != null && (
+                            <a
+                              href={`https://app.chroniclelegal.com/dashboard/clients/${c.chronicleId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`inline-flex items-center gap-0.5 hover:underline shrink-0 ${dark ? "text-blue-400" : "text-blue-600"}`}
+                            >
+                              Chronicle
+                              <ExternalLink
+                                className="h-2.5 w-2.5"
+                                aria-hidden="true"
+                              />
+                            </a>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td
                       className={`${tdBase} ${t.textSub} ${stickyTd2}`}
