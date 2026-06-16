@@ -2,9 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import { Activity, Search } from "lucide-react";
+import { Activity } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDateTime } from "@/lib/formatters";
+import {
+  ActivityFilterBar,
+  defaultActivityFilters,
+  matchesActivityFilters,
+} from "./activity-filters";
 
 export interface AdminActivityEntry {
   id: string;
@@ -52,18 +57,37 @@ export function AdminActivityLog({ entries }: { entries: AdminActivityEntry[] })
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState(() =>
+    defaultActivityFilters(entries[0]?.createdAt),
+  );
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter(
-      (e) =>
-        e.summary.toLowerCase().includes(q) ||
-        (e.actorEmail ?? "").toLowerCase().includes(q) ||
-        (e.targetEmail ?? "").toLowerCase().includes(q),
-    );
-  }, [entries, search]);
+  // Distinct actors + years for the dropdowns (newest year first).
+  const users = useMemo(
+    () =>
+      Array.from(
+        new Set(entries.map((e) => e.actorEmail).filter((v): v is string => !!v)),
+      ).sort(),
+    [entries],
+  );
+  const years = useMemo(
+    () =>
+      Array.from(
+        new Set(entries.map((e) => new Date(e.createdAt).getFullYear())),
+      ).sort((a, b) => b - a),
+    [entries],
+  );
+
+  const filtered = useMemo(
+    () =>
+      entries.filter((e) =>
+        matchesActivityFilters(filters, {
+          user: e.actorEmail,
+          createdAt: e.createdAt,
+          haystack: `${e.summary} ${e.actorEmail ?? ""} ${e.targetEmail ?? ""}`,
+        }),
+      ),
+    [entries, filters],
+  );
 
   const sectionCard = `rounded-xl border ${t.card}`;
 
@@ -88,32 +112,27 @@ export function AdminActivityLog({ entries }: { entries: AdminActivityEntry[] })
 
   return (
     <div className={`${sectionCard} overflow-hidden`}>
-      <div
-        className={`flex items-center justify-between gap-3 px-4 py-3 border-b ${t.borderLight}`}
-      >
+      <div className={`px-4 py-3 border-b ${t.borderLight} space-y-2`}>
         <h3 className={`text-xs font-bold ${t.text}`}>
           Activity Log
           <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-            ({entries.length})
+            ({filtered.length}
+            {filtered.length !== entries.length ? ` of ${entries.length}` : ""})
           </span>
         </h3>
-        <div className="relative">
-          <Search
-            className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
-            aria-hidden="true"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search activity…"
-            className={`h-8 w-48 pl-8 pr-3 rounded-md border text-xs outline-none ${t.inputBg}`}
-          />
-        </div>
+        <ActivityFilterBar
+          dark={dark}
+          users={users}
+          years={years}
+          state={filters}
+          onChange={setFilters}
+          searchPlaceholder="Search summary, actor, target…"
+        />
       </div>
 
       {filtered.length === 0 ? (
         <p className={`text-xs ${t.textMuted} text-center py-10`}>
-          No entries match “{search}”.
+          No entries match the current filters.
         </p>
       ) : (
         <ul className="divide-y divide-current/5">

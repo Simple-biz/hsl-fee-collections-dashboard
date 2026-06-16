@@ -3,9 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { MessageSquare, Search, ExternalLink } from "lucide-react";
+import { MessageSquare, ExternalLink } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDateTime } from "@/lib/formatters";
+import {
+  ActivityFilterBar,
+  defaultActivityFilters,
+  matchesActivityFilters,
+} from "./activity-filters";
 
 export interface CaseActivityEntry {
   id: string;
@@ -26,18 +31,37 @@ export function CaseActivityFeed({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState(() =>
+    defaultActivityFilters(entries[0]?.createdAt),
+  );
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter(
-      (e) =>
-        e.message.toLowerCase().includes(q) ||
-        e.caseName.toLowerCase().includes(q) ||
-        (e.createdBy ?? "").toLowerCase().includes(q),
-    );
-  }, [entries, search]);
+  // Distinct authors (agents) + years for the dropdowns.
+  const users = useMemo(
+    () =>
+      Array.from(
+        new Set(entries.map((e) => e.createdBy).filter((v): v is string => !!v)),
+      ).sort(),
+    [entries],
+  );
+  const years = useMemo(
+    () =>
+      Array.from(
+        new Set(entries.map((e) => new Date(e.createdAt).getFullYear())),
+      ).sort((a, b) => b - a),
+    [entries],
+  );
+
+  const filtered = useMemo(
+    () =>
+      entries.filter((e) =>
+        matchesActivityFilters(filters, {
+          user: e.createdBy,
+          createdAt: e.createdAt,
+          haystack: `${e.message} ${e.caseName} ${e.createdBy ?? ""}`,
+        }),
+      ),
+    [entries, filters],
+  );
 
   const sectionCard = `rounded-xl border ${t.card}`;
 
@@ -61,32 +85,27 @@ export function CaseActivityFeed({
 
   return (
     <div className={`${sectionCard} overflow-hidden`}>
-      <div
-        className={`flex items-center justify-between gap-3 px-4 py-3 border-b ${t.borderLight}`}
-      >
+      <div className={`px-4 py-3 border-b ${t.borderLight} space-y-2`}>
         <h3 className={`text-xs font-bold ${t.text}`}>
           Case Activity
           <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-            ({entries.length})
+            ({filtered.length}
+            {filtered.length !== entries.length ? ` of ${entries.length}` : ""})
           </span>
         </h3>
-        <div className="relative">
-          <Search
-            className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
-            aria-hidden="true"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search case, note, agent…"
-            className={`h-8 w-52 pl-8 pr-3 rounded-md border text-xs outline-none ${t.inputBg}`}
-          />
-        </div>
+        <ActivityFilterBar
+          dark={dark}
+          users={users}
+          years={years}
+          state={filters}
+          onChange={setFilters}
+          searchPlaceholder="Search case, note, agent…"
+        />
       </div>
 
       {filtered.length === 0 ? (
         <p className={`text-xs ${t.textMuted} text-center py-10`}>
-          No entries match “{search}”.
+          No entries match the current filters.
         </p>
       ) : (
         <ul className="divide-y divide-current/5">
