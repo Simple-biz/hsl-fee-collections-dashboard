@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CloudDownload,
+  ArchiveIcon,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
@@ -37,7 +38,7 @@ interface DbOnlyRow {
   caseName: string;
   caseLink: string;
   approvalDate: string | null;
-  status: "fees_closed" | "missing";
+  status: "fees_closed" | "missing" | "missing_closed";
 }
 
 interface NeedsLinkRow {
@@ -81,6 +82,7 @@ interface SyncPreviewResponse {
     unchanged: number;
     feesClosed: number;
     missing: number;
+    missingClosed?: number;
     synthetic: number;
     needsLink: number;
     warnings: { row: number; message: string }[];
@@ -89,6 +91,7 @@ interface SyncPreviewResponse {
     sheet: SheetPreviewRow[];
     feesClosed: DbOnlyRow[];
     missing: DbOnlyRow[];
+    missingClosed?: DbOnlyRow[];
     needsLink: NeedsLinkRow[];
   };
 }
@@ -149,6 +152,8 @@ const STATUS_BADGE: Record<string, (dark: boolean) => string> = {
     dark ? "bg-teal-900/40 text-teal-400" : "bg-teal-100 text-teal-700",
   missing: (dark) =>
     dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-100 text-amber-700",
+  missing_closed: (dark) =>
+    dark ? "bg-rose-900/40 text-rose-400" : "bg-rose-100 text-rose-700",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -158,6 +163,7 @@ const STATUS_LABEL: Record<string, string> = {
   fees_closed: "FEES CLOSED",
   fees_closed_new: "FEES CLOSED NEW",
   missing: "MISSING",
+  missing_closed: "MISSING CLOSED",
 };
 
 const SYNC_TIMEOUT_MS = 240_000;
@@ -185,16 +191,18 @@ export default function SheetSyncModal({
   const [selectedFcNames, setSelectedFcNames] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Step4Filter>("all");
+  const [selectedMissing, setSelectedMissing] = useState<Set<number>>(new Set());
+  const [selectedMissingClosed, setSelectedMissingClosed] = useState<Set<number>>(new Set());
+  const [archiving, setArchiving] = useState<"active" | "closed" | null>(null);
 
-  const handleFetch = async () => {
-    if (preview != null && selected.size > 0) {
-      if (!window.confirm("Re-fetching will reset your current selection. Continue?")) return;
-    }
+  const doFetch = async () => {
     setFetching(true);
     setError(null);
     setPreview(null);
     setFcPreview(null);
     setFcPreviewError(null);
+    setSelectedMissing(new Set());
+    setSelectedMissingClosed(new Set());
 
     const mainController = new AbortController();
     const fcController = new AbortController();
@@ -268,6 +276,40 @@ export default function SheetSyncModal({
       clearTimeout(mainTimer);
       clearTimeout(fcTimer);
       setFetching(false);
+    }
+  };
+
+  const handleFetch = async () => {
+    if (preview != null && selected.size > 0) {
+      if (!window.confirm("Re-fetching will reset your current selection. Continue?")) return;
+    }
+    await doFetch();
+  };
+
+  const handleArchive = async (
+    source: "active_sheet" | "fees_closed_sheet",
+    clientIds: number[],
+  ) => {
+    const key = source === "active_sheet" ? "active" : "closed";
+    setArchiving(key);
+    const controller = new AbortController();
+    try {
+      const res = await fetch("/api/archive/cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientIds, source }),
+        signal: controller.signal,
+      });
+      const json = (await res.json()) as { archived?: number; error?: string };
+      if (!res.ok) throw new Error(json.error ?? `Archive failed (${res.status})`);
+      if (source === "active_sheet") setSelectedMissing(new Set());
+      else setSelectedMissingClosed(new Set());
+      await doFetch();
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Archive failed");
+    } finally {
+      setArchiving(null);
     }
   };
 
@@ -809,8 +851,97 @@ export default function SheetSyncModal({
                   description="In database · not found in any sheet — may have been manually removed"
                   dark={dark}
                   t={t}
+                  footer={
+                    selectedMissing.size > 0 ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            handleArchive("active_sheet", [...selectedMissing])
+                          }
+                          disabled={archiving !== null}
+                          className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs font-medium transition-colors ${
+                            dark
+                              ? "bg-amber-900/30 border-amber-700 text-amber-300 hover:bg-amber-900/50 disabled:opacity-50"
+                              : "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                          }`}
+                        >
+                          <ArchiveIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                          {archiving === "active"
+                            ? "Archiving…"
+                            : `Archive selected (${selectedMissing.size})`}
+                        </button>
+                        <button
+                          onClick={() => setSelectedMissing(new Set())}
+                          className={`text-[11px] ${dark ? "text-neutral-400 hover:text-neutral-200" : "text-neutral-500 hover:text-neutral-700"}`}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    ) : null
+                  }
                 >
-                  <DbOnlyTable t={t} dark={dark} rows={preview.rows.missing} />
+                  <DbOnlyTable
+                    t={t}
+                    dark={dark}
+                    rows={preview.rows.missing}
+                    selected={selectedMissing}
+                    onToggle={(id) =>
+                      setSelectedMissing((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id); else next.add(id);
+                        return next;
+                      })
+                    }
+                  />
+                </CategorySection>
+                <CategorySection
+                  status="missing_closed"
+                  count={preview.summary.missingClosed ?? 0}
+                  description="Closed in database · not found in Fees Closed sheet"
+                  dark={dark}
+                  t={t}
+                  footer={
+                    selectedMissingClosed.size > 0 ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            handleArchive("fees_closed_sheet", [...selectedMissingClosed])
+                          }
+                          disabled={archiving !== null}
+                          className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs font-medium transition-colors ${
+                            dark
+                              ? "bg-rose-900/30 border-rose-700 text-rose-300 hover:bg-rose-900/50 disabled:opacity-50"
+                              : "bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                          }`}
+                        >
+                          <ArchiveIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                          {archiving === "closed"
+                            ? "Archiving…"
+                            : `Archive selected (${selectedMissingClosed.size})`}
+                        </button>
+                        <button
+                          onClick={() => setSelectedMissingClosed(new Set())}
+                          className={`text-[11px] ${dark ? "text-neutral-400 hover:text-neutral-200" : "text-neutral-500 hover:text-neutral-700"}`}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    ) : null
+                  }
+                >
+                  <DbOnlyTable
+                    t={t}
+                    dark={dark}
+                    rows={preview.rows.missingClosed ?? []}
+                    selected={selectedMissingClosed}
+                    onToggle={(id) =>
+                      setSelectedMissingClosed((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id); else next.add(id);
+                        return next;
+                      })
+                    }
+                  />
                 </CategorySection>
                 <CategorySection
                   status="fees_closed_new"
@@ -1077,13 +1208,15 @@ const CategorySection = ({
   dark,
   t,
   children,
+  footer,
 }: {
-  status: "new" | "changed" | "unchanged" | "fees_closed" | "fees_closed_new" | "missing";
+  status: "new" | "changed" | "unchanged" | "fees_closed" | "fees_closed_new" | "missing" | "missing_closed";
   count: number;
   description: string;
   dark: boolean;
   t: ReturnType<typeof themeClasses>;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }) => (
   <div>
     <div className="flex items-center gap-2 mb-2">
@@ -1100,7 +1233,10 @@ const CategorySection = ({
         None
       </div>
     ) : (
-      children
+      <>
+        {children}
+        {footer}
+      </>
     )}
   </div>
 );
@@ -1215,16 +1351,21 @@ const DbOnlyTable = ({
   t,
   dark,
   rows,
+  selected,
+  onToggle,
 }: {
   t: ReturnType<typeof themeClasses>;
   dark: boolean;
   rows: DbOnlyRow[];
+  selected?: Set<number>;
+  onToggle?: (id: number) => void;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
+            {onToggle && <Th>{""}</Th>}
             <Th>Case</Th>
             <Th>Approved</Th>
             <Th>Case Link</Th>
@@ -1232,7 +1373,22 @@ const DbOnlyTable = ({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.clientId} className={`border-b ${t.borderLight}`}>
+            <tr
+              key={r.clientId}
+              onClick={() => onToggle?.(r.clientId)}
+              className={`border-b ${t.borderLight} ${onToggle ? `cursor-pointer ${dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50"}` : ""}`}
+            >
+              {onToggle && (
+                <td className="px-3 py-1.5 w-8">
+                  <input
+                    type="checkbox"
+                    checked={selected?.has(r.clientId) ?? false}
+                    onChange={() => onToggle(r.clientId)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 cursor-pointer"
+                  />
+                </td>
+              )}
               <td className={`${t.text} px-3 py-1.5 font-medium`}>{r.caseName}</td>
               <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
               <td className={`${t.textMuted} px-3 py-1.5 text-[11px] max-w-80 truncate`} title={r.caseLink}>

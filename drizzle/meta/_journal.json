@@ -148,6 +148,20 @@
       "when": 1781630742397,
       "tag": "0020_elite_silk_fever",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1781625209544,
+      "tag": "0021_case_archive",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781639172443,
+      "tag": "0022_archive_related_snapshots",
+      "breakpoints": true
     }
   ]
 }

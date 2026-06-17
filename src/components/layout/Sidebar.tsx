@@ -27,6 +27,7 @@ import {
   KeyRound,
   Scale,
   CheckCircle2,
+  Archive,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtClaim } from "@/lib/formatters";
@@ -74,6 +75,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
     items: [
       { path: "/team", icon: Users, label: "Team" },
       { path: "/admin", icon: Shield, label: "Admin", adminOnly: true },
+      { path: "/archive", icon: Archive, label: "Archive", adminOnly: true },
       { path: "/settings", icon: Settings, label: "Settings" },
     ],
   },
