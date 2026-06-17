@@ -2,13 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
 
-// GET /api/scoreboard?week=2026-02-17 (Monday of the week, defaults to current week)
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Add days to a YYYY-MM-DD (UTC math, returns YYYY-MM-DD) — used for the
+// exclusive upper bound of the call-aggregation window.
+const addDays = (iso: string, days: number): string => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0];
+};
+
+// GET /api/scoreboard
+//   ?week=YYYY-MM-DD          → Monday of a week (default: current week)
+//   ?from=YYYY-MM-DD&to=...   → explicit date range (month/range views)
+// Only the CALL metrics (SSA / client calls) are windowed by date — case
+// metrics are current-state snapshots and ignore the window.
 export const GET = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
     const weekParam = searchParams.get("week");
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
 
-    // Calculate Monday of the target week
+    // Calculate Monday of the target week (used as the default window)
     const now = new Date();
     let monday: string;
     if (weekParam) {
@@ -20,6 +35,23 @@ export const GET = async (req: NextRequest) => {
       d.setDate(diff);
       monday = d.toISOString().split("T")[0];
     }
+
+    // Resolve the call-aggregation window: explicit range when both from/to
+    // are valid, otherwise the 7-day week starting Monday.
+    const useRange =
+      fromParam != null &&
+      toParam != null &&
+      ISO_DATE_RE.test(fromParam) &&
+      ISO_DATE_RE.test(toParam) &&
+      fromParam <= toParam;
+    if ((fromParam || toParam) && !useRange) {
+      return NextResponse.json(
+        { error: "Invalid from/to range" },
+        { status: 400 },
+      );
+    }
+    const startDate = useRange ? fromParam! : monday;
+    const endExclusive = useRange ? addDays(toParam!, 1) : addDays(monday, 7);
 
     // Team-wide totals for the week
     const teamTotals = await db.execute(sql`
@@ -71,13 +103,13 @@ export const GET = async (req: NextRequest) => {
         -- Daily metrics from daily_metrics table for the week
         COALESCE((SELECT SUM(dm.ssa_calls) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
-         AND dm.metric_date >= ${monday}::date
-         AND dm.metric_date < ${monday}::date + INTERVAL '7 days'), 0) AS week_ssa_calls,
+         AND dm.metric_date >= ${startDate}::date
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_ssa_calls,
 
         COALESCE((SELECT SUM(dm.client_calls_ib + dm.client_calls_ob) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
-         AND dm.metric_date >= ${monday}::date
-         AND dm.metric_date < ${monday}::date + INTERVAL '7 days'), 0) AS week_client_calls
+         AND dm.metric_date >= ${startDate}::date
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_client_calls
 
       FROM team_members tm
       WHERE tm.is_active = TRUE
@@ -94,8 +126,8 @@ export const GET = async (req: NextRequest) => {
         dm.client_calls_ob,
         dm.notes
       FROM daily_metrics dm
-      WHERE dm.metric_date >= ${monday}::date
-        AND dm.metric_date < ${monday}::date + INTERVAL '7 days'
+      WHERE dm.metric_date >= ${startDate}::date
+        AND dm.metric_date < ${endExclusive}::date
       ORDER BY dm.agent_name, dm.metric_date
     `);
 
@@ -141,7 +173,14 @@ export const GET = async (req: NextRequest) => {
       }),
     );
 
-    return NextResponse.json({ week: monday, summary, agents, daily });
+    return NextResponse.json({
+      week: monday,
+      start: startDate,
+      end: useRange ? toParam : addDays(monday, 6),
+      summary,
+      agents,
+      daily,
+    });
   } catch (error) {
     console.error("GET /api/scoreboard error:", error);
     return NextResponse.json(
