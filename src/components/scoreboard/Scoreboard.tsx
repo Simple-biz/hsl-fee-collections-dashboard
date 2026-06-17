@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useTheme } from "next-themes";
 import {
   ChevronLeft,
@@ -8,7 +14,8 @@ import {
   RefreshCw,
   Trophy,
   Phone,
-  // Users,
+  Search,
+  AlertTriangle,
   AlertCircle,
   Pencil,
   Save,
@@ -109,6 +116,54 @@ const getWeekDays = (
 
 const cellKey = (agent: string, date: string): CellKey => `${agent}|${date}`;
 
+// Client-side monitoring filters (operate on the loaded week's agents).
+type MetricFocus = "all" | "aging" | "calls" | "fees";
+
+const FOCUS_OPTIONS: { value: MetricFocus; label: string }[] = [
+  { value: "all", label: "All metrics" },
+  { value: "aging", label: "Aging (>60d)" },
+  { value: "calls", label: "Calls" },
+  { value: "fees", label: "Fees" },
+];
+
+// Which focus modes each agent-table column belongs to (besides "all", which
+// shows everything). The Agent column is always shown.
+const COL_FOCUS: Record<string, MetricFocus[]> = {
+  cases: ["aging", "fees"],
+  winsheets: ["fees"],
+  t2: ["aging"],
+  t16: ["aging"],
+  conc: ["aging"],
+  collected: ["fees"],
+  fullfee: ["fees"],
+  ssa: ["calls"],
+  client: ["calls"],
+};
+
+const hasOverdue = (a: AgentScore): boolean =>
+  a.unpaidT2Over60 + a.unpaidT16Over60 + a.unpaidConcOver60 > 0;
+
+// Date window mode for the board. Only the call columns are windowed by date.
+type DateMode = "week" | "month" | "range";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const firstDayOfMonth = (year: number, month0: number): string =>
+  `${year}-${String(month0 + 1).padStart(2, "0")}-01`;
+
+const lastDayOfMonth = (year: number, month0: number): string =>
+  new Date(Date.UTC(year, month0 + 1, 0)).toISOString().split("T")[0];
+
+const fmtRangeDate = (iso: string): string =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -125,6 +180,70 @@ export const Scoreboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Monitoring filters (client-side, over the loaded week's agents)
+  const [agentSearch, setAgentSearch] = useState("");
+  const [needsAttention, setNeedsAttention] = useState(false);
+  const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
+
+  // Date window mode (week nav / month / custom range). Only the call columns
+  // are date-windowed server-side; case columns are current-state snapshots.
+  const [dateMode, setDateMode] = useState<DateMode>("week");
+  const nowForInit = new Date();
+  const [monthSel, setMonthSel] = useState(nowForInit.getMonth());
+  const [yearSel, setYearSel] = useState(nowForInit.getFullYear());
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+
+  const currentYear = nowForInit.getFullYear();
+  const yearOptions = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => currentYear - i),
+    [currentYear],
+  );
+
+  // Switching mode closes the (week-only) call-entry panel.
+  const changeDateMode = (m: DateMode) => {
+    setDateMode(m);
+    if (m !== "week") setEntryOpen(false);
+  };
+
+  const showCol = (key: string) =>
+    metricFocus === "all" || (COL_FOCUS[key] ?? []).includes(metricFocus);
+
+  // Agents after search + needs-attention filters
+  const filteredAgents = useMemo(() => {
+    const q = agentSearch.trim().toLowerCase();
+    return (data?.agents ?? []).filter((a) => {
+      if (q && !a.agent.toLowerCase().includes(q)) return false;
+      if (needsAttention && !hasOverdue(a)) return false;
+      return true;
+    });
+  }, [data, agentSearch, needsAttention]);
+
+  // Totals recomputed from the filtered set so cards + footer track the filter.
+  const filteredSummary = useMemo(
+    () => ({
+      totalCasesAssigned: filteredAgents.reduce((s, a) => s + a.casesAssigned, 0),
+      totalCompletedWinSheets: filteredAgents.reduce(
+        (s, a) => s + a.completedWinSheets,
+        0,
+      ),
+      totalUnpaidT2Over60: filteredAgents.reduce((s, a) => s + a.unpaidT2Over60, 0),
+      totalUnpaidT16Over60: filteredAgents.reduce(
+        (s, a) => s + a.unpaidT16Over60,
+        0,
+      ),
+      totalUnpaidConcOver60: filteredAgents.reduce(
+        (s, a) => s + a.unpaidConcOver60,
+        0,
+      ),
+      totalCollected: filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
+      totalCasesFullFee: filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
+      totalSsaCalls: filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
+      totalClientCalls: filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
+    }),
+    [filteredAgents],
+  );
+
   // Call entry state
   const [entryOpen, setEntryOpen] = useState(false);
   const [cells, setCells] = useState<Map<CellKey, CellValues>>(new Map());
@@ -136,12 +255,38 @@ export const Scoreboard = () => {
   const monday = getMonday(weekOffset);
   const weekDays = getWeekDays(monday);
 
+  // Resolve the active date window → API query string + readiness + label.
+  const monthStart = firstDayOfMonth(yearSel, monthSel);
+  const monthEnd = lastDayOfMonth(yearSel, monthSel);
+  const { query: scoreboardQuery, ready: windowReady } = (() => {
+    if (dateMode === "month")
+      return { query: `from=${monthStart}&to=${monthEnd}`, ready: true };
+    if (dateMode === "range")
+      return rangeFrom && rangeTo && rangeFrom <= rangeTo
+        ? { query: `from=${rangeFrom}&to=${rangeTo}`, ready: true }
+        : { query: "", ready: false };
+    return { query: `week=${monday}`, ready: true };
+  })();
+
+  const windowLabel =
+    dateMode === "month"
+      ? `${MONTH_NAMES[monthSel]} ${yearSel}`
+      : dateMode === "range"
+        ? windowReady
+          ? `${fmtRangeDate(rangeFrom)} – ${fmtRangeDate(rangeTo)}`
+          : "Select a date range"
+        : formatWeekLabel(monday);
+
   // Fetch scoreboard data
   const fetchScoreboard = useCallback(async () => {
+    if (!windowReady) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/scoreboard?week=${monday}`);
+      const res = await fetch(`/api/scoreboard?${scoreboardQuery}`);
       if (!res.ok) throw new Error("Failed to fetch scoreboard");
       const json = await res.json();
       setData(json);
@@ -164,7 +309,7 @@ export const Scoreboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [monday]);
+  }, [scoreboardQuery, windowReady]);
 
   useEffect(() => {
     fetchScoreboard();
@@ -311,52 +456,123 @@ export const Scoreboard = () => {
               className={`h-5 w-5 ${dark ? "text-amber-400" : "text-amber-500"}`}
             />
             <div>
-              <h3 className={`text-sm font-bold ${t.text}`}>
-                Weekly Scoreboard
-              </h3>
+              <h3 className={`text-sm font-bold ${t.text}`}>Scoreboard</h3>
               <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-                {formatWeekLabel(monday)}
+                {windowLabel}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setEntryOpen(!entryOpen)}
-              className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                entryOpen
-                  ? dark
-                    ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700"
-                    : "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                  : t.outlineBtn + " border"
-              }`}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Log Calls is week-only (entry grid is per-day for one week) */}
+            {dateMode === "week" && (
+              <>
+                <button
+                  onClick={() => setEntryOpen(!entryOpen)}
+                  className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                    entryOpen
+                      ? dark
+                        ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700"
+                        : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                      : t.outlineBtn + " border"
+                  }`}
+                >
+                  <Pencil className="h-3 w-3" />
+                  {entryOpen ? "Close Entry" : "Log Calls"}
+                </button>
+                <div
+                  className={`h-6 w-px ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}
+                />
+              </>
+            )}
+
+            {/* Period mode */}
+            <select
+              value={dateMode}
+              onChange={(e) => changeDateMode(e.target.value as DateMode)}
+              aria-label="Date period"
+              className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
-              <Pencil className="h-3 w-3" />
-              {entryOpen ? "Close Entry" : "Log Calls"}
-            </button>
-            <div
-              className={`h-6 w-px ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}
-            />
-            <button
-              onClick={() => setWeekOffset(weekOffset - 1)}
-              className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setWeekOffset(0)}
-              className={`h-8 px-3 rounded-md text-xs font-medium ${dark ? "bg-neutral-800 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
-            >
-              This Week
-            </button>
-            <button
-              onClick={() => setWeekOffset(weekOffset + 1)}
-              className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
-              disabled={weekOffset >= 0}
-            >
-              <ChevronRight
-                className={`h-4 w-4 ${weekOffset >= 0 ? "opacity-30" : ""}`}
-              />
-            </button>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="range">Range</option>
+            </select>
+
+            {dateMode === "week" && (
+              <>
+                <button
+                  onClick={() => setWeekOffset(weekOffset - 1)}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                  aria-label="Previous week"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className={`h-8 px-3 rounded-md text-xs font-medium ${dark ? "bg-neutral-800 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
+                >
+                  This Week
+                </button>
+                <button
+                  onClick={() => setWeekOffset(weekOffset + 1)}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                  disabled={weekOffset >= 0}
+                  aria-label="Next week"
+                >
+                  <ChevronRight
+                    className={`h-4 w-4 ${weekOffset >= 0 ? "opacity-30" : ""}`}
+                  />
+                </button>
+              </>
+            )}
+
+            {dateMode === "month" && (
+              <>
+                <select
+                  value={monthSel}
+                  onChange={(e) => setMonthSel(Number(e.target.value))}
+                  aria-label="Month"
+                  className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+                >
+                  {MONTH_NAMES.map((m, i) => (
+                    <option key={m} value={i}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={yearSel}
+                  onChange={(e) => setYearSel(Number(e.target.value))}
+                  aria-label="Year"
+                  className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {dateMode === "range" && (
+              <>
+                <input
+                  type="date"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                  aria-label="From date"
+                  className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+                />
+                <span className={`text-[11px] ${t.textMuted}`}>to</span>
+                <input
+                  type="date"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                  aria-label="To date"
+                  className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+                />
+              </>
+            )}
           </div>
         </div>
 
@@ -370,8 +586,14 @@ export const Scoreboard = () => {
           </div>
         )}
 
-        {/* Loading */}
-        {loading ? (
+        {/* Range mode with no/invalid dates picked yet */}
+        {!windowReady ? (
+          <div
+            className={`flex items-center justify-center py-16 text-sm ${t.textMuted}`}
+          >
+            Pick a start and end date to view the range.
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-16">
             <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
             <span className={`ml-2 text-sm ${t.textSub}`}>
@@ -388,30 +610,30 @@ export const Scoreboard = () => {
                 {[
                   {
                     label: "Cases Assigned",
-                    value: data.summary.totalCasesAssigned,
+                    value: filteredSummary.totalCasesAssigned,
                   },
                   {
                     label: "Win Sheets",
-                    value: data.summary.totalCompletedWinSheets,
+                    value: filteredSummary.totalCompletedWinSheets,
                   },
-                  { label: "T2 >60d", value: data.summary.totalUnpaidT2Over60 },
+                  { label: "T2 >60d", value: filteredSummary.totalUnpaidT2Over60 },
                   {
                     label: "T16 >60d",
-                    value: data.summary.totalUnpaidT16Over60,
+                    value: filteredSummary.totalUnpaidT16Over60,
                   },
                   {
                     label: "Conc >60d",
-                    value: data.summary.totalUnpaidConcOver60,
+                    value: filteredSummary.totalUnpaidConcOver60,
                   },
                   {
                     label: "Collected",
-                    value: fmt(data.summary.totalCollected),
+                    value: fmt(filteredSummary.totalCollected),
                   },
-                  { label: "Full Fee", value: data.summary.totalCasesFullFee },
-                  { label: "SSA Calls", value: data.summary.totalSsaCalls },
+                  { label: "Full Fee", value: filteredSummary.totalCasesFullFee },
+                  { label: "SSA Calls", value: filteredSummary.totalSsaCalls },
                   {
                     label: "Client Calls",
-                    value: data.summary.totalClientCalls,
+                    value: filteredSummary.totalClientCalls,
                   },
                 ].map((item, i) => (
                   <div key={i} className={`rounded-lg border p-3 ${t.card}`}>
@@ -427,6 +649,53 @@ export const Scoreboard = () => {
                 ))}
               </div>
 
+              {/* Monitoring filters (client-side, current week) */}
+              <div
+                className={`flex flex-wrap items-center gap-2 px-4 py-3 border-b ${t.borderLight}`}
+              >
+                <div className="relative">
+                  <Search
+                    aria-hidden="true"
+                    className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
+                  />
+                  <input
+                    value={agentSearch}
+                    onChange={(e) => setAgentSearch(e.target.value)}
+                    placeholder="Search agent…"
+                    className={`h-8 w-44 pl-8 pr-3 rounded-md border text-xs outline-none ${t.inputBg}`}
+                  />
+                </div>
+                <select
+                  value={metricFocus}
+                  onChange={(e) => setMetricFocus(e.target.value as MetricFocus)}
+                  aria-label="Metric focus"
+                  className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+                >
+                  {FOCUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setNeedsAttention((v) => !v)}
+                  aria-pressed={needsAttention}
+                  className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                    needsAttention
+                      ? dark
+                        ? "bg-red-900/30 border-red-700 text-red-300"
+                        : "bg-red-50 border-red-300 text-red-700"
+                      : `${t.outlineBtn} border`
+                  }`}
+                >
+                  <AlertTriangle aria-hidden="true" className="h-3 w-3" />
+                  Needs attention
+                </button>
+                <span className={`ml-auto text-[11px] ${t.textMuted}`}>
+                  {filteredAgents.length} of {data.agents.length} agents
+                </span>
+              </div>
+
               {/* Agent table */}
               <div className="overflow-x-auto">
                 <table className="w-full min-w-225">
@@ -435,142 +704,197 @@ export const Scoreboard = () => {
                       <th className={`${thBase} ${t.textSub} text-left`}>
                         Agent
                       </th>
-                      <th className={`${thBase} ${t.textSub} text-right`}>
-                        Cases
-                      </th>
-                      <th className={`${thBase} ${t.textSub} text-right`}>
-                        Win Sheets
-                      </th>
-                      <th
-                        className={`${thBase} ${t.textSub} text-right ${dark ? "text-red-400" : "text-red-600"}`}
-                      >
-                        T2 &gt;60d
-                      </th>
-                      <th
-                        className={`${thBase} ${t.textSub} text-right ${dark ? "text-red-400" : "text-red-600"}`}
-                      >
-                        T16 &gt;60d
-                      </th>
-                      <th
-                        className={`${thBase} ${t.textSub} text-right ${dark ? "text-red-400" : "text-red-600"}`}
-                      >
-                        Conc &gt;60d
-                      </th>
-                      <th className={`${thBase} ${t.textSub} text-right`}>
-                        Collected
-                      </th>
-                      <th className={`${thBase} ${t.textSub} text-right`}>
-                        Full Fee
-                      </th>
-                      <th className={`${thBase} ${t.textSub} text-right`}>
-                        SSA Calls
-                      </th>
-                      <th className={`${thBase} ${t.textSub} text-right`}>
-                        Client Calls
-                      </th>
+                      {showCol("cases") && (
+                        <th className={`${thBase} ${t.textSub} text-right`}>
+                          Cases
+                        </th>
+                      )}
+                      {showCol("winsheets") && (
+                        <th className={`${thBase} ${t.textSub} text-right`}>
+                          Win Sheets
+                        </th>
+                      )}
+                      {showCol("t2") && (
+                        <th
+                          className={`${thBase} ${t.textSub} text-right ${dark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          T2 &gt;60d
+                        </th>
+                      )}
+                      {showCol("t16") && (
+                        <th
+                          className={`${thBase} ${t.textSub} text-right ${dark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          T16 &gt;60d
+                        </th>
+                      )}
+                      {showCol("conc") && (
+                        <th
+                          className={`${thBase} ${t.textSub} text-right ${dark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          Conc &gt;60d
+                        </th>
+                      )}
+                      {showCol("collected") && (
+                        <th className={`${thBase} ${t.textSub} text-right`}>
+                          Collected
+                        </th>
+                      )}
+                      {showCol("fullfee") && (
+                        <th className={`${thBase} ${t.textSub} text-right`}>
+                          Full Fee
+                        </th>
+                      )}
+                      {showCol("ssa") && (
+                        <th className={`${thBase} ${t.textSub} text-right`}>
+                          SSA Calls
+                        </th>
+                      )}
+                      {showCol("client") && (
+                        <th className={`${thBase} ${t.textSub} text-right`}>
+                          Client Calls
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {data.agents.map((a) => (
-                      <tr
-                        key={a.agent}
-                        className={`border-b ${rowBorder} ${rowHover} transition-colors`}
-                      >
-                        <td className={`${tdBase} ${t.text} font-semibold`}>
-                          {a.agent}
-                        </td>
-                        <td className={`${tdBase} text-right ${t.text}`}>
-                          {a.casesAssigned}
-                        </td>
-                        <td className={`${tdBase} text-right ${t.text}`}>
-                          {a.completedWinSheets}
-                        </td>
+                    {filteredAgents.length === 0 ? (
+                      <tr>
                         <td
-                          className={`${tdBase} text-right ${a.unpaidT2Over60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}
+                          colSpan={10}
+                          className={`${tdBase} text-center ${t.textMuted} py-8`}
                         >
-                          {a.unpaidT2Over60}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right ${a.unpaidT16Over60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}
-                        >
-                          {a.unpaidT16Over60}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right ${a.unpaidConcOver60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}
-                        >
-                          {a.unpaidConcOver60}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right font-semibold ${a.totalCollected > 0 ? "text-emerald-500" : t.textMuted}`}
-                        >
-                          {a.totalCollected > 0 ? fmt(a.totalCollected) : "—"}
-                        </td>
-                        <td className={`${tdBase} text-right ${t.text}`}>
-                          {a.casesFullFee}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right ${a.weekSsaCalls > 0 ? t.text : t.textMuted}`}
-                        >
-                          {a.weekSsaCalls || "—"}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right ${a.weekClientCalls > 0 ? t.text : t.textMuted}`}
-                        >
-                          {a.weekClientCalls || "—"}
+                          No agents match the current filters.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredAgents.map((a) => (
+                        <tr
+                          key={a.agent}
+                          className={`border-b ${rowBorder} ${rowHover} transition-colors`}
+                        >
+                          <td className={`${tdBase} ${t.text} font-semibold`}>
+                            {a.agent}
+                          </td>
+                          {showCol("cases") && (
+                            <td className={`${tdBase} text-right ${t.text}`}>
+                              {a.casesAssigned}
+                            </td>
+                          )}
+                          {showCol("winsheets") && (
+                            <td className={`${tdBase} text-right ${t.text}`}>
+                              {a.completedWinSheets}
+                            </td>
+                          )}
+                          {showCol("t2") && (
+                            <td
+                              className={`${tdBase} text-right ${a.unpaidT2Over60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}
+                            >
+                              {a.unpaidT2Over60}
+                            </td>
+                          )}
+                          {showCol("t16") && (
+                            <td
+                              className={`${tdBase} text-right ${a.unpaidT16Over60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}
+                            >
+                              {a.unpaidT16Over60}
+                            </td>
+                          )}
+                          {showCol("conc") && (
+                            <td
+                              className={`${tdBase} text-right ${a.unpaidConcOver60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}
+                            >
+                              {a.unpaidConcOver60}
+                            </td>
+                          )}
+                          {showCol("collected") && (
+                            <td
+                              className={`${tdBase} text-right font-semibold ${a.totalCollected > 0 ? "text-emerald-500" : t.textMuted}`}
+                            >
+                              {a.totalCollected > 0 ? fmt(a.totalCollected) : "—"}
+                            </td>
+                          )}
+                          {showCol("fullfee") && (
+                            <td className={`${tdBase} text-right ${t.text}`}>
+                              {a.casesFullFee}
+                            </td>
+                          )}
+                          {showCol("ssa") && (
+                            <td
+                              className={`${tdBase} text-right ${a.weekSsaCalls > 0 ? t.text : t.textMuted}`}
+                            >
+                              {a.weekSsaCalls || "—"}
+                            </td>
+                          )}
+                          {showCol("client") && (
+                            <td
+                              className={`${tdBase} text-right ${a.weekClientCalls > 0 ? t.text : t.textMuted}`}
+                            >
+                              {a.weekClientCalls || "—"}
+                            </td>
+                          )}
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                   <tfoot>
                     <tr
                       className={`${dark ? "bg-neutral-800/60" : "bg-neutral-50"}`}
                     >
                       <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${t.text}`}
-                      >
-                        {data.summary.totalCasesAssigned}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${t.text}`}
-                      >
-                        {data.summary.totalCompletedWinSheets}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}
-                      >
-                        {data.summary.totalUnpaidT2Over60}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}
-                      >
-                        {data.summary.totalUnpaidT16Over60}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}
-                      >
-                        {data.summary.totalUnpaidConcOver60}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold text-emerald-500`}
-                      >
-                        {fmt(data.summary.totalCollected)}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${t.text}`}
-                      >
-                        {data.summary.totalCasesFullFee}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${t.text}`}
-                      >
-                        {data.summary.totalSsaCalls}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${t.text}`}
-                      >
-                        {data.summary.totalClientCalls}
-                      </td>
+                      {showCol("cases") && (
+                        <td className={`${tdBase} text-right font-bold ${t.text}`}>
+                          {filteredSummary.totalCasesAssigned}
+                        </td>
+                      )}
+                      {showCol("winsheets") && (
+                        <td className={`${tdBase} text-right font-bold ${t.text}`}>
+                          {filteredSummary.totalCompletedWinSheets}
+                        </td>
+                      )}
+                      {showCol("t2") && (
+                        <td
+                          className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          {filteredSummary.totalUnpaidT2Over60}
+                        </td>
+                      )}
+                      {showCol("t16") && (
+                        <td
+                          className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          {filteredSummary.totalUnpaidT16Over60}
+                        </td>
+                      )}
+                      {showCol("conc") && (
+                        <td
+                          className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          {filteredSummary.totalUnpaidConcOver60}
+                        </td>
+                      )}
+                      {showCol("collected") && (
+                        <td
+                          className={`${tdBase} text-right font-bold text-emerald-500`}
+                        >
+                          {fmt(filteredSummary.totalCollected)}
+                        </td>
+                      )}
+                      {showCol("fullfee") && (
+                        <td className={`${tdBase} text-right font-bold ${t.text}`}>
+                          {filteredSummary.totalCasesFullFee}
+                        </td>
+                      )}
+                      {showCol("ssa") && (
+                        <td className={`${tdBase} text-right font-bold ${t.text}`}>
+                          {filteredSummary.totalSsaCalls}
+                        </td>
+                      )}
+                      {showCol("client") && (
+                        <td className={`${tdBase} text-right font-bold ${t.text}`}>
+                          {filteredSummary.totalClientCalls}
+                        </td>
+                      )}
                     </tr>
                   </tfoot>
                 </table>
@@ -580,8 +904,8 @@ export const Scoreboard = () => {
         )}
       </div>
 
-      {/* Daily Call Entry Panel */}
-      {entryOpen && data && (
+      {/* Daily Call Entry Panel — week mode only */}
+      {entryOpen && data && dateMode === "week" && (
         <div ref={entryRef} className={`rounded-xl border ${t.card}`}>
           {/* Entry header */}
           <div
