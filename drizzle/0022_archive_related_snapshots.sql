@@ -1,0 +1,1 @@
+ALTER TABLE "case_archive" ADD COLUMN "related_snapshots" jsonb;
