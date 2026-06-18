@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Plus,
@@ -53,6 +53,8 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const moveAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { moveAbortRef.current?.abort(); }, []);
 
   const sectionCard = `rounded-xl border ${t.card}`;
 
@@ -170,36 +172,51 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
     if (direction === "down" && idx === options.length - 1) return;
     if (busyId !== null) return;
 
-    const reordered = [...options];
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+    const a = options[idx];
+    const b = options[swapIdx];
 
+    const reordered = [...options];
+    reordered[idx] = b;
+    reordered[swapIdx] = a;
     setOptions(reordered);
     setBusyId(id);
     setError(null);
+
+    const controller = new AbortController();
+    moveAbortRef.current = controller;
     try {
-      await Promise.all(
-        reordered.map((o, i) =>
-          fetch(`/api/settings/dropdown-options/${o.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sortOrder: i * 10 }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const j = await res.json().catch(() => ({}));
-              throw new Error(
-                (j as { error?: string }).error ||
-                  `Failed to reorder (${res.status})`,
-              );
-            }
-          }),
-        ),
-      );
+      await Promise.all([
+        fetch(`/api/settings/dropdown-options/${a.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder: b.sortOrder }),
+          signal: controller.signal,
+        }).then(async (res) => {
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error((j as { error?: string }).error || `Failed to reorder (${res.status})`);
+          }
+        }),
+        fetch(`/api/settings/dropdown-options/${b.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder: a.sortOrder }),
+          signal: controller.signal,
+        }).then(async (res) => {
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error((j as { error?: string }).error || `Failed to reorder (${res.status})`);
+          }
+        }),
+      ]);
       await load();
     } catch (e) {
+      if ((e as Error).name === "AbortError") return;
       setError((e as Error).message);
       await load();
     } finally {
+      if (moveAbortRef.current === controller) moveAbortRef.current = null;
       setBusyId(null);
     }
   };
