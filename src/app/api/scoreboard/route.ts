@@ -116,23 +116,6 @@ export const GET = async (req: NextRequest) => {
       ORDER BY tm.name
     `);
 
-    // Fees collected by claim type (all-time team snapshot)
-    const teamFeesResult = await db.execute(sql`
-      SELECT
-        COALESCE(SUM(CASE WHEN c.claim_type_label = 'T2' THEN fr.total_fees_paid::numeric ELSE 0 END), 0) AS t2_collected,
-        COALESCE(SUM(CASE WHEN c.claim_type_label = 'T16' THEN fr.total_fees_paid::numeric ELSE 0 END), 0) AS t16_collected,
-        COALESCE(SUM(CASE WHEN c.claim_type_label IN ('T2_T16', 'T2/T16') THEN fr.total_fees_paid::numeric ELSE 0 END), 0) AS conc_collected
-      FROM fee_records fr
-      JOIN cases c ON c.client_id = fr.case_id
-    `);
-    const teamFeesRow =
-      (teamFeesResult as Record<string, string | number>[])[0] ?? {};
-    const teamFees = {
-      t2: Number(teamFeesRow.t2_collected ?? 0),
-      t16: Number(teamFeesRow.t16_collected ?? 0),
-      conc: Number(teamFeesRow.conc_collected ?? 0),
-    };
-
     // Daily breakdown for the week (from daily_metrics)
     const dailyBreakdown = await db.execute(sql`
       SELECT
@@ -197,7 +180,6 @@ export const GET = async (req: NextRequest) => {
       summary,
       agents,
       daily,
-      teamFees,
     });
   } catch (error) {
     console.error("GET /api/scoreboard error:", error);
