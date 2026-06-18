@@ -11,6 +11,8 @@ import {
   Pencil,
   Check,
   X,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { Button } from "@/components/ui/button";
@@ -161,6 +163,47 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
     handleUpdate(id, { name });
   };
 
+  const handleMove = async (id: number, direction: "up" | "down") => {
+    const idx = options.findIndex((o) => o.id === id);
+    if (idx === -1) return;
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === options.length - 1) return;
+    if (busyId !== null) return;
+
+    const reordered = [...options];
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+
+    setOptions(reordered);
+    setBusyId(id);
+    setError(null);
+    try {
+      await Promise.all(
+        reordered.map((o, i) =>
+          fetch(`/api/settings/dropdown-options/${o.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sortOrder: i * 10 }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const j = await res.json().catch(() => ({}));
+              throw new Error(
+                (j as { error?: string }).error ||
+                  `Failed to reorder (${res.status})`,
+              );
+            }
+          }),
+        ),
+      );
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className={sectionCard}>
       <div
@@ -296,6 +339,26 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                     </>
                   ) : (
                     <>
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleMove(opt.id, "up")}
+                          disabled={rowBusy || busyId !== null || options.indexOf(opt) === 0}
+                          aria-label={`Move ${opt.name} up`}
+                          className={`h-4 w-5 flex items-center justify-center rounded text-[10px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
+                        >
+                          <ChevronUp aria-hidden="true" className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMove(opt.id, "down")}
+                          disabled={rowBusy || busyId !== null || options.indexOf(opt) === options.length - 1}
+                          aria-label={`Move ${opt.name} down`}
+                          className={`h-4 w-5 flex items-center justify-center rounded text-[10px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
+                        >
+                          <ChevronDown aria-hidden="true" className="h-3 w-3" />
+                        </button>
+                      </div>
                       <span
                         className={`flex-1 text-xs ${opt.isActive ? t.text : t.textMuted} ${opt.isActive ? "" : "line-through"}`}
                       >
