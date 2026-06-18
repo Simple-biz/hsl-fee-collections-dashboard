@@ -79,12 +79,13 @@ const patchSingleField = async (
   field: CaseField | FeeField,
   value: string | null,
   fieldLabel: string,
+  signal?: AbortSignal,
 ) => {
   const payload =
     target === "case"
       ? { caseFields: { [field]: value } }
       : { feeFields: { [field]: value } };
-  await fetch(`/api/cases/${caseId}`, {
+  const res = await fetch(`/api/cases/${caseId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -93,7 +94,15 @@ const patchSingleField = async (
         ? `${fieldLabel} set to "${value}"`
         : `${fieldLabel} cleared`,
     }),
+    signal,
   });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(
+      (j as { error?: string }).error ||
+        `Failed to update ${fieldLabel} (${res.status})`,
+    );
+  }
 };
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
@@ -216,6 +225,14 @@ export const FeeRecordsTable = ({
   >({});
   const [batchLoading, setBatchLoading] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
+  useEffect(() => {
+    const abortMap = patchAbortRef.current;
+    return () => {
+      for (const ctrl of abortMap.values()) ctrl.abort();
+      abortMap.clear();
+    };
+  }, []);
 
   const toggleRowSelection = (id: number) => {
     setSelectedIds((prev) => {
@@ -444,14 +461,20 @@ export const FeeRecordsTable = ({
     fieldLabel: string,
     next: string,
   ) => {
+    const key = `${c.id}:${field}`;
+    patchAbortRef.current.get(key)?.abort();
+    const controller = new AbortController();
+    patchAbortRef.current.set(key, controller);
+
     const value = next || null;
     setPending((prev) => ({
       ...prev,
       [c.id]: { ...prev[c.id], [rowKey]: value ?? "" },
     }));
     try {
-      await patchSingleField(c.id, target, field, value, fieldLabel);
+      await patchSingleField(c.id, target, field, value, fieldLabel, controller.signal);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       console.error(`Failed to update ${fieldLabel}:`, err);
       setPending((prev) => {
         const copy = { ...prev };
@@ -462,6 +485,10 @@ export const FeeRecordsTable = ({
         }
         return copy;
       });
+    } finally {
+      if (patchAbortRef.current.get(key) === controller) {
+        patchAbortRef.current.delete(key);
+      }
     }
   };
 
@@ -1012,10 +1039,7 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} ${t.textSub} ${stickyTd2}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {mode === "closed" ? (
-                        c.assigned
-                      ) : (
-                        <select
+                      <select
                           value={cellValue(c, "assigned")}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) =>
@@ -1057,21 +1081,13 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      )}
                     </td>
                     {/* Level — varchar; lives on the cases row. */}
                     <td
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {mode === "closed" ? (
-                        <span
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
-                        >
-                          {cellValue(c, "level") || "—"}
-                        </span>
-                      ) : (
-                        <select
+                      <select
                           value={cellValue(c, "level")}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) =>
@@ -1112,21 +1128,13 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      )}
                     </td>
                     {/* Claim — varchar; lives on the cases row. */}
                     <td
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {mode === "closed" ? (
-                        <span
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
-                        >
-                          {fmtClaim(cellValue(c, "claim")) || "—"}
-                        </span>
-                      ) : (
-                        <select
+                      <select
                           value={cellValue(c, "claim")}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) =>
@@ -1167,7 +1175,6 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      )}
                     </td>
                     <td className={`${tdBase} ${t.textSub} tabular-nums`}>
                       {dateStr(c.date)}
@@ -1177,16 +1184,7 @@ export const FeeRecordsTable = ({
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {mode === "closed" ? (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(cellValue(c, "status"), dark)}`}
-                        >
-                          {STATUS_LABELS[cellValue(c, "status")] ||
-                            cellValue(c, "status") ||
-                            "—"}
-                        </span>
-                      ) : (
-                        <select
+                      <select
                           value={cellValue(c, "status")}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) =>
@@ -1227,7 +1225,6 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      )}
                     </td>
 
                     {/* Win Sheet Link */}
@@ -1483,10 +1480,7 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} ${t.textSub}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {mode === "closed" ? (
-                        cellValue(c, "caseStatus") || "—"
-                      ) : (
-                        <select
+                      <select
                           value={cellValue(c, "caseStatus")}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) =>
@@ -1528,7 +1522,6 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      )}
                     </td>
                     <td className={`${tdBase} ${t.textSub} max-w-65`}>
                       {c.update && c.update !== "—" ? (
