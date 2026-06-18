@@ -27,6 +27,7 @@ interface TeamMemberFull {
   id: number;
   name: string;
   role: string;
+  team: string | null;
   isActive: boolean;
   createdAt: string;
   cases: number;
@@ -42,6 +43,8 @@ const ROLES = [
   { value: "attorney", label: "Attorney" },
   { value: "admin", label: "Admin" },
 ] as const;
+
+const DEFAULT_TEAMS = ["T2", "T16", "Concurrent"];
 
 const roleLabel = (role: string) =>
   ROLES.find((r) => r.value === role)?.label ??
@@ -69,6 +72,7 @@ export const TeamManagement = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [teamOptions, setTeamOptions] = useState<string[]>(DEFAULT_TEAMS);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -77,6 +81,7 @@ export const TeamManagement = () => {
   );
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState("collections_specialist");
+  const [formTeam, setFormTeam] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -103,6 +108,14 @@ export const TeamManagement = () => {
 
   useEffect(() => {
     fetchMembers();
+    fetch("/api/settings/dropdown-options?category=team")
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => {
+        if (json?.data?.length > 0) {
+          setTeamOptions(json.data.map((o: { name: string }) => o.name));
+        }
+      })
+      .catch(() => {});
   }, [fetchMembers]);
 
   /* ---- Filter ---- */
@@ -126,6 +139,7 @@ export const TeamManagement = () => {
     setEditingMember(null);
     setFormName("");
     setFormRole("collections_specialist");
+    setFormTeam("");
     setFormError(null);
     setDialogOpen(true);
   };
@@ -134,6 +148,7 @@ export const TeamManagement = () => {
     setEditingMember(m);
     setFormName(m.name);
     setFormRole(m.role);
+    setFormTeam(m.team ?? "");
     setFormError(null);
     setDialogOpen(true);
   };
@@ -155,6 +170,7 @@ export const TeamManagement = () => {
             id: editingMember.id,
             name: formName.trim(),
             role: formRole,
+            team: formTeam || null,
           }),
         });
         const json = await res.json();
@@ -163,7 +179,7 @@ export const TeamManagement = () => {
         const res = await fetch("/api/team-members", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: formName.trim(), role: formRole }),
+          body: JSON.stringify({ name: formName.trim(), role: formRole, team: formTeam || null }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to create");
@@ -354,6 +370,11 @@ export const TeamManagement = () => {
                   Role
                 </th>
                 <th
+                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[11px]`}
+                >
+                  Team
+                </th>
+                <th
                   className={`px-4 py-2.5 text-center font-semibold ${t.textMuted} text-[11px]`}
                 >
                   Status
@@ -391,7 +412,7 @@ export const TeamManagement = () => {
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className={`px-4 py-12 text-center text-sm ${t.textMuted}`}
                   >
                     {search
@@ -422,6 +443,25 @@ export const TeamManagement = () => {
                     {/* Role */}
                     <td className={`px-4 py-2.5 ${t.textSub}`}>
                       {roleLabel(m.role)}
+                    </td>
+
+                    {/* Team */}
+                    <td className="px-4 py-2.5">
+                      {m.team ? (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            m.team === "T2"
+                              ? dark ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-700"
+                              : m.team === "T16"
+                              ? dark ? "bg-purple-900/30 text-purple-400" : "bg-purple-50 text-purple-700"
+                              : dark ? "bg-teal-900/30 text-teal-400" : "bg-teal-50 text-teal-700"
+                          }`}
+                        >
+                          {m.team}
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                      )}
                     </td>
 
                     {/* Status */}
@@ -565,6 +605,34 @@ export const TeamManagement = () => {
                   </select>
                   <ChevronDown
                     className={`absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted} pointer-events-none`}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+
+              {/* Team */}
+              <div>
+                <label
+                  className={`block text-[11px] font-semibold ${t.textMuted} mb-1`}
+                >
+                  Team
+                </label>
+                <div className="relative">
+                  <select
+                    value={formTeam}
+                    onChange={(e) => setFormTeam(e.target.value)}
+                    className={`w-full h-8 px-3 pr-8 rounded-lg border text-xs outline-none appearance-none ${t.inputBg} focus:ring-2 focus:ring-indigo-500/40`}
+                  >
+                    <option value="">— Unassigned —</option>
+                    {teamOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className={`absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted} pointer-events-none`}
+                    aria-hidden="true"
                   />
                 </div>
               </div>

@@ -12,6 +12,7 @@ export const DROPDOWN_CATEGORIES = [
   { key: "win_sheet_status", label: "Win Sheet Status", description: "Win-sheet progress states." },
   { key: "fees_confirmation", label: "Fees Confirmation", description: "Final fee disposition labels." },
   { key: "case_status", label: "Case Status", description: "Workflow status shown in the dashboard." },
+  { key: "team", label: "Team", description: "Team groupings for scoreboard tracking (e.g. T2, T16, Concurrent)." },
 ] as const;
 
 export type DropdownCategory = (typeof DROPDOWN_CATEGORIES)[number]["key"];
