@@ -63,11 +63,18 @@ interface DailyEntry {
   notes: string | null;
 }
 
+interface TeamFees {
+  t2: number;
+  t16: number;
+  conc: number;
+}
+
 interface ScoreboardData {
   week: string;
   summary: Summary;
   agents: AgentScore[];
   daily: DailyEntry[];
+  teamFees?: TeamFees;
 }
 
 // Cell value for the entry grid: [ssaCalls, clientCallsIb, clientCallsOb]
@@ -648,6 +655,43 @@ export const Scoreboard = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Fees by claim type — all-time team snapshot */}
+              {data.teamFees && (
+                <div className={`p-4 border-b ${t.borderLight}`}>
+                  <p
+                    className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-3`}
+                  >
+                    Fees by Claim Type
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "T2 Collected", value: data.teamFees.t2 },
+                      { label: "T16 Collected", value: data.teamFees.t16 },
+                      {
+                        label: "Concurrent Collected",
+                        value: data.teamFees.conc,
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className={`rounded-lg border p-3 ${t.card}`}
+                      >
+                        <p
+                          className={`text-[10px] font-medium ${t.textMuted} uppercase`}
+                        >
+                          {item.label}
+                        </p>
+                        <p
+                          className={`text-lg font-bold mt-1 ${item.value > 0 ? "text-emerald-500" : t.textMuted}`}
+                        >
+                          {item.value > 0 ? fmt(item.value) : "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Monitoring filters (client-side, current week) */}
               <div
