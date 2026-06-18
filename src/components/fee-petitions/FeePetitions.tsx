@@ -464,10 +464,8 @@ export const FeePetitions = () => {
     setBulkClosing(true);
     const ids = [...selectedIds];
     const closingRows = rows.filter((r) => ids.includes(r.id));
-    const closingComplete = closingRows.filter((r) => CHECKBOX_COLUMNS.every((c) => r[c.key])).length;
-    const closingIncomplete = closingRows.length - closingComplete;
     try {
-      await Promise.all(
+      const results = await Promise.allSettled(
         ids.map((id) =>
           fetch(`/api/cases/${id}`, {
             method: "PATCH",
@@ -481,22 +479,41 @@ export const FeePetitions = () => {
               const j = await res.json().catch(() => ({}));
               throw new Error(j.error || `Failed to close case ${id} (${res.status})`);
             }
+            return id;
           }),
         ),
       );
+
       if (!mountedRef.current) return;
-      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-      setTotal((t) => Math.max(0, t - ids.length));
-      setStats((s) => ({
-        ...s,
-        completeCount: Math.max(0, s.completeCount - closingComplete),
-        incompleteCount: Math.max(0, s.incompleteCount - closingIncomplete),
-      }));
+
+      const succeeded = results
+        .filter((r): r is PromiseFulfilledResult<number> => r.status === "fulfilled")
+        .map((r) => r.value);
+      const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+
+      if (succeeded.length > 0) {
+        const closedRows = closingRows.filter((r) => succeeded.includes(r.id));
+        const closedComplete = closedRows.filter((r) => CHECKBOX_COLUMNS.every((c) => r[c.key])).length;
+        const closedIncomplete = closedRows.length - closedComplete;
+        setRows((prev) => prev.filter((r) => !succeeded.includes(r.id)));
+        setTotal((t) => Math.max(0, t - succeeded.length));
+        setStats((s) => ({
+          ...s,
+          completeCount: Math.max(0, s.completeCount - closedComplete),
+          incompleteCount: Math.max(0, s.incompleteCount - closedIncomplete),
+        }));
+      }
+
       setSelectedIds(new Set());
       setBulkCloseConfirming(false);
-    } catch (err) {
-      if (!mountedRef.current) return;
-      setError((err as Error).message);
+
+      if (failures.length > 0) {
+        setError(
+          failures.length === 1
+            ? (failures[0].reason as Error).message
+            : `${failures.length} of ${ids.length} cases failed to close — the rest were moved successfully.`,
+        );
+      }
     } finally {
       if (mountedRef.current) setBulkClosing(false);
     }
