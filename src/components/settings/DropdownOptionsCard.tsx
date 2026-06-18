@@ -61,7 +61,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
       const res = await fetch(
         `/api/settings/dropdown-options?category=${encodeURIComponent(category)}`,
       );
-      if (!res.ok) throw new Error("Failed to load options");
+      if (!res.ok) throw new Error(`Failed to load options (${res.status})`);
       const json = await res.json();
       setOptions(json.data || []);
     } catch (e) {
@@ -87,7 +87,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         body: JSON.stringify({ category, name }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Failed to add");
+      if (!res.ok) throw new Error(json.error || `Failed to add (${res.status})`);
       setNewName("");
       await load();
     } catch (e) {
@@ -111,7 +111,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         body: JSON.stringify(patch),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Failed to update");
+      if (!res.ok) throw new Error(json.error || `Failed to update (${res.status})`);
       setEditingId(null);
       await load();
     } catch (e) {
@@ -137,7 +137,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "Failed to delete");
+        throw new Error(j.error || `Failed to delete (${res.status})`);
       }
       await load();
     } catch (e) {
@@ -273,12 +273,13 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                           rowBusy ||
                           editName.trim() === opt.name
                         }
+                        aria-label="Save"
                         className="h-7"
                       >
                         {rowBusy ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                         ) : (
-                          <Check className="h-3 w-3" />
+                          <Check className="h-3 w-3" aria-hidden="true" />
                         )}
                       </Button>
                       <Button
@@ -287,9 +288,10 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                         variant="outline"
                         onClick={cancelEdit}
                         disabled={rowBusy}
+                        aria-label="Cancel"
                         className="h-7"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3 w-3" aria-hidden="true" />
                       </Button>
                     </>
                   ) : (
@@ -318,9 +320,10 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                         variant="outline"
                         onClick={() => startEdit(opt)}
                         disabled={rowBusy}
+                        aria-label={`Edit ${opt.name}`}
                         className="h-7"
                       >
-                        <Pencil className="h-3 w-3" />
+                        <Pencil className="h-3 w-3" aria-hidden="true" />
                       </Button>
                       <Button
                         type="button"
@@ -328,12 +331,13 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                         variant="outline"
                         onClick={() => handleDelete(opt)}
                         disabled={rowBusy}
+                        aria-label={`Delete ${opt.name}`}
                         className={`h-7 ${dark ? "text-red-400" : "text-red-600"}`}
                       >
                         {rowBusy ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                         ) : (
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" aria-hidden="true" />
                         )}
                       </Button>
                     </>

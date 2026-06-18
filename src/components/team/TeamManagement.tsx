@@ -95,7 +95,7 @@ export const TeamManagement = () => {
   const fetchMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/team-members");
-      if (!res.ok) throw new Error("Failed to load team members");
+      if (!res.ok) throw new Error(`Failed to load team members (${res.status})`);
       const json = await res.json();
       setMembers(json.data);
       setError(null);
@@ -174,7 +174,7 @@ export const TeamManagement = () => {
           }),
         });
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Failed to update");
+        if (!res.ok) throw new Error(json.error || `Failed to update (${res.status})`);
       } else {
         const res = await fetch("/api/team-members", {
           method: "POST",
@@ -182,7 +182,7 @@ export const TeamManagement = () => {
           body: JSON.stringify({ name: formName.trim(), role: formRole, team: formTeam || null }),
         });
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Failed to create");
+        if (!res.ok) throw new Error(json.error || `Failed to create (${res.status})`);
       }
       setDialogOpen(false);
       await fetchMembers();

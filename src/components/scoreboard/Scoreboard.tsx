@@ -303,16 +303,21 @@ export const Scoreboard = () => {
         : formatWeekLabel(monday);
 
   // Fetch scoreboard data
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchScoreboard = useCallback(async () => {
     if (!windowReady) {
       setLoading(false);
       return;
     }
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/scoreboard?${scoreboardQuery}`);
-      if (!res.ok) throw new Error("Failed to fetch scoreboard");
+      const res = await fetch(`/api/scoreboard?${scoreboardQuery}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to fetch scoreboard (${res.status})`);
       const json = await res.json();
       setData(json);
 
@@ -331,6 +336,7 @@ export const Scoreboard = () => {
       setCells(map);
       setDirty(false);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -339,6 +345,7 @@ export const Scoreboard = () => {
 
   useEffect(() => {
     fetchScoreboard();
+    return () => fetchAbortRef.current?.abort();
   }, [fetchScoreboard]);
 
   // Auto-scroll to entry panel when opened
@@ -442,7 +449,7 @@ export const Scoreboard = () => {
         body: JSON.stringify({ entries }),
       });
 
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) throw new Error(`Failed to save (${res.status})`);
 
       setSaveMsg(`Saved ${entries.length} entries`);
       setDirty(false);

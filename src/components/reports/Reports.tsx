@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import {
   BarChart3,
@@ -151,15 +151,21 @@ export const Reports = () => {
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [showPresets, setShowPresets] = useState(false);
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchReport = useCallback(async () => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports?from=${fromDate}&to=${toDate}`);
-      if (!res.ok) throw new Error("Failed to load report");
+      const res = await fetch(`/api/reports?from=${fromDate}&to=${toDate}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to load report (${res.status})`);
       const json = await res.json();
       setData(json.data);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -168,6 +174,7 @@ export const Reports = () => {
 
   useEffect(() => {
     fetchReport();
+    return () => fetchAbortRef.current?.abort();
   }, [fetchReport]);
 
   const handleSort = (key: SortKey) => {
