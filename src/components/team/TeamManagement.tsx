@@ -108,14 +108,16 @@ export const TeamManagement = () => {
 
   useEffect(() => {
     fetchMembers();
-    fetch("/api/settings/dropdown-options?category=team")
+    const controller = new AbortController();
+    fetch("/api/settings/dropdown-options?category=team", { signal: controller.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((json) => {
         if (json?.data?.length > 0) {
           setTeamOptions(json.data.map((o: { name: string }) => o.name));
         }
       })
-      .catch(() => {});
+      .catch((e: Error) => { if (e.name !== "AbortError") console.error("Failed to load team options:", e); });
+    return () => controller.abort();
   }, [fetchMembers]);
 
   /* ---- Filter ---- */
