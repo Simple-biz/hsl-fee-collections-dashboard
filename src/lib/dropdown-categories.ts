@@ -11,7 +11,7 @@ export const DROPDOWN_CATEGORIES = [
   { key: "claim_type", label: "Claim Type", description: "Benefit type for the claim (T2, T16, CONC, etc.)." },
   { key: "win_sheet_status", label: "Win Sheet Status", description: "Win-sheet progress states." },
   { key: "fees_confirmation", label: "Fees Confirmation", description: "Final fee disposition labels." },
-  { key: "case_status", label: "Case Status", description: "Workflow status shown in the dashboard." },
+  { key: "case_status", label: "Remarks", description: "Remarks/status notes shown in the dashboard." },
   { key: "team", label: "Team", description: "Team groupings for scoreboard tracking (e.g. T2, T16, Concurrent)." },
 ] as const;
 

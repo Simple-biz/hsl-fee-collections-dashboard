@@ -824,7 +824,7 @@ export const FeeRecordsTable = ({
                     Approval <ArrowUpDown className="h-3 w-3" />
                   </span>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left`}>Status</th>
+                <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet Status</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Win Sheet
                 </th>
@@ -910,7 +910,7 @@ export const FeeRecordsTable = ({
                   Fees Conf
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
-                  Case Status
+                  Remarks
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Recent Update
@@ -1478,7 +1478,7 @@ export const FeeRecordsTable = ({
                         </select>
                       )}
                     </td>
-                    {/* Case Status */}
+                    {/* Remarks */}
                     <td
                       className={`${tdBase} ${t.textSub}`}
                       onClick={(e) => e.stopPropagation()}
@@ -1495,7 +1495,7 @@ export const FeeRecordsTable = ({
                               "fee",
                               "caseStatus",
                               "caseStatus",
-                              "Case Status",
+                              "Remarks",
                               e.target.value,
                             )
                           }
