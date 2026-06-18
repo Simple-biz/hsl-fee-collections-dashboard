@@ -244,10 +244,14 @@ export const FeePetitions = () => {
   }, [search]);
 
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const bulkCloseAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      bulkCloseAbortRef.current?.abort();
+    };
   }, []);
 
   const fetchPetitions = useCallback(async () => {
@@ -464,6 +468,8 @@ export const FeePetitions = () => {
     setBulkClosing(true);
     const ids = [...selectedIds];
     const closingRows = rows.filter((r) => ids.includes(r.id));
+    const controller = new AbortController();
+    bulkCloseAbortRef.current = controller;
     try {
       const results = await Promise.allSettled(
         ids.map((id) =>
@@ -474,6 +480,7 @@ export const FeePetitions = () => {
               feeFields: { isClosed: true },
               logMessage: "Fee petition complete — case moved to Fees Closed.",
             }),
+            signal: controller.signal,
           }).then(async (res) => {
             if (!res.ok) {
               const j = await res.json().catch(() => ({}));
