@@ -53,14 +53,27 @@ export const GET = async (req: NextRequest) => {
     const startDate = useRange ? fromParam! : monday;
     const endExclusive = useRange ? addDays(toParam!, 1) : addDays(monday, 7);
 
-    // Team-wide totals for the week
+    // Per-agent totals for the window
     const teamTotals = await db.execute(sql`
       SELECT
         tm.name AS agent,
+        tm.team AS team,
+
         -- Cases assigned (current snapshot)
         (SELECT COUNT(*) FROM fee_records fr WHERE fr.assigned_to = tm.name) AS cases_assigned,
 
-        -- Completed win sheets (status = paid_in_full or closed)
+        -- Open cases (current snapshot)
+        (SELECT COUNT(*) FROM fee_records fr
+         WHERE fr.assigned_to = tm.name
+         AND fr.is_closed = FALSE) AS open_cases,
+
+        -- Cases closed within the window
+        (SELECT COUNT(*) FROM fee_records fr
+         WHERE fr.assigned_to = tm.name
+         AND fr.closed_at >= ${startDate}::date
+         AND fr.closed_at < ${endExclusive}::date) AS cases_closed,
+
+        -- Completed win sheets (status = paid_in_full or closed, current snapshot)
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.win_sheet_status IN ('paid_in_full', 'closed')) AS completed_win_sheets,
@@ -95,12 +108,23 @@ export const GET = async (req: NextRequest) => {
         -- Total fees collected (all time for this agent)
         COALESCE((SELECT SUM(fr.total_fees_paid::numeric) FROM fee_records fr WHERE fr.assigned_to = tm.name), 0) AS total_collected,
 
+        -- Fees collected within the window (derived from per-type received dates)
+        COALESCE((
+          SELECT SUM(
+            CASE WHEN fr.t2_fee_received_date >= ${startDate}::date AND fr.t2_fee_received_date < ${endExclusive}::date THEN fr.t2_fee_received::numeric ELSE 0 END +
+            CASE WHEN fr.t16_fee_received_date >= ${startDate}::date AND fr.t16_fee_received_date < ${endExclusive}::date THEN fr.t16_fee_received::numeric ELSE 0 END +
+            CASE WHEN fr.aux_fee_received_date >= ${startDate}::date AND fr.aux_fee_received_date < ${endExclusive}::date THEN fr.aux_fee_received::numeric ELSE 0 END
+          )
+          FROM fee_records fr
+          WHERE fr.assigned_to = tm.name
+        ), 0) AS fees_collected_in_window,
+
         -- Cases with full fee collected (PIF)
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.pif_ready_to_close = TRUE) AS cases_full_fee,
 
-        -- Daily metrics from daily_metrics table for the week
+        -- Call and win sheet metrics from daily_metrics for the window
         COALESCE((SELECT SUM(dm.ssa_calls) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
          AND dm.metric_date >= ${startDate}::date
@@ -109,14 +133,19 @@ export const GET = async (req: NextRequest) => {
         COALESCE((SELECT SUM(dm.client_calls_ib + dm.client_calls_ob) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
          AND dm.metric_date >= ${startDate}::date
-         AND dm.metric_date < ${endExclusive}::date), 0) AS week_client_calls
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_client_calls,
+
+        COALESCE((SELECT SUM(dm.win_sheets_created) FROM daily_metrics dm
+         WHERE dm.agent_name = tm.name
+         AND dm.metric_date >= ${startDate}::date
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_win_sheets_created
 
       FROM team_members tm
       WHERE tm.is_active = TRUE
-      ORDER BY tm.name
+      ORDER BY tm.team NULLS LAST, tm.name
     `);
 
-    // Daily breakdown for the week (from daily_metrics)
+    // Daily breakdown for the window (from daily_metrics)
     const dailyBreakdown = await db.execute(sql`
       SELECT
         dm.agent_name AS agent,
@@ -124,6 +153,7 @@ export const GET = async (req: NextRequest) => {
         dm.ssa_calls,
         dm.client_calls_ib,
         dm.client_calls_ob,
+        dm.win_sheets_created,
         dm.notes
       FROM daily_metrics dm
       WHERE dm.metric_date >= ${startDate}::date
@@ -131,36 +161,72 @@ export const GET = async (req: NextRequest) => {
       ORDER BY dm.agent_name, dm.metric_date
     `);
 
-    // Compute team-wide summary
-    const agents = (teamTotals as Record<string, string | number>[]).map(
+    const agents = (teamTotals as Record<string, string | number | null>[]).map(
       (r) => ({
         agent: String(r.agent),
+        team: r.team ? String(r.team) : null,
         casesAssigned: Number(r.cases_assigned),
+        openCases: Number(r.open_cases),
+        casesClosed: Number(r.cases_closed),
         completedWinSheets: Number(r.completed_win_sheets),
+        winSheetsCreated: Number(r.week_win_sheets_created),
         unpaidT2Over60: Number(r.unpaid_t2_over_60),
         unpaidT16Over60: Number(r.unpaid_t16_over_60),
         unpaidConcOver60: Number(r.unpaid_conc_over_60),
         totalCollected: Number(r.total_collected),
+        feesCollectedInWindow: Number(r.fees_collected_in_window),
         casesFullFee: Number(r.cases_full_fee),
         weekSsaCalls: Number(r.week_ssa_calls),
         weekClientCalls: Number(r.week_client_calls),
       }),
     );
 
+    // Overall summary (all agents)
     const summary = {
       totalCasesAssigned: agents.reduce((s, a) => s + a.casesAssigned, 0),
-      totalCompletedWinSheets: agents.reduce(
-        (s, a) => s + a.completedWinSheets,
-        0,
-      ),
+      totalOpenCases: agents.reduce((s, a) => s + a.openCases, 0),
+      totalCasesClosed: agents.reduce((s, a) => s + a.casesClosed, 0),
+      totalCompletedWinSheets: agents.reduce((s, a) => s + a.completedWinSheets, 0),
+      totalWinSheetsCreated: agents.reduce((s, a) => s + a.winSheetsCreated, 0),
       totalUnpaidT2Over60: agents.reduce((s, a) => s + a.unpaidT2Over60, 0),
       totalUnpaidT16Over60: agents.reduce((s, a) => s + a.unpaidT16Over60, 0),
       totalUnpaidConcOver60: agents.reduce((s, a) => s + a.unpaidConcOver60, 0),
       totalCollected: agents.reduce((s, a) => s + a.totalCollected, 0),
+      totalFeesCollectedInWindow: agents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
       totalCasesFullFee: agents.reduce((s, a) => s + a.casesFullFee, 0),
       totalSsaCalls: agents.reduce((s, a) => s + a.weekSsaCalls, 0),
       totalClientCalls: agents.reduce((s, a) => s + a.weekClientCalls, 0),
     };
+
+    // Team-level aggregation — group agents by team, exclude unassigned
+    const TEAM_ORDER = ["T2", "T16", "Concurrent"];
+    const teamMap = new Map<string, typeof agents>();
+    for (const a of agents) {
+      if (!a.team) continue;
+      const bucket = teamMap.get(a.team) ?? [];
+      bucket.push(a);
+      teamMap.set(a.team, bucket);
+    }
+    const teams = TEAM_ORDER.filter((t) => teamMap.has(t)).map((teamName) => {
+      const members = teamMap.get(teamName)!;
+      return {
+        team: teamName,
+        agentCount: members.length,
+        casesAssigned: members.reduce((s, a) => s + a.casesAssigned, 0),
+        openCases: members.reduce((s, a) => s + a.openCases, 0),
+        casesClosed: members.reduce((s, a) => s + a.casesClosed, 0),
+        completedWinSheets: members.reduce((s, a) => s + a.completedWinSheets, 0),
+        winSheetsCreated: members.reduce((s, a) => s + a.winSheetsCreated, 0),
+        unpaidT2Over60: members.reduce((s, a) => s + a.unpaidT2Over60, 0),
+        unpaidT16Over60: members.reduce((s, a) => s + a.unpaidT16Over60, 0),
+        unpaidConcOver60: members.reduce((s, a) => s + a.unpaidConcOver60, 0),
+        totalCollected: members.reduce((s, a) => s + a.totalCollected, 0),
+        feesCollectedInWindow: members.reduce((s, a) => s + a.feesCollectedInWindow, 0),
+        casesFullFee: members.reduce((s, a) => s + a.casesFullFee, 0),
+        ssaCalls: members.reduce((s, a) => s + a.weekSsaCalls, 0),
+        clientCalls: members.reduce((s, a) => s + a.weekClientCalls, 0),
+      };
+    });
 
     const daily = (dailyBreakdown as Record<string, string | number>[]).map(
       (r) => ({
@@ -169,6 +235,7 @@ export const GET = async (req: NextRequest) => {
         ssaCalls: Number(r.ssa_calls),
         clientCallsIb: Number(r.client_calls_ib),
         clientCallsOb: Number(r.client_calls_ob),
+        winSheetsCreated: Number(r.win_sheets_created),
         notes: r.notes ? String(r.notes) : null,
       }),
     );
@@ -179,6 +246,7 @@ export const GET = async (req: NextRequest) => {
       end: useRange ? toParam : addDays(monday, 6),
       summary,
       agents,
+      teams,
       daily,
     });
   } catch (error) {
