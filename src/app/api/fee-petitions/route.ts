@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { cases, feePetitions } from "@/lib/db/schema";
+import { cases, feePetitions, feeRecords } from "@/lib/db/schema";
 import { eq, ilike, sql } from "drizzle-orm";
 
 const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress"] as const;
@@ -77,8 +77,9 @@ export const GET = async (req: NextRequest) => {
 
     // Accept both the legacy enum value and the worksheet-direct label
     // saved via the dashboard dropdown (column C in the master sheet uses
-    // "FEE PETITION" with a space).
+    // "FEE PETITION" with a space). Exclude cases already closed to Fees Closed.
     const whereClause = sql`${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
+      AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)
       ${searchClause}
       ${statusClause}
       ${touchedClause}
@@ -94,6 +95,7 @@ export const GET = async (req: NextRequest) => {
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
+      .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
       .where(whereClause);
 
     const total = agg?.total ?? 0;
@@ -128,6 +130,7 @@ export const GET = async (req: NextRequest) => {
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
+      .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
       .where(whereClause)
       .orderBy(orderClause)
       .limit(limit)
