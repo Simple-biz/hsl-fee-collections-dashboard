@@ -11,6 +11,7 @@ export const GET = async () => {
         id: teamMembers.id,
         name: teamMembers.name,
         role: teamMembers.role,
+        team: teamMembers.team,
         isActive: teamMembers.isActive,
         createdAt: teamMembers.createdAt,
         caseCount: count(feeRecords.id),
@@ -28,6 +29,7 @@ export const GET = async () => {
         teamMembers.id,
         teamMembers.name,
         teamMembers.role,
+        teamMembers.team,
         teamMembers.isActive,
         teamMembers.createdAt,
       )
@@ -37,6 +39,7 @@ export const GET = async () => {
       id: r.id,
       name: r.name,
       role: r.role,
+      team: r.team ?? null,
       isActive: r.isActive,
       createdAt: r.createdAt,
       cases: Number(r.caseCount) || 0,
@@ -59,7 +62,7 @@ export const GET = async () => {
 export const POST = async (req: NextRequest) => {
   try {
     const body = await req.json();
-    const { name, role } = body;
+    const { name, role, team } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -67,6 +70,7 @@ export const POST = async (req: NextRequest) => {
 
     const trimmedName = name.trim();
     const trimmedRole = (role || "collections_specialist").trim();
+    const trimmedTeam = team ? String(team).trim() : null;
 
     // Check for duplicate
     const existing = await db
@@ -84,7 +88,7 @@ export const POST = async (req: NextRequest) => {
 
     const [created] = await db
       .insert(teamMembers)
-      .values({ name: trimmedName, role: trimmedRole })
+      .values({ name: trimmedName, role: trimmedRole, team: trimmedTeam })
       .returning();
 
     return NextResponse.json({ data: created }, { status: 201 });
@@ -101,7 +105,7 @@ export const POST = async (req: NextRequest) => {
 export const PATCH = async (req: NextRequest) => {
   try {
     const body = await req.json();
-    const { id, name, role, isActive } = body;
+    const { id, name, role, team, isActive } = body;
 
     if (!id || typeof id !== "number") {
       return NextResponse.json(
@@ -113,6 +117,7 @@ export const PATCH = async (req: NextRequest) => {
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name.trim();
     if (role !== undefined) updates.role = role.trim();
+    if (team !== undefined) updates.team = team ? String(team).trim() : null;
     if (isActive !== undefined) updates.isActive = Boolean(isActive);
 
     if (Object.keys(updates).length === 0) {

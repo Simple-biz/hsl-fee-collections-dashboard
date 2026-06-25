@@ -54,20 +54,22 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
 
   // Fetch unread notification count
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
     const fetchCount = async () => {
       try {
-        const res = await fetch("/api/notifications?unread=true&limit=1");
+        const res = await fetch("/api/notifications?unread=true&limit=1", { signal });
         if (res.ok) {
           const json = await res.json();
           setUnreadCount(json.unreadCount || 0);
         }
-      } catch {
-        /* silent */
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
       }
     };
     fetchCount();
     const interval = setInterval(fetchCount, 60000); // poll every 60s
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); controller.abort(); };
   }, []);
 
   useEffect(() => {

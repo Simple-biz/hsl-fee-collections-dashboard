@@ -401,6 +401,7 @@ export const teamMembers = pgTable("team_members", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull().unique(),
   role: varchar("role", { length: 100 }).default("collections_specialist"),
+  team: varchar("team", { length: 20 }),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -501,6 +502,7 @@ export const dailyMetrics = pgTable(
     ssaCalls: integer("ssa_calls").notNull().default(0),
     clientCallsIb: integer("client_calls_ib").notNull().default(0),
     clientCallsOb: integer("client_calls_ob").notNull().default(0),
+    winSheetsCreated: integer("win_sheets_created").notNull().default(0),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useSyncExternalStore,
+  useRef,
 } from "react";
 import { useTheme } from "next-themes";
 import {
@@ -170,15 +171,20 @@ export default function SettingsPage() {
   const [capNotes, setCapNotes] = useState("");
   const [addingCap, setAddingCap] = useState(false);
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchSettings = useCallback(async () => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     setLoading(true);
     setError(null);
     try {
       const [settingsRes, connRes] = await Promise.all([
-        fetch("/api/settings"),
-        fetch("/api/settings/connections"),
+        fetch("/api/settings", { signal: controller.signal }),
+        fetch("/api/settings/connections", { signal: controller.signal }),
       ]);
-      if (!settingsRes.ok) throw new Error("Failed to load settings");
+      if (!settingsRes.ok) throw new Error(`Failed to load settings (${settingsRes.status})`);
       const sJson = await settingsRes.json();
       setSettings(sJson.settings || []);
       setFeeCaps(sJson.feeCaps || []);
@@ -193,6 +199,7 @@ export default function SettingsPage() {
       }
       setEdits(initial);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -201,6 +208,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
+    return () => fetchAbortRef.current?.abort();
   }, [fetchSettings]);
 
   const editValue = (key: string, value: string) => {

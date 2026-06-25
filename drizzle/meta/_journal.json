@@ -162,6 +162,13 @@
       "when": 1781639172443,
       "tag": "0022_archive_related_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1781721739564,
+      "tag": "0023_team_daily_tracking_schema",
+      "breakpoints": true
     }
   ]
 }

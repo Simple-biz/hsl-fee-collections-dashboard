@@ -147,7 +147,7 @@ function ClientDetailsSection({
           {ud.cellPhone && (
             <div>
               <p className={`${lbl} flex items-center gap-1`}><Phone aria-hidden="true" className="h-3 w-3" /> Cell Phone</p>
-              <p className={val}>{ud.cellPhone}</p>
+              <a href={`tel:${ud.cellPhone}`} className={`${val} hover:underline`}>{ud.cellPhone}</a>
             </div>
           )}
           {ud.email && (

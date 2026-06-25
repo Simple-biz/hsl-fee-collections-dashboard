@@ -784,7 +784,7 @@ export const OverpaidCases = () => {
           {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
               <div
-                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+                className="h-1.5 rounded-full bg-emerald-500 transition-[width] duration-300"
                 style={{ width: `${Math.min(100, (stats.clearedCount / total) * 100)}%` }}
               />
             </div>
@@ -799,7 +799,7 @@ export const OverpaidCases = () => {
           {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
               <div
-                className="h-1.5 rounded-full bg-indigo-500 transition-all duration-300"
+                className="h-1.5 rounded-full bg-indigo-500 transition-[width] duration-300"
                 style={{ width: `${Math.min(100, (stats.ltrCount / total) * 100)}%` }}
               />
             </div>

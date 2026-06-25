@@ -259,11 +259,12 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                             )}
                           </div>
                           {user.name && (
-                            <div
-                              className={`text-[10px] ${t.textMuted} truncate`}
+                            <a
+                              href={`mailto:${user.email}`}
+                              className={`text-[10px] ${t.textMuted} truncate hover:underline`}
                             >
                               {user.email}
-                            </div>
+                            </a>
                           )}
                         </div>
                       </div>
@@ -638,7 +639,7 @@ function ResetPasswordDialog({
           <DialogTitle>Reset password</DialogTitle>
           <DialogDescription>
             A new temporary password has been generated for{" "}
-            <span className="font-semibold">{target?.email}</span>. Copy it and
+            <a href={`mailto:${target?.email}`} className="font-semibold hover:underline">{target?.email}</a>. Copy it and
             share out-of-band before closing.
           </DialogDescription>
         </DialogHeader>
