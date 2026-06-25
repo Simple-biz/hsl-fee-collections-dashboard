@@ -116,20 +116,22 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
 
   // Poll notification unread count
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
     const fetchCount = async () => {
       try {
-        const res = await fetch("/api/notifications?unread=true&limit=1");
+        const res = await fetch("/api/notifications?unread=true&limit=1", { signal });
         if (res.ok) {
           const json = await res.json();
           setNotifCount(json.unreadCount || 0);
         }
-      } catch {
-        /* silent */
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
       }
     };
     fetchCount();
     const interval = setInterval(fetchCount, 60000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); controller.abort(); };
   }, []);
 
   useEffect(() => {
@@ -160,21 +162,26 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
       };
     }
+    const controller = new AbortController();
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
         const res = await fetch(
           `/api/cases?search=${encodeURIComponent(searchQuery.trim())}&limit=8`,
+          { signal: controller.signal },
         );
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data.data || []);
         }
-      } catch {}
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+      }
       setSearching(false);
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      controller.abort();
     };
   }, [searchQuery]);
 
@@ -208,7 +215,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
   return (
     <>
       <aside
-        className={`${open ? "w-64" : "w-14"} ${t.bg} border-r ${t.border} flex flex-col transition-all duration-200 shrink-0 overflow-hidden`}
+        className={`${open ? "w-64" : "w-14"} ${t.bg} border-r ${t.border} flex flex-col transition-[width] duration-200 shrink-0 overflow-hidden`}
       >
         {/* Logo */}
         <div
@@ -301,6 +308,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                   >
                     <div className="relative shrink-0">
                       <item.icon
+                        aria-hidden="true"
                         className={`h-4 w-4 ${active ? "" : t.textMuted}`}
                       />
                       {item.path === "/notifications" &&
@@ -343,7 +351,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                 }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${t.textSub} ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}
               >
-                <KeyRound className="h-4 w-4 shrink-0" />
+                <KeyRound aria-hidden="true" className="h-4 w-4 shrink-0" />
                 Change password
               </button>
               <div className={`border-t ${t.borderLight}`} />
@@ -351,7 +359,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${dark ? "text-red-400 hover:bg-neutral-800" : "text-red-600 hover:bg-neutral-50"}`}
               >
-                <LogOut className="h-4 w-4 shrink-0" />
+                <LogOut aria-hidden="true" className="h-4 w-4 shrink-0" />
                 Sign out
               </button>
             </div>

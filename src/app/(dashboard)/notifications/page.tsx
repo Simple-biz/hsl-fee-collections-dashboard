@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import {
@@ -122,17 +122,23 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [markingAll, setMarkingAll] = useState(false);
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchNotifications = useCallback(async () => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/notifications?limit=100&computeLive=true");
-      if (!res.ok) throw new Error("Failed to fetch notifications");
+      const res = await fetch("/api/notifications?limit=100&computeLive=true", { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to fetch notifications (${res.status})`);
       const json = await res.json();
       setStored(json.notifications || []);
       setLive(json.liveAlerts || []);
       setUnreadCount(json.unreadCount || 0);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -141,6 +147,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications();
+    return () => fetchAbortRef.current?.abort();
   }, [fetchNotifications]);
 
   // Combine stored + live, dedupe by id, sort desc

@@ -680,7 +680,7 @@ export const OverpaidCases = () => {
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Fees Confirmation", "O/P Ltr Date", "O/P LTR Date Received", "Notes", "Checks Cleared", "Last Updated"];
+      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Fees Confirmation", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
@@ -784,7 +784,7 @@ export const OverpaidCases = () => {
           {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
               <div
-                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+                className="h-1.5 rounded-full bg-emerald-500 transition-[width] duration-300"
                 style={{ width: `${Math.min(100, (stats.clearedCount / total) * 100)}%` }}
               />
             </div>
@@ -799,7 +799,7 @@ export const OverpaidCases = () => {
           {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
               <div
-                className="h-1.5 rounded-full bg-indigo-500 transition-all duration-300"
+                className="h-1.5 rounded-full bg-indigo-500 transition-[width] duration-300"
                 style={{ width: `${Math.min(100, (stats.ltrCount / total) * 100)}%` }}
               />
             </div>
@@ -1183,7 +1183,7 @@ export const OverpaidCases = () => {
                   </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>O/P Ltr Date</th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Notice Sent</th>
                 <th
                   aria-sort={ariaSortFor("opLtrDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -1193,7 +1193,7 @@ export const OverpaidCases = () => {
                     onClick={() => toggleSort("opLtrDate")}
                     className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                   >
-                    O/P LTR Date Received {sortIcon("opLtrDate")}
+                    Notice Received {sortIcon("opLtrDate")}
                   </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left min-w-48 sticky top-0 z-20 ${stickyHeaderBg}`}>Notes</th>

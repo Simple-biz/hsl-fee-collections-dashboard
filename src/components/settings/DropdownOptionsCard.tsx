@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Plus,
@@ -11,6 +11,8 @@ import {
   Pencil,
   Check,
   X,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,8 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const moveAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { moveAbortRef.current?.abort(); }, []);
 
   const sectionCard = `rounded-xl border ${t.card}`;
 
@@ -61,7 +65,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
       const res = await fetch(
         `/api/settings/dropdown-options?category=${encodeURIComponent(category)}`,
       );
-      if (!res.ok) throw new Error("Failed to load options");
+      if (!res.ok) throw new Error(`Failed to load options (${res.status})`);
       const json = await res.json();
       setOptions(json.data || []);
     } catch (e) {
@@ -87,7 +91,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         body: JSON.stringify({ category, name }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Failed to add");
+      if (!res.ok) throw new Error(json.error || `Failed to add (${res.status})`);
       setNewName("");
       await load();
     } catch (e) {
@@ -111,7 +115,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         body: JSON.stringify(patch),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Failed to update");
+      if (!res.ok) throw new Error(json.error || `Failed to update (${res.status})`);
       setEditingId(null);
       await load();
     } catch (e) {
@@ -137,7 +141,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "Failed to delete");
+        throw new Error(j.error || `Failed to delete (${res.status})`);
       }
       await load();
     } catch (e) {
@@ -159,6 +163,67 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
     const name = editName.trim();
     if (!name) return;
     handleUpdate(id, { name });
+  };
+
+  const handleMove = async (id: number, direction: "up" | "down") => {
+    const idx = options.findIndex((o) => o.id === id);
+    if (idx === -1) return;
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === options.length - 1) return;
+    if (busyId !== null) return;
+
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    const a = options[idx];
+    const b = options[swapIdx];
+
+    // Use position-based sort_order values rather than swapping existing ones,
+    // so items that share sort_order=0 (e.g. newly added options) still move correctly.
+    const newOrderA = (swapIdx + 1) * 10;
+    const newOrderB = (idx + 1) * 10;
+
+    const reordered = [...options];
+    reordered[idx] = { ...b, sortOrder: newOrderB };
+    reordered[swapIdx] = { ...a, sortOrder: newOrderA };
+    setOptions(reordered);
+    setBusyId(id);
+    setError(null);
+
+    const controller = new AbortController();
+    moveAbortRef.current = controller;
+    try {
+      await Promise.all([
+        fetch(`/api/settings/dropdown-options/${a.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder: newOrderA }),
+          signal: controller.signal,
+        }).then(async (res) => {
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error((j as { error?: string }).error || `Failed to reorder (${res.status})`);
+          }
+        }),
+        fetch(`/api/settings/dropdown-options/${b.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder: newOrderB }),
+          signal: controller.signal,
+        }).then(async (res) => {
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error((j as { error?: string }).error || `Failed to reorder (${res.status})`);
+          }
+        }),
+      ]);
+      await load();
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setError((e as Error).message);
+      await load();
+    } finally {
+      if (moveAbortRef.current === controller) moveAbortRef.current = null;
+      setBusyId(null);
+    }
   };
 
   return (
@@ -273,12 +338,13 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                           rowBusy ||
                           editName.trim() === opt.name
                         }
+                        aria-label="Save"
                         className="h-7"
                       >
                         {rowBusy ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                         ) : (
-                          <Check className="h-3 w-3" />
+                          <Check className="h-3 w-3" aria-hidden="true" />
                         )}
                       </Button>
                       <Button
@@ -287,13 +353,34 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                         variant="outline"
                         onClick={cancelEdit}
                         disabled={rowBusy}
+                        aria-label="Cancel"
                         className="h-7"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3 w-3" aria-hidden="true" />
                       </Button>
                     </>
                   ) : (
                     <>
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleMove(opt.id, "up")}
+                          disabled={rowBusy || busyId !== null || options.indexOf(opt) === 0}
+                          aria-label={`Move ${opt.name} up`}
+                          className={`h-4 w-5 flex items-center justify-center rounded text-[10px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
+                        >
+                          <ChevronUp aria-hidden="true" className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMove(opt.id, "down")}
+                          disabled={rowBusy || busyId !== null || options.indexOf(opt) === options.length - 1}
+                          aria-label={`Move ${opt.name} down`}
+                          className={`h-4 w-5 flex items-center justify-center rounded text-[10px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
+                        >
+                          <ChevronDown aria-hidden="true" className="h-3 w-3" />
+                        </button>
+                      </div>
                       <span
                         className={`flex-1 text-xs ${opt.isActive ? t.text : t.textMuted} ${opt.isActive ? "" : "line-through"}`}
                       >
@@ -318,9 +405,10 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                         variant="outline"
                         onClick={() => startEdit(opt)}
                         disabled={rowBusy}
+                        aria-label={`Edit ${opt.name}`}
                         className="h-7"
                       >
-                        <Pencil className="h-3 w-3" />
+                        <Pencil className="h-3 w-3" aria-hidden="true" />
                       </Button>
                       <Button
                         type="button"
@@ -328,12 +416,13 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                         variant="outline"
                         onClick={() => handleDelete(opt)}
                         disabled={rowBusy}
+                        aria-label={`Delete ${opt.name}`}
                         className={`h-7 ${dark ? "text-red-400" : "text-red-600"}`}
                       >
                         {rowBusy ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                         ) : (
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" aria-hidden="true" />
                         )}
                       </Button>
                     </>

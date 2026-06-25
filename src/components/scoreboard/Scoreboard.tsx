@@ -31,24 +31,51 @@ import { fmt } from "@/lib/formatters";
 
 interface AgentScore {
   agent: string;
+  team: string | null;
   casesAssigned: number;
+  openCases: number;
+  casesClosed: number;
   completedWinSheets: number;
+  winSheetsCreated: number;
   unpaidT2Over60: number;
   unpaidT16Over60: number;
   unpaidConcOver60: number;
   totalCollected: number;
+  feesCollectedInWindow: number;
   casesFullFee: number;
   weekSsaCalls: number;
   weekClientCalls: number;
 }
 
+interface TeamScore {
+  team: string;
+  agentCount: number;
+  casesAssigned: number;
+  openCases: number;
+  casesClosed: number;
+  completedWinSheets: number;
+  winSheetsCreated: number;
+  unpaidT2Over60: number;
+  unpaidT16Over60: number;
+  unpaidConcOver60: number;
+  totalCollected: number;
+  feesCollectedInWindow: number;
+  casesFullFee: number;
+  ssaCalls: number;
+  clientCalls: number;
+}
+
 interface Summary {
   totalCasesAssigned: number;
+  totalOpenCases: number;
+  totalCasesClosed: number;
   totalCompletedWinSheets: number;
+  totalWinSheetsCreated: number;
   totalUnpaidT2Over60: number;
   totalUnpaidT16Over60: number;
   totalUnpaidConcOver60: number;
   totalCollected: number;
+  totalFeesCollectedInWindow: number;
   totalCasesFullFee: number;
   totalSsaCalls: number;
   totalClientCalls: number;
@@ -60,6 +87,7 @@ interface DailyEntry {
   ssaCalls: number;
   clientCallsIb: number;
   clientCallsOb: number;
+  winSheetsCreated: number;
   notes: string | null;
 }
 
@@ -67,15 +95,17 @@ interface ScoreboardData {
   week: string;
   summary: Summary;
   agents: AgentScore[];
+  teams: TeamScore[];
   daily: DailyEntry[];
 }
 
-// Cell value for the entry grid: [ssaCalls, clientCallsIb, clientCallsOb]
+// Cell value for the entry grid
 type CellKey = `${string}|${string}`;
 interface CellValues {
   ssaCalls: string;
   clientCallsIb: string;
   clientCallsOb: string;
+  winSheetsCreated: string;
 }
 
 // ============================================================================
@@ -223,20 +253,15 @@ export const Scoreboard = () => {
   const filteredSummary = useMemo(
     () => ({
       totalCasesAssigned: filteredAgents.reduce((s, a) => s + a.casesAssigned, 0),
-      totalCompletedWinSheets: filteredAgents.reduce(
-        (s, a) => s + a.completedWinSheets,
-        0,
-      ),
+      totalOpenCases: filteredAgents.reduce((s, a) => s + a.openCases, 0),
+      totalCasesClosed: filteredAgents.reduce((s, a) => s + a.casesClosed, 0),
+      totalCompletedWinSheets: filteredAgents.reduce((s, a) => s + a.completedWinSheets, 0),
+      totalWinSheetsCreated: filteredAgents.reduce((s, a) => s + a.winSheetsCreated, 0),
       totalUnpaidT2Over60: filteredAgents.reduce((s, a) => s + a.unpaidT2Over60, 0),
-      totalUnpaidT16Over60: filteredAgents.reduce(
-        (s, a) => s + a.unpaidT16Over60,
-        0,
-      ),
-      totalUnpaidConcOver60: filteredAgents.reduce(
-        (s, a) => s + a.unpaidConcOver60,
-        0,
-      ),
+      totalUnpaidT16Over60: filteredAgents.reduce((s, a) => s + a.unpaidT16Over60, 0),
+      totalUnpaidConcOver60: filteredAgents.reduce((s, a) => s + a.unpaidConcOver60, 0),
       totalCollected: filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
+      totalFeesCollectedInWindow: filteredAgents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
       totalCasesFullFee: filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
       totalSsaCalls: filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
       totalClientCalls: filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
@@ -278,16 +303,21 @@ export const Scoreboard = () => {
         : formatWeekLabel(monday);
 
   // Fetch scoreboard data
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchScoreboard = useCallback(async () => {
     if (!windowReady) {
       setLoading(false);
       return;
     }
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/scoreboard?${scoreboardQuery}`);
-      if (!res.ok) throw new Error("Failed to fetch scoreboard");
+      const res = await fetch(`/api/scoreboard?${scoreboardQuery}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to fetch scoreboard (${res.status})`);
       const json = await res.json();
       setData(json);
 
@@ -299,12 +329,14 @@ export const Scoreboard = () => {
             ssaCalls: d.ssaCalls > 0 ? String(d.ssaCalls) : "",
             clientCallsIb: d.clientCallsIb > 0 ? String(d.clientCallsIb) : "",
             clientCallsOb: d.clientCallsOb > 0 ? String(d.clientCallsOb) : "",
+            winSheetsCreated: d.winSheetsCreated > 0 ? String(d.winSheetsCreated) : "",
           });
         }
       }
       setCells(map);
       setDirty(false);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -313,6 +345,7 @@ export const Scoreboard = () => {
 
   useEffect(() => {
     fetchScoreboard();
+    return () => fetchAbortRef.current?.abort();
   }, [fetchScoreboard]);
 
   // Auto-scroll to entry panel when opened
@@ -328,15 +361,10 @@ export const Scoreboard = () => {
   }, [entryOpen]);
 
   // Cell accessors
-  const getCell = (agent: string, date: string): CellValues => {
-    return (
-      cells.get(cellKey(agent, date)) || {
-        ssaCalls: "",
-        clientCallsIb: "",
-        clientCallsOb: "",
-      }
-    );
-  };
+  const EMPTY_CELL: CellValues = { ssaCalls: "", clientCallsIb: "", clientCallsOb: "", winSheetsCreated: "" };
+
+  const getCell = (agent: string, date: string): CellValues =>
+    cells.get(cellKey(agent, date)) ?? { ...EMPTY_CELL };
 
   const setCell = (
     agent: string,
@@ -346,11 +374,7 @@ export const Scoreboard = () => {
   ) => {
     setCells((prev) => {
       const next = new Map(prev);
-      const existing = next.get(cellKey(agent, date)) || {
-        ssaCalls: "",
-        clientCallsIb: "",
-        clientCallsOb: "",
-      };
+      const existing = next.get(cellKey(agent, date)) ?? { ...EMPTY_CELL };
       next.set(cellKey(agent, date), { ...existing, [field]: value });
       return next;
     });
@@ -360,16 +384,15 @@ export const Scoreboard = () => {
 
   // Agent weekly totals from cells
   const agentCellTotals = (agent: string) => {
-    let ssa = 0,
-      ib = 0,
-      ob = 0;
+    let ssa = 0, ib = 0, ob = 0, ws = 0;
     for (const day of weekDays) {
       const c = getCell(agent, day.date);
       ssa += parseInt(c.ssaCalls) || 0;
       ib += parseInt(c.clientCallsIb) || 0;
       ob += parseInt(c.clientCallsOb) || 0;
+      ws += parseInt(c.winSheetsCreated) || 0;
     }
-    return { ssa, ib, ob, total: ssa + ib + ob };
+    return { ssa, ib, ob, ws, total: ssa + ib + ob };
   };
 
   // Save all cells
@@ -383,6 +406,7 @@ export const Scoreboard = () => {
         ssaCalls: number;
         clientCallsIb: number;
         clientCallsOb: number;
+        winSheetsCreated: number;
       }[] = [];
 
       if (data) {
@@ -392,11 +416,12 @@ export const Scoreboard = () => {
             const ssa = parseInt(c.ssaCalls) || 0;
             const ib = parseInt(c.clientCallsIb) || 0;
             const ob = parseInt(c.clientCallsOb) || 0;
-            // Only send if there's any value (or if there was previously a value — to allow clearing)
+            const ws = parseInt(c.winSheetsCreated) || 0;
             if (
               ssa > 0 ||
               ib > 0 ||
               ob > 0 ||
+              ws > 0 ||
               cells.has(cellKey(agent.agent, day.date))
             ) {
               entries.push({
@@ -405,6 +430,7 @@ export const Scoreboard = () => {
                 ssaCalls: ssa,
                 clientCallsIb: ib,
                 clientCallsOb: ob,
+                winSheetsCreated: ws,
               });
             }
           }
@@ -423,7 +449,7 @@ export const Scoreboard = () => {
         body: JSON.stringify({ entries }),
       });
 
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) throw new Error(`Failed to save (${res.status})`);
 
       setSaveMsg(`Saved ${entries.length} entries`);
       setDirty(false);
@@ -648,6 +674,58 @@ export const Scoreboard = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Team breakdown — only shown when teams data is present */}
+              {data.teams && data.teams.length > 0 && (
+                <div className={`p-4 border-b ${t.borderLight}`}>
+                  <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-3`}>
+                    By Team — {windowLabel}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {data.teams.map((team) => {
+                      const teamColor =
+                        team.team === "T2"
+                          ? dark ? "border-blue-700/50 bg-blue-900/10" : "border-blue-200 bg-blue-50/60"
+                          : team.team === "T16"
+                          ? dark ? "border-purple-700/50 bg-purple-900/10" : "border-purple-200 bg-purple-50/60"
+                          : dark ? "border-teal-700/50 bg-teal-900/10" : "border-teal-200 bg-teal-50/60";
+                      const teamLabel =
+                        team.team === "T2" ? "T2 Team"
+                        : team.team === "T16" ? "T16 Team"
+                        : "Concurrent Team";
+                      const accentText =
+                        team.team === "T2"
+                          ? dark ? "text-blue-400" : "text-blue-700"
+                          : team.team === "T16"
+                          ? dark ? "text-purple-400" : "text-purple-700"
+                          : dark ? "text-teal-400" : "text-teal-700";
+                      return (
+                        <div key={team.team} className={`rounded-lg border p-4 ${teamColor}`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className={`text-xs font-bold ${accentText}`}>{teamLabel}</span>
+                            <span className={`text-[10px] ${t.textMuted}`}>{team.agentCount} agent{team.agentCount !== 1 ? "s" : ""}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { label: "Fees Collected", value: fmt(team.feesCollectedInWindow) },
+                              { label: "SSA Calls", value: team.ssaCalls },
+                              { label: "CL Calls", value: team.clientCalls },
+                              { label: "Win Sheets", value: team.winSheetsCreated },
+                              { label: "Cases Closed", value: team.casesClosed },
+                              { label: "Open Cases", value: team.openCases },
+                            ].map((stat) => (
+                              <div key={stat.label}>
+                                <p className={`text-[9px] font-medium uppercase tracking-wide ${t.textMuted}`}>{stat.label}</p>
+                                <p className={`text-sm font-bold ${t.text} mt-0.5`}>{stat.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Monitoring filters (client-side, current week) */}
               <div
@@ -991,7 +1069,7 @@ export const Scoreboard = () => {
                       <tr className={rowBorder}>
                         <td
                           className={`${tdBase} ${t.text} font-semibold align-middle`}
-                          rowSpan={3}
+                          rowSpan={4}
                         >
                           <div className="flex items-center gap-2">
                             <div
@@ -1067,7 +1145,7 @@ export const Scoreboard = () => {
                         </td>
                       </tr>
                       {/* Row 3: Client OB */}
-                      <tr className={`border-b ${rowBorder}`}>
+                      <tr className={rowBorder}>
                         <td
                           className={`px-2 py-1.5 text-[10px] font-medium ${dark ? "text-amber-400" : "text-amber-600"} whitespace-nowrap`}
                         >
@@ -1098,6 +1176,33 @@ export const Scoreboard = () => {
                           className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ob > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
                         >
                           {totals.ob || "—"}
+                        </td>
+                      </tr>
+                      {/* Row 4: Win Sheets Created */}
+                      <tr className={`border-b ${rowBorder}`}>
+                        <td
+                          className={`px-2 py-1.5 text-[10px] font-medium ${dark ? "text-violet-400" : "text-violet-600"} whitespace-nowrap`}
+                        >
+                          Win Sheets
+                        </td>
+                        {weekDays.map((day) => (
+                          <td key={day.date} className="px-1 py-1 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              value={getCell(agent.agent, day.date).winSheetsCreated}
+                              onChange={(e) =>
+                                setCell(agent.agent, day.date, "winSheetsCreated", e.target.value)
+                              }
+                              placeholder="0"
+                              className={miniInput}
+                            />
+                          </td>
+                        ))}
+                        <td
+                          className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ws > 0 ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}
+                        >
+                          {totals.ws || "—"}
                         </td>
                       </tr>
                     </React.Fragment>
