@@ -4,9 +4,7 @@ import { useTheme } from "next-themes";
 import { StatCards } from "@/components/cases/StatCards";
 import { CollectionsPanel } from "@/components/cases/CollectionsPanel";
 import { RevenuePanel } from "@/components/cases/RevenuePanel";
-import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
 import { useDashboard } from "@/hooks/useDashboard";
-import { useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
 
@@ -15,14 +13,10 @@ export default function OverviewPage() {
     cases,
     summary,
     monthlyData,
-    approvedByOptions,
-    dropdownOptions,
     loading,
-    casesLoading,
     error,
     refresh,
   } = useDashboard();
-  const { dateRange } = useDateRange();
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
@@ -62,22 +56,6 @@ export default function OverviewPage() {
         <CollectionsPanel data={monthlyData} />
         <RevenuePanel stats={summary} cases={cases} />
       </div>
-      {casesLoading ? (
-        <div
-          className={`rounded-xl border ${t.card} flex items-center justify-center py-16`}
-        >
-          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
-          <span className={`ml-3 text-sm ${t.textSub}`}>Loading cases...</span>
-        </div>
-      ) : (
-        <FeeRecordsTable
-          cases={cases}
-          dateRange={dateRange}
-          onImported={refresh}
-          approvedByOptions={approvedByOptions}
-          dropdownOptions={dropdownOptions}
-        />
-      )}
     </>
   );
 }
