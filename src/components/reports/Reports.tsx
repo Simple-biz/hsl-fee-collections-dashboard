@@ -13,6 +13,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { ActivityEntry } from "@/components/reports/RecentActivityFeed";
+import { ScoreboardTracker } from "@/components/reports/ScoreboardTracker";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
 
@@ -669,6 +670,8 @@ export const Reports = () => {
           </div>
         </>
       )}
+
+      <ScoreboardTracker dark={dark} t={t} />
     </div>
   );
 };
