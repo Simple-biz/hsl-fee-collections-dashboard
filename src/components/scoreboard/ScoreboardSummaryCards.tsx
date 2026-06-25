@@ -1,5 +1,3 @@
-"use client";
-
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt } from "@/lib/formatters";
 
@@ -69,16 +67,18 @@ export function ScoreboardSummaryCards({
   return (
     <>
       {/* Summary mini-cards */}
-      {showMiniCards && <div className={`grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3`}>
-        {stats.map((item) => (
-          <div key={item.label} className={`rounded-lg border p-3 ${t.card}`}>
-            <p className={`text-[10px] font-medium ${t.textMuted} uppercase`}>
-              {item.label}
-            </p>
-            <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
-          </div>
-        ))}
-      </div>}
+      {showMiniCards && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
+          {stats.map((item) => (
+            <div key={item.label} className={`rounded-lg border p-3 ${t.card}`}>
+              <p className={`text-[10px] font-medium ${t.textMuted} uppercase`}>
+                {item.label}
+              </p>
+              <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Team breakdown */}
       {teams.length > 0 && (

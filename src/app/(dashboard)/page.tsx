@@ -11,7 +11,6 @@ import { RefreshCw, AlertCircle } from "lucide-react";
 import {
   ScoreboardSummaryCards,
   ScoreboardSummary,
-  ScoreboardTeam,
 } from "@/components/scoreboard/ScoreboardSummaryCards";
 import { RecentActivityFeed, ActivityEntry } from "@/components/reports/RecentActivityFeed";
 
@@ -38,7 +37,6 @@ export default function OverviewPage() {
   const t = themeClasses(dark);
 
   const [scoreboardSummary, setScoreboardSummary] = useState<ScoreboardSummary | null>(null);
-  const [scoreboardTeams, setScoreboardTeams] = useState<ScoreboardTeam[]>([]);
   const [scoreboardLabel, setScoreboardLabel] = useState("This Week");
   const [recentActivities, setRecentActivities] = useState<ActivityEntry[]>([]);
 
@@ -54,7 +52,6 @@ export default function OverviewPage() {
       .then((json) => {
         if (cancelled) return;
         setScoreboardSummary(json.summary);
-        setScoreboardTeams(json.teams ?? []);
         if (json.start && json.end) {
           const fmt = (s: string) =>
             new Date(s + "T12:00:00").toLocaleDateString("en-US", {
