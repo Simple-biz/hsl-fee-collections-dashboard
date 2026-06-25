@@ -132,6 +132,84 @@ type SortKey =
   | "collected"
   | "totalAssigned";
 
+// ---------- case type chart ----------
+interface CaseTypeCounts {
+  concurrent: number;
+  t16Only: number;
+  t2Only: number;
+  total: number;
+}
+
+const CaseTypeChart = ({ dark, t }: { dark: boolean; t: ReturnType<typeof themeClasses> }) => {
+  const [counts, setCounts] = useState<CaseTypeCounts | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/reports/case-types", { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load case types (${res.status})`);
+        return res.json();
+      })
+      .then(setCounts)
+      .catch((e) => { if (e.name !== "AbortError") setError(e.message); });
+    return () => controller.abort();
+  }, []);
+
+  const bars = [
+    { label: "Concurrent", sublabel: "T16 + T2", value: counts?.concurrent ?? 0, color: "bg-indigo-500" },
+    { label: "T16 Only",   sublabel: "Title XVI",  value: counts?.t16Only   ?? 0, color: dark ? "bg-blue-500"   : "bg-blue-400" },
+    { label: "T2 Only",    sublabel: "Title II",   value: counts?.t2Only    ?? 0, color: dark ? "bg-violet-500" : "bg-violet-400" },
+  ];
+  const total  = counts?.total ?? 0;
+  const maxVal = Math.max(...bars.map((b) => b.value), 1);
+
+  return (
+    <div className="flex flex-col gap-3 h-full">
+      {/* Legend derived from the same bars config */}
+      <div className="flex items-center gap-4 text-[10px]">
+        {bars.map((b) => (
+          <span key={b.label} className="flex items-center gap-1">
+            <span className={`w-2 h-2 rounded ${b.color}`} aria-hidden="true" />
+            {b.label}
+          </span>
+        ))}
+      </div>
+
+      {error ? (
+        <div className={`flex-1 flex items-center justify-center text-xs ${t.textMuted}`} role="alert">
+          {error}
+        </div>
+      ) : counts == null ? (
+        <div className={`flex-1 flex items-center justify-center text-xs ${t.textMuted}`}>
+          Loading…
+        </div>
+      ) : (
+        <div className="flex gap-6 flex-1 items-end">
+          {bars.map((bar) => {
+            const pct   = (bar.value / maxVal) * 100;
+            const share = total > 0 ? ((bar.value / total) * 100).toFixed(1) : "0.0";
+            return (
+              <div key={bar.label} className="flex flex-col items-center gap-1 flex-1">
+                <span className={`text-sm font-bold ${t.text}`}>{bar.value}</span>
+                <div className="w-full flex items-end" style={{ height: 80 }}>
+                  <div
+                    className={`w-full rounded-t ${bar.color}`}
+                    style={{ height: `${Math.max(pct, bar.value > 0 ? 4 : 0)}%` }}
+                  />
+                </div>
+                <span className={`text-[11px] font-semibold ${t.text}`}>{bar.label}</span>
+                <span className={`text-[10px] ${t.textMuted}`}>{bar.sublabel}</span>
+                <span className={`text-[10px] ${t.textMuted}`}>{share}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ---------- component ----------
 export const Reports = () => {
   const { resolvedTheme } = useTheme();
@@ -516,6 +594,17 @@ export const Reports = () => {
                 </p>
               </div>
             ))}
+          </div>
+
+          {/* Case type distribution */}
+          <div className={`${sectionCard} px-4 pt-4 pb-5`}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className={`text-xs font-bold ${t.text} flex items-center gap-2`}>
+                <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> Case Type Distribution
+              </h4>
+              <span className={`text-[10px] ${t.textMuted}`}>All cases · snapshot</span>
+            </div>
+            <CaseTypeChart dark={dark} t={t} />
           </div>
 
           {/* Chart + Recent Activity side by side */}
