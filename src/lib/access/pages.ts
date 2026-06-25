@@ -13,7 +13,6 @@ export const PAGES = [
   { key: "chronicle", label: "Chronicle Sync", path: "/chronicle" },
   { key: "fee_petitions", label: "Fee Petitions", path: "/fee-petitions" },
   { key: "overpaid_cases", label: "Overpaid Cases", path: "/overpaid-cases" },
-  { key: "mycase", label: "MyCase", path: "/mycase" },
   { key: "reports", label: "Reports", path: "/reports" },
   { key: "notifications", label: "Notifications", path: "/notifications" },
   { key: "team", label: "Team", path: "/team" },

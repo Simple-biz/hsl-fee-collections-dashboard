@@ -25,7 +25,6 @@ import {
   LogOut,
   Shield,
   KeyRound,
-  Scale,
   CheckCircle2,
   Archive,
 } from "lucide-react";
@@ -65,7 +64,6 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
       { path: "/fee-petitions", icon: Gavel, label: "Fee Petitions" },
       { path: "/overpaid-cases", icon: TrendingDown, label: "Overpaid Cases" },
-      { path: "/mycase", icon: Scale, label: "MyCase" },
       { path: "/reports", icon: FileText, label: "Reports" },
       { path: "/notifications", icon: Bell, label: "Notifications" },
     ],
