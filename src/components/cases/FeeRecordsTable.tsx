@@ -192,6 +192,8 @@ export const FeeRecordsTable = ({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("all");
+  const [feesConfFilter, setFeesConfFilter] = useState("all");
+  const [claimFilter, setClaimFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Client-side pagination over the filtered+sorted set. Page size is
@@ -304,6 +306,16 @@ export const FeeRecordsTable = ({
     return Array.from(set).sort();
   }, [cases]);
 
+  // Unique fees-confirmation values present in the data for the filter dropdown.
+  // Derived from cases rather than feesConfirmationOptions so inactive values
+  // that are already set on records remain filterable.
+  const feesConfValues = useMemo(() => {
+    const set = new Set(
+      cases.map((c) => c.feesConfirmation).filter((v): v is string => v != null),
+    );
+    return Array.from(set).sort();
+  }, [cases]);
+
   const filtered = useMemo(() => {
     let d = [...cases];
     // Date range filter (approval date)
@@ -339,8 +351,21 @@ export const FeeRecordsTable = ({
         d = d.filter((c) => c.status === statusFilter);
       }
     }
-    if (assignedFilter !== "all")
-      d = d.filter((c) => c.assigned === assignedFilter);
+    if (assignedFilter === "__unassigned__") {
+      d = d.filter((c) => {
+        const ov = pending[c.id]?.assigned;
+        return ov !== undefined ? !ov : c.assigned === "—";
+      });
+    } else if (assignedFilter !== "all") {
+      d = d.filter((c) => {
+        const ov = pending[c.id]?.assigned;
+        return ov !== undefined ? ov === assignedFilter : c.assigned === assignedFilter;
+      });
+    }
+    if (feesConfFilter !== "all")
+      d = d.filter((c) => c.feesConfirmation === feesConfFilter);
+    if (claimFilter !== "all")
+      d = d.filter((c) => c.claim === claimFilter);
 
     d.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -349,12 +374,18 @@ export const FeeRecordsTable = ({
           av = a.name;
           bv = b.name;
           break;
-        case "assigned":
+        case "assigned": {
           // Empty assignees ("—") sort last regardless of direction so the
           // unassigned bucket never breaks up real groups in the middle.
-          av = a.assigned === "—" ? "￿" : a.assigned.toLowerCase();
-          bv = b.assigned === "—" ? "￿" : b.assigned.toLowerCase();
+          // Use pending override when present (same logic as the filter above).
+          const ova = pending[a.id]?.assigned;
+          const ovb = pending[b.id]?.assigned;
+          const ea = ova !== undefined ? (ova || "—") : a.assigned;
+          const eb = ovb !== undefined ? (ovb || "—") : b.assigned;
+          av = ea === "—" ? "￿" : ea.toLowerCase();
+          bv = eb === "—" ? "￿" : eb.toLowerCase();
           break;
+        }
         case "date":
           av = a.date || "";
           bv = b.date || "";
@@ -380,9 +411,12 @@ export const FeeRecordsTable = ({
     return d;
   }, [
     cases,
+    pending,
     search,
     statusFilter,
     assignedFilter,
+    feesConfFilter,
+    claimFilter,
     sortKey,
     sortDir,
     dateRange,
@@ -409,6 +443,8 @@ export const FeeRecordsTable = ({
     search,
     statusFilter,
     assignedFilter,
+    feesConfFilter,
+    claimFilter,
     sortKey,
     sortDir,
     pageSize,
@@ -567,6 +603,8 @@ export const FeeRecordsTable = ({
   // Case Name cell can't overflow in front of (cover) the Assigned column.
   const colNameW = `w-36 min-w-36 max-w-36 sm:w-48 sm:min-w-48 sm:max-w-48`;
   const colAssignedW = `w-32 min-w-32 max-w-32 sm:w-40 sm:min-w-40 sm:max-w-40`;
+  // left offset: checkbox(40) + name(192) + assigned(160) = 392px = 24.5rem
+  const colFeesConfW = `w-32 min-w-32 max-w-32 sm:w-36 sm:min-w-36 sm:max-w-36`;
 
   // Every header cell is sticky vertically by default — the column-header
   // row (row 2) parks 32px down. Baking this into `thBase` means the ~24
@@ -588,20 +626,21 @@ export const FeeRecordsTable = ({
   // sticky neighbors during scroll.
   const stickyTh1 = `left-10 z-30 ${colNameW} ${nameDivider}`;
   // z-30 only at sm+ (where Assigned is a frozen corner). On mobile Assigned
+  // scrolls, so no sticky-left. Freeze boundary moved to Fees Conf, so no divider here.
   // scrolls, so it must stay at thBase's z-20 — BELOW the frozen Case Name
   // (z-30) — otherwise it paints over the frozen "front index" on scroll.
-  const stickyTh2 = `sm:left-[14.5rem] sm:z-30 ${colAssignedW} ${stickyDivider}`;
-  // "Case Info" group label is split into two cells so each part's freeze
-  // matches the column beneath it: the label over Case Name freezes on all
-  // screens (stickyGroup); the blank part over Assigned freezes only at sm+
-  // (stickyGroup2). This keeps "Case Info" pinned over the frozen Case Name
-  // column on mobile instead of letting T16/T2 labels slide over it.
+  // Assigned: no divider — freeze boundary now sits after Fees Conf.
+  const stickyTh2 = `sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
+  // "Case Info" group label is split into cells so each part's freeze matches
+  // the column beneath it. Three frozen columns: Case Name, Assigned, Fees Conf.
   const stickyGroup = `top-0! left-10 z-30 ${colNameW} ${nameDivider}`;
-  // Same as stickyTh2: z-30 only at sm+ so on mobile this scrolls below the
-  // frozen "Case Info" label (z-30) instead of covering it.
-  const stickyGroup2 = `top-0! sm:left-[14.5rem] sm:z-30 ${colAssignedW} ${stickyDivider}`;
+  const stickyGroup2 = `top-0! sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
+  // Fees Conf is the 3rd frozen column (left offset = 40 + 192 + 160 = 392px = 24.5rem).
+  const stickyGroup3 = `top-0! sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
+  const stickyTh3 = `sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
   const stickyTd1 = `sticky left-10 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
-  const stickyTd2 = `sm:sticky sm:left-[14.5rem] sm:z-10 ${colAssignedW} ${stickyColBg} ${stickyDivider}`;
+  const stickyTd2 = `sm:sticky sm:left-[14.5rem] sm:z-10 ${colAssignedW} ${stickyColBg}`;
+  const stickyTd3 = `sm:sticky sm:left-[24.5rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`;
   const stickyCheckTh = `sticky top-0! left-0 z-30 w-10 min-w-10 ${stickyBg}`;
   const stickyCheckTd = `sticky left-0 z-10 w-10 min-w-10 ${stickyBg} ${stickyHover}`;
 
@@ -632,6 +671,7 @@ export const FeeRecordsTable = ({
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 sm:flex-none">
             <Search
+              aria-hidden="true"
               className={`absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
             />
             <input
@@ -658,11 +698,34 @@ export const FeeRecordsTable = ({
             className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
           >
             <option value="all">All Agents</option>
+            <option value="__unassigned__">Unassigned</option>
             {assignees.map((a) => (
               <option key={a} value={a}>
                 {a}
               </option>
             ))}
+          </select>
+          <select
+            value={feesConfFilter}
+            onChange={(e) => setFeesConfFilter(e.target.value)}
+            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+          >
+            <option value="all">All Fees Conf</option>
+            {feesConfValues.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <select
+            value={claimFilter}
+            onChange={(e) => setClaimFilter(e.target.value)}
+            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+          >
+            <option value="all">All Claims</option>
+            <option value="T2">T2</option>
+            <option value="T16">T16</option>
+            <option value="CONC">CONC</option>
           </select>
           {isAdmin && (
             <>
@@ -783,6 +846,10 @@ export const FeeRecordsTable = ({
                   className={`${thBase} ${t.textSub} text-left ${stickyGroup2}`}
                 />
                 <th
+                  aria-hidden="true"
+                  className={`${thBase} ${t.textSub} text-left ${stickyGroup3}`}
+                />
+                <th
                   colSpan={5}
                   aria-hidden="true"
                   className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
@@ -813,7 +880,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={mode === "closed" ? 8 : 7}
+                  colSpan={mode === "closed" ? 7 : 6}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -837,6 +904,9 @@ export const FeeRecordsTable = ({
                   <span className="flex items-center gap-1">
                     Assigned <ArrowUpDown className="h-3 w-3" />
                   </span>
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left ${stickyTh3}`}>
+                  Fees Conf
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
@@ -929,9 +999,6 @@ export const FeeRecordsTable = ({
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Approved By
-                </th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
-                  Fees Conf
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Remarks
@@ -1049,7 +1116,7 @@ export const FeeRecordsTable = ({
                               e.target.value,
                             )
                           }
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             assignedOptions.length === 0
                               ? "No options configured — add them in Settings"
@@ -1078,6 +1145,74 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
+                    </td>
+                    {/* Fees Confirmation — 3rd frozen column */}
+                    <td
+                      className={`${tdBase} ${t.textSub} ${stickyTd3}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" || !isAdmin ? (
+                        cellValue(c, "feesConfirmation") || "—"
+                      ) : (
+                        <select
+                          value={cellValue(c, "feesConfirmation")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (
+                              canFinalize &&
+                              next &&
+                              next.toLowerCase() === "paid in full" &&
+                              next !== cellValue(c, "feesConfirmation")
+                            ) {
+                              setAckTarget({
+                                caseId: c.id,
+                                caseName: c.name,
+                                triggerField: "feesConfirmation",
+                                triggerValue: next,
+                                triggerLabel: "Fees Confirmation",
+                              });
+                              return;
+                            }
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "feesConfirmation",
+                              "feesConfirmation",
+                              "Fees Confirmation",
+                              next,
+                            );
+                          }}
+                          className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            feesConfirmationOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "feesConfirmation");
+                            return (
+                              v &&
+                              !feesConfirmationOptions.some(
+                                (o) => o.name === v,
+                              ) && <option value={v}>{v}</option>
+                            );
+                          })()}
+                          {feesConfirmationOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "feesConfirmation"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
                     </td>
                     {/* Level — varchar; lives on the cases row. */}
                     <td
@@ -1392,77 +1527,6 @@ export const FeeRecordsTable = ({
                               (o) =>
                                 o.isActive ||
                                 o.name === cellValue(c, "approvedBy"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
-                      )}
-                    </td>
-                    {/* Fees Confirmation */}
-                    <td
-                      className={`${tdBase} ${t.textSub}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {mode === "closed" ? (
-                        cellValue(c, "feesConfirmation") || "—"
-                      ) : (
-                        <select
-                          value={cellValue(c, "feesConfirmation")}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            const next = e.target.value;
-                            // "Paid In Full" prompts the close flow, which is a
-                            // finalize action — only offer it to users who can
-                            // finalize. Others just set the field value.
-                            if (
-                              canFinalize &&
-                              next &&
-                              next.toLowerCase() === "paid in full" &&
-                              next !== cellValue(c, "feesConfirmation")
-                            ) {
-                              setAckTarget({
-                                caseId: c.id,
-                                caseName: c.name,
-                                triggerField: "feesConfirmation",
-                                triggerValue: next,
-                                triggerLabel: "Fees Confirmation",
-                              });
-                              return;
-                            }
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "feesConfirmation",
-                              "feesConfirmation",
-                              "Fees Confirmation",
-                              next,
-                            );
-                          }}
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            feesConfirmationOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "feesConfirmation");
-                            return (
-                              v &&
-                              !feesConfirmationOptions.some(
-                                (o) => o.name === v,
-                              ) && <option value={v}>{v}</option>
-                            );
-                          })()}
-                          {feesConfirmationOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "feesConfirmation"),
                             )
                             .map((o) => (
                               <option key={o.id} value={o.name}>

@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import { pageKeyForPath } from "@/lib/access/pages";
+import { rolePageDefaults } from "@/lib/access/role-defaults";
 
 /**
  * Edge-safe Auth.js configuration.
@@ -55,7 +56,13 @@ export const authConfig = {
         pages.length > 0 &&
         !pages.includes(pageKey)
       ) {
-        return Response.redirect(new URL("/", nextUrl));
+        // Stale-token mitigation: if this page was added to role defaults after
+        // the token was minted, the token won't list it. Allow access when the
+        // current role default includes it so users don't need to re-login.
+        const defaults = rolePageDefaults(auth?.user?.role);
+        if (!defaults.includes(pageKey)) {
+          return Response.redirect(new URL("/", nextUrl));
+        }
       }
 
       return true;

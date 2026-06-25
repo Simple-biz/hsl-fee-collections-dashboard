@@ -48,8 +48,11 @@ export async function requireCapability(
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Unauthenticated" };
 
+  const rawCaps = session.user.capabilities;
   const caps =
-    session.user.capabilities ?? roleCapabilityDefaults(session.user.role);
+    rawCaps && rawCaps.length > 0
+      ? rawCaps
+      : roleCapabilityDefaults(session.user.role);
   if (!hasCapability(caps, capability)) {
     return { ok: false, error: "Forbidden" };
   }
