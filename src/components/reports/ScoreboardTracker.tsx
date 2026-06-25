@@ -178,6 +178,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [dirty, setDirty] = useState(false);
   const entryRef = useRef<HTMLDivElement>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const cancelledRef = useRef(false);
 
   const currentYear = nowForInit.getFullYear();
   const yearOptions = useMemo(
@@ -232,6 +233,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       const res = await fetch(`/api/scoreboard?${scoreboardQuery}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to fetch agent tracking (${res.status})`);
       const json = await res.json();
+      if (cancelledRef.current) return;
       setData({
         agents: json.agents ?? [],
         daily: json.daily ?? [],
@@ -250,16 +252,20 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       setCells(map);
       setDirty(false);
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
+      if ((err as Error).name === "AbortError" || cancelledRef.current) return;
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
   }, [scoreboardQuery, windowReady]);
 
   useEffect(() => {
+    cancelledRef.current = false;
     fetchScoreboard();
-    return () => fetchAbortRef.current?.abort();
+    return () => {
+      cancelledRef.current = true;
+      fetchAbortRef.current?.abort();
+    };
   }, [fetchScoreboard]);
 
   useEffect(() => {
@@ -318,6 +324,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const handleSave = async () => {
     setSaving(true);
     setSaveMsg(null);
+    const controller = new AbortController();
     try {
       const entries: {
         agent: string; date: string;
@@ -342,12 +349,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entries }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Failed to save (${res.status})`);
       setSaveMsg(`Saved ${entries.length} entries`);
       setDirty(false);
       await fetchScoreboard();
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setSaveMsg("Error saving: " + (err as Error).message);
     } finally {
       setSaving(false);
@@ -633,7 +642,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             </div>
             <div className="flex items-center gap-2">
               {saveMsg && (
-                <span className={`text-xs font-medium flex items-center gap-1 ${saveMsg.startsWith("Error") ? "text-red-500" : "text-emerald-500"}`}>
+                <span role="alert" className={`text-xs font-medium flex items-center gap-1 ${saveMsg.startsWith("Error") ? "text-red-500" : "text-emerald-500"}`}>
                   {!saveMsg.startsWith("Error") && <Check className="h-3 w-3" aria-hidden="true" />}
                   {saveMsg}
                 </span>
