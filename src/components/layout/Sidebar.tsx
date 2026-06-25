@@ -27,6 +27,7 @@ import {
   KeyRound,
   CheckCircle2,
   Archive,
+  TableProperties,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtClaim } from "@/lib/formatters";
@@ -59,6 +60,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
     section: "General",
     items: [
       { path: "/", icon: Home, label: "Overview" },
+      { path: "/master-fees", icon: TableProperties, label: "Master Fees" },
       { path: "/fees-closed", icon: CheckCircle2, label: "Fees Closed" },
       { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
