@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+import { requireCapability, requireAdmin, guardStatus } from "@/lib/auth-helpers";
 
 // Fee fields that count as "finalizing" a case — gated by case.finalize rather
 // than the broader case.update (members can record payments but not close,
@@ -345,6 +345,16 @@ export const PATCH = async (
         return NextResponse.json(
           { error: "You don't have permission to close, reopen, mark overpaid, or approve cases." },
           { status: guardStatus(fin.error) },
+        );
+      }
+    }
+
+    if (feeFields && "feesConfirmation" in feeFields) {
+      const admin = await requireAdmin();
+      if (!admin.ok) {
+        return NextResponse.json(
+          { error: "Only admins can update Fees Confirmation." },
+          { status: guardStatus(admin.error) },
         );
       }
     }
