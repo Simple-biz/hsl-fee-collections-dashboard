@@ -24,10 +24,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import {
   fmtFull,
   fmtDate,
-  fmtClaim,
   fmtClaimLong,
-  STATUS_LABELS,
-  getStatusColor,
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
