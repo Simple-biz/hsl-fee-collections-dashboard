@@ -608,6 +608,7 @@ export const Scoreboard = () => {
                   label={windowLabel}
                   dark={dark}
                   t={t}
+                  showMiniCards={false}
                 />
               </div>
 

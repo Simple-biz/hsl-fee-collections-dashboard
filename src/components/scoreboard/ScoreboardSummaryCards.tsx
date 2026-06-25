@@ -43,6 +43,7 @@ interface ScoreboardSummaryCardsProps {
   label: string;
   dark: boolean;
   t: ReturnType<typeof themeClasses>;
+  showMiniCards?: boolean;
 }
 
 export function ScoreboardSummaryCards({
@@ -51,6 +52,7 @@ export function ScoreboardSummaryCards({
   label,
   dark,
   t,
+  showMiniCards = true,
 }: ScoreboardSummaryCardsProps) {
   const stats = [
     { label: "Cases Assigned", value: summary.totalCasesAssigned },
@@ -67,7 +69,7 @@ export function ScoreboardSummaryCards({
   return (
     <>
       {/* Summary mini-cards */}
-      <div className={`grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3`}>
+      {showMiniCards && <div className={`grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3`}>
         {stats.map((item) => (
           <div key={item.label} className={`rounded-lg border p-3 ${t.card}`}>
             <p className={`text-[10px] font-medium ${t.textMuted} uppercase`}>
@@ -76,7 +78,7 @@ export function ScoreboardSummaryCards({
             <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Team breakdown */}
       {teams.length > 0 && (
