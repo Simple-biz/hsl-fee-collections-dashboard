@@ -176,9 +176,14 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
     const a = options[idx];
     const b = options[swapIdx];
 
+    // Use position-based sort_order values rather than swapping existing ones,
+    // so items that share sort_order=0 (e.g. newly added options) still move correctly.
+    const newOrderA = (swapIdx + 1) * 10;
+    const newOrderB = (idx + 1) * 10;
+
     const reordered = [...options];
-    reordered[idx] = b;
-    reordered[swapIdx] = a;
+    reordered[idx] = { ...b, sortOrder: newOrderB };
+    reordered[swapIdx] = { ...a, sortOrder: newOrderA };
     setOptions(reordered);
     setBusyId(id);
     setError(null);
@@ -190,7 +195,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         fetch(`/api/settings/dropdown-options/${a.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sortOrder: b.sortOrder }),
+          body: JSON.stringify({ sortOrder: newOrderA }),
           signal: controller.signal,
         }).then(async (res) => {
           if (!res.ok) {
@@ -201,7 +206,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         fetch(`/api/settings/dropdown-options/${b.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sortOrder: a.sortOrder }),
+          body: JSON.stringify({ sortOrder: newOrderB }),
           signal: controller.signal,
         }).then(async (res) => {
           if (!res.ok) {
