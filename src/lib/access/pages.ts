@@ -8,6 +8,7 @@
 
 export const PAGES = [
   { key: "overview", label: "Overview", path: "/" },
+  { key: "master_fees", label: "Master Fees", path: "/master-fees" },
   { key: "fees_closed", label: "Fees Closed", path: "/fees-closed" },
   { key: "scoreboard", label: "Scoreboard", path: "/scoreboard" },
   { key: "chronicle", label: "Chronicle Sync", path: "/chronicle" },

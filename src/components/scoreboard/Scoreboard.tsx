@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt } from "@/lib/formatters";
+import { ScoreboardSummaryCards } from "./ScoreboardSummaryCards";
+import type { ScoreboardSummary, ScoreboardTeam } from "./ScoreboardSummaryCards";
 
 // ============================================================================
 // Types
@@ -47,39 +49,8 @@ interface AgentScore {
   weekClientCalls: number;
 }
 
-interface TeamScore {
-  team: string;
-  agentCount: number;
-  casesAssigned: number;
-  openCases: number;
-  casesClosed: number;
-  completedWinSheets: number;
-  winSheetsCreated: number;
-  unpaidT2Over60: number;
-  unpaidT16Over60: number;
-  unpaidConcOver60: number;
-  totalCollected: number;
-  feesCollectedInWindow: number;
-  casesFullFee: number;
-  ssaCalls: number;
-  clientCalls: number;
-}
-
-interface Summary {
-  totalCasesAssigned: number;
-  totalOpenCases: number;
-  totalCasesClosed: number;
-  totalCompletedWinSheets: number;
-  totalWinSheetsCreated: number;
-  totalUnpaidT2Over60: number;
-  totalUnpaidT16Over60: number;
-  totalUnpaidConcOver60: number;
-  totalCollected: number;
-  totalFeesCollectedInWindow: number;
-  totalCasesFullFee: number;
-  totalSsaCalls: number;
-  totalClientCalls: number;
-}
+type TeamScore = ScoreboardTeam;
+type Summary = ScoreboardSummary;
 
 interface DailyEntry {
   agent: string;
@@ -629,103 +600,17 @@ export const Scoreboard = () => {
         ) : (
           data && (
             <>
-              {/* Summary cards */}
-              <div
-                className={`grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3 p-4 border-b ${t.borderLight}`}
-              >
-                {[
-                  {
-                    label: "Cases Assigned",
-                    value: filteredSummary.totalCasesAssigned,
-                  },
-                  {
-                    label: "Win Sheets",
-                    value: filteredSummary.totalCompletedWinSheets,
-                  },
-                  { label: "T2 >60d", value: filteredSummary.totalUnpaidT2Over60 },
-                  {
-                    label: "T16 >60d",
-                    value: filteredSummary.totalUnpaidT16Over60,
-                  },
-                  {
-                    label: "Conc >60d",
-                    value: filteredSummary.totalUnpaidConcOver60,
-                  },
-                  {
-                    label: "Collected",
-                    value: fmt(filteredSummary.totalCollected),
-                  },
-                  { label: "Full Fee", value: filteredSummary.totalCasesFullFee },
-                  { label: "SSA Calls", value: filteredSummary.totalSsaCalls },
-                  {
-                    label: "Client Calls",
-                    value: filteredSummary.totalClientCalls,
-                  },
-                ].map((item, i) => (
-                  <div key={i} className={`rounded-lg border p-3 ${t.card}`}>
-                    <p
-                      className={`text-[10px] font-medium ${t.textMuted} uppercase`}
-                    >
-                      {item.label}
-                    </p>
-                    <p className={`text-lg font-bold ${t.text} mt-1`}>
-                      {item.value}
-                    </p>
-                  </div>
-                ))}
+              {/* Summary cards + team breakdown */}
+              <div className={`p-4 border-b ${t.borderLight} space-y-4`}>
+                <ScoreboardSummaryCards
+                  summary={filteredSummary}
+                  teams={data.teams ?? []}
+                  label={windowLabel}
+                  dark={dark}
+                  t={t}
+                  showMiniCards={false}
+                />
               </div>
-
-              {/* Team breakdown — only shown when teams data is present */}
-              {data.teams && data.teams.length > 0 && (
-                <div className={`p-4 border-b ${t.borderLight}`}>
-                  <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-3`}>
-                    By Team — {windowLabel}
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {data.teams.map((team) => {
-                      const teamColor =
-                        team.team === "T2"
-                          ? dark ? "border-blue-700/50 bg-blue-900/10" : "border-blue-200 bg-blue-50/60"
-                          : team.team === "T16"
-                          ? dark ? "border-purple-700/50 bg-purple-900/10" : "border-purple-200 bg-purple-50/60"
-                          : dark ? "border-teal-700/50 bg-teal-900/10" : "border-teal-200 bg-teal-50/60";
-                      const teamLabel =
-                        team.team === "T2" ? "T2 Team"
-                        : team.team === "T16" ? "T16 Team"
-                        : "Concurrent Team";
-                      const accentText =
-                        team.team === "T2"
-                          ? dark ? "text-blue-400" : "text-blue-700"
-                          : team.team === "T16"
-                          ? dark ? "text-purple-400" : "text-purple-700"
-                          : dark ? "text-teal-400" : "text-teal-700";
-                      return (
-                        <div key={team.team} className={`rounded-lg border p-4 ${teamColor}`}>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className={`text-xs font-bold ${accentText}`}>{teamLabel}</span>
-                            <span className={`text-[10px] ${t.textMuted}`}>{team.agentCount} agent{team.agentCount !== 1 ? "s" : ""}</span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { label: "Fees Collected", value: fmt(team.feesCollectedInWindow) },
-                              { label: "SSA Calls", value: team.ssaCalls },
-                              { label: "CL Calls", value: team.clientCalls },
-                              { label: "Win Sheets", value: team.winSheetsCreated },
-                              { label: "Cases Closed", value: team.casesClosed },
-                              { label: "Open Cases", value: team.openCases },
-                            ].map((stat) => (
-                              <div key={stat.label}>
-                                <p className={`text-[9px] font-medium uppercase tracking-wide ${t.textMuted}`}>{stat.label}</p>
-                                <p className={`text-sm font-bold ${t.text} mt-0.5`}>{stat.value}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Monitoring filters (client-side, current week) */}
               <div
