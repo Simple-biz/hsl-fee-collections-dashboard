@@ -55,6 +55,7 @@ type SortDir = "asc" | "desc";
 type StatusFilter = "all" | "complete" | "incomplete";
 type TouchedFilter = "" | "none";
 type MissingFilter = "" | CheckboxKey;
+type AgingFilter = "" | "unpaid_60" | "unpaid_90";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -80,6 +81,7 @@ const DEFAULTS = {
   status: "all" as StatusFilter,
   touched: "" as TouchedFilter,
   missing: "" as MissingFilter,
+  aging: "" as AgingFilter,
   sort: "approvalDate" as SortKey,
   dir: "desc" as SortDir,
   page: 1,
@@ -122,6 +124,7 @@ export const FeePetitions = () => {
       : DEFAULTS.status) as StatusFilter,
     touched: (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter,
     missing: (CHECKBOX_KEYS.includes(urlParams.get("missing") as CheckboxKey) ? urlParams.get("missing") : "") as MissingFilter,
+    aging: (["unpaid_60", "unpaid_90"].includes(urlParams.get("aging") ?? "") ? urlParams.get("aging") : "") as AgingFilter,
     sort: (SORT_KEYS.includes(urlParams.get("sort") as SortKey)
       ? (urlParams.get("sort") as SortKey)
       : DEFAULTS.sort) as SortKey,
@@ -148,6 +151,7 @@ export const FeePetitions = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialState.status);
   const [touchedFilter, setTouchedFilter] = useState<TouchedFilter>(initialState.touched);
   const [missingFilter, setMissingFilter] = useState<MissingFilter>(initialState.missing);
+  const [agingFilter, setAgingFilter] = useState<AgingFilter>(initialState.aging);
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
@@ -176,6 +180,7 @@ export const FeePetitions = () => {
     if (statusFilter !== DEFAULTS.status) params.set("status", statusFilter);
     if (touchedFilter) params.set("touched", touchedFilter);
     if (missingFilter) params.set("missing", missingFilter);
+    if (agingFilter) params.set("aging", agingFilter);
     if (sortKey !== DEFAULTS.sort) params.set("sort", sortKey);
     if (sortDir !== DEFAULTS.dir) params.set("dir", sortDir);
     if (page !== DEFAULTS.page) params.set("page", String(page));
@@ -190,7 +195,7 @@ export const FeePetitions = () => {
       { scroll: false },
     );
     urlMethodRef.current = "replace";
-  }, [appliedSearch, statusFilter, touchedFilter, missingFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
+  }, [appliedSearch, statusFilter, touchedFilter, missingFilter, agingFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
 
   // Sync URL → state (back/forward)
   useEffect(() => {
@@ -202,6 +207,8 @@ export const FeePetitions = () => {
     const urlTouched = (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter;
     const urlMissingRaw = urlParams.get("missing");
     const urlMissing = (CHECKBOX_KEYS.includes(urlMissingRaw as CheckboxKey) ? urlMissingRaw : "") as MissingFilter;
+    const urlAgingRaw = urlParams.get("aging") ?? "";
+    const urlAging = (["unpaid_60", "unpaid_90"].includes(urlAgingRaw) ? urlAgingRaw : "") as AgingFilter;
     const urlSortRaw = urlParams.get("sort") as SortKey | null;
     const urlSort = SORT_KEYS.includes(urlSortRaw as SortKey)
       ? (urlSortRaw as SortKey)
@@ -215,6 +222,7 @@ export const FeePetitions = () => {
     if (urlStatus !== statusFilter) setStatusFilter(urlStatus);
     if (urlTouched !== touchedFilter) setTouchedFilter(urlTouched);
     if (urlMissing !== missingFilter) setMissingFilter(urlMissing);
+    if (urlAging !== agingFilter) setAgingFilter(urlAging);
     if (urlSort !== sortKey) setSortKey(urlSort);
     if (urlDir !== sortDir) setSortDir(urlDir);
     if (urlPage !== page) setPage(urlPage);
@@ -271,6 +279,7 @@ export const FeePetitions = () => {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (touchedFilter) params.set("touched", touchedFilter);
       if (missingFilter) params.set("missing", missingFilter);
+      if (agingFilter) params.set("aging", agingFilter);
       params.set("sort", sortKey);
       params.set("dir", sortDir);
       const res = await fetch(`/api/fee-petitions?${params.toString()}`, {
@@ -296,7 +305,7 @@ export const FeePetitions = () => {
     } finally {
       if (fetchAbortRef.current === controller) setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, statusFilter, touchedFilter, missingFilter, sortKey, sortDir]);
+  }, [page, pageSize, appliedSearch, statusFilter, touchedFilter, missingFilter, agingFilter, sortKey, sortDir]);
 
   useEffect(() => {
     fetchPetitions();
@@ -316,7 +325,8 @@ export const FeePetitions = () => {
     appliedSearch !== DEFAULTS.search ||
     statusFilter !== DEFAULTS.status ||
     touchedFilter !== DEFAULTS.touched ||
-    missingFilter !== DEFAULTS.missing;
+    missingFilter !== DEFAULTS.missing ||
+    agingFilter !== DEFAULTS.aging;
 
   const clearAllFilters = () => {
     urlMethodRef.current = "push";
@@ -325,6 +335,7 @@ export const FeePetitions = () => {
     setStatusFilter(DEFAULTS.status);
     setTouchedFilter(DEFAULTS.touched);
     setMissingFilter(DEFAULTS.missing);
+    setAgingFilter(DEFAULTS.aging);
     setPage(1);
   };
 
@@ -623,6 +634,7 @@ export const FeePetitions = () => {
         if (statusFilter !== "all") params.set("status", statusFilter);
         if (touchedFilter) params.set("touched", touchedFilter);
         if (missingFilter) params.set("missing", missingFilter);
+        if (agingFilter) params.set("aging", agingFilter);
         params.set("sort", sortKey);
         params.set("dir", sortDir);
         const res = await fetch(`/api/fee-petitions?${params.toString()}`);
@@ -967,6 +979,20 @@ export const FeePetitions = () => {
           >
             Never Touched
           </button>
+          <button
+            onClick={() => { urlMethodRef.current = "push"; setAgingFilter((v) => (v === "unpaid_60" ? "" : "unpaid_60")); setPage(1); }}
+            aria-pressed={agingFilter === "unpaid_60"}
+            className={`${presetBase} ${agingFilter === "unpaid_60" ? presetActive : t.outlineBtn}`}
+          >
+            Unpaid &gt;60d
+          </button>
+          <button
+            onClick={() => { urlMethodRef.current = "push"; setAgingFilter((v) => (v === "unpaid_90" ? "" : "unpaid_90")); setPage(1); }}
+            aria-pressed={agingFilter === "unpaid_90"}
+            className={`${presetBase} ${agingFilter === "unpaid_90" ? presetActive : t.outlineBtn}`}
+          >
+            Unpaid &gt;90d
+          </button>
         </div>
 
         {/* Active filter chips */}
@@ -1000,6 +1026,14 @@ export const FeePetitions = () => {
               <span className={chipBase}>
                 Missing: {CHECKBOX_COLUMNS.find((c) => c.key === missingFilter)?.label}
                 <button aria-label="Clear missing filter" onClick={() => { urlMethodRef.current = "push"; setMissingFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {agingFilter && (
+              <span className={chipBase}>
+                {agingFilter === "unpaid_60" ? "Unpaid >60d" : "Unpaid >90d"}
+                <button aria-label="Clear aging filter" onClick={() => { urlMethodRef.current = "push"; setAgingFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
