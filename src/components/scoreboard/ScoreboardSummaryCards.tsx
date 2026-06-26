@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt } from "@/lib/formatters";
 
@@ -10,6 +13,9 @@ export interface ScoreboardSummary {
   totalUnpaidT2Over60: number;
   totalUnpaidT16Over60: number;
   totalUnpaidConcOver60: number;
+  totalUnpaidT2Over90: number;
+  totalUnpaidT16Over90: number;
+  totalUnpaidConcOver90: number;
   totalCollected: number;
   totalFeesCollectedInWindow: number;
   totalCasesFullFee: number;
@@ -52,12 +58,31 @@ export function ScoreboardSummaryCards({
   t,
   showMiniCards = true,
 }: ScoreboardSummaryCardsProps) {
-  const stats = [
+  const [t2Days, setT2Days] = useState<60 | 90>(60);
+  const [t16Days, setT16Days] = useState<60 | 90>(60);
+  const [concDays, setConcDays] = useState<60 | 90>(60);
+
+  const stats: { label: string; value: string | number; onClick?: () => void; toggled?: boolean }[] = [
     { label: "Cases Assigned", value: summary.totalCasesAssigned },
     { label: "Win Sheets", value: summary.totalCompletedWinSheets },
-    { label: "T2 >60d", value: summary.totalUnpaidT2Over60 },
-    { label: "T16 >60d", value: summary.totalUnpaidT16Over60 },
-    { label: "Conc >60d", value: summary.totalUnpaidConcOver60 },
+    {
+      label: `T2 >${t2Days}D`,
+      value: t2Days === 60 ? summary.totalUnpaidT2Over60 : summary.totalUnpaidT2Over90,
+      onClick: () => setT2Days((v) => v === 60 ? 90 : 60),
+      toggled: t2Days === 90,
+    },
+    {
+      label: `T16 >${t16Days}D`,
+      value: t16Days === 60 ? summary.totalUnpaidT16Over60 : summary.totalUnpaidT16Over90,
+      onClick: () => setT16Days((v) => v === 60 ? 90 : 60),
+      toggled: t16Days === 90,
+    },
+    {
+      label: `CONC >${concDays}D`,
+      value: concDays === 60 ? summary.totalUnpaidConcOver60 : summary.totalUnpaidConcOver90,
+      onClick: () => setConcDays((v) => v === 60 ? 90 : 60),
+      toggled: concDays === 90,
+    },
     { label: "Collected", value: fmt(summary.totalCollected) },
     { label: "Full Fee", value: summary.totalCasesFullFee },
     { label: "SSA Calls", value: summary.totalSsaCalls },
@@ -69,14 +94,38 @@ export function ScoreboardSummaryCards({
       {/* Summary mini-cards */}
       {showMiniCards && (
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
-          {stats.map((item) => (
-            <div key={item.label} className={`rounded-lg border p-3 ${t.card}`}>
-              <p className={`text-[10px] font-medium ${t.textMuted} uppercase`}>
-                {item.label}
-              </p>
-              <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
-            </div>
-          ))}
+          {stats.map((item) =>
+            item.onClick ? (
+              <button
+                key={item.label}
+                onClick={item.onClick}
+                aria-pressed={item.toggled}
+                aria-label={`${item.label} aging threshold — click to toggle`}
+                title="Toggle 60D / 90D threshold"
+                className={`rounded-lg border p-3 text-left transition-colors ${
+                  item.toggled
+                    ? dark
+                      ? "bg-violet-900/20 border-violet-700/60"
+                      : "bg-violet-50 border-violet-300"
+                    : t.card
+                }`}
+              >
+                <p className={`text-[10px] font-medium uppercase ${item.toggled ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
+                  {item.label}
+                </p>
+                <p className={`text-lg font-bold mt-1 ${item.toggled ? (dark ? "text-violet-300" : "text-violet-700") : t.text}`}>
+                  {item.value}
+                </p>
+              </button>
+            ) : (
+              <div key={item.label} className={`rounded-lg border p-3 ${t.card}`}>
+                <p className={`text-[10px] font-medium ${t.textMuted} uppercase`}>
+                  {item.label}
+                </p>
+                <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
+              </div>
+            )
+          )}
         </div>
       )}
 

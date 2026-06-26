@@ -105,6 +105,33 @@ export const GET = async (req: NextRequest) => {
          AND c.approval_date IS NOT NULL
          AND c.approval_date < CURRENT_DATE - INTERVAL '60 days') AS unpaid_conc_over_60,
 
+        -- Unpaid T2 cases over 90 days
+        (SELECT COUNT(*) FROM cases c
+         JOIN fee_records fr ON fr.case_id = c.client_id
+         WHERE fr.assigned_to = tm.name
+         AND c.claim_type_label = 'T2'
+         AND fr.t2_pending > 0
+         AND c.approval_date IS NOT NULL
+         AND c.approval_date < CURRENT_DATE - INTERVAL '90 days') AS unpaid_t2_over_90,
+
+        -- Unpaid T16 cases over 90 days
+        (SELECT COUNT(*) FROM cases c
+         JOIN fee_records fr ON fr.case_id = c.client_id
+         WHERE fr.assigned_to = tm.name
+         AND c.claim_type_label = 'T16'
+         AND fr.t16_pending > 0
+         AND c.approval_date IS NOT NULL
+         AND c.approval_date < CURRENT_DATE - INTERVAL '90 days') AS unpaid_t16_over_90,
+
+        -- Unpaid concurrent cases over 90 days
+        (SELECT COUNT(*) FROM cases c
+         JOIN fee_records fr ON fr.case_id = c.client_id
+         WHERE fr.assigned_to = tm.name
+         AND c.claim_type_label = 'T2_T16'
+         AND (fr.t2_pending > 0 OR fr.t16_pending > 0)
+         AND c.approval_date IS NOT NULL
+         AND c.approval_date < CURRENT_DATE - INTERVAL '90 days') AS unpaid_conc_over_90,
+
         -- Total fees collected (all time for this agent)
         COALESCE((SELECT SUM(fr.total_fees_paid::numeric) FROM fee_records fr WHERE fr.assigned_to = tm.name), 0) AS total_collected,
 
@@ -173,6 +200,9 @@ export const GET = async (req: NextRequest) => {
         unpaidT2Over60: Number(r.unpaid_t2_over_60),
         unpaidT16Over60: Number(r.unpaid_t16_over_60),
         unpaidConcOver60: Number(r.unpaid_conc_over_60),
+        unpaidT2Over90: Number(r.unpaid_t2_over_90),
+        unpaidT16Over90: Number(r.unpaid_t16_over_90),
+        unpaidConcOver90: Number(r.unpaid_conc_over_90),
         totalCollected: Number(r.total_collected),
         feesCollectedInWindow: Number(r.fees_collected_in_window),
         casesFullFee: Number(r.cases_full_fee),
@@ -191,6 +221,9 @@ export const GET = async (req: NextRequest) => {
       totalUnpaidT2Over60: agents.reduce((s, a) => s + a.unpaidT2Over60, 0),
       totalUnpaidT16Over60: agents.reduce((s, a) => s + a.unpaidT16Over60, 0),
       totalUnpaidConcOver60: agents.reduce((s, a) => s + a.unpaidConcOver60, 0),
+      totalUnpaidT2Over90: agents.reduce((s, a) => s + a.unpaidT2Over90, 0),
+      totalUnpaidT16Over90: agents.reduce((s, a) => s + a.unpaidT16Over90, 0),
+      totalUnpaidConcOver90: agents.reduce((s, a) => s + a.unpaidConcOver90, 0),
       totalCollected: agents.reduce((s, a) => s + a.totalCollected, 0),
       totalFeesCollectedInWindow: agents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
       totalCasesFullFee: agents.reduce((s, a) => s + a.casesFullFee, 0),
