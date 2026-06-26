@@ -9,7 +9,6 @@ import {
   Upload,
   MessageSquare,
   FileSpreadsheet,
-  CloudUpload,
   Database,
   RotateCcw,
   Loader2,
@@ -38,7 +37,6 @@ import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
 import AddCaseModal from "@/components/modals/AddCaseModal";
 import SheetSyncModal from "@/components/modals/SheetSyncModal";
-import SheetPushModal from "@/components/modals/SheetPushModal";
 import MyCaseSyncModal from "@/components/modals/MyCaseSyncModal";
 import NotesModal from "@/components/modals/NotesModal";
 import { AcknowledgeAndCloseDialog } from "./AcknowledgeAndCloseDialog";
@@ -212,7 +210,6 @@ export const FeeRecordsTable = ({
   const [addOpen, setAddOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [myCaseSyncOpen, setMyCaseSyncOpen] = useState(false);
-  const [pushOpen, setPushOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
   );
@@ -745,13 +742,6 @@ export const FeeRecordsTable = ({
               >
                 <Database className="h-3.5 w-3.5" aria-hidden="true" /> Sync
                 from MyCase
-              </button>
-              <button
-                onClick={() => setPushOpen(true)}
-                className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${dark ? "bg-blue-700 hover:bg-blue-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"} transition-colors`}
-              >
-                <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" /> Push
-                to Sheets
               </button>
             </>
           )}
@@ -1851,13 +1841,6 @@ export const FeeRecordsTable = ({
         />
       )}
 
-      {pushOpen && (
-        <SheetPushModal
-          dark={dark}
-          onClose={() => setPushOpen(false)}
-          onPushed={() => {}}
-        />
-      )}
 
       {notesFor && (
         <NotesModal
