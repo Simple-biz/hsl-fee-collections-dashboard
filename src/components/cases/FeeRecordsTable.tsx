@@ -65,6 +65,7 @@ type FeeField =
   | "assignedTo"
   | "approvedBy"
   | "feesConfirmation"
+  | "feesClosedTrigger"
   | "caseStatus"
   | "winSheetStatus";
 
@@ -156,6 +157,7 @@ export const FeeRecordsTable = ({
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
+  const feesClosedOptions = dropdownOptions.fees_closed ?? [];
   const caseStatusOptions = dropdownOptions.case_status ?? [];
   const caseLevelOptions = dropdownOptions.case_level ?? [];
   const claimTypeOptions = dropdownOptions.claim_type ?? [];
@@ -167,6 +169,7 @@ export const FeeRecordsTable = ({
     | "assigned"
     | "approvedBy"
     | "feesConfirmation"
+    | "feesClosedTrigger"
     | "caseStatus"
     | "level"
     | "claim"
@@ -538,7 +541,7 @@ export const FeeRecordsTable = ({
     if (reopeningId !== null) return;
     if (
       !window.confirm(
-        `Reopen "${c.name}"? It will move back to the active dashboard and Fees Confirmation will be cleared.`,
+        `Reopen "${c.name}"? It will move back to the active dashboard. Fees Confirmation and Fees Closed will be cleared.`,
       )
     )
       return;
@@ -548,9 +551,9 @@ export const FeeRecordsTable = ({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          feeFields: { isClosed: false, feesConfirmation: null },
+          feeFields: { isClosed: false, feesConfirmation: null, feesClosedTrigger: null },
           logMessage:
-            "Reopened from Fees Closed — moved back to the active dashboard and Fees Confirmation cleared.",
+            "Reopened from Fees Closed — moved back to the active dashboard. Fees Confirmation and Fees Closed cleared.",
         }),
       });
       if (!res.ok) {
@@ -908,6 +911,7 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left ${stickyTh3}`}>
                   Fees Conf
                 </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>Fees Closed</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
                 <th
@@ -1205,6 +1209,74 @@ export const FeeRecordsTable = ({
                               (o) =>
                                 o.isActive ||
                                 o.name === cellValue(c, "feesConfirmation"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </td>
+                    {/* Fees Closed — triggers AcknowledgeAndCloseDialog when set to "Closed" */}
+                    <td
+                      className={`${tdBase} ${t.textSub}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" || !isAdmin ? (
+                        cellValue(c, "feesClosedTrigger") || "—"
+                      ) : (
+                        <select
+                          value={cellValue(c, "feesClosedTrigger")}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (
+                              canFinalize &&
+                              next &&
+                              next.toLowerCase() === "closed" &&
+                              next !== cellValue(c, "feesClosedTrigger")
+                            ) {
+                              setAckTarget({
+                                caseId: c.id,
+                                caseName: c.name,
+                                triggerField: "feesClosedTrigger",
+                                triggerValue: next,
+                                triggerLabel: "Fees Closed",
+                              });
+                              return;
+                            }
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "feesClosedTrigger",
+                              "feesClosedTrigger",
+                              "Fees Closed",
+                              next,
+                            );
+                          }}
+                          className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            feesClosedOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "feesClosedTrigger");
+                            return (
+                              v &&
+                              !feesClosedOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {feesClosedOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "feesClosedTrigger"),
                             )
                             .map((o) => (
                               <option key={o.id} value={o.name}>

@@ -19,7 +19,7 @@ const getMissingClause = (key: string | null) => {
   }
 };
 
-// GET /api/fee-petitions?page=&limit=&search=&sort=&dir=&status=&touched=&missing=
+// GET /api/fee-petitions?page=&limit=&search=&sort=&dir=&status=&touched=&missing=&aging=
 // Lists cases at FEE_PETITION level with checklist state and aggregate stats
 export const GET = async (req: NextRequest) => {
   try {
@@ -28,6 +28,7 @@ export const GET = async (req: NextRequest) => {
     const status = searchParams.get("status"); // "complete" | "incomplete"
     const touched = searchParams.get("touched"); // "none" = no fee_petitions row yet
     const missing = searchParams.get("missing"); // checkbox key to filter by
+    const aging = searchParams.get("aging"); // "unpaid_60" | "unpaid_90"
     const sortParam = searchParams.get("sort");
     const sort: SortKey = SORT_KEYS.includes(sortParam as SortKey)
       ? (sortParam as SortKey)
@@ -74,6 +75,12 @@ export const GET = async (req: NextRequest) => {
 
     const touchedClause = touched === "none" ? sql`AND ${feePetitions.updatedAt} IS NULL` : sql``;
     const missingClause = getMissingClause(missing);
+    const agingClause =
+      aging === "unpaid_60"
+        ? sql`AND COALESCE(${feeRecords.totalFeesPaid}, 0) = 0 AND ${cases.approvalDate} IS NOT NULL AND (CURRENT_DATE - ${cases.approvalDate}::date) > 60`
+        : aging === "unpaid_90"
+          ? sql`AND COALESCE(${feeRecords.totalFeesPaid}, 0) = 0 AND ${cases.approvalDate} IS NOT NULL AND (CURRENT_DATE - ${cases.approvalDate}::date) > 90`
+          : sql``;
 
     // Accept both the legacy enum value and the worksheet-direct label
     // saved via the dashboard dropdown (column C in the master sheet uses
@@ -84,6 +91,7 @@ export const GET = async (req: NextRequest) => {
       ${statusClause}
       ${touchedClause}
       ${missingClause}
+      ${agingClause}
     `;
 
     // Single aggregate for stats + count
@@ -118,6 +126,7 @@ export const GET = async (req: NextRequest) => {
         firstName: cases.firstName,
         lastName: cases.lastName,
         approvalDate: cases.approvalDate,
+        totalFeesExpected: feeRecords.totalFeesExpected,
         noa: feePetitions.noa,
         timeDelineation: feePetitions.timeDelineation,
         feePetitionDoc: feePetitions.feePetitionDoc,
@@ -141,6 +150,7 @@ export const GET = async (req: NextRequest) => {
       claimant: `${r.lastName}, ${r.firstName}`,
       approvalDate: r.approvalDate ?? null,
       updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
+      feeAmount: r.totalFeesExpected != null ? Number(r.totalFeesExpected) : null,
       noa: r.noa ?? false,
       timeDelineation: r.timeDelineation ?? false,
       feePetitionDoc: r.feePetitionDoc ?? false,

@@ -14,13 +14,13 @@ export const PAGES = [
   { key: "chronicle", label: "Chronicle Sync", path: "/chronicle" },
   { key: "fee_petitions", label: "Fee Petitions", path: "/fee-petitions" },
   { key: "overpaid_cases", label: "Overpaid Cases", path: "/overpaid-cases" },
-  { key: "mycase", label: "MyCase", path: "/mycase" },
   { key: "reports", label: "Reports", path: "/reports" },
   { key: "notifications", label: "Notifications", path: "/notifications" },
   { key: "team", label: "Team", path: "/team" },
   { key: "admin", label: "Admin", path: "/admin" },
   { key: "settings", label: "Settings", path: "/settings" },
   { key: "archive", label: "Archive", path: "/archive" },
+  { key: "inbound_calls", label: "Inbound Calls", path: "/inbound-calls" },
 ] as const;
 
 export type PageKey = (typeof PAGES)[number]["key"];

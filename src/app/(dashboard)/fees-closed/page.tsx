@@ -8,6 +8,8 @@ import { useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
 import type { CaseRow } from "@/types";
 
+type LevelFilter = "all" | "fee_petition";
+
 export default function FeesClosedPage() {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
@@ -17,6 +19,7 @@ export default function FeesClosedPage() {
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchClosed = useCallback(async () => {
@@ -41,6 +44,11 @@ export default function FeesClosedPage() {
     fetchClosed();
     return () => { controllerRef.current?.abort(); };
   }, [fetchClosed]);
+
+  const filteredCases =
+    levelFilter === "fee_petition"
+      ? cases.filter((c) => c.level === "FEE_PETITION" || c.level === "FEE PETITION")
+      : cases;
 
   const sectionCard = `rounded-xl border ${t.card}`;
 
@@ -75,26 +83,48 @@ export default function FeesClosedPage() {
   return (
     <div className="space-y-4">
       <div className={`${sectionCard} p-4 md:p-5`}>
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-emerald-900/40" : "bg-emerald-50"}`}
-          >
-            <CheckCircle2
-              aria-hidden="true"
-              className={`h-5 w-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-            />
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-emerald-900/40" : "bg-emerald-50"}`}
+            >
+              <CheckCircle2
+                aria-hidden="true"
+                className={`h-5 w-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
+              />
+            </div>
+            <div>
+              <h3 className={`text-sm font-bold ${t.text}`}>Fees Closed</h3>
+              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                Cases acknowledged and marked closed from the dashboard
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className={`text-sm font-bold ${t.text}`}>Fees Closed</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-              Cases acknowledged and marked closed from the dashboard
-            </p>
+          <div className="flex items-center gap-1.5">
+            {(["all", "fee_petition"] as LevelFilter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setLevelFilter(f)}
+                aria-pressed={levelFilter === f}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                  levelFilter === f
+                    ? dark
+                      ? "bg-emerald-700 border-emerald-600 text-white"
+                      : "bg-emerald-100 border-emerald-400 text-emerald-800"
+                    : dark
+                      ? "border-neutral-700 text-neutral-400 hover:border-neutral-500"
+                      : "border-neutral-200 text-neutral-500 hover:border-neutral-400"
+                }`}
+              >
+                {f === "all" ? "All" : "Fee Petitions"}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       <FeeRecordsTable
-        cases={cases}
+        cases={filteredCases}
         dateRange={dateRange}
         mode="closed"
         onImported={fetchClosed}

@@ -7,18 +7,13 @@ import {
   Download,
   RefreshCw,
   Calendar,
-  Phone,
-  FileText,
   Users,
-  DollarSign,
   ChevronDown,
   ChevronRight,
   ArrowUpDown,
-  MessageSquare,
-  Clock,
-  TrendingUp,
-  // X,
 } from "lucide-react";
+import { ActivityEntry } from "@/components/reports/RecentActivityFeed";
+import { ScoreboardTracker } from "@/components/reports/ScoreboardTracker";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
 
@@ -41,22 +36,6 @@ interface AgentRow {
   pendingCount: number;
 }
 
-interface DailyRow {
-  date: string;
-  ssa_calls: number;
-  client_calls_ib: number;
-  client_calls_ob: number;
-}
-
-interface ActivityEntry {
-  id: string;
-  caseId: number;
-  message: string;
-  createdBy: string;
-  createdAt: string;
-  caseName: string | null;
-}
-
 interface Totals {
   ssaCalls: number;
   clientCallsIb: number;
@@ -73,7 +52,6 @@ interface ReportData {
   to: string;
   agents: AgentRow[];
   totals: Totals;
-  dailyBreakdown: DailyRow[];
   recentActivity: ActivityEntry[];
 }
 
@@ -256,115 +234,6 @@ export const Reports = () => {
     />
   );
 
-  // Mini bar chart using divs
-  const DailyChart = () => {
-    if (!data || data.dailyBreakdown.length === 0)
-      return (
-        <p className={`text-xs ${t.textMuted} text-center py-6`}>
-          No daily data for this range.
-        </p>
-      );
-    const maxVal = Math.max(
-      ...data.dailyBreakdown.map(
-        (d) => d.ssa_calls + d.client_calls_ib + d.client_calls_ob,
-      ),
-      1,
-    );
-    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxVal * f));
-    return (
-      <div className="flex gap-2 flex-1 min-h-0">
-        {/* Y-axis labels */}
-        <div className="flex flex-col justify-between py-0.5 shrink-0">
-          {[...ticks].reverse().map((v, i) => (
-            <span
-              key={i}
-              className={`text-[9px] tabular-nums ${t.textMuted} text-right w-6`}
-            >
-              {v}
-            </span>
-          ))}
-        </div>
-        {/* Bars area */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="relative flex items-end gap-1.5 flex-1 min-h-0">
-            {/* Grid lines */}
-            {[0.25, 0.5, 0.75, 1].map((f) => (
-              <div
-                key={f}
-                className={`absolute left-0 right-0 border-t ${dark ? "border-neutral-800/40" : "border-neutral-100"}`}
-                style={{ bottom: `${f * 100}%` }}
-              />
-            ))}
-            {data.dailyBreakdown.map((d, i) => {
-              const total = d.ssa_calls + d.client_calls_ib + d.client_calls_ob;
-              const pct = total > 0 ? Math.max((total / maxVal) * 100, 2) : 0;
-              const ssaPct = total > 0 ? (d.ssa_calls / total) * 100 : 0;
-              const ibPct = total > 0 ? (d.client_calls_ib / total) * 100 : 0;
-              const obPct = total > 0 ? (d.client_calls_ob / total) * 100 : 0;
-              return (
-                <div
-                  key={i}
-                  className="flex-1 h-full flex flex-col justify-end relative z-10"
-                >
-                  {/* Number above bar */}
-                  {total > 0 && (
-                    <div
-                      className={`text-center text-[9px] font-bold ${t.text} mb-0.5`}
-                    >
-                      {total}
-                    </div>
-                  )}
-                  <div
-                    className="w-full flex flex-col-reverse rounded-t overflow-hidden"
-                    style={{ height: `${pct}%` }}
-                  >
-                    <div
-                      className="bg-indigo-500 w-full"
-                      style={{ height: `${ssaPct}%` }}
-                    />
-                    <div
-                      className={`${dark ? "bg-blue-500" : "bg-blue-400"} w-full`}
-                      style={{ height: `${ibPct}%` }}
-                    />
-                    <div
-                      className={`${dark ? "bg-violet-500" : "bg-violet-400"} w-full`}
-                      style={{ height: `${obPct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {/* X-axis labels */}
-          <div
-            className={`flex gap-1.5 border-t ${dark ? "border-neutral-800/40" : "border-neutral-100"} pt-1 shrink-0`}
-          >
-            {data.dailyBreakdown.map((d, i) => {
-              const dayLabel = new Date(
-                d.date + "T12:00:00",
-              ).toLocaleDateString("en-US", { weekday: "short" });
-              const dateLabel = new Date(
-                d.date + "T12:00:00",
-              ).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              return (
-                <div key={i} className="flex-1 text-center">
-                  <span className={`text-[9px] font-medium ${t.textSub} block`}>
-                    {dayLabel}
-                  </span>
-                  <span
-                    className={`text-[8px] ${t.textMuted} block leading-none`}
-                  >
-                    {dateLabel}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-4">
       {/* Header with date range picker */}
@@ -481,134 +350,6 @@ export const Reports = () => {
 
       {data && !loading && (
         <>
-          {/* Summary cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              {
-                label: "Total Calls",
-                value: data.totals.totalCalls,
-                icon: Phone,
-                color: "text-indigo-500",
-              },
-              {
-                label: "Activity Entries",
-                value: data.totals.activityCount,
-                icon: MessageSquare,
-                color: "text-blue-500",
-              },
-              {
-                label: "Cases Touched",
-                value: data.totals.casesTouched,
-                icon: FileText,
-                color: "text-violet-500",
-              },
-              {
-                label: "Collected",
-                value: fmtFull(data.totals.collected),
-                icon: DollarSign,
-                color: "text-emerald-500",
-              },
-            ].map((item, i) => (
-              <div key={i} className={`${sectionCard} p-3`}>
-                <div className="flex items-center gap-2">
-                  <item.icon className={`h-3.5 w-3.5 ${item.color}`} />
-                  <p
-                    className={`text-[10px] font-semibold uppercase ${t.textMuted}`}
-                  >
-                    {item.label}
-                  </p>
-                </div>
-                <p className={`text-xl font-bold mt-1 ${t.text}`}>
-                  {item.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Chart + Recent Activity side by side */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Daily calls chart */}
-            <div
-              className={`${sectionCard} px-4 pt-4 pb-3 lg:col-span-2 flex flex-col`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h4
-                  className={`text-xs font-bold ${t.text} flex items-center gap-2`}
-                >
-                  <TrendingUp className="h-3.5 w-3.5" /> Daily Call Volume
-                </h4>
-                <div className="flex items-center gap-3 text-[10px]">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded bg-indigo-500" /> SSA
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span
-                      className={`w-2 h-2 rounded ${dark ? "bg-blue-500" : "bg-blue-400"}`}
-                    />{" "}
-                    Client IB
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span
-                      className={`w-2 h-2 rounded ${dark ? "bg-violet-500" : "bg-violet-400"}`}
-                    />{" "}
-                    Client OB
-                  </span>
-                </div>
-              </div>
-              <DailyChart />
-            </div>
-
-            {/* Recent Activity feed */}
-            <div className={`${sectionCard} p-4`}>
-              <h4
-                className={`text-xs font-bold ${t.text} flex items-center gap-2 mb-3`}
-              >
-                <Clock className="h-3.5 w-3.5" /> Recent Activity
-                <span className={`text-[10px] font-normal ${t.textMuted}`}>
-                  ({data.recentActivity.length})
-                </span>
-              </h4>
-              <div className="space-y-2.5 max-h-70 overflow-y-auto pr-1">
-                {data.recentActivity.length === 0 ? (
-                  <p className={`text-xs ${t.textMuted} text-center py-6`}>
-                    No activity in this range.
-                  </p>
-                ) : (
-                  data.recentActivity.slice(0, 20).map((a) => (
-                    <div
-                      key={a.id}
-                      className={`rounded-md p-2 ${dark ? "bg-neutral-800/40" : "bg-neutral-50"}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-semibold ${t.text}`}>
-                          {a.createdBy}
-                        </span>
-                        {a.caseName && (
-                          <span className={`text-[10px] ${t.textMuted}`}>
-                            on {a.caseName}
-                          </span>
-                        )}
-                      </div>
-                      <p
-                        className={`text-[11px] ${t.textSub} mt-0.5 leading-snug line-clamp-2`}
-                      >
-                        {a.message}
-                      </p>
-                      <p className={`text-[9px] ${t.textMuted} mt-0.5`}>
-                        {new Date(a.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Agent table */}
           <div className={sectionCard}>
             <div
@@ -929,6 +670,8 @@ export const Reports = () => {
           </div>
         </>
       )}
+
+      <ScoreboardTracker dark={dark} t={t} />
     </div>
   );
 };

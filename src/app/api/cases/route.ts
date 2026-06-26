@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, userDetails, feePetitions } from "@/lib/db/schema";
 import { eq, ilike, sql, desc } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
 
@@ -83,6 +83,7 @@ export const GET = async (req: NextRequest) => {
         closedAt: feeRecords.closedAt,
         approvedBy: feeRecords.approvedBy,
         feesConfirmation: feeRecords.feesConfirmation,
+        feesClosedTrigger: feeRecords.feesClosedTrigger,
         caseStatus: feeRecords.caseStatus,
         winSheetLink: feeRecords.winSheetLink,
         winSheetLinkText: feeRecords.winSheetLinkText,
@@ -211,6 +212,7 @@ export const GET = async (req: NextRequest) => {
         pif,
         approvedBy: r.approvedBy ?? null,
         feesConfirmation: r.feesConfirmation ?? null,
+        feesClosedTrigger: r.feesClosedTrigger ?? null,
         caseStatus: r.caseStatus ?? null,
         isClosed: r.isClosed ?? false,
         markedOverpaid: r.markedOverpaid ?? false,
@@ -336,6 +338,10 @@ export const POST = async (req: NextRequest) => {
       assignedTo: input.assignedTo,
       winSheetStatus: input.winSheetStatus ?? "not_started",
     });
+
+    if (input.levelWon === "FEE_PETITION") {
+      await db.insert(feePetitions).values({ caseId: input.clientId }).onConflictDoNothing();
+    }
 
     // Best-effort: persist the Chronicle id so the case deep-links to Chronicle.
     // onConflictDoNothing guards the case_id unique key; the .catch swallows a

@@ -68,6 +68,7 @@ export interface CaseRow {
   pif: PifStatus;
   approvedBy: string | null;
   feesConfirmation: string | null;
+  feesClosedTrigger: string | null;
   caseStatus: string | null;
   isClosed: boolean;
   markedOverpaid: boolean;
@@ -210,6 +211,7 @@ export interface CaseDetailData {
   // Workflow
   pif: PifStatus;
   approvedBy: string | null;
+  feesClosedTrigger: string | null;
   feeMethod: string | null;
   applicableFeeCap: number;
   feeCapApplied: boolean;
