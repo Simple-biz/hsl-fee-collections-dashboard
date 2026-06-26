@@ -94,7 +94,7 @@ const COL_FOCUS: Record<string, MetricFocus[]> = {
   fullfee:   ["fees"],
 };
 
-type DateMode = "week" | "month" | "range";
+type DateMode = "week" | "month" | "range" | "day";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -176,6 +176,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [yearSel, setYearSel] = useState(nowForInit.getFullYear());
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
+  const [daySel, setDaySel] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date()),
+  );
 
   const [entryOpen, setEntryOpen] = useState(false);
   const [cells, setCells] = useState<Map<CellKey, CellValues>>(new Map());
@@ -194,7 +197,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
 
   const changeDateMode = (m: DateMode) => {
     setDateMode(m);
-    if (m !== "week") setEntryOpen(false);
+    if (m !== "week" && m !== "day") setEntryOpen(false);
   };
 
   const showCol = (key: string) =>
@@ -203,10 +206,26 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const monday = getMonday(weekOffset);
   const weekDays = getWeekDays(monday);
 
+  const todayEt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+
+  // Days shown in the entry panel — 5 weekdays in week mode, one day in day mode.
+  const entryDays =
+    dateMode === "day" && daySel
+      ? [{
+          date: daySel,
+          label: new Date(daySel + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          dayName: new Date(daySel + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" }),
+        }]
+      : weekDays;
+
   const monthStart = firstDayOfMonth(yearSel, monthSel);
   const monthEnd = lastDayOfMonth(yearSel, monthSel);
 
   const { query: scoreboardQuery, ready: windowReady } = (() => {
+    if (dateMode === "day")
+      return daySel
+        ? { query: `from=${daySel}&to=${daySel}`, ready: true }
+        : { query: "", ready: false };
     if (dateMode === "month")
       return { query: `from=${monthStart}&to=${monthEnd}`, ready: true };
     if (dateMode === "range")
@@ -217,13 +236,17 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   })();
 
   const windowLabel =
-    dateMode === "month"
-      ? `${MONTH_NAMES[monthSel]} ${yearSel}`
-      : dateMode === "range"
-        ? windowReady
-          ? `${fmtRangeDate(rangeFrom)} – ${fmtRangeDate(rangeTo)}`
-          : "Select a date range"
-        : formatWeekLabel(monday);
+    dateMode === "day"
+      ? daySel
+        ? fmtRangeDate(daySel) + (daySel === todayEt ? " (Today)" : "")
+        : "Select a date"
+      : dateMode === "month"
+        ? `${MONTH_NAMES[monthSel]} ${yearSel}`
+        : dateMode === "range"
+          ? windowReady
+            ? `${fmtRangeDate(rangeFrom)} – ${fmtRangeDate(rangeTo)}`
+            : "Select a date range"
+          : formatWeekLabel(monday);
 
   const fetchScoreboard = useCallback(async () => {
     if (!windowReady) {
@@ -324,7 +347,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
 
   const agentCellTotals = (agent: string) => {
     let ssa = 0, ib = 0, ob = 0, ws = 0;
-    for (const day of weekDays) {
+    for (const day of entryDays) {
       const c = getCell(agent, day.date);
       ssa += parseInt(c.ssaCalls) || 0;
       ib  += parseInt(c.clientCallsIb) || 0;
@@ -345,7 +368,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       }[] = [];
       if (data) {
         for (const agent of data.agents) {
-          for (const day of weekDays) {
+          for (const day of entryDays) {
             const c = getCell(agent.agent, day.date);
             const ssa = parseInt(c.ssaCalls) || 0;
             const ib  = parseInt(c.clientCallsIb) || 0;
@@ -374,6 +397,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const adjustDay = (delta: number) => {
+    const [y, m, d] = daySel.split("-").map(Number);
+    const date = new Date(y, m - 1, d + delta);
+    setDaySel(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
   };
 
   const thBase = `py-2.5 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
@@ -413,7 +442,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {dateMode === "week" && (
+            {(dateMode === "week" || dateMode === "day") && (
               <>
                 <button
                   onClick={() => setEntryOpen(!entryOpen)}
@@ -438,10 +467,47 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               aria-label="Date period"
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
+              <option value="day">Day</option>
               <option value="week">Week</option>
               <option value="month">Month</option>
               <option value="range">Range</option>
             </select>
+
+            {dateMode === "day" && (
+              <>
+                <button
+                  onClick={() => adjustDay(-1)}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                  aria-label="Previous day"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <input
+                  type="date"
+                  value={daySel}
+                  max={todayEt}
+                  onChange={(e) => setDaySel(e.target.value)}
+                  aria-label="Select date"
+                  className={`h-8 px-2 rounded-md border text-xs outline-none ${t.inputBg}`}
+                />
+                {daySel !== todayEt && (
+                  <button
+                    onClick={() => setDaySel(todayEt)}
+                    className={`h-8 px-3 rounded-md text-xs font-medium ${dark ? "bg-neutral-800 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
+                  >
+                    Today
+                  </button>
+                )}
+                <button
+                  onClick={() => adjustDay(1)}
+                  disabled={daySel >= todayEt}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                  aria-label="Next day"
+                >
+                  <ChevronRight className={`h-4 w-4 ${daySel >= todayEt ? "opacity-30" : ""}`} aria-hidden="true" />
+                </button>
+              </>
+            )}
 
             {dateMode === "week" && (
               <>
@@ -681,8 +747,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         )}
       </div>
 
-      {/* Daily Call Entry Panel — week mode only */}
-      {entryOpen && data && dateMode === "week" && (
+      {/* Daily Call Entry Panel — week and day mode */}
+      {entryOpen && data && (dateMode === "week" || dateMode === "day") && (
         <div ref={entryRef} className={`rounded-xl border ${t.card}`}>
           <div className={`p-4 flex items-center justify-between border-b ${t.borderLight}`}>
             <div className="flex items-center gap-3">
@@ -690,7 +756,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               <div>
                 <h3 className={`text-sm font-bold ${t.text}`}>Daily Call Log</h3>
                 <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-                  {formatWeekLabel(monday)} — Enter daily SSA &amp; client call counts per agent
+                  {windowLabel} — Enter SSA &amp; client call counts per agent
                 </p>
               </div>
             </div>
@@ -727,13 +793,13 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <tr className={`border-b ${t.borderLight}`}>
                   <th className={`${thBase} ${t.textSub} text-left w-36`}>Agent</th>
                   <th className={`${thBase} ${t.textSub} text-center w-20`}>Type</th>
-                  {weekDays.map((day) => (
+                  {entryDays.map((day) => (
                     <th key={day.date} className={`${thBase} ${t.textSub} text-center`}>
                       <div>{day.dayName}</div>
                       <div className={`text-[9px] font-normal ${t.textMuted}`}>{day.label}</div>
                     </th>
                   ))}
-                  <th className={`${thBase} ${t.textSub} text-center`}>Week</th>
+                  {entryDays.length > 1 && <th className={`${thBase} ${t.textSub} text-center`}>Total</th>}
                 </tr>
               </thead>
               <tbody>
@@ -752,7 +818,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           </div>
                         </td>
                         <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-blue-400" : "text-blue-600"}`}>SSA</td>
-                        {weekDays.map((day) => (
+                        {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
                               value={getCell(agent.agent, day.date).ssaCalls}
@@ -760,14 +826,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                             />
                           </td>
                         ))}
-                        <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ssa > 0 ? (dark ? "text-blue-400" : "text-blue-600") : t.textMuted}`}>
-                          {totals.ssa || "—"}
-                        </td>
+                        {entryDays.length > 1 && (
+                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ssa > 0 ? (dark ? "text-blue-400" : "text-blue-600") : t.textMuted}`}>
+                            {totals.ssa || "—"}
+                          </td>
+                        )}
                       </tr>
                       {/* Client IB */}
                       <tr className={rowBorder}>
                         <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-emerald-400" : "text-emerald-600"}`}>Client IB</td>
-                        {weekDays.map((day) => (
+                        {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
                               value={getCell(agent.agent, day.date).clientCallsIb}
@@ -775,14 +843,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                             />
                           </td>
                         ))}
-                        <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ib > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                          {totals.ib || "—"}
-                        </td>
+                        {entryDays.length > 1 && (
+                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ib > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
+                            {totals.ib || "—"}
+                          </td>
+                        )}
                       </tr>
                       {/* Client OB */}
                       <tr className={rowBorder}>
                         <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-amber-400" : "text-amber-600"}`}>Client OB</td>
-                        {weekDays.map((day) => (
+                        {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
                               value={getCell(agent.agent, day.date).clientCallsOb}
@@ -790,14 +860,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                             />
                           </td>
                         ))}
-                        <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ob > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}>
-                          {totals.ob || "—"}
-                        </td>
+                        {entryDays.length > 1 && (
+                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ob > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}>
+                            {totals.ob || "—"}
+                          </td>
+                        )}
                       </tr>
                       {/* Win Sheets */}
                       <tr className={`border-b ${rowBorder}`}>
                         <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-violet-400" : "text-violet-600"}`}>Win Sheets</td>
-                        {weekDays.map((day) => (
+                        {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
                               value={getCell(agent.agent, day.date).winSheetsCreated}
@@ -805,9 +877,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                             />
                           </td>
                         ))}
-                        <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ws > 0 ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
-                          {totals.ws || "—"}
-                        </td>
+                        {entryDays.length > 1 && (
+                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ws > 0 ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
+                            {totals.ws || "—"}
+                          </td>
+                        )}
                       </tr>
                     </React.Fragment>
                   );
@@ -817,7 +891,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
                   <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
                   <td className={`px-2 py-1.5 text-[10px] font-bold ${t.textSub}`}>All</td>
-                  {weekDays.map((day) => {
+                  {entryDays.map((day) => {
                     const dayTotal = data.agents.reduce((sum, a) => {
                       const c = getCell(a.agent, day.date);
                       return sum + (parseInt(c.ssaCalls) || 0) + (parseInt(c.clientCallsIb) || 0) + (parseInt(c.clientCallsOb) || 0);
@@ -828,9 +902,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       </td>
                     );
                   })}
-                  <td className={`px-2 py-1.5 text-center text-[11px] font-bold tabular-nums ${t.text}`}>
-                    {data.agents.reduce((sum, a) => sum + agentCellTotals(a.agent).total, 0) || "—"}
-                  </td>
+                  {entryDays.length > 1 && (
+                    <td className={`px-2 py-1.5 text-center text-[11px] font-bold tabular-nums ${t.text}`}>
+                      {data.agents.reduce((sum, a) => sum + agentCellTotals(a.agent).total, 0) || "—"}
+                    </td>
+                  )}
                 </tr>
               </tfoot>
             </table>

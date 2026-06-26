@@ -18,8 +18,12 @@ import {
  */
 export function useCapabilities() {
   const { data: session } = useSession();
-  const capabilities = (session?.user?.capabilities ??
-    roleCapabilityDefaults(session?.user?.role)) as CapabilityKey[];
+  const rawCaps = session?.user?.capabilities;
+  const capabilities = (
+    Array.isArray(rawCaps) && rawCaps.length > 0
+      ? rawCaps
+      : roleCapabilityDefaults(session?.user?.role)
+  ) as CapabilityKey[];
 
   return {
     capabilities,
