@@ -32,7 +32,6 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
-  console.log("resolvedTheme:", resolvedTheme);
 
   return (
     <div

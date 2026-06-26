@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { themeClasses } from "@/lib/theme-classes";
@@ -13,16 +11,6 @@ interface HeaderProps {
   dateRange: DateRange | null;
   onDateRangeChange: (range: DateRange | null) => void;
 }
-
-const TABS = [
-  { path: "/", label: "Overview" },
-  { path: "/scoreboard", label: "Scoreboard" },
-  { path: "/chronicle", label: "Chronicle Sync" },
-  { path: "/fee-petitions", label: "Fee Petitions" },
-  { path: "/overpaid-cases", label: "Overpaid Cases" },
-  { path: "/reports", label: "Reports" },
-  { path: "/notifications", label: "Notifications" },
-];
 
 const PRESETS = [
   { label: "Today", days: 0 },
@@ -44,33 +32,10 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
   );
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
-  const pathname = usePathname();
-
   const [open, setOpen] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const dropRef = useRef<HTMLDivElement>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Fetch unread notification count
-  useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
-    const fetchCount = async () => {
-      try {
-        const res = await fetch("/api/notifications?unread=true&limit=1", { signal });
-        if (res.ok) {
-          const json = await res.json();
-          setUnreadCount(json.unreadCount || 0);
-        }
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-      }
-    };
-    fetchCount();
-    const interval = setInterval(fetchCount, 60000); // poll every 60s
-    return () => { clearInterval(interval); controller.abort(); };
-  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -92,9 +57,6 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
       return () => clearTimeout(t);
     }
   }, [dateRange]);
-
-  const isActive = (path: string) =>
-    path === "/" ? pathname === "/" : pathname.startsWith(path);
 
   const applyPreset = (days: number) => {
     const now = new Date();
@@ -149,38 +111,8 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
 
   return (
     <header
-      className={`hidden md:flex h-14 ${t.bg} border-b ${t.border} items-center justify-between px-6 shrink-0`}
+      className={`hidden md:flex h-12 ${t.bg} border-b ${t.border} items-center justify-end px-6 shrink-0`}
     >
-      {/* Tab links */}
-      <div className="flex items-center gap-1">
-        {TABS.map((tab) => {
-          const active = isActive(tab.path);
-          return (
-            <Link
-              key={tab.path}
-              href={tab.path}
-              className={`h-8 px-3 rounded-md text-xs font-medium transition-colors ${
-                active
-                  ? dark
-                    ? "bg-neutral-800 text-neutral-100 font-semibold"
-                    : "bg-neutral-100 text-neutral-900 font-semibold"
-                  : dark
-                    ? "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
-                    : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"
-              } flex items-center gap-1.5`}
-            >
-              {tab.label}
-              {tab.path === "/notifications" && unreadCount > 0 && (
-                <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Right actions */}
       <div className="flex items-center gap-2.5">
         <div className="relative" ref={dropRef}>
           <button

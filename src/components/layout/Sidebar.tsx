@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   Archive,
   TableProperties,
+  PhoneIncoming,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtClaim } from "@/lib/formatters";
@@ -61,12 +62,13 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
     items: [
       { path: "/", icon: Home, label: "Overview" },
       { path: "/master-fees", icon: TableProperties, label: "Master Fees" },
+      { path: "/inbound-calls", icon: PhoneIncoming, label: "Inbound Calls" },
       { path: "/fees-closed", icon: CheckCircle2, label: "Fees Closed" },
-      { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
-      { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
       { path: "/fee-petitions", icon: Gavel, label: "Fee Petitions" },
       { path: "/overpaid-cases", icon: TrendingDown, label: "Overpaid Cases" },
+      { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/reports", icon: FileText, label: "Reports" },
+      { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
       { path: "/notifications", icon: Bell, label: "Notifications" },
     ],
   },
