@@ -41,6 +41,9 @@ interface AgentScore {
   unpaidT2Over60: number;
   unpaidT16Over60: number;
   unpaidConcOver60: number;
+  unpaidT2Over90: number;
+  unpaidT16Over90: number;
+  unpaidConcOver90: number;
   totalCollected: number;
   feesCollectedInWindow: number;
   casesFullFee: number;
@@ -144,8 +147,10 @@ const fmtRangeDate = (iso: string): string =>
 const cellKey = (agent: string, date: string): CellKey => `${agent}|${date}`;
 const EMPTY_CELL: CellValues = { ssaCalls: "", clientCallsIb: "", clientCallsOb: "", winSheetsCreated: "" };
 
-const hasOverdue = (a: AgentScore) =>
-  a.unpaidT2Over60 + a.unpaidT16Over60 + a.unpaidConcOver60 > 0;
+const hasOverdue = (a: AgentScore, t2d: 60 | 90, t16d: 60 | 90, concd: 60 | 90) =>
+  (t2d === 60 ? a.unpaidT2Over60 : a.unpaidT2Over90) +
+  (t16d === 60 ? a.unpaidT16Over60 : a.unpaidT16Over90) +
+  (concd === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90) > 0;
 
 // ---------- component ----------
 
@@ -161,6 +166,10 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [agentSearch, setAgentSearch] = useState("");
+  const [teamFilter, setTeamFilter] = useState("all");
+  const [t2Days, setT2Days] = useState<60 | 90>(60);
+  const [t16Days, setT16Days] = useState<60 | 90>(60);
+  const [concDays, setConcDays] = useState<60 | 90>(60);
   const [needsAttention, setNeedsAttention] = useState(false);
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
 
@@ -235,7 +244,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       const json = await res.json();
       if (cancelledRef.current) return;
       setData({
-        agents: json.agents ?? [],
+        agents: (json.agents ?? []).map((a: AgentScore) => ({
+          ...a,
+          unpaidT2Over90:   a.unpaidT2Over90   ?? 0,
+          unpaidT16Over90:  a.unpaidT16Over90  ?? 0,
+          unpaidConcOver90: a.unpaidConcOver90 ?? 0,
+        })),
         daily: json.daily ?? [],
         summary: json.summary ?? null,
         teams: json.teams ?? [],
@@ -278,10 +292,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     const q = agentSearch.trim().toLowerCase();
     return (data?.agents ?? []).filter((a) => {
       if (q && !a.agent.toLowerCase().includes(q)) return false;
-      if (needsAttention && !hasOverdue(a)) return false;
+      if (teamFilter !== "all" && a.team !== teamFilter) return false;
+      if (needsAttention && !hasOverdue(a, t2Days, t16Days, concDays)) return false;
       return true;
     });
-  }, [data, agentSearch, needsAttention]);
+  }, [data, agentSearch, teamFilter, t2Days, t16Days, concDays, needsAttention]);
 
   const filteredTotals = useMemo(() => ({
     casesAssigned:      filteredAgents.reduce((s, a) => s + a.casesAssigned, 0),
@@ -289,6 +304,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     unpaidT2Over60:     filteredAgents.reduce((s, a) => s + a.unpaidT2Over60, 0),
     unpaidT16Over60:    filteredAgents.reduce((s, a) => s + a.unpaidT16Over60, 0),
     unpaidConcOver60:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver60, 0),
+    unpaidT2Over90:     filteredAgents.reduce((s, a) => s + a.unpaidT2Over90, 0),
+    unpaidT16Over90:    filteredAgents.reduce((s, a) => s + a.unpaidT16Over90, 0),
+    unpaidConcOver90:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver90, 0),
     totalCollected:     filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
     casesFullFee:       filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
     weekSsaCalls:       filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
@@ -536,6 +554,17 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 />
               </div>
               <select
+                value={teamFilter}
+                onChange={(e) => setTeamFilter(e.target.value)}
+                aria-label="Team filter"
+                className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+              >
+                <option value="all">All Teams</option>
+                <option value="T2">T2</option>
+                <option value="T16">T16</option>
+                <option value="Concurrent">Concurrent</option>
+              </select>
+              <select
                 value={metricFocus}
                 onChange={(e) => setMetricFocus(e.target.value as MetricFocus)}
                 aria-label="Metric focus"
@@ -572,9 +601,45 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <th className={`${thBase} ${t.textSub} text-left`}>Agent</th>
                     {showCol("cases")     && <th className={`${thBase} ${t.textSub} text-right`}>Cases</th>}
                     {showCol("winsheets") && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
-                    {showCol("t2")   && <th className={`${thBase} text-right ${dark ? "text-red-400" : "text-red-600"}`}>T2 &gt;60d</th>}
-                    {showCol("t16")  && <th className={`${thBase} text-right ${dark ? "text-red-400" : "text-red-600"}`}>T16 &gt;60d</th>}
-                    {showCol("conc") && <th className={`${thBase} text-right ${dark ? "text-red-400" : "text-red-600"}`}>Conc &gt;60d</th>}
+                    {showCol("t2") && (
+                      <th className={`${thBase} text-right`}>
+                        <button
+                          onClick={() => setT2Days((v) => v === 60 ? 90 : 60)}
+                          aria-pressed={t2Days === 90}
+                          aria-label={`T2 aging threshold, currently ${t2Days} days`}
+                          className={`ml-auto flex items-center gap-0.5 transition-colors ${t2Days === 90 ? (dark ? "text-violet-400" : "text-violet-600") : (dark ? "text-red-400" : "text-red-600")}`}
+                          title="Toggle 60d / 90d threshold"
+                        >
+                          T2 &gt;{t2Days}d
+                        </button>
+                      </th>
+                    )}
+                    {showCol("t16") && (
+                      <th className={`${thBase} text-right`}>
+                        <button
+                          onClick={() => setT16Days((v) => v === 60 ? 90 : 60)}
+                          aria-pressed={t16Days === 90}
+                          aria-label={`T16 aging threshold, currently ${t16Days} days`}
+                          className={`ml-auto flex items-center gap-0.5 transition-colors ${t16Days === 90 ? (dark ? "text-violet-400" : "text-violet-600") : (dark ? "text-red-400" : "text-red-600")}`}
+                          title="Toggle 60d / 90d threshold"
+                        >
+                          T16 &gt;{t16Days}d
+                        </button>
+                      </th>
+                    )}
+                    {showCol("conc") && (
+                      <th className={`${thBase} text-right`}>
+                        <button
+                          onClick={() => setConcDays((v) => v === 60 ? 90 : 60)}
+                          aria-pressed={concDays === 90}
+                          aria-label={`Concurrent aging threshold, currently ${concDays} days`}
+                          className={`ml-auto flex items-center gap-0.5 transition-colors ${concDays === 90 ? (dark ? "text-violet-400" : "text-violet-600") : (dark ? "text-red-400" : "text-red-600")}`}
+                          title="Toggle 60d / 90d threshold"
+                        >
+                          Conc &gt;{concDays}d
+                        </button>
+                      </th>
+                    )}
                     {showCol("collected") && <th className={`${thBase} ${t.textSub} text-right`}>Collected</th>}
                     {showCol("fullfee")   && <th className={`${thBase} ${t.textSub} text-right`}>Full Fee</th>}
                     {showCol("ssa")    && <th className={`${thBase} ${t.textSub} text-right`}>SSA Calls</th>}
@@ -593,9 +658,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       <td className={`${tdBase} ${t.text} font-semibold`}>{a.agent}</td>
                       {showCol("cases")     && <td className={`${tdBase} text-right ${t.text}`}>{a.casesAssigned}</td>}
                       {showCol("winsheets") && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
-                      {showCol("t2")  && <td className={`${tdBase} text-right ${a.unpaidT2Over60  > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{a.unpaidT2Over60}</td>}
-                      {showCol("t16") && <td className={`${tdBase} text-right ${a.unpaidT16Over60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{a.unpaidT16Over60}</td>}
-                      {showCol("conc") && <td className={`${tdBase} text-right ${a.unpaidConcOver60 > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{a.unpaidConcOver60}</td>}
+                      {showCol("t2")  && <td className={`${tdBase} text-right ${(t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90)   > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90}</td>}
+                      {showCol("t16") && <td className={`${tdBase} text-right ${(t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90)  > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90}</td>}
+                      {showCol("conc") && <td className={`${tdBase} text-right ${(concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90) > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90}</td>}
                       {showCol("collected") && (
                         <td className={`${tdBase} text-right font-semibold ${a.totalCollected > 0 ? "text-emerald-500" : t.textMuted}`}>
                           {a.totalCollected > 0 ? fmt(a.totalCollected) : "—"}
@@ -612,9 +677,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
                     {showCol("cases")     && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesAssigned}</td>}
                     {showCol("winsheets") && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
-                    {showCol("t2")   && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{filteredTotals.unpaidT2Over60}</td>}
-                    {showCol("t16")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{filteredTotals.unpaidT16Over60}</td>}
-                    {showCol("conc") && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{filteredTotals.unpaidConcOver60}</td>}
+                    {showCol("t2")   && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t2Days   === 60 ? filteredTotals.unpaidT2Over60   : filteredTotals.unpaidT2Over90}</td>}
+                    {showCol("t16")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t16Days  === 60 ? filteredTotals.unpaidT16Over60  : filteredTotals.unpaidT16Over90}</td>}
+                    {showCol("conc") && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{concDays === 60 ? filteredTotals.unpaidConcOver60 : filteredTotals.unpaidConcOver90}</td>}
                     {showCol("collected") && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.totalCollected)}</td>}
                     {showCol("fullfee")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesFullFee}</td>}
                     {showCol("ssa")    && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.weekSsaCalls}</td>}
