@@ -17,20 +17,44 @@ import { themeClasses } from "@/lib/theme-classes";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function getMondayOf(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+// All "today" and week-start logic is anchored to Eastern Time so the week
+// boundaries are consistent regardless of where the browser is running.
+const ET = "America/New_York";
+
+function todayEasternIso(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: ET }).format(new Date());
 }
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+function isoToParts(dateStr: string): [number, number, number] {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return [y, m, d];
+}
+
+function partsToIso(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function getMondayOf(dateStr: string): string {
+  // Construct via numeric parts so the Date is always local midnight —
+  // new Date("YYYY-MM-DDT00:00:00") does the same, but toISOString() then
+  // converts back to UTC and shifts the date for timezones ahead of UTC.
+  const [y, m, d] = isoToParts(dateStr);
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  date.setDate(date.getDate() + diff);
+  return partsToIso(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 function currentWeekStart(): string {
-  return getMondayOf(todayIso());
+  return getMondayOf(todayEasternIso());
+}
+
+function addWeeks(weekStart: string, delta: number): string {
+  const [y, m, d] = isoToParts(weekStart);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + delta * 7);
+  return partsToIso(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 function weekLabel(weekStart: string): string {
@@ -101,6 +125,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   const [recordsError, setRecordsError] = useState<string | null>(null);
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [addingRow, setAddingRow] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   const recordsControllerRef = useRef<AbortController | null>(null);
   const pocControllerRef = useRef<AbortController | null>(null);
@@ -111,12 +136,9 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   useEffect(() => {
     const cur = currentWeekStart();
-    // Generate last 8 weeks including current
     const weeks: string[] = [];
     for (let i = 0; i < 8; i++) {
-      const d = new Date(cur + "T00:00:00");
-      d.setDate(d.getDate() - i * 7);
-      weeks.push(d.toISOString().slice(0, 10));
+      weeks.push(addWeeks(cur, -i));
     }
     setAvailableWeeks(weeks);
   }, []);
@@ -164,6 +186,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   useEffect(() => {
     fetchCancelledRef.current = false;
+    setPendingDelete(null);
     fetchPoc(selectedWeek);
     fetchRecords(selectedWeek);
     return () => {
@@ -247,7 +270,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           weekStart: selectedWeek,
-          callDate: todayIso(),
+          callDate: todayEasternIso(),
         }),
       });
       if (!res.ok) throw new Error(`Failed to add row (${res.status})`);
@@ -262,7 +285,8 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   // ── delete row ─────────────────────────────────────────────────────────────
 
-  const deleteRow = async (id: number) => {
+  const confirmDelete = async (id: number) => {
+    setPendingDelete(null);
     setRecords((prev) => prev.filter((r) => r.id !== id));
     try {
       await fetch(`/api/inbound-calls/${id}`, { method: "DELETE" });
@@ -561,13 +585,30 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                     </td>
                     {/* Delete */}
                     <td className={tdCls}>
-                      <button
-                        onClick={() => deleteRow(row.id)}
-                        aria-label="Delete row"
-                        className={`p-1 rounded transition-colors ${dark ? "text-neutral-500 hover:text-red-400" : "text-neutral-400 hover:text-red-500"}`}
-                      >
-                        <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
-                      </button>
+                      {pendingDelete === row.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => confirmDelete(row.id)}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setPendingDelete(null)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${dark ? "border-neutral-600 text-neutral-400 hover:border-neutral-400" : "border-neutral-200 text-neutral-500 hover:border-neutral-400"}`}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setPendingDelete(row.id)}
+                          aria-label="Delete row"
+                          className={`p-1 rounded transition-colors ${dark ? "text-neutral-500 hover:text-red-400" : "text-neutral-400 hover:text-red-500"}`}
+                        >
+                          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
