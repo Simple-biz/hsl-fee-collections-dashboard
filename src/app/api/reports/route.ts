@@ -101,7 +101,19 @@ export const GET = async (req: NextRequest) => {
       ORDER BY d.dt::date
     `);
 
-    // 7. Recent activity entries (for the feed)
+    // 7. Inbound call records assigned to a specialist in date range
+    const inboundIbCounts = await db.execute(sql`
+      SELECT
+        specialist_assigned AS agent_name,
+        COUNT(*)::int AS ib_count
+      FROM inbound_call_records
+      WHERE specialist_assigned IS NOT NULL
+        AND specialist_assigned != ''
+        AND call_date >= ${from}::date AND call_date <= ${to}::date
+      GROUP BY specialist_assigned
+    `);
+
+    // 8. Recent activity entries (for the feed)
     const recentActivity = await db.execute(sql`
       SELECT
         al.id,
@@ -214,6 +226,14 @@ export const GET = async (req: NextRequest) => {
       a.pifCount = r.pif_count;
       a.activeCount = r.active_count;
       a.pendingCount = r.pending_count;
+    }
+    for (const r of inboundIbCounts as unknown as {
+      agent_name: string;
+      ib_count: number;
+    }[]) {
+      const a = ensure(r.agent_name);
+      a.clientCallsIb += r.ib_count;
+      a.totalCalls += r.ib_count;
     }
 
     const agents = Array.from(agentMap.values())
