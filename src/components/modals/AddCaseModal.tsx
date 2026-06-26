@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, RefreshCw, Plus, CheckCircle2, ExternalLink, AlertCircle } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import {
@@ -72,6 +72,10 @@ export default function AddCaseModal({
   const [duplicateName, setDuplicateName] = useState<string | null>(null);
   const checkAbortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    return () => { checkAbortRef.current?.abort(); };
+  }, []);
+
   const set = (key: keyof FormState, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -85,7 +89,7 @@ export default function AddCaseModal({
     try {
       const res = await fetch(`/api/cases/${trimmed}`, { signal: controller.signal });
       if (res.ok) {
-        const json = await res.json();
+        const json = await res.json() as { data?: { firstName?: string; lastName?: string } };
         const { firstName, lastName } = json.data ?? {};
         setDuplicateName(lastName && firstName ? `${lastName}, ${firstName}` : `Client ID ${trimmed}`);
         setClientIdStatus("duplicate");
