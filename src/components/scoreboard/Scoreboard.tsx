@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useReducer, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -51,6 +51,22 @@ const TEAMS = [
   { key: "T16",        label: "T16 Team",         headerBg: "bg-red-700"  },
 ];
 
+// ---------- state ----------
+
+type FetchState = { weeks: WeekSlot[]; loading: boolean; error: string | null };
+type FetchAction =
+  | { type: "start" }
+  | { type: "success"; weeks: WeekSlot[] }
+  | { type: "error"; message: string };
+
+function fetchReducer(state: FetchState, action: FetchAction): FetchState {
+  switch (action.type) {
+    case "start":   return { ...state, loading: true, error: null };
+    case "success": return { weeks: action.weeks, loading: false, error: null };
+    case "error":   return { ...state, loading: false, error: action.message };
+  }
+}
+
 // ---------- component ----------
 
 export const Scoreboard = () => {
@@ -59,14 +75,15 @@ export const Scoreboard = () => {
   const t = themeClasses(dark);
 
   const [weekOffset, setWeekOffset] = useState(0);
-  const [weeks, setWeeks] = useState<WeekSlot[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
+    weeks: [],
+    loading: true,
+    error: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    dispatch({ type: "start" });
     const mondays = Array.from({ length: 5 }, (_, i) => getMonday(weekOffset - i));
     const controllers = mondays.map(() => new AbortController());
 
@@ -90,13 +107,11 @@ export const Scoreboard = () => {
     )
       .then((results) => {
         if (cancelled) return;
-        setWeeks(results);
-        setLoading(false);
+        dispatch({ type: "success", weeks: results });
       })
       .catch((err: Error) => {
         if (err.name === "AbortError" || cancelled) return;
-        setError(err.message);
-        setLoading(false);
+        dispatch({ type: "error", message: err.message });
       });
 
     return () => {
@@ -128,7 +143,7 @@ export const Scoreboard = () => {
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={() => setWeekOffset((v) => v - 1)}
+            onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
             aria-label="Previous 5 weeks"
           >
@@ -144,7 +159,7 @@ export const Scoreboard = () => {
             </button>
           )}
           <button
-            onClick={() => setWeekOffset((v) => v + 1)}
+            onClick={() => setWeekOffset(weekOffset + 1)}
             disabled={weekOffset >= 0}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${weekOffset >= 0 ? (dark ? "border-neutral-800 text-neutral-600 cursor-not-allowed" : "border-neutral-100 text-neutral-300 cursor-not-allowed") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
             aria-label="Next 5 weeks"
