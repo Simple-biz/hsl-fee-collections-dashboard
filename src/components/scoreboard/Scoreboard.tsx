@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 
 // ---------- types ----------
@@ -58,13 +58,16 @@ export const Scoreboard = () => {
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
 
+  const [weekOffset, setWeekOffset] = useState(0);
   const [weeks, setWeeks] = useState<WeekSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const mondays = Array.from({ length: 5 }, (_, i) => getMonday(-i));
+    setLoading(true);
+    setError(null);
+    const mondays = Array.from({ length: 5 }, (_, i) => getMonday(weekOffset - i));
     const controllers = mondays.map(() => new AbortController());
 
     Promise.all(
@@ -76,7 +79,7 @@ export const Scoreboard = () => {
           })
           .then((json): WeekSlot => ({
             monday,
-            label: i === 0 ? "This week" : weekRangeLabel(monday),
+            label: i === 0 && weekOffset === 0 ? "This week" : weekRangeLabel(monday),
             agents: (json.agents ?? []).map((a: AgentWeekData) => ({
               agent: a.agent,
               team: a.team ?? "",
@@ -100,7 +103,7 @@ export const Scoreboard = () => {
       cancelled = true;
       controllers.forEach((c) => c.abort());
     };
-  }, []);
+  }, [weekOffset]);
 
   const currentWeekMax = Math.max(
     ...TEAMS.flatMap(({ key }) =>
@@ -114,11 +117,43 @@ export const Scoreboard = () => {
   return (
     <div className={`rounded-xl border ${t.card} overflow-hidden`}>
       {/* Header */}
-      <div className={`px-5 py-4 border-b ${t.borderLight}`}>
-        <h2 className={`text-sm font-bold ${t.text}`}>Total Number of Closed Cases</h2>
-        <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-          Current week + 4 previous weeks
-        </p>
+      <div className={`px-5 py-4 border-b ${t.borderLight} flex items-center justify-between gap-4`}>
+        <div>
+          <h2 className={`text-sm font-bold ${t.text}`}>Total Number of Closed Cases</h2>
+          <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+            {weekOffset === 0
+              ? "Current week + 4 previous weeks"
+              : `5 weeks ending ${weekRangeLabel(getMonday(weekOffset)).split("–")[0].trim()}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setWeekOffset((v) => v - 1)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+            aria-label="Previous 5 weeks"
+          >
+            <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" />
+            Prev
+          </button>
+          {weekOffset < 0 && (
+            <button
+              onClick={() => setWeekOffset(0)}
+              className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-amber-700 text-amber-400 hover:bg-amber-900/20" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
+            >
+              This week
+            </button>
+          )}
+          <button
+            onClick={() => setWeekOffset((v) => v + 1)}
+            disabled={weekOffset >= 0}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${weekOffset >= 0 ? (dark ? "border-neutral-800 text-neutral-600 cursor-not-allowed" : "border-neutral-100 text-neutral-300 cursor-not-allowed") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+            aria-label="Next 5 weeks"
+            aria-disabled={weekOffset >= 0}
+          >
+            Next
+            <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {loading && (
