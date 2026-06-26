@@ -75,6 +75,32 @@ export default function AddCaseModal({
   const set = (key: keyof FormState, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const checkClientId = async (id: string) => {
+    const trimmed = id.trim();
+    if (!trimmed) { setClientIdStatus("idle"); setDuplicateName(null); return; }
+    checkAbortRef.current?.abort();
+    const controller = new AbortController();
+    checkAbortRef.current = controller;
+    setClientIdStatus("checking");
+    try {
+      const res = await fetch(`/api/cases/${trimmed}`, { signal: controller.signal });
+      if (res.ok) {
+        const json = await res.json();
+        const { firstName, lastName } = json.data ?? {};
+        setDuplicateName(lastName && firstName ? `${lastName}, ${firstName}` : `Client ID ${trimmed}`);
+        setClientIdStatus("duplicate");
+      } else if (res.status === 404) {
+        setClientIdStatus("clear");
+        setDuplicateName(null);
+      } else {
+        setClientIdStatus("idle");
+      }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setClientIdStatus("idle");
+    }
+  };
+
   // Paste the worksheet "CASE LINK" text — e.g.
   // "2026.05.22 Watson, Katrina v. ALJ WENDY HOLLINGSWORTH" — and fill the
   // name/date/ALJ fields from it. Existing values are kept when the line has
@@ -101,6 +127,11 @@ export default function AddCaseModal({
       externalId: value,
       clientId: id ? String(id) : f.clientId,
     }));
+    if (id) {
+      setClientIdStatus("idle");
+      setDuplicateName(null);
+      checkClientId(String(id));
+    }
   };
 
   // Paste a Chronicle URL (or a bare client id); we store the raw value for
@@ -123,32 +154,6 @@ export default function AddCaseModal({
   const levels = dropdownOptions?.case_level ?? [];
   const assignees = dropdownOptions?.assigned_to ?? [];
   const statuses = dropdownOptions?.win_sheet_status ?? [];
-
-  const checkClientId = async (id: string) => {
-    const trimmed = id.trim();
-    if (!trimmed) { setClientIdStatus("idle"); setDuplicateName(null); return; }
-    checkAbortRef.current?.abort();
-    const controller = new AbortController();
-    checkAbortRef.current = controller;
-    setClientIdStatus("checking");
-    try {
-      const res = await fetch(`/api/cases/${trimmed}`, { signal: controller.signal });
-      if (res.ok) {
-        const json = await res.json();
-        const { firstName, lastName } = json.data ?? {};
-        setDuplicateName(lastName && firstName ? `${lastName}, ${firstName}` : `Client ID ${trimmed}`);
-        setClientIdStatus("duplicate");
-      } else if (res.status === 404) {
-        setClientIdStatus("clear");
-        setDuplicateName(null);
-      } else {
-        setClientIdStatus("idle");
-      }
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return;
-      setClientIdStatus("idle");
-    }
-  };
 
   const canSubmit =
     form.clientId.trim() !== "" &&
