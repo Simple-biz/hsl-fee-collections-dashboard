@@ -15,8 +15,10 @@ import {
   RefreshCw,
   ChevronRight,
   Eye,
+  ClipboardList,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { AuditLogTab } from "@/components/notifications/AuditLogTab";
 
 // ============================================================================
 // Types
@@ -36,6 +38,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
+type PageTab = "notifications" | "audit_logs";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -84,6 +87,11 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
   { key: "case_assigned", label: "Assignments" },
 ];
 
+const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
+  { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "audit_logs",    label: "Audit Logs",    icon: ClipboardList },
+];
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -121,6 +129,7 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [markingAll, setMarkingAll] = useState(false);
+  const [pageTab, setPageTab] = useState<PageTab>("notifications");
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -230,6 +239,38 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-4">
+      {/* Page-level tab switcher */}
+      <div className={`flex gap-1 p-1 rounded-lg border w-fit ${dark ? "bg-neutral-900 border-neutral-800" : "bg-neutral-100/60 border-neutral-200"}`}>
+        {PAGE_TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setPageTab(key)}
+            className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              pageTab === key
+                ? dark
+                  ? "bg-neutral-800 text-neutral-100"
+                  : "bg-white text-neutral-900 shadow-sm"
+                : dark
+                  ? "text-neutral-400 hover:text-neutral-200"
+                  : "text-neutral-500 hover:text-neutral-700"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {label}
+            {key === "notifications" && unreadCount > 0 && (
+              <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Audit Logs tab */}
+      {pageTab === "audit_logs" && <AuditLogTab dark={dark} t={t} />}
+
+      {/* Notifications tab */}
+      {pageTab === "notifications" && <>
       {/* Header */}
       <div className={`rounded-xl border ${t.card}`}>
         <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -469,6 +510,7 @@ export default function NotificationsPage() {
           })}
         </div>
       )}
+      </>}
     </div>
   );
 }

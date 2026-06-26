@@ -76,13 +76,12 @@ interface CellValues {
   winSheetsCreated: string;
 }
 
-type MetricFocus = "all" | "aging" | "calls" | "fees";
+type MetricFocus = "all" | "aging" | "fees";
 
 const FOCUS_OPTIONS: { value: MetricFocus; label: string }[] = [
-  { value: "all",    label: "All metrics"  },
-  { value: "aging",  label: "Aging (>60d)" },
-  { value: "calls",  label: "Calls"        },
-  { value: "fees",   label: "Fees"         },
+  { value: "all",   label: "All metrics"  },
+  { value: "aging", label: "Aging (>60d)" },
+  { value: "fees",  label: "Fees"         },
 ];
 
 const COL_FOCUS: Record<string, MetricFocus[]> = {
@@ -93,8 +92,6 @@ const COL_FOCUS: Record<string, MetricFocus[]> = {
   conc:      ["aging"],
   collected: ["fees"],
   fullfee:   ["fees"],
-  ssa:       ["calls"],
-  client:    ["calls"],
 };
 
 type DateMode = "week" | "month" | "range";
@@ -309,8 +306,6 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     unpaidConcOver90:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver90, 0),
     totalCollected:     filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
     casesFullFee:       filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
-    weekSsaCalls:       filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
-    weekClientCalls:    filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
   }), [filteredAgents]);
 
   const getCell = (agent: string, date: string): CellValues =>
@@ -642,8 +637,6 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     )}
                     {showCol("collected") && <th className={`${thBase} ${t.textSub} text-right`}>Collected</th>}
                     {showCol("fullfee")   && <th className={`${thBase} ${t.textSub} text-right`}>Full Fee</th>}
-                    {showCol("ssa")    && <th className={`${thBase} ${t.textSub} text-right`}>SSA Calls</th>}
-                    {showCol("client") && <th className={`${thBase} ${t.textSub} text-right`}>Client Calls</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -667,8 +660,6 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         </td>
                       )}
                       {showCol("fullfee") && <td className={`${tdBase} text-right ${t.text}`}>{a.casesFullFee}</td>}
-                      {showCol("ssa")    && <td className={`${tdBase} text-right ${a.weekSsaCalls    > 0 ? t.text : t.textMuted}`}>{a.weekSsaCalls    || "—"}</td>}
-                      {showCol("client") && <td className={`${tdBase} text-right ${a.weekClientCalls > 0 ? t.text : t.textMuted}`}>{a.weekClientCalls || "—"}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -682,8 +673,6 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("conc") && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{concDays === 60 ? filteredTotals.unpaidConcOver60 : filteredTotals.unpaidConcOver90}</td>}
                     {showCol("collected") && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.totalCollected)}</td>}
                     {showCol("fullfee")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesFullFee}</td>}
-                    {showCol("ssa")    && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.weekSsaCalls}</td>}
-                    {showCol("client") && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.weekClientCalls}</td>}
                   </tr>
                 </tfoot>
               </table>
