@@ -16,9 +16,11 @@ import {
   ChevronRight,
   Eye,
   ClipboardList,
+  Activity,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { AuditLogTab } from "@/components/notifications/AuditLogTab";
+import { RecentActivityTab } from "@/components/notifications/RecentActivityTab";
 
 // ============================================================================
 // Types
@@ -38,7 +40,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "audit_logs";
+type PageTab = "notifications" | "audit_logs" | "recent_activity";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -88,8 +90,9 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
 ];
 
 const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
-  { key: "notifications", label: "Notifications", icon: Bell },
-  { key: "audit_logs",    label: "Audit Logs",    icon: ClipboardList },
+  { key: "notifications",   label: "Notifications",   icon: Bell },
+  { key: "audit_logs",      label: "Audit Logs",      icon: ClipboardList },
+  { key: "recent_activity", label: "Recent Activity", icon: Activity },
 ];
 
 // ============================================================================
@@ -268,6 +271,9 @@ export default function NotificationsPage() {
 
       {/* Audit Logs tab */}
       {pageTab === "audit_logs" && <AuditLogTab dark={dark} t={t} />}
+
+      {/* Recent Activity tab */}
+      {pageTab === "recent_activity" && <RecentActivityTab dark={dark} t={t} />}
 
       {/* Notifications tab */}
       {pageTab === "notifications" && <>

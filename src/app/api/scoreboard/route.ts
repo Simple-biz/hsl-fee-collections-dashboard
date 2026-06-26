@@ -160,7 +160,13 @@ export const GET = async (req: NextRequest) => {
         COALESCE((SELECT SUM(dm.client_calls_ib + dm.client_calls_ob) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
          AND dm.metric_date >= ${startDate}::date
-         AND dm.metric_date < ${endExclusive}::date), 0) AS week_client_calls,
+         AND dm.metric_date < ${endExclusive}::date), 0)
+        + COALESCE((SELECT COUNT(*) FROM inbound_call_records icr
+         WHERE icr.specialist_assigned = tm.name
+         AND icr.specialist_assigned IS NOT NULL
+         AND icr.specialist_assigned != ''
+         AND icr.call_date >= ${startDate}::date
+         AND icr.call_date < ${endExclusive}::date), 0) AS week_client_calls,
 
         COALESCE((SELECT SUM(dm.win_sheets_created) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name

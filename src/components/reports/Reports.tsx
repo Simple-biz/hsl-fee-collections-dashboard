@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import {
   BarChart3,
@@ -9,10 +9,9 @@ import {
   Calendar,
   Users,
   ChevronDown,
-  ChevronRight,
   ArrowUpDown,
+  Phone,
 } from "lucide-react";
-import { ActivityEntry } from "@/components/reports/RecentActivityFeed";
 import { ScoreboardTracker } from "@/components/reports/ScoreboardTracker";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
@@ -52,7 +51,6 @@ interface ReportData {
   to: string;
   agents: AgentRow[];
   totals: Totals;
-  recentActivity: ActivityEntry[];
 }
 
 // ---------- helpers ----------
@@ -126,8 +124,8 @@ export const Reports = () => {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("totalCalls");
   const [sortAsc, setSortAsc] = useState(false);
-  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [showPresets, setShowPresets] = useState(false);
+  const [activeTab, setActiveTab] = useState<"breakdown" | "tracking">("breakdown");
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -234,8 +232,36 @@ export const Reports = () => {
     />
   );
 
+  const TABS: { key: "breakdown" | "tracking"; label: string; icon: React.ElementType }[] = [
+    { key: "breakdown", label: "Activity Report", icon: BarChart3 },
+    { key: "tracking",  label: "Agent Tracking",  icon: Phone },
+  ];
+
   return (
     <div className="space-y-4">
+      {/* Tab switcher */}
+      <div className={`flex gap-1 p-1 rounded-lg border w-fit ${dark ? "bg-neutral-900 border-neutral-800" : "bg-neutral-100/60 border-neutral-200"}`}>
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              activeTab === key
+                ? dark
+                  ? "bg-neutral-800 text-neutral-100"
+                  : "bg-white text-neutral-900 shadow-sm"
+                : dark
+                  ? "text-neutral-400 hover:text-neutral-200"
+                  : "text-neutral-500 hover:text-neutral-700"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "breakdown" && <>
       {/* Header with date range picker */}
       <div className={`${sectionCard} p-4 md:p-5`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -245,6 +271,7 @@ export const Reports = () => {
             >
               <BarChart3
                 className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                aria-hidden="true"
               />
             </div>
             <div>
@@ -358,7 +385,7 @@ export const Reports = () => {
               <h4
                 className={`text-xs font-bold ${t.text} flex items-center gap-2`}
               >
-                <Users className="h-3.5 w-3.5" /> Agent Breakdown
+                <Users className="h-3.5 w-3.5" aria-hidden="true" /> Agent Breakdown
                 <span className={`text-[10px] font-normal ${t.textMuted}`}>
                   ({sortedAgents.length} agents)
                 </span>
@@ -369,18 +396,17 @@ export const Reports = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-250">
+              <table className="w-full min-w-300">
                 <thead>
                   <tr className={`border-b ${t.borderLight}`}>
-                    <th className={`${thBase} ${t.textSub} text-left w-8`} />
                     <th
-                      className={`${thBase} ${t.textSub} text-left`}
+                      className={`${thBase} ${t.textSub} text-left cursor-pointer select-none`}
                       onClick={() => handleSort("name")}
                     >
                       Agent <SortIcon col="name" />
                     </th>
                     <th
-                      className={`${thBase} ${t.textSub} text-right`}
+                      className={`${thBase} ${t.textSub} text-right cursor-pointer select-none`}
                       onClick={() => handleSort("totalCalls")}
                     >
                       Calls <SortIcon col="totalCalls" />
@@ -388,32 +414,36 @@ export const Reports = () => {
                     <th className={`${thBase} ${t.textSub} text-right`}>SSA</th>
                     <th className={`${thBase} ${t.textSub} text-right`}>IB</th>
                     <th className={`${thBase} ${t.textSub} text-right`}>OB</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Days</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Avg/Day</th>
                     <th
-                      className={`${thBase} ${t.textSub} text-right`}
+                      className={`${thBase} ${t.textSub} text-right cursor-pointer select-none`}
                       onClick={() => handleSort("activityCount")}
                     >
                       Activity <SortIcon col="activityCount" />
                     </th>
                     <th
-                      className={`${thBase} ${t.textSub} text-right`}
+                      className={`${thBase} ${t.textSub} text-right cursor-pointer select-none`}
                       onClick={() => handleSort("casesTouched")}
                     >
                       Cases <SortIcon col="casesTouched" />
                     </th>
                     <th
-                      className={`${thBase} ${t.textSub} text-right`}
+                      className={`${thBase} ${t.textSub} text-right cursor-pointer select-none`}
                       onClick={() => handleSort("statusChanges")}
                     >
                       Changes <SortIcon col="statusChanges" />
                     </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>PIF</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Act/Pend</th>
                     <th
-                      className={`${thBase} ${t.textSub} text-right`}
+                      className={`${thBase} ${t.textSub} text-right cursor-pointer select-none`}
                       onClick={() => handleSort("collected")}
                     >
                       Collected <SortIcon col="collected" />
                     </th>
                     <th
-                      className={`${thBase} ${t.textSub} text-right`}
+                      className={`${thBase} ${t.textSub} text-right cursor-pointer select-none`}
                       onClick={() => handleSort("totalAssigned")}
                     >
                       Assigned <SortIcon col="totalAssigned" />
@@ -424,242 +454,61 @@ export const Reports = () => {
                   {sortedAgents.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={11}
+                        colSpan={14}
                         className={`${tdBase} text-center py-8 ${t.textMuted}`}
                       >
                         No agent data for this date range.
                       </td>
                     </tr>
                   ) : (
-                    sortedAgents.map((agent) => {
-                      const isExpanded = expandedAgent === agent.name;
-                      return (
-                        <tr key={agent.name} className="group">
-                          <td colSpan={11} className="p-0">
-                            {/* Main row */}
-                            <div
-                              className={`flex items-center border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer`}
-                              onClick={() =>
-                                setExpandedAgent(isExpanded ? null : agent.name)
-                              }
-                            >
-                              <div
-                                className={`${tdBase} w-8 flex items-center justify-center`}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-3 w-3" />
-                                ) : (
-                                  <ChevronRight className="h-3 w-3" />
-                                )}
-                              </div>
-                              <div
-                                className={`${tdBase} flex-1 ${t.text} font-semibold`}
-                              >
-                                {agent.name}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right font-semibold ${t.text}`}
-                              >
-                                {agent.totalCalls}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.ssaCalls}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.clientCallsIb}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.clientCallsOb}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.activityCount}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.casesTouched}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.statusChanges}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${agent.collected > 0 ? "text-emerald-500 font-semibold" : t.textMuted}`}
-                              >
-                                {agent.collected > 0
-                                  ? fmtFull(agent.collected)
-                                  : "—"}
-                              </div>
-                              <div
-                                className={`${tdBase} text-right ${t.textSub}`}
-                              >
-                                {agent.totalAssigned}
-                              </div>
-                            </div>
-
-                            {/* Expanded detail */}
-                            {isExpanded && (
-                              <div
-                                className={`px-4 py-3 border-b ${rowBorder} ${dark ? "bg-neutral-800/20" : "bg-neutral-50/50"}`}
-                              >
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
-                                  <div>
-                                    <p
-                                      className={`text-[10px] font-semibold uppercase ${t.textMuted}`}
-                                    >
-                                      Days Active
-                                    </p>
-                                    <p className={`font-semibold ${t.text}`}>
-                                      {agent.daysActive}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p
-                                      className={`text-[10px] font-semibold uppercase ${t.textMuted}`}
-                                    >
-                                      Avg Calls/Day
-                                    </p>
-                                    <p className={`font-semibold ${t.text}`}>
-                                      {agent.daysActive > 0
-                                        ? Math.round(
-                                            agent.totalCalls / agent.daysActive,
-                                          )
-                                        : 0}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p
-                                      className={`text-[10px] font-semibold uppercase ${t.textMuted}`}
-                                    >
-                                      PIF Cases
-                                    </p>
-                                    <p className="font-semibold text-emerald-500">
-                                      {agent.pifCount}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p
-                                      className={`text-[10px] font-semibold uppercase ${t.textMuted}`}
-                                    >
-                                      Active / Pending
-                                    </p>
-                                    <p className={`font-semibold ${t.text}`}>
-                                      {agent.activeCount} / {agent.pendingCount}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Agent's activity entries */}
-                                {data.recentActivity.filter(
-                                  (a) => a.createdBy === agent.name,
-                                ).length > 0 && (
-                                  <div className="mt-3">
-                                    <p
-                                      className={`text-[10px] font-semibold uppercase ${t.textMuted} mb-1.5`}
-                                    >
-                                      Recent Activity
-                                    </p>
-                                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                                      {data.recentActivity
-                                        .filter(
-                                          (a) => a.createdBy === agent.name,
-                                        )
-                                        .slice(0, 10)
-                                        .map((a) => (
-                                          <div
-                                            key={a.id}
-                                            className={`flex items-start gap-2 text-[11px] ${t.textSub}`}
-                                          >
-                                            <span
-                                              className={`text-[9px] ${t.textMuted} shrink-0 w-16`}
-                                            >
-                                              {new Date(
-                                                a.createdAt,
-                                              ).toLocaleDateString("en-US", {
-                                                month: "short",
-                                                day: "numeric",
-                                              })}
-                                            </span>
-                                            <span className="flex-1 leading-snug">
-                                              {a.caseName && (
-                                                <span
-                                                  className={`font-medium ${t.text}`}
-                                                >
-                                                  {a.caseName}:{" "}
-                                                </span>
-                                              )}
-                                              {a.message}
-                                            </span>
-                                          </div>
-                                        ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
+                    sortedAgents.map((agent) => (
+                      <tr
+                        key={agent.name}
+                        className={`border-b ${rowBorder} ${rowHover} transition-colors`}
+                      >
+                        <td className={`${tdBase} ${t.text} font-semibold`}>{agent.name}</td>
+                        <td className={`${tdBase} text-right font-semibold ${t.text}`}>{agent.totalCalls}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.ssaCalls}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.clientCallsIb}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.clientCallsOb}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.daysActive}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>
+                          {agent.daysActive > 0 ? Math.round(agent.totalCalls / agent.daysActive) : 0}
+                        </td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.activityCount}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.casesTouched}</td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.statusChanges}</td>
+                        <td className={`${tdBase} text-right font-semibold text-emerald-500`}>
+                          {agent.pifCount > 0 ? agent.pifCount : <span className={t.textMuted}>—</span>}
+                        </td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>
+                          {agent.activeCount} / {agent.pendingCount}
+                        </td>
+                        <td className={`${tdBase} text-right ${agent.collected > 0 ? "text-emerald-500 font-semibold" : t.textMuted}`}>
+                          {agent.collected > 0 ? fmtFull(agent.collected) : "—"}
+                        </td>
+                        <td className={`${tdBase} text-right ${t.textSub}`}>{agent.totalAssigned}</td>
+                      </tr>
+                    ))
                   )}
 
                   {/* Totals row */}
                   {sortedAgents.length > 0 && (
-                    <tr
-                      className={`border-t-2 ${dark ? "border-neutral-700" : "border-neutral-300"}`}
-                    >
-                      <td className={`${tdBase}`} />
+                    <tr className={`border-t-2 ${dark ? "border-neutral-700" : "border-neutral-300"}`}>
                       <td className={`${tdBase} font-bold ${t.text}`}>Total</td>
-                      <td
-                        className={`${tdBase} text-right font-bold ${t.text}`}
-                      >
-                        {data.totals.totalCalls}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-semibold ${t.textSub}`}
-                      >
-                        {data.totals.ssaCalls}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-semibold ${t.textSub}`}
-                      >
-                        {data.totals.clientCallsIb}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-semibold ${t.textSub}`}
-                      >
-                        {data.totals.clientCallsOb}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-semibold ${t.textSub}`}
-                      >
-                        {data.totals.activityCount}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-semibold ${t.textSub}`}
-                      >
-                        {data.totals.casesTouched}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-semibold ${t.textSub}`}
-                      >
-                        {data.totals.statusChanges}
-                      </td>
-                      <td
-                        className={`${tdBase} text-right font-bold text-emerald-500`}
-                      >
-                        {data.totals.collected > 0
-                          ? fmtFull(data.totals.collected)
-                          : "—"}
+                      <td className={`${tdBase} text-right font-bold ${t.text}`}>{data.totals.totalCalls}</td>
+                      <td className={`${tdBase} text-right font-semibold ${t.textSub}`}>{data.totals.ssaCalls}</td>
+                      <td className={`${tdBase} text-right font-semibold ${t.textSub}`}>{data.totals.clientCallsIb}</td>
+                      <td className={`${tdBase} text-right font-semibold ${t.textSub}`}>{data.totals.clientCallsOb}</td>
+                      <td className={`${tdBase}`} />
+                      <td className={`${tdBase}`} />
+                      <td className={`${tdBase} text-right font-semibold ${t.textSub}`}>{data.totals.activityCount}</td>
+                      <td className={`${tdBase} text-right font-semibold ${t.textSub}`}>{data.totals.casesTouched}</td>
+                      <td className={`${tdBase} text-right font-semibold ${t.textSub}`}>{data.totals.statusChanges}</td>
+                      <td className={`${tdBase}`} />
+                      <td className={`${tdBase}`} />
+                      <td className={`${tdBase} text-right font-bold text-emerald-500`}>
+                        {data.totals.collected > 0 ? fmtFull(data.totals.collected) : "—"}
                       </td>
                       <td className={`${tdBase}`} />
                     </tr>
@@ -671,7 +520,9 @@ export const Reports = () => {
         </>
       )}
 
-      <ScoreboardTracker dark={dark} t={t} />
+      </>}
+
+      {activeTab === "tracking" && <ScoreboardTracker dark={dark} t={t} />}
     </div>
   );
 };
