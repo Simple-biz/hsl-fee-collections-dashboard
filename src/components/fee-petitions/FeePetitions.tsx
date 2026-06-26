@@ -21,7 +21,7 @@ import {
   ArchiveX,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmtDate } from "@/lib/formatters";
+import { fmt, fmtDate } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists } from "@/app/(dashboard)/fee-petitions/actions";
 import { useCapabilities } from "@/hooks/useCapabilities";
 
@@ -31,6 +31,7 @@ interface FeePetitionRow {
   claimant: string;
   approvalDate: string | null;
   updatedAt: string | null;
+  feeAmount: number | null;
   noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
@@ -694,7 +695,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 6;
+  const colSpan = CHECKBOX_COLUMNS.length + 7;
 
   return (
     <div className="space-y-4">
@@ -1015,7 +1016,7 @@ export const FeePetitions = () => {
             <thead>
               <tr className={`border-b ${t.borderLight}`}>
                 {/* Select-all checkbox */}
-                <th className={`${thBase} text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
+                <th className={`${thBase} w-10 text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
                   <input
                     ref={selectAllRef}
                     type="checkbox"
@@ -1026,7 +1027,7 @@ export const FeePetitions = () => {
                 </th>
                 <th
                   aria-sort={ariaSortFor("claimant")}
-                  className={`${thBase} ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
+                  className={`${thBase} w-40 ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
                 >
                   <button
                     type="button"
@@ -1035,6 +1036,9 @@ export const FeePetitions = () => {
                   >
                     Claimant {sortIcon("claimant")}
                   </button>
+                </th>
+                <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[200px] top-0 z-30 ${stickyHeaderBg}`}>
+                  Fee Amount
                 </th>
                 <th
                   aria-sort={ariaSortFor("approvalDate")}
@@ -1135,7 +1139,7 @@ export const FeePetitions = () => {
                         />
                       </td>
                       <td
-                        className={`${tdBase} ${t.text} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
+                        className={`${tdBase} ${t.text} font-semibold w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
                         <Link
@@ -1149,6 +1153,9 @@ export const FeePetitions = () => {
                             Updated {formatRelativeDate(row.updatedAt)}
                           </p>
                         )}
+                      </td>
+                      <td className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}>
+                        {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
                         <div className="flex items-center gap-1.5">
