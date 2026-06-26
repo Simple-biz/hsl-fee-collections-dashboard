@@ -147,7 +147,10 @@ export const Reports = () => {
         return res.json() as Promise<{ summary: ScoreboardSummary }>;
       })
       .then((json) => { if (!cancelled) setSummary(json.summary ?? null); })
-      .catch((err: Error) => { if (err.name === "AbortError" || cancelled) return; });
+      .catch((err: Error) => {
+        if (err.name === "AbortError" || cancelled) return;
+        console.error("Reports summary fetch error:", err);
+      });
     return () => { cancelled = true; summaryAbortRef.current?.abort(); };
   }, []);
 
@@ -404,7 +407,6 @@ export const Reports = () => {
           label=""
           dark={dark}
           t={t}
-          showMiniCards={true}
         />
       )}
 

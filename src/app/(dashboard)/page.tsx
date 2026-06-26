@@ -12,7 +12,6 @@ import { RecentActivityFeed, ActivityEntry } from "@/components/reports/RecentAc
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
-
 export default function OverviewPage() {
   const {
     cases,
