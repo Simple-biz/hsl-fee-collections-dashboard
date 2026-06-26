@@ -1162,29 +1162,13 @@ export const FeeRecordsTable = ({
                           value={cellValue(c, "feesConfirmation")}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => {
-                            const next = e.target.value;
-                            if (
-                              canFinalize &&
-                              next &&
-                              next.toLowerCase() === "paid in full" &&
-                              next !== cellValue(c, "feesConfirmation")
-                            ) {
-                              setAckTarget({
-                                caseId: c.id,
-                                caseName: c.name,
-                                triggerField: "feesConfirmation",
-                                triggerValue: next,
-                                triggerLabel: "Fees Confirmation",
-                              });
-                              return;
-                            }
                             handleVarcharChange(
                               c,
                               "fee",
                               "feesConfirmation",
                               "feesConfirmation",
                               "Fees Confirmation",
-                              next,
+                              e.target.value,
                             );
                           }}
                           className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
