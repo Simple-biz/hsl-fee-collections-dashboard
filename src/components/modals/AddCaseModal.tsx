@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X, RefreshCw, Plus, CheckCircle2, ExternalLink } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, RefreshCw, Plus, CheckCircle2, ExternalLink, AlertCircle } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import {
   parseCaseLink,
@@ -68,6 +68,9 @@ export default function AddCaseModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [clientIdStatus, setClientIdStatus] = useState<"idle" | "checking" | "duplicate" | "clear">("idle");
+  const [duplicateName, setDuplicateName] = useState<string | null>(null);
+  const checkAbortRef = useRef<AbortController | null>(null);
 
   const set = (key: keyof FormState, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -121,10 +124,37 @@ export default function AddCaseModal({
   const assignees = dropdownOptions?.assigned_to ?? [];
   const statuses = dropdownOptions?.win_sheet_status ?? [];
 
+  const checkClientId = async (id: string) => {
+    const trimmed = id.trim();
+    if (!trimmed) { setClientIdStatus("idle"); setDuplicateName(null); return; }
+    checkAbortRef.current?.abort();
+    const controller = new AbortController();
+    checkAbortRef.current = controller;
+    setClientIdStatus("checking");
+    try {
+      const res = await fetch(`/api/cases/${trimmed}`, { signal: controller.signal });
+      if (res.ok) {
+        const json = await res.json();
+        const { firstName, lastName } = json.data ?? {};
+        setDuplicateName(lastName && firstName ? `${lastName}, ${firstName}` : `Client ID ${trimmed}`);
+        setClientIdStatus("duplicate");
+      } else if (res.status === 404) {
+        setClientIdStatus("clear");
+        setDuplicateName(null);
+      } else {
+        setClientIdStatus("idle");
+      }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setClientIdStatus("idle");
+    }
+  };
+
   const canSubmit =
     form.clientId.trim() !== "" &&
     form.firstName.trim() !== "" &&
     form.lastName.trim() !== "" &&
+    clientIdStatus !== "duplicate" &&
     !busy;
 
   const submit = async () => {
@@ -278,10 +308,23 @@ export default function AddCaseModal({
                   <input
                     type="number"
                     value={form.clientId}
-                    onChange={(e) => set("clientId", e.target.value)}
+                    onChange={(e) => { set("clientId", e.target.value); setClientIdStatus("idle"); setDuplicateName(null); }}
+                    onBlur={(e) => checkClientId(e.target.value)}
                     placeholder="MyCase ID"
-                    className={inputCls}
+                    className={`${inputCls} ${clientIdStatus === "duplicate" ? "border-red-500 dark:border-red-600" : ""}`}
                   />
+                  {clientIdStatus === "checking" && (
+                    <p className={`mt-1 text-[11px] flex items-center gap-1 ${t.textMuted}`}>
+                      <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
+                      Checking…
+                    </p>
+                  )}
+                  {clientIdStatus === "duplicate" && (
+                    <p className="mt-1 text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
+                      <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      Already exists: {duplicateName}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={lblCls}>First Name *</label>
