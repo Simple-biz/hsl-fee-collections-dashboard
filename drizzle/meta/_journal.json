@@ -169,6 +169,13 @@
       "when": 1781721739564,
       "tag": "0023_team_daily_tracking_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1782494416088,
+      "tag": "0024_add_fees_closed_trigger_to_fee_records",
+      "breakpoints": true
     }
   ]
 }

@@ -205,6 +205,7 @@ export const feeRecords = pgTable(
     winSheetLinkText: varchar("win_sheet_link_text", { length: 200 }),
     caseStatus: varchar("case_status", { length: 100 }),
     feesConfirmation: varchar("fees_confirmation", { length: 50 }),
+    feesClosedTrigger: varchar("fees_closed_trigger", { length: 50 }),
     dateAssignedToAgent: date("date_assigned_to_agent"),
 
     // T16

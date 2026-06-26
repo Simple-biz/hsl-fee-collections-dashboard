@@ -1,0 +1,1 @@
+ALTER TABLE "fee_records" ADD COLUMN "fees_closed_trigger" varchar(50);
