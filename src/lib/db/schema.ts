@@ -836,6 +836,53 @@ export const myCaseSyncTags = pgTable("mycase_sync_tags", {
 });
 
 // ============================================================================
+// INBOUND_CALL_POC — Weekly point-of-contact assignments per day (Mon–Fri)
+// ============================================================================
+
+export const inboundCallPoc = pgTable(
+  "inbound_call_poc",
+  {
+    id: serial("id").primaryKey(),
+    weekStart: date("week_start").notNull(), // Monday of the week (YYYY-MM-DD)
+    dayOfWeek: integer("day_of_week").notNull(), // 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri
+    pocName: varchar("poc_name", { length: 200 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("uq_inbound_call_poc_week_day_name").on(
+      table.weekStart,
+      table.dayOfWeek,
+      table.pocName,
+    ),
+    index("idx_inbound_call_poc_week").on(table.weekStart),
+  ],
+);
+
+// ============================================================================
+// INBOUND_CALL_RECORDS — Call history log
+// ============================================================================
+
+export const inboundCallRecords = pgTable(
+  "inbound_call_records",
+  {
+    id: serial("id").primaryKey(),
+    weekStart: date("week_start").notNull(), // for week-based filtering
+    callDate: date("call_date").notNull(),
+    number: varchar("number", { length: 50 }),
+    transcript: text("transcript"),
+    caseLink: varchar("case_link", { length: 500 }),
+    specialistAssigned: varchar("specialist_assigned", { length: 200 }),
+    calledBackResolved: boolean("called_back_resolved").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_inbound_call_records_week").on(table.weekStart),
+    index("idx_inbound_call_records_date").on(table.callDate),
+  ],
+);
+
+// ============================================================================
 // Case archive — records moved out of cases/fee_records when they are missing
 // from the sheet reconciliation (active or fees-closed).
 // No FK on originalClientId — the source row is deleted on archive.

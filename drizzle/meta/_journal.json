@@ -176,6 +176,13 @@
       "when": 1782494416088,
       "tag": "0024_add_fees_closed_trigger_to_fee_records",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1782501445109,
+      "tag": "0025_add_inbound_call_tables",
+      "breakpoints": true
     }
   ]
 }
