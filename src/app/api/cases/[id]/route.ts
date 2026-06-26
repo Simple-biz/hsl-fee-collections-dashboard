@@ -91,6 +91,7 @@ export const GET = async (
         pifReadyToClose: feeRecords.pifReadyToClose,
         approvedBy: feeRecords.approvedBy,
         feesConfirmation: feeRecords.feesConfirmation,
+        feesClosedTrigger: feeRecords.feesClosedTrigger,
         caseStatus: feeRecords.caseStatus,
         isClosed: feeRecords.isClosed,
         closedAt: feeRecords.closedAt,
@@ -241,6 +242,7 @@ export const GET = async (
             : null,
       approvedBy: row.approvedBy,
       feesConfirmation: row.feesConfirmation ?? null,
+      feesClosedTrigger: row.feesClosedTrigger ?? null,
       caseStatus: row.caseStatus ?? null,
       isClosed: row.isClosed ?? false,
       closedAt: row.closedAt ? row.closedAt.toISOString() : null,
@@ -349,11 +351,14 @@ export const PATCH = async (
       }
     }
 
-    if (feeFields && "feesConfirmation" in feeFields) {
+    if (
+      feeFields &&
+      ("feesConfirmation" in feeFields || "feesClosedTrigger" in feeFields)
+    ) {
       const admin = await requireAdmin();
       if (!admin.ok) {
         return NextResponse.json(
-          { error: "Only admins can update Fees Confirmation." },
+          { error: "Only admins can update Fees Confirmation or Fees Closed." },
           { status: guardStatus(admin.error) },
         );
       }
@@ -423,6 +428,7 @@ export const PATCH = async (
         pifReadyToClose: "pif_ready_to_close",
         approvedBy: "approved_by",
         feesConfirmation: "fees_confirmation",
+        feesClosedTrigger: "fees_closed_trigger",
         caseStatus: "case_status",
         feeMethod: "fee_method",
         feeComputed: "fee_computed",
