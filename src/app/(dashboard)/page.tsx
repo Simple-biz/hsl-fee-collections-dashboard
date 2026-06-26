@@ -8,20 +8,9 @@ import { RevenuePanel } from "@/components/cases/RevenuePanel";
 import { useDashboard } from "@/hooks/useDashboard";
 import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import {
-  ScoreboardSummaryCards,
-  ScoreboardSummary,
-} from "@/components/scoreboard/ScoreboardSummaryCards";
 import { RecentActivityFeed, ActivityEntry } from "@/components/reports/RecentActivityFeed";
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
-
-const currentMonday = () => {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.getFullYear(), d.getMonth(), diff);
-};
 
 export default function OverviewPage() {
   const {
@@ -36,39 +25,7 @@ export default function OverviewPage() {
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
 
-  const [scoreboardSummary, setScoreboardSummary] = useState<ScoreboardSummary | null>(null);
-  const [scoreboardLabel, setScoreboardLabel] = useState("This Week");
   const [recentActivities, setRecentActivities] = useState<ActivityEntry[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    const week = toISO(currentMonday());
-    fetch(`/api/scoreboard?week=${week}`, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load scoreboard (${res.status})`);
-        return res.json();
-      })
-      .then((json) => {
-        if (cancelled) return;
-        setScoreboardSummary(json.summary);
-        if (json.start && json.end) {
-          const fmt = (s: string) =>
-            new Date(s + "T12:00:00").toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            });
-          setScoreboardLabel(`${fmt(json.start)} – ${fmt(json.end)}`);
-        }
-      })
-      .catch((err: Error) => {
-        if (err.name === "AbortError") return;
-      });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,19 +87,6 @@ export default function OverviewPage() {
         <CollectionsPanel data={monthlyData} />
         <RevenuePanel stats={summary} cases={cases} />
       </div>
-      {scoreboardSummary && (
-        <div
-          className={`rounded-xl border p-4 space-y-4 ${dark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200"}`}
-        >
-          <ScoreboardSummaryCards
-            summary={scoreboardSummary}
-            teams={[]}
-            label={scoreboardLabel}
-            dark={dark}
-            t={t}
-          />
-        </div>
-      )}
       {recentActivities.length > 0 && (
         <RecentActivityFeed
           activities={recentActivities}
