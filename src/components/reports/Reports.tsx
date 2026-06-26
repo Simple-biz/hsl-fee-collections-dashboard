@@ -13,6 +13,10 @@ import {
   Phone,
 } from "lucide-react";
 import { ScoreboardTracker } from "@/components/reports/ScoreboardTracker";
+import {
+  ScoreboardSummaryCards,
+  type ScoreboardSummary,
+} from "@/components/scoreboard/ScoreboardSummaryCards";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
 
@@ -128,6 +132,27 @@ export const Reports = () => {
   const [activeTab, setActiveTab] = useState<"breakdown" | "tracking">("breakdown");
 
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const summaryAbortRef = useRef<AbortController | null>(null);
+  const [summary, setSummary] = useState<ScoreboardSummary | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    summaryAbortRef.current?.abort();
+    const controller = new AbortController();
+    summaryAbortRef.current = controller;
+    const monday = toISO(startOfWeek(new Date()));
+    fetch(`/api/scoreboard?week=${monday}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load summary (${res.status})`);
+        return res.json() as Promise<{ summary: ScoreboardSummary }>;
+      })
+      .then((json) => { if (!cancelled) setSummary(json.summary ?? null); })
+      .catch((err: Error) => {
+        if (err.name === "AbortError" || cancelled) return;
+        console.error("Reports summary fetch error:", err);
+      });
+    return () => { cancelled = true; summaryAbortRef.current?.abort(); };
+  }, []);
 
   const fetchReport = useCallback(async () => {
     fetchAbortRef.current?.abort();
@@ -373,6 +398,16 @@ export const Reports = () => {
             Generating report...
           </span>
         </div>
+      )}
+
+      {summary && (
+        <ScoreboardSummaryCards
+          summary={summary}
+          teams={[]}
+          label=""
+          dark={dark}
+          t={t}
+        />
       )}
 
       {data && !loading && (
