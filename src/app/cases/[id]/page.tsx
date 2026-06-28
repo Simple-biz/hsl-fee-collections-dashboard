@@ -444,6 +444,8 @@ const CaseDetailPage = () => {
   const [editFeeMethod, setEditFeeMethod] = useState("");
   const [editFeeCap, setEditFeeCap] = useState("");
   const [editApprovedBy, setEditApprovedBy] = useState("");
+  const [editWinSheetLink, setEditWinSheetLink] = useState("");
+  const [editWinSheetLinkText, setEditWinSheetLinkText] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
@@ -459,7 +461,7 @@ const CaseDetailPage = () => {
       const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete");
-      router.push("/");
+      router.back();
     } catch (err) {
       setError((err as Error).message);
       setDeleteConfirm(false);
@@ -515,6 +517,8 @@ const CaseDetailPage = () => {
     setEditFeeMethod(d.feeMethod || "fee_agreement");
     setEditFeeCap(String(d.applicableFeeCap || 9200));
     setEditApprovedBy(d.approvedBy || "");
+    setEditWinSheetLink(d.winSheetLink || "");
+    setEditWinSheetLinkText(d.winSheetLinkText || "");
   };
 
   useEffect(() => {
@@ -602,6 +606,14 @@ const CaseDetailPage = () => {
       if (editApprovedBy !== (caseData.approvedBy || "")) {
         feeFields.approvedBy = editApprovedBy || null;
         changes.push(`Approved by → ${editApprovedBy || "cleared"}`);
+      }
+      if (editWinSheetLink !== (caseData.winSheetLink || "")) {
+        feeFields.winSheetLink = editWinSheetLink || null;
+        changes.push(`Win sheet link → ${editWinSheetLink || "cleared"}`);
+      }
+      if (editWinSheetLinkText !== (caseData.winSheetLinkText || "")) {
+        feeFields.winSheetLinkText = editWinSheetLinkText || null;
+        changes.push(`Win sheet link text → ${editWinSheetLinkText || "cleared"}`);
       }
 
       if (changes.length === 0) {
@@ -785,7 +797,7 @@ const CaseDetailPage = () => {
       <div className={`sticky top-0 z-30 ${t.bg} border-b ${t.border}`}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 flex items-center gap-3">
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.back()}
             className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -892,7 +904,7 @@ const CaseDetailPage = () => {
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span className="text-sm">{error}</span>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.back()}
               className="ml-auto text-xs font-medium underline"
             >
               Back to dashboard
@@ -1135,12 +1147,29 @@ const CaseDetailPage = () => {
                   </div>
                   <div>
                     <p className={lbl}>Win Sheet Link</p>
-                    {caseData.winSheetLink ? (
+                    {editing ? (
+                      <>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={editWinSheetLink}
+                          onChange={(e) => setEditWinSheetLink(e.target.value)}
+                          className={inp}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Display text (optional)"
+                          value={editWinSheetLinkText}
+                          onChange={(e) => setEditWinSheetLinkText(e.target.value)}
+                          className={`${inp} mt-1`}
+                        />
+                      </>
+                    ) : caseData.winSheetLink ? (
                       <a
                         href={caseData.winSheetLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-1 text-xs font-medium text-blue-500 hover:underline`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-500 hover:underline"
                       >
                         <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         {caseData.winSheetLinkText || "Open"}
