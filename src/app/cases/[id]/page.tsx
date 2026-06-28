@@ -461,7 +461,7 @@ const CaseDetailPage = () => {
       const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete");
-      router.back();
+      router.push("/");
     } catch (err) {
       setError((err as Error).message);
       setDeleteConfirm(false);
@@ -517,8 +517,8 @@ const CaseDetailPage = () => {
     setEditFeeMethod(d.feeMethod || "fee_agreement");
     setEditFeeCap(String(d.applicableFeeCap || 9200));
     setEditApprovedBy(d.approvedBy || "");
-    setEditWinSheetLink(d.winSheetLink || "");
-    setEditWinSheetLinkText(d.winSheetLinkText || "");
+    setEditWinSheetLink(d.winSheetLink ?? "");
+    setEditWinSheetLinkText(d.winSheetLinkText ?? "");
   };
 
   useEffect(() => {

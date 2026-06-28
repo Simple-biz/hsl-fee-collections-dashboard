@@ -184,7 +184,9 @@ export const FeeRecordsTable = ({
   // Win sheet link inline edit state.
   const [winSheetEditing, setWinSheetEditing] = useState<number | null>(null);
   const [winSheetDraft, setWinSheetDraft] = useState<{ url: string; text: string }>({ url: "", text: "" });
-  const [winSheetSaving, setWinSheetSaving] = useState(false);
+  const [winSheetSaving, setWinSheetSaving] = useState<number | null>(null);
+  const [winSheetError, setWinSheetError] = useState<string | null>(null);
+  const winSheetAbortRef = useRef<AbortController | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -522,19 +524,24 @@ export const FeeRecordsTable = ({
   };
 
   const handleWinSheetSave = async (c: CaseRow) => {
-    if (winSheetSaving) return;
-    setWinSheetSaving(true);
+    if (winSheetSaving != null) return;
+    winSheetAbortRef.current?.abort();
+    const controller = new AbortController();
+    winSheetAbortRef.current = controller;
+    setWinSheetSaving(c.id);
+    setWinSheetError(null);
     try {
       const res = await fetch(`/api/cases/${c.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           feeFields: {
-            winSheetLink: winSheetDraft.url || null,
-            winSheetLinkText: winSheetDraft.text || null,
+            winSheetLink: winSheetDraft.url ?? null,
+            winSheetLinkText: winSheetDraft.text ?? null,
           },
           logMessage: "Win Sheet link updated.",
         }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -543,9 +550,10 @@ export const FeeRecordsTable = ({
       setWinSheetEditing(null);
       onImported?.();
     } catch (err) {
-      console.error("Failed to save win sheet link:", err);
+      if ((err as Error).name === "AbortError") return;
+      setWinSheetError((err as Error).message);
     } finally {
-      setWinSheetSaving(false);
+      if (!controller.signal.aborted) setWinSheetSaving(null);
     }
   };
 
@@ -1378,8 +1386,13 @@ export const FeeRecordsTable = ({
                             }}
                             className={`h-6 px-2 rounded border text-[11px] outline-none w-full ${t.inputBg}`}
                           />
+                          {winSheetError && (
+                            <p role="alert" className={`text-[10px] text-red-500`}>
+                              {winSheetError}
+                            </p>
+                          )}
                           <div className="flex gap-1 justify-end">
-                            {winSheetSaving ? (
+                            {winSheetSaving === c.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin self-center" aria-hidden="true" />
                             ) : (
                               <>
@@ -1393,7 +1406,7 @@ export const FeeRecordsTable = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setWinSheetEditing(null)}
+                                  onClick={() => { setWinSheetEditing(null); setWinSheetError(null); }}
                                   className={`inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[10px] font-semibold border ${t.outlineBtn}`}
                                 >
                                   <X className="h-3 w-3" aria-hidden="true" />

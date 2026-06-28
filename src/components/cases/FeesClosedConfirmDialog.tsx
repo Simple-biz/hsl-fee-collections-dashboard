@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,11 +31,21 @@ export function FeesClosedConfirmDialog({
 }: FeesClosedConfirmDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const isClose = mode === "close";
 
+  const handleDismiss = () => {
+    controllerRef.current?.abort();
+    setError(null);
+    onClose();
+  };
+
   const handleConfirm = async () => {
     if (caseId == null || submitting) return;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setSubmitting(true);
     setError(null);
     try {
@@ -49,6 +59,7 @@ export function FeesClosedConfirmDialog({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feeFields, logMessage }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -57,9 +68,10 @@ export function FeesClosedConfirmDialog({
       onConfirmed();
       onClose();
     } catch (e) {
+      if ((e as Error).name === "AbortError") return;
       setError((e as Error).message);
     } finally {
-      setSubmitting(false);
+      if (!controller.signal.aborted) setSubmitting(false);
     }
   };
 
@@ -67,7 +79,7 @@ export function FeesClosedConfirmDialog({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v && !submitting) onClose();
+        if (!v && !submitting) handleDismiss();
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -105,7 +117,7 @@ export function FeesClosedConfirmDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={onClose}
+            onClick={handleDismiss}
             disabled={submitting}
           >
             Cancel
