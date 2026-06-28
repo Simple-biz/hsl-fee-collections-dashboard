@@ -3,6 +3,9 @@
 import { db } from "@/lib/db";
 import { feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
+import { resolveCaseId } from "@/lib/import/resolve-case";
+import type { ImportResult } from "@/components/modals/CsvImportModal";
 
 const FIELD_KEYS = ["overpaidAmount", "opLtrDate", "opLtrReceived", "checksCleared", "updateNote", "region"] as const;
 
@@ -141,4 +144,86 @@ export async function updateFeesConfirmation(input: {
     console.error("updateFeesConfirmation error:", error);
     return { ok: false, error: "Server error" };
   }
+}
+
+export async function bulkImportOverpaidCases(
+  rawRows: Record<string, string>[],
+): Promise<ImportResult> {
+  let imported = 0;
+  const rowErrors: ImportResult["rowErrors"] = [];
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i];
+    const rowNum = i + 1;
+
+    const resolved = await resolveCaseId(raw["client_id"] ?? "");
+    if ("error" in resolved) {
+      rowErrors.push({ row: rowNum, error: resolved.error });
+      continue;
+    }
+
+    const values: Partial<typeof overpaidCases.$inferInsert> & { caseId: number } = {
+      caseId: resolved.caseId,
+    };
+    let parseOk = true;
+
+    if (raw["op_ltr_date"] !== undefined && raw["op_ltr_date"].trim()) {
+      const d = parseDate(raw["op_ltr_date"]);
+      if (!d) { rowErrors.push({ row: rowNum, error: "Invalid op_ltr_date" }); parseOk = false; }
+      else values.opLtrDate = d;
+    }
+
+    if (parseOk && raw["op_ltr_received"] !== undefined && raw["op_ltr_received"].trim()) {
+      const d = parseDate(raw["op_ltr_received"]);
+      if (!d) { rowErrors.push({ row: rowNum, error: "Invalid op_ltr_received" }); parseOk = false; }
+      else values.opLtrReceived = d;
+    }
+
+    if (parseOk && raw["overpaid_amount"] !== undefined && raw["overpaid_amount"].trim()) {
+      const amount = parseDecimalString(raw["overpaid_amount"]);
+      if (!amount) { rowErrors.push({ row: rowNum, error: "Invalid overpaid_amount" }); parseOk = false; }
+      else values.overpaidAmount = amount;
+    }
+
+    if (parseOk && raw["checks_cleared"] !== undefined && raw["checks_cleared"].trim()) {
+      const b = parseBool(raw["checks_cleared"]);
+      if (b === null) { rowErrors.push({ row: rowNum, error: "Invalid checks_cleared value" }); parseOk = false; }
+      else {
+        values.checksCleared = b;
+        if (b) values.checksClearedAt = new Date();
+      }
+    }
+
+    if (parseOk && raw["region"] !== undefined) {
+      values.region = raw["region"].trim() || null;
+    }
+
+    if (parseOk && raw["update_note"] !== undefined) {
+      const note = raw["update_note"].trim();
+      if (note.length > 5000) { rowErrors.push({ row: rowNum, error: "update_note exceeds 5000 characters" }); parseOk = false; }
+      else values.updateNote = note;
+    }
+
+    if (!parseOk) continue;
+
+    try {
+      await db
+        .insert(overpaidCases)
+        .values(values)
+        .onConflictDoUpdate({
+          target: overpaidCases.caseId,
+          set: { ...values, updatedAt: new Date() },
+        });
+      // Mark the fee_record as overpaid so the page query picks it up
+      await db
+        .update(feeRecords)
+        .set({ markedOverpaid: true })
+        .where(eq(feeRecords.caseId, resolved.caseId));
+      imported++;
+    } catch {
+      rowErrors.push({ row: rowNum, error: "Database error — row skipped" });
+    }
+  }
+
+  return { imported, failed: rowErrors.length, rowErrors };
 }
