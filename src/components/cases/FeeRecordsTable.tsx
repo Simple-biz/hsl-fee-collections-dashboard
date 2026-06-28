@@ -10,9 +10,10 @@ import {
   MessageSquare,
   FileSpreadsheet,
   Database,
-  RotateCcw,
   Loader2,
   ExternalLink,
+  Pencil,
+  Check,
   TrendingDown,
   Plus,
   X,
@@ -39,8 +40,8 @@ import AddCaseModal from "@/components/modals/AddCaseModal";
 import SheetSyncModal from "@/components/modals/SheetSyncModal";
 import MyCaseSyncModal from "@/components/modals/MyCaseSyncModal";
 import NotesModal from "@/components/modals/NotesModal";
-import { AcknowledgeAndCloseDialog } from "./AcknowledgeAndCloseDialog";
 import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
+import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
 
 interface FeeRecordsTableProps {
   cases: CaseRow[];
@@ -63,7 +64,6 @@ type FeeField =
   | "assignedTo"
   | "approvedBy"
   | "feesConfirmation"
-  | "feesClosedTrigger"
   | "caseStatus"
   | "winSheetStatus";
 
@@ -155,7 +155,6 @@ export const FeeRecordsTable = ({
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
-  const feesClosedOptions = dropdownOptions.fees_closed ?? [];
   const caseStatusOptions = dropdownOptions.case_status ?? [];
   const caseLevelOptions = dropdownOptions.case_level ?? [];
   const claimTypeOptions = dropdownOptions.claim_type ?? [];
@@ -167,7 +166,6 @@ export const FeeRecordsTable = ({
     | "assigned"
     | "approvedBy"
     | "feesConfirmation"
-    | "feesClosedTrigger"
     | "caseStatus"
     | "level"
     | "claim"
@@ -179,16 +177,16 @@ export const FeeRecordsTable = ({
     Record<number, Partial<Record<DropdownRowKey, string>>>
   >({});
 
-  // Case row whose dropdown change should prompt the "mark closed?" modal.
-  // Currently triggered by Fees Confirmation = "Paid In Full"; the dialog is
-  // field-agnostic so it can host future triggers without another branch.
-  const [ackTarget, setAckTarget] = useState<{
-    caseId: number;
-    caseName: string;
-    triggerField: string;
-    triggerValue: string;
-    triggerLabel: string;
-  } | null>(null);
+  // Case targeted by the Fees Closed / Reopen confirmation dialogs.
+  const [closeConfirmCase, setCloseConfirmCase] = useState<CaseRow | null>(null);
+  const [reopenConfirmCase, setReopenConfirmCase] = useState<CaseRow | null>(null);
+
+  // Win sheet link inline edit state.
+  const [winSheetEditing, setWinSheetEditing] = useState<number | null>(null);
+  const [winSheetDraft, setWinSheetDraft] = useState<{ url: string; text: string }>({ url: "", text: "" });
+  const [winSheetSaving, setWinSheetSaving] = useState<number | null>(null);
+  const [winSheetError, setWinSheetError] = useState<string | null>(null);
+  const winSheetAbortRef = useRef<AbortController | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -525,44 +523,37 @@ export const FeeRecordsTable = ({
     }
   };
 
-  // Track per-row reopen state so the button can show a spinner + disable
-  // while the PATCH is in flight. Cleared on refresh (the row leaves the
-  // closed list).
-  const [reopeningId, setReopeningId] = useState<number | null>(null);
-
-  // Reopen a closed case from /fees-closed: flip isClosed=false (the API
-  // also stamps closed_at NULL) and clear feesConfirmation so the case
-  // doesn't immediately re-trigger the "mark closed?" modal when the user
-  // sees it back on the dashboard.
-  const handleReopen = async (c: CaseRow) => {
-    if (reopeningId !== null) return;
-    if (
-      !window.confirm(
-        `Reopen "${c.name}"? It will move back to the active dashboard. Fees Confirmation and Fees Closed will be cleared.`,
-      )
-    )
-      return;
-    setReopeningId(c.id);
+  const handleWinSheetSave = async (c: CaseRow) => {
+    if (winSheetSaving != null) return;
+    winSheetAbortRef.current?.abort();
+    const controller = new AbortController();
+    winSheetAbortRef.current = controller;
+    setWinSheetSaving(c.id);
+    setWinSheetError(null);
     try {
       const res = await fetch(`/api/cases/${c.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          feeFields: { isClosed: false, feesConfirmation: null, feesClosedTrigger: null },
-          logMessage:
-            "Reopened from Fees Closed — moved back to the active dashboard. Fees Confirmation and Fees Closed cleared.",
+          feeFields: {
+            winSheetLink: winSheetDraft.url ?? null,
+            winSheetLinkText: winSheetDraft.text ?? null,
+          },
+          logMessage: "Win Sheet link updated.",
         }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || `Reopen failed (${res.status})`);
+        throw new Error(j.error ?? `Save failed (${res.status})`);
       }
-      await onImported?.();
+      setWinSheetEditing(null);
+      onImported?.();
     } catch (err) {
-      console.error("Failed to reopen case:", err);
-      window.alert((err as Error).message);
+      if ((err as Error).name === "AbortError") return;
+      setWinSheetError((err as Error).message);
     } finally {
-      setReopeningId(null);
+      if (!controller.signal.aborted) setWinSheetSaving(null);
     }
   };
 
@@ -873,7 +864,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={mode === "closed" ? 7 : 6}
+                  colSpan={6}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -1009,11 +1000,6 @@ export const FeeRecordsTable = ({
                     Days <ArrowUpDown className="h-3 w-3" />
                   </span>
                 </th>
-                {mode === "closed" && (
-                  <th className={`${thBase} ${t.textSub} text-center`}>
-                    Action
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -1192,72 +1178,30 @@ export const FeeRecordsTable = ({
                         </select>
                       )}
                     </td>
-                    {/* Fees Closed — triggers AcknowledgeAndCloseDialog when set to "Closed" */}
+                    {/* Fees Closed — checkbox; check → close dialog; uncheck → reopen dialog */}
                     <td
-                      className={`${tdBase} ${t.textSub}`}
+                      className={`${tdBase} text-center`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {mode === "closed" || !isAdmin ? (
-                        cellValue(c, "feesClosedTrigger") || "—"
+                      {mode === "closed" ? (
+                        <input
+                          type="checkbox"
+                          checked
+                          className={`h-4 w-4 ${canFinalize ? "cursor-pointer" : "cursor-default opacity-60"}`}
+                          aria-label="Reopen case — move back to active dashboard"
+                          disabled={!canFinalize}
+                          onChange={() => setReopenConfirmCase(c)}
+                        />
+                      ) : isAdmin && canFinalize ? (
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          className="h-4 w-4 cursor-pointer"
+                          aria-label="Mark as Fees Closed"
+                          onChange={() => setCloseConfirmCase(c)}
+                        />
                       ) : (
-                        <select
-                          value={cellValue(c, "feesClosedTrigger")}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            const next = e.target.value;
-                            if (
-                              canFinalize &&
-                              next &&
-                              next.toLowerCase() === "closed" &&
-                              next !== cellValue(c, "feesClosedTrigger")
-                            ) {
-                              setAckTarget({
-                                caseId: c.id,
-                                caseName: c.name,
-                                triggerField: "feesClosedTrigger",
-                                triggerValue: next,
-                                triggerLabel: "Fees Closed",
-                              });
-                              return;
-                            }
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "feesClosedTrigger",
-                              "feesClosedTrigger",
-                              "Fees Closed",
-                              next,
-                            );
-                          }}
-                          className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            feesClosedOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "feesClosedTrigger");
-                            return (
-                              v &&
-                              !feesClosedOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {feesClosedOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "feesClosedTrigger"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
+                        "—"
                       )}
                     </td>
                     {/* Level — varchar; lives on the cases row. */}
@@ -1405,27 +1349,123 @@ export const FeeRecordsTable = ({
                         </select>
                     </td>
 
-                    {/* Win Sheet Link */}
+                    {/* Win Sheet Link — hover pen to edit; HoverCard shows URL + text */}
                     <td
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {c.winSheetLink ? (
-                        <a
-                          href={c.winSheetLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {winSheetEditing === c.id ? (
+                        <div
+                          className="flex flex-col gap-1 min-w-[200px]"
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
                         >
-                          <ExternalLink
-                            className="h-3 w-3"
-                            aria-hidden="true"
+                          <input
+                            type="url"
+                            placeholder="https://..."
+                            value={winSheetDraft.url}
+                            autoFocus
+                            onChange={(e) =>
+                              setWinSheetDraft((d) => ({ ...d, url: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleWinSheetSave(c);
+                              if (e.key === "Escape") setWinSheetEditing(null);
+                            }}
+                            className={`h-6 px-2 rounded border text-[11px] outline-none w-full ${t.inputBg}`}
                           />
-                          {c.winSheetLinkText || "Open"}
-                        </a>
+                          <input
+                            type="text"
+                            placeholder="Display text (optional)"
+                            value={winSheetDraft.text}
+                            onChange={(e) =>
+                              setWinSheetDraft((d) => ({ ...d, text: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleWinSheetSave(c);
+                              if (e.key === "Escape") setWinSheetEditing(null);
+                            }}
+                            className={`h-6 px-2 rounded border text-[11px] outline-none w-full ${t.inputBg}`}
+                          />
+                          {winSheetError && (
+                            <p role="alert" className={`text-[10px] text-red-500`}>
+                              {winSheetError}
+                            </p>
+                          )}
+                          <div className="flex gap-1 justify-end">
+                            {winSheetSaving === c.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin self-center" aria-hidden="true" />
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleWinSheetSave(c)}
+                                  className="inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[10px] font-semibold bg-blue-500 text-white hover:bg-blue-600"
+                                >
+                                  <Check className="h-3 w-3" aria-hidden="true" />
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setWinSheetEditing(null); setWinSheetError(null); }}
+                                  className={`inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[10px] font-semibold border ${t.outlineBtn}`}
+                                >
+                                  <X className="h-3 w-3" aria-hidden="true" />
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       ) : (
-                        <span className={`text-[11px] ${t.textMuted}`}>—</span>
+                        <div className="flex items-center gap-1.5">
+                          {c.winSheetLink ? (
+                            <HoverCard openDelay={150} closeDelay={50}>
+                              <HoverCardTrigger asChild>
+                                <a
+                                  href={c.winSheetLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
+                                >
+                                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                                  {c.winSheetLinkText || "Open"}
+                                </a>
+                              </HoverCardTrigger>
+                              <HoverCardContent
+                                align="start"
+                                collisionPadding={12}
+                                className="w-72 p-3 space-y-2 text-[11px]"
+                              >
+                                <p>
+                                  <span className="font-semibold">Display text: </span>
+                                  {c.winSheetLinkText || "Open"}
+                                </p>
+                                <p className="break-all">
+                                  <span className="font-semibold">URL: </span>
+                                  {c.winSheetLink}
+                                </p>
+                              </HoverCardContent>
+                            </HoverCard>
+                          ) : (
+                            <span className={`text-[11px] ${t.textMuted}`}>—</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setWinSheetEditing(c.id);
+                              setWinSheetDraft({
+                                url: c.winSheetLink ?? "",
+                                text: c.winSheetLinkText ?? "",
+                              });
+                            }}
+                            className={`opacity-0 group-hover:opacity-100 transition-colors shrink-0 p-0.5 rounded ${t.hover}`}
+                            aria-label="Edit win sheet link"
+                          >
+                            <Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
+                          </button>
+                        </div>
                       )}
                     </td>
 
@@ -1690,34 +1730,6 @@ export const FeeRecordsTable = ({
                         "—"
                       )}
                     </td>
-                    {mode === "closed" && (
-                      <td
-                        className={`${tdBase} text-center`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {canFinalize ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReopen(c);
-                            }}
-                            disabled={reopeningId !== null}
-                            className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn} disabled:opacity-40`}
-                            title="Move this case back to the active dashboard and clear Fees Confirmation"
-                          >
-                            {reopeningId === c.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <RotateCcw className="h-3 w-3" />
-                            )}
-                            Reopen
-                          </button>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    )}
                   </tr>
                 );
               })}
@@ -1863,19 +1875,30 @@ export const FeeRecordsTable = ({
         }}
       />
 
-      <AcknowledgeAndCloseDialog
-        open={ackTarget !== null}
-        caseId={ackTarget?.caseId ?? null}
-        caseName={ackTarget?.caseName ?? ""}
-        triggerField={ackTarget?.triggerField ?? ""}
-        triggerValue={ackTarget?.triggerValue ?? ""}
-        triggerLabel={ackTarget?.triggerLabel ?? ""}
-        onClose={() => setAckTarget(null)}
-        onAcknowledged={() => {
-          setAckTarget(null);
+      <FeesClosedConfirmDialog
+        open={closeConfirmCase !== null}
+        mode="close"
+        caseId={closeConfirmCase?.id ?? null}
+        caseName={closeConfirmCase?.name ?? ""}
+        onClose={() => setCloseConfirmCase(null)}
+        onConfirmed={() => {
+          setCloseConfirmCase(null);
           onImported?.();
         }}
       />
+
+      <FeesClosedConfirmDialog
+        open={reopenConfirmCase !== null}
+        mode="reopen"
+        caseId={reopenConfirmCase?.id ?? null}
+        caseName={reopenConfirmCase?.name ?? ""}
+        onClose={() => setReopenConfirmCase(null)}
+        onConfirmed={() => {
+          setReopenConfirmCase(null);
+          onImported?.();
+        }}
+      />
+
     </div>
   );
 };

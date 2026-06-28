@@ -407,6 +407,8 @@ export const PATCH = async (
       const FEE_FIELD_MAP: Record<string, string> = {
         assignedTo: "assigned_to",
         winSheetStatus: "win_sheet_status",
+        winSheetLink: "win_sheet_link",
+        winSheetLinkText: "win_sheet_link_text",
         t16Retro: "t16_retro",
         t16FeeDue: "t16_fee_due",
         t16FeeReceived: "t16_fee_received",
