@@ -761,6 +761,20 @@ export default function CaseDetailSheet({
                   <p className={lbl}>Win Sheet Status</p>
                   <p className={val}>{STATUS_LABELS_DETAIL[data.status] || data.status}</p>
                 </div>
+                {data.winSheetLink && (
+                  <div className="flex items-center justify-between">
+                    <p className={lbl}>Win Sheet Link</p>
+                    <a
+                      href={data.winSheetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-500 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      {data.winSheetLinkText || "Open"}
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -918,6 +932,20 @@ export default function CaseDetailSheet({
                       <p className={lbl}>Win Sheet Status</p>
                       <p className={val}>{myCaseData.winSheetStatus.replace(/_/g, " ")}</p>
                     </div>
+                    {data?.winSheetLink && (
+                      <div>
+                        <p className={lbl}>Win Sheet Link</p>
+                        <a
+                          href={data.winSheetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-500 hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          {data.winSheetLinkText || "Open"}
+                        </a>
+                      </div>
+                    )}
                     {myCaseData.claimTypeLabel && (
                       <div>
                         <p className={lbl}>Claim Type</p>

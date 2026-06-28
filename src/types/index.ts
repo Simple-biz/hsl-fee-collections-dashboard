@@ -208,6 +208,10 @@ export interface CaseDetailData {
   paid: number;
   outstanding: number;
 
+  // Win sheet
+  winSheetLink: string | null;
+  winSheetLinkText: string | null;
+
   // Workflow
   pif: PifStatus;
   approvedBy: string | null;
