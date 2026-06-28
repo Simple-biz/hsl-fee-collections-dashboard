@@ -2,8 +2,11 @@
 
 import { useState, useReducer, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import CsvImportModal, { type ColumnDef, type ImportResult } from "@/components/modals/CsvImportModal";
+import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
+import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 
 // ---------- types ----------
 
@@ -75,6 +78,7 @@ export const Scoreboard = () => {
   const t = themeClasses(dark);
 
   const [weekOffset, setWeekOffset] = useState(0);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
     weeks: [],
     loading: true,
@@ -129,7 +133,52 @@ export const Scoreboard = () => {
     1
   );
 
+  const DM_CSV_COLUMNS: ColumnDef[] = [
+    { key: "agent_name", label: "Agent Name", required: true, hint: "Must match a team member name" },
+    { key: "metric_date", label: "Metric Date", required: true, hint: "YYYY-MM-DD or MM/DD/YYYY" },
+    { key: "ssa_calls", label: "SSA Calls", hint: "Non-negative integer" },
+    { key: "client_calls_ib", label: "Client Calls IB", hint: "Non-negative integer" },
+    { key: "client_calls_ob", label: "Client Calls OB", hint: "Non-negative integer" },
+    { key: "win_sheets_created", label: "Win Sheets Created", hint: "Non-negative integer" },
+    { key: "notes", label: "Notes", hint: "Optional text" },
+  ];
+
+  const DM_TEMPLATE_CSV =
+    "agent_name,metric_date,ssa_calls,client_calls_ib,client_calls_ob,win_sheets_created,notes\n" +
+    "Jane Smith,2024-01-15,5,3,2,1,\n";
+
+  const validateDmRow = (raw: Record<string, string>): string[] => {
+    const errors: string[] = [];
+    if (!raw["agent_name"]?.trim()) errors.push("agent_name is required");
+    if (!raw["metric_date"]?.trim() || !parseDate(raw["metric_date"])) errors.push("Invalid or missing metric_date");
+    for (const key of ["ssa_calls", "client_calls_ib", "client_calls_ob", "win_sheets_created"]) {
+      if (raw[key] !== undefined && raw[key].trim() && parseNonNegativeInt(raw[key]) === null) {
+        errors.push(`Invalid value for "${key}" — must be a non-negative integer`);
+      }
+    }
+    return errors;
+  };
+
+  const handleDmImport = async (validRows: Record<string, string>[]): Promise<ImportResult> => {
+    return bulkImportDailyMetrics(validRows);
+  };
+
   return (
+    <>
+    {csvImportOpen && (
+      <CsvImportModal
+        dark={dark}
+        title="Import Daily Metrics"
+        description="Upload a CSV to bulk-import or update daily metric entries for the scoreboard."
+        columns={DM_CSV_COLUMNS}
+        templateFilename="daily-metrics-template.csv"
+        templateCsv={DM_TEMPLATE_CSV}
+        validateRow={validateDmRow}
+        onImport={handleDmImport}
+        onClose={() => setCsvImportOpen(false)}
+        onSuccess={() => dispatch({ type: "start" })}
+      />
+    )}
     <div className={`rounded-xl border ${t.card} overflow-hidden`}>
       {/* Header */}
       <div className={`px-5 py-4 border-b ${t.borderLight} flex items-center justify-between gap-4`}>
@@ -142,6 +191,14 @@ export const Scoreboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setCsvImportOpen(true)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+            aria-label="Import daily metrics from CSV"
+          >
+            <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+            Import
+          </button>
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
@@ -263,5 +320,6 @@ export const Scoreboard = () => {
         </div>
       )}
     </div>
+    </>
   );
 };

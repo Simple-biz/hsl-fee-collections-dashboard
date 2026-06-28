@@ -3,6 +3,9 @@
 import { db } from "@/lib/db";
 import { feePetitions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { parseBool } from "@/lib/import/csv-parser";
+import { resolveCaseId } from "@/lib/import/resolve-case";
+import type { ImportResult } from "@/components/modals/CsvImportModal";
 
 const FIELD_KEYS = [
   "noa",
@@ -125,4 +128,76 @@ export async function bulkRestoreChecklists(input: {
     console.error("bulkRestoreChecklists error:", error);
     return { ok: false, error: "Server error" };
   }
+}
+
+const BOOL_KEYS = [
+  "noa",
+  "time_delineation",
+  "fee_petition_doc",
+  "ltr_to_clmt",
+  "ltr_to_clmt_with_signature",
+  "ltr_to_alj",
+  "fax_conf_fee_pet",
+] as const;
+
+export async function bulkImportFeePetitions(
+  rawRows: Record<string, string>[],
+): Promise<ImportResult> {
+  let imported = 0;
+  const rowErrors: ImportResult["rowErrors"] = [];
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i];
+    const rowNum = i + 1;
+
+    const resolved = await resolveCaseId(raw["client_id"] ?? "");
+    if ("error" in resolved) {
+      rowErrors.push({ row: rowNum, error: resolved.error });
+      continue;
+    }
+
+    const values: Partial<typeof feePetitions.$inferInsert> = {
+      caseId: resolved.caseId,
+    };
+
+    let parseOk = true;
+    for (const key of BOOL_KEYS) {
+      const cell = raw[key];
+      if (cell === undefined) continue;
+      const b = parseBool(cell);
+      if (b === null) {
+        rowErrors.push({ row: rowNum, error: `Invalid boolean value for "${key}": "${cell}"` });
+        parseOk = false;
+        break;
+      }
+      const schemaKey = key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof feePetitions.$inferInsert;
+      (values as Record<string, unknown>)[schemaKey] = b;
+    }
+
+    if (!parseOk) continue;
+
+    if (raw["update_note"] !== undefined) {
+      const note = raw["update_note"].trim();
+      if (note.length > 5000) {
+        rowErrors.push({ row: rowNum, error: "update_note exceeds 5000 characters" });
+        continue;
+      }
+      values.updateNote = note;
+    }
+
+    try {
+      await db
+        .insert(feePetitions)
+        .values(values as typeof feePetitions.$inferInsert)
+        .onConflictDoUpdate({
+          target: feePetitions.caseId,
+          set: { ...values, updatedAt: new Date() },
+        });
+      imported++;
+    } catch {
+      rowErrors.push({ row: rowNum, error: "Database error — row skipped" });
+    }
+  }
+
+  return { imported, failed: rowErrors.length, rowErrors };
 }

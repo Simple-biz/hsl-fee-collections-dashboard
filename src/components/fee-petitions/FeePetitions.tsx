@@ -16,14 +16,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Upload,
   X,
   Undo2,
   ArchiveX,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
-import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists } from "@/app/(dashboard)/fee-petitions/actions";
+import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import CsvImportModal, { type ColumnDef, type ImportResult } from "@/components/modals/CsvImportModal";
+import { parseBool } from "@/lib/import/csv-parser";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -166,6 +169,7 @@ export const FeePetitions = () => {
   const [undoing, setUndoing] = useState(false);
   const [bulkCloseConfirming, setBulkCloseConfirming] = useState(false);
   const [bulkClosing, setBulkClosing] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const { can } = useCapabilities();
@@ -709,8 +713,55 @@ export const FeePetitions = () => {
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
   const colSpan = CHECKBOX_COLUMNS.length + 7;
 
+  const FP_CSV_COLUMNS: ColumnDef[] = [
+    { key: "client_id", label: "Client ID / Name", required: true, hint: "Integer client ID or \"First Last\" / \"Last, First\"" },
+    { key: "noa", label: "NOA", hint: "true/false/yes/no/1/0" },
+    { key: "time_delineation", label: "Time Delineation", hint: "true/false/yes/no/1/0" },
+    { key: "fee_petition_doc", label: "Fee Petition Doc", hint: "true/false/yes/no/1/0" },
+    { key: "ltr_to_clmt", label: "Ltr to Clmt", hint: "true/false/yes/no/1/0" },
+    { key: "ltr_to_clmt_with_signature", label: "Ltr to Clmt (Sig)", hint: "true/false/yes/no/1/0" },
+    { key: "ltr_to_alj", label: "Ltr to ALJ", hint: "true/false/yes/no/1/0" },
+    { key: "fax_conf_fee_pet", label: "Fax Conf Fee Pet", hint: "true/false/yes/no/1/0" },
+    { key: "update_note", label: "Update Note", hint: "Optional text, max 5000 chars" },
+  ];
+
+  const FP_TEMPLATE_CSV =
+    "client_id,noa,time_delineation,fee_petition_doc,ltr_to_clmt,ltr_to_clmt_with_signature,ltr_to_alj,fax_conf_fee_pet,update_note\n" +
+    "123456,true,true,false,false,false,false,false,Example note\n";
+
+  const validateFpRow = (raw: Record<string, string>): string[] => {
+    const errors: string[] = [];
+    if (!raw["client_id"]?.trim()) errors.push("client_id is required");
+    const boolKeys = ["noa", "time_delineation", "fee_petition_doc", "ltr_to_clmt", "ltr_to_clmt_with_signature", "ltr_to_alj", "fax_conf_fee_pet"];
+    for (const key of boolKeys) {
+      if (raw[key] !== undefined && raw[key].trim() && parseBool(raw[key]) === null) {
+        errors.push(`Invalid boolean for "${key}"`);
+      }
+    }
+    if (raw["update_note"] && raw["update_note"].length > 5000) errors.push("update_note too long");
+    return errors;
+  };
+
+  const handleFpImport = async (validRows: Record<string, string>[]): Promise<ImportResult> => {
+    return bulkImportFeePetitions(validRows);
+  };
+
   return (
     <div className="space-y-4">
+      {csvImportOpen && (
+        <CsvImportModal
+          dark={dark}
+          title="Import Fee Petitions"
+          description="Upload a CSV to bulk-upsert checklist data for fee petition cases."
+          columns={FP_CSV_COLUMNS}
+          templateFilename="fee-petitions-template.csv"
+          templateCsv={FP_TEMPLATE_CSV}
+          validateRow={validateFpRow}
+          onImport={handleFpImport}
+          onClose={() => setCsvImportOpen(false)}
+          onSuccess={fetchPetitions}
+        />
+      )}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveMessage}
       </div>
@@ -954,6 +1005,14 @@ export const FeePetitions = () => {
               <span className="hidden sm:inline">
                 {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
               </span>
+            </button>
+            <button
+              onClick={() => setCsvImportOpen(true)}
+              className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
+              aria-label="Import from CSV"
+            >
+              <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Import</span>
             </button>
           </div>
         </div>
