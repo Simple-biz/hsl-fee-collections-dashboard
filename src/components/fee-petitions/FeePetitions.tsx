@@ -25,7 +25,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { useCapabilities } from "@/hooks/useCapabilities";
-import CsvImportModal, { type ColumnDef, type ImportResult } from "@/components/modals/CsvImportModal";
+import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
 
 // ---------- types ----------
@@ -107,6 +107,37 @@ const patchPetition = async (
 ) => {
   const result = await upsertFeePetition({ caseId, fields: body });
   if (!result.ok) throw new Error(result.error);
+};
+
+// ---------- csv import config ----------
+const FP_CSV_COLUMNS: ColumnDef[] = [
+  { key: "client_id", label: "Client ID / Name", required: true, hint: "Integer client ID or \"First Last\" / \"Last, First\"" },
+  { key: "noa", label: "NOA", hint: "true/false/yes/no/1/0" },
+  { key: "time_delineation", label: "Time Delineation", hint: "true/false/yes/no/1/0" },
+  { key: "fee_petition_doc", label: "Fee Petition Doc", hint: "true/false/yes/no/1/0" },
+  { key: "ltr_to_clmt", label: "Ltr to Clmt", hint: "true/false/yes/no/1/0" },
+  { key: "ltr_to_clmt_with_signature", label: "Ltr to Clmt (Sig)", hint: "true/false/yes/no/1/0" },
+  { key: "ltr_to_alj", label: "Ltr to ALJ", hint: "true/false/yes/no/1/0" },
+  { key: "fax_conf_fee_pet", label: "Fax Conf Fee Pet", hint: "true/false/yes/no/1/0" },
+  { key: "update_note", label: "Update Note", hint: "Optional text, max 5000 chars" },
+];
+
+const FP_TEMPLATE_CSV =
+  "client_id,noa,time_delineation,fee_petition_doc,ltr_to_clmt,ltr_to_clmt_with_signature,ltr_to_alj,fax_conf_fee_pet,update_note\n" +
+  "123456,true,true,false,false,false,false,false,Example note\n";
+
+const FP_BOOL_KEYS = ["noa", "time_delineation", "fee_petition_doc", "ltr_to_clmt", "ltr_to_clmt_with_signature", "ltr_to_alj", "fax_conf_fee_pet"];
+
+const validateFpRow = (raw: Record<string, string>): string[] => {
+  const errors: string[] = [];
+  if (!raw["client_id"]?.trim()) errors.push("client_id is required");
+  for (const key of FP_BOOL_KEYS) {
+    if (raw[key] !== undefined && raw[key].trim() && parseBool(raw[key]) === null) {
+      errors.push(`Invalid boolean for "${key}"`);
+    }
+  }
+  if (raw["update_note"] && raw["update_note"].length > 5000) errors.push("update_note too long");
+  return errors;
 };
 
 // ---------- component ----------
@@ -713,39 +744,6 @@ export const FeePetitions = () => {
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
   const colSpan = CHECKBOX_COLUMNS.length + 7;
 
-  const FP_CSV_COLUMNS: ColumnDef[] = [
-    { key: "client_id", label: "Client ID / Name", required: true, hint: "Integer client ID or \"First Last\" / \"Last, First\"" },
-    { key: "noa", label: "NOA", hint: "true/false/yes/no/1/0" },
-    { key: "time_delineation", label: "Time Delineation", hint: "true/false/yes/no/1/0" },
-    { key: "fee_petition_doc", label: "Fee Petition Doc", hint: "true/false/yes/no/1/0" },
-    { key: "ltr_to_clmt", label: "Ltr to Clmt", hint: "true/false/yes/no/1/0" },
-    { key: "ltr_to_clmt_with_signature", label: "Ltr to Clmt (Sig)", hint: "true/false/yes/no/1/0" },
-    { key: "ltr_to_alj", label: "Ltr to ALJ", hint: "true/false/yes/no/1/0" },
-    { key: "fax_conf_fee_pet", label: "Fax Conf Fee Pet", hint: "true/false/yes/no/1/0" },
-    { key: "update_note", label: "Update Note", hint: "Optional text, max 5000 chars" },
-  ];
-
-  const FP_TEMPLATE_CSV =
-    "client_id,noa,time_delineation,fee_petition_doc,ltr_to_clmt,ltr_to_clmt_with_signature,ltr_to_alj,fax_conf_fee_pet,update_note\n" +
-    "123456,true,true,false,false,false,false,false,Example note\n";
-
-  const validateFpRow = (raw: Record<string, string>): string[] => {
-    const errors: string[] = [];
-    if (!raw["client_id"]?.trim()) errors.push("client_id is required");
-    const boolKeys = ["noa", "time_delineation", "fee_petition_doc", "ltr_to_clmt", "ltr_to_clmt_with_signature", "ltr_to_alj", "fax_conf_fee_pet"];
-    for (const key of boolKeys) {
-      if (raw[key] !== undefined && raw[key].trim() && parseBool(raw[key]) === null) {
-        errors.push(`Invalid boolean for "${key}"`);
-      }
-    }
-    if (raw["update_note"] && raw["update_note"].length > 5000) errors.push("update_note too long");
-    return errors;
-  };
-
-  const handleFpImport = async (validRows: Record<string, string>[]): Promise<ImportResult> => {
-    return bulkImportFeePetitions(validRows);
-  };
-
   return (
     <div className="space-y-4">
       {csvImportOpen && (
@@ -757,7 +755,7 @@ export const FeePetitions = () => {
           templateFilename="fee-petitions-template.csv"
           templateCsv={FP_TEMPLATE_CSV}
           validateRow={validateFpRow}
-          onImport={handleFpImport}
+          onImport={bulkImportFeePetitions}
           onClose={() => setCsvImportOpen(false)}
           onSuccess={fetchPetitions}
         />

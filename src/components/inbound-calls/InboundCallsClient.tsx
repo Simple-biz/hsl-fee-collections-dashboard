@@ -15,7 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import CsvImportModal, { type ColumnDef, type ImportResult } from "@/components/modals/CsvImportModal";
+import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportInboundCalls } from "@/app/(dashboard)/inbound-calls/actions";
 import { parseBool, parseDate } from "@/lib/import/csv-parser";
 
@@ -99,6 +99,30 @@ interface PocAssignments {
   4: string[];
   5: string[];
 }
+
+// ── csv import config ─────────────────────────────────────────────────────────
+
+const IC_CSV_COLUMNS: ColumnDef[] = [
+  { key: "call_date", label: "Call Date", required: true, hint: "YYYY-MM-DD or MM/DD/YYYY (week_start is derived automatically)" },
+  { key: "number", label: "Number", hint: "Phone number (optional)" },
+  { key: "transcript", label: "Transcript", hint: "Call notes (optional)" },
+  { key: "case_link", label: "Case Link", hint: "URL or case ID (optional)" },
+  { key: "specialist_assigned", label: "Specialist Assigned", hint: "Name (optional)" },
+  { key: "called_back_resolved", label: "Called Back / Resolved", hint: "true/false/yes/no/1/0" },
+];
+
+const IC_TEMPLATE_CSV =
+  "call_date,number,transcript,case_link,specialist_assigned,called_back_resolved\n" +
+  "2024-01-15,555-1234,Caller asked about status,https://...,Jane Smith,false\n";
+
+const validateIcRow = (raw: Record<string, string>): string[] => {
+  const errors: string[] = [];
+  if (!raw["call_date"]?.trim() || !parseDate(raw["call_date"])) errors.push("Invalid or missing call_date");
+  if (raw["called_back_resolved"]?.trim() && parseBool(raw["called_back_resolved"]) === null) {
+    errors.push("Invalid called_back_resolved value");
+  }
+  return errors;
+};
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -309,32 +333,6 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const IC_CSV_COLUMNS: ColumnDef[] = [
-    { key: "call_date", label: "Call Date", required: true, hint: "YYYY-MM-DD or MM/DD/YYYY (week_start is derived automatically)" },
-    { key: "number", label: "Number", hint: "Phone number (optional)" },
-    { key: "transcript", label: "Transcript", hint: "Call notes (optional)" },
-    { key: "case_link", label: "Case Link", hint: "URL or case ID (optional)" },
-    { key: "specialist_assigned", label: "Specialist Assigned", hint: "Name (optional)" },
-    { key: "called_back_resolved", label: "Called Back / Resolved", hint: "true/false/yes/no/1/0" },
-  ];
-
-  const IC_TEMPLATE_CSV =
-    "call_date,number,transcript,case_link,specialist_assigned,called_back_resolved\n" +
-    "2024-01-15,555-1234,Caller asked about status,https://...,Jane Smith,false\n";
-
-  const validateIcRow = (raw: Record<string, string>): string[] => {
-    const errors: string[] = [];
-    if (!raw["call_date"]?.trim() || !parseDate(raw["call_date"])) errors.push("Invalid or missing call_date");
-    if (raw["called_back_resolved"]?.trim() && parseBool(raw["called_back_resolved"]) === null) {
-      errors.push("Invalid called_back_resolved value");
-    }
-    return errors;
-  };
-
-  const handleIcImport = async (validRows: Record<string, string>[]): Promise<ImportResult> => {
-    return bulkImportInboundCalls(validRows);
-  };
-
   return (
     <div className="space-y-4">
       {csvImportOpen && (
@@ -346,7 +344,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           templateFilename="inbound-calls-template.csv"
           templateCsv={IC_TEMPLATE_CSV}
           validateRow={validateIcRow}
-          onImport={handleIcImport}
+          onImport={bulkImportInboundCalls}
           onClose={() => setCsvImportOpen(false)}
           onSuccess={() => void fetchRecords(selectedWeek)}
           defaultHeaderRow={2}

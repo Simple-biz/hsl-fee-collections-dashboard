@@ -58,6 +58,16 @@ interface CsvImportModalProps {
 
 type Step = "upload" | "map" | "preview" | "importing" | "done";
 
+const FOOTER_LABELS = new Set([
+  "total", "total amount", "grand total", "subtotal", "sum", "totals",
+]);
+
+const STEPS: { id: Step; label: string }[] = [
+  { id: "upload", label: "Upload" },
+  { id: "map", label: "Map columns" },
+  { id: "preview", label: "Preview" },
+];
+
 export default function CsvImportModal({
   dark,
   title,
@@ -142,10 +152,6 @@ export default function CsvImportModal({
 
   // ── apply mapping → validate ───────────────────────────────────────────────
 
-  const FOOTER_LABELS = new Set([
-    "total", "total amount", "grand total", "subtotal", "sum", "totals",
-  ]);
-
   const applyAndPreview = () => {
     const mapped = applyMapping(csvRows, mapping);
     const parsed: ParsedRow[] = [];
@@ -198,11 +204,6 @@ export default function CsvImportModal({
     (c) => c.required && !mapping[c.key],
   );
 
-  const STEPS: { id: Step; label: string }[] = [
-    { id: "upload", label: "Upload" },
-    { id: "map", label: "Map columns" },
-    { id: "preview", label: "Preview" },
-  ];
   const activeStepIndex = STEPS.findIndex((s) => s.id === step);
 
   const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;

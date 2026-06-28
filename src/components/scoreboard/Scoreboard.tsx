@@ -4,7 +4,7 @@ import { useState, useReducer, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { RefreshCw, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import CsvImportModal, { type ColumnDef, type ImportResult } from "@/components/modals/CsvImportModal";
+import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 
@@ -70,6 +70,35 @@ function fetchReducer(state: FetchState, action: FetchAction): FetchState {
   }
 }
 
+// ---------- csv import config ----------
+const DM_CSV_COLUMNS: ColumnDef[] = [
+  { key: "agent_name", label: "Agent Name", required: true, hint: "Must match a team member name" },
+  { key: "metric_date", label: "Metric Date", required: true, hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "ssa_calls", label: "SSA Calls", hint: "Non-negative integer" },
+  { key: "client_calls_ib", label: "Client Calls IB", hint: "Non-negative integer" },
+  { key: "client_calls_ob", label: "Client Calls OB", hint: "Non-negative integer" },
+  { key: "win_sheets_created", label: "Win Sheets Created", hint: "Non-negative integer" },
+  { key: "notes", label: "Notes", hint: "Optional text" },
+];
+
+const DM_TEMPLATE_CSV =
+  "agent_name,metric_date,ssa_calls,client_calls_ib,client_calls_ob,win_sheets_created,notes\n" +
+  "Jane Smith,2024-01-15,5,3,2,1,\n";
+
+const DM_INT_KEYS = ["ssa_calls", "client_calls_ib", "client_calls_ob", "win_sheets_created"];
+
+const validateDmRow = (raw: Record<string, string>): string[] => {
+  const errors: string[] = [];
+  if (!raw["agent_name"]?.trim()) errors.push("agent_name is required");
+  if (!raw["metric_date"]?.trim() || !parseDate(raw["metric_date"])) errors.push("Invalid or missing metric_date");
+  for (const key of DM_INT_KEYS) {
+    if (raw[key] !== undefined && raw[key].trim() && parseNonNegativeInt(raw[key]) === null) {
+      errors.push(`Invalid value for "${key}" — must be a non-negative integer`);
+    }
+  }
+  return errors;
+};
+
 // ---------- component ----------
 
 export const Scoreboard = () => {
@@ -133,36 +162,6 @@ export const Scoreboard = () => {
     1
   );
 
-  const DM_CSV_COLUMNS: ColumnDef[] = [
-    { key: "agent_name", label: "Agent Name", required: true, hint: "Must match a team member name" },
-    { key: "metric_date", label: "Metric Date", required: true, hint: "YYYY-MM-DD or MM/DD/YYYY" },
-    { key: "ssa_calls", label: "SSA Calls", hint: "Non-negative integer" },
-    { key: "client_calls_ib", label: "Client Calls IB", hint: "Non-negative integer" },
-    { key: "client_calls_ob", label: "Client Calls OB", hint: "Non-negative integer" },
-    { key: "win_sheets_created", label: "Win Sheets Created", hint: "Non-negative integer" },
-    { key: "notes", label: "Notes", hint: "Optional text" },
-  ];
-
-  const DM_TEMPLATE_CSV =
-    "agent_name,metric_date,ssa_calls,client_calls_ib,client_calls_ob,win_sheets_created,notes\n" +
-    "Jane Smith,2024-01-15,5,3,2,1,\n";
-
-  const validateDmRow = (raw: Record<string, string>): string[] => {
-    const errors: string[] = [];
-    if (!raw["agent_name"]?.trim()) errors.push("agent_name is required");
-    if (!raw["metric_date"]?.trim() || !parseDate(raw["metric_date"])) errors.push("Invalid or missing metric_date");
-    for (const key of ["ssa_calls", "client_calls_ib", "client_calls_ob", "win_sheets_created"]) {
-      if (raw[key] !== undefined && raw[key].trim() && parseNonNegativeInt(raw[key]) === null) {
-        errors.push(`Invalid value for "${key}" — must be a non-negative integer`);
-      }
-    }
-    return errors;
-  };
-
-  const handleDmImport = async (validRows: Record<string, string>[]): Promise<ImportResult> => {
-    return bulkImportDailyMetrics(validRows);
-  };
-
   return (
     <>
     {csvImportOpen && (
@@ -174,7 +173,7 @@ export const Scoreboard = () => {
         templateFilename="daily-metrics-template.csv"
         templateCsv={DM_TEMPLATE_CSV}
         validateRow={validateDmRow}
-        onImport={handleDmImport}
+        onImport={bulkImportDailyMetrics}
         onClose={() => setCsvImportOpen(false)}
         onSuccess={() => dispatch({ type: "start" })}
       />

@@ -23,7 +23,7 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull } from "@/lib/formatters";
 import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkImportOverpaidCases } from "@/app/(dashboard)/overpaid-cases/actions";
-import CsvImportModal, { type ColumnDef, type ImportResult } from "@/components/modals/CsvImportModal";
+import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
 
 // ---------- types ----------
@@ -82,6 +82,32 @@ const patchCase = async (
 ) => {
   const result = await upsertOverpaidCase({ caseId, fields: body as Parameters<typeof upsertOverpaidCase>[0]["fields"] });
   if (!result.ok) throw new Error(result.error);
+};
+
+// ---------- csv import config ----------
+const OC_CSV_COLUMNS: ColumnDef[] = [
+  { key: "client_id", label: "Client ID / Name", required: true, hint: "Integer client ID or \"First Last\" / \"Last, First\"" },
+  { key: "op_ltr_date", label: "OP Ltr Date", hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "op_ltr_received", label: "OP Ltr Received", hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "overpaid_amount", label: "Overpaid Amount", hint: "Decimal, e.g. 1234.56" },
+  { key: "checks_cleared", label: "Checks Cleared", hint: "true/false/yes/no/1/0" },
+  { key: "region", label: "Region", hint: "Optional text" },
+  { key: "update_note", label: "Update Note", hint: "Optional text, max 5000 chars" },
+];
+
+const OC_TEMPLATE_CSV =
+  "client_id,op_ltr_date,op_ltr_received,overpaid_amount,checks_cleared,region,update_note\n" +
+  "123456,2024-01-15,2024-01-20,1500.00,false,Region A,Example note\n";
+
+const validateOcRow = (raw: Record<string, string>): string[] => {
+  const errors: string[] = [];
+  if (!raw["client_id"]?.trim()) errors.push("client_id is required");
+  if (raw["op_ltr_date"]?.trim() && !parseDate(raw["op_ltr_date"])) errors.push("Invalid op_ltr_date");
+  if (raw["op_ltr_received"]?.trim() && !parseDate(raw["op_ltr_received"])) errors.push("Invalid op_ltr_received");
+  if (raw["overpaid_amount"]?.trim() && !parseDecimalString(raw["overpaid_amount"])) errors.push("Invalid overpaid_amount");
+  if (raw["checks_cleared"]?.trim() && parseBool(raw["checks_cleared"]) === null) errors.push("Invalid checks_cleared value");
+  if (raw["update_note"] && raw["update_note"].length > 5000) errors.push("update_note too long");
+  return errors;
 };
 
 // ---------- component ----------
@@ -745,35 +771,6 @@ export const OverpaidCases = () => {
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
 
-  const OC_CSV_COLUMNS: ColumnDef[] = [
-    { key: "client_id", label: "Client ID / Name", required: true, hint: "Integer client ID or \"First Last\" / \"Last, First\"" },
-    { key: "op_ltr_date", label: "OP Ltr Date", hint: "YYYY-MM-DD or MM/DD/YYYY" },
-    { key: "op_ltr_received", label: "OP Ltr Received", hint: "YYYY-MM-DD or MM/DD/YYYY" },
-    { key: "overpaid_amount", label: "Overpaid Amount", hint: "Decimal, e.g. 1234.56" },
-    { key: "checks_cleared", label: "Checks Cleared", hint: "true/false/yes/no/1/0" },
-    { key: "region", label: "Region", hint: "Optional text" },
-    { key: "update_note", label: "Update Note", hint: "Optional text, max 5000 chars" },
-  ];
-
-  const OC_TEMPLATE_CSV =
-    "client_id,op_ltr_date,op_ltr_received,overpaid_amount,checks_cleared,region,update_note\n" +
-    "123456,2024-01-15,2024-01-20,1500.00,false,Region A,Example note\n";
-
-  const validateOcRow = (raw: Record<string, string>): string[] => {
-    const errors: string[] = [];
-    if (!raw["client_id"]?.trim()) errors.push("client_id is required");
-    if (raw["op_ltr_date"]?.trim() && !parseDate(raw["op_ltr_date"])) errors.push("Invalid op_ltr_date");
-    if (raw["op_ltr_received"]?.trim() && !parseDate(raw["op_ltr_received"])) errors.push("Invalid op_ltr_received");
-    if (raw["overpaid_amount"]?.trim() && !parseDecimalString(raw["overpaid_amount"])) errors.push("Invalid overpaid_amount");
-    if (raw["checks_cleared"]?.trim() && parseBool(raw["checks_cleared"]) === null) errors.push("Invalid checks_cleared value");
-    if (raw["update_note"] && raw["update_note"].length > 5000) errors.push("update_note too long");
-    return errors;
-  };
-
-  const handleOcImport = async (validRows: Record<string, string>[]): Promise<ImportResult> => {
-    return bulkImportOverpaidCases(validRows);
-  };
-
   return (
     <div className="space-y-4">
       {csvImportOpen && (
@@ -785,7 +782,7 @@ export const OverpaidCases = () => {
           templateFilename="overpaid-cases-template.csv"
           templateCsv={OC_TEMPLATE_CSV}
           validateRow={validateOcRow}
-          onImport={handleOcImport}
+          onImport={bulkImportOverpaidCases}
           onClose={() => setCsvImportOpen(false)}
           onSuccess={fetchCases}
         />
