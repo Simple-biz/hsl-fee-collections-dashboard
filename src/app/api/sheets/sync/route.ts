@@ -352,9 +352,9 @@ export const POST = async (req: NextRequest) => {
     }
 
     // upsert mode
-    let body: { selectedClientIds: unknown };
+    let body: { selectedClientIds: unknown; linkOverrides?: unknown };
     try {
-      body = (await req.json()) as { selectedClientIds: unknown };
+      body = (await req.json()) as { selectedClientIds: unknown; linkOverrides?: unknown };
     } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -379,6 +379,15 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    const rawOverrides: Record<string, string> =
+      body.linkOverrides != null && typeof body.linkOverrides === "object" && !Array.isArray(body.linkOverrides)
+        ? Object.fromEntries(
+            Object.entries(body.linkOverrides as Record<string, unknown>).filter(
+              (entry): entry is [string, string] => typeof entry[1] === "string",
+            ),
+          )
+        : {};
+
     const selectedSet = new Set(ids);
 
     const cached = sheetCache && Date.now() - sheetCache.ts < SHEET_CACHE_TTL ? sheetCache : null;
@@ -386,7 +395,18 @@ export const POST = async (req: NextRequest) => {
       ? [{ rows: cached.masterRows }, cached.feesClosedRows]
       : await Promise.all([fetchMasterListRows(), fetchFeesClosedSheetRows()]);
     if (!cached) sheetCache = { masterRows: rawRows, feesClosedRows: feesClosedRaw, ts: Date.now() };
-    const { rows: parsed } = mapSheetRows(rawRows);
+
+    const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
+    const patchedRows = rawRows.map((r, i) => {
+      const override = rawOverrides[String(i + 2)];
+      if (!override) return r;
+      const match = override.match(MYCASE_URL_RE);
+      if (!match) return r;
+      selectedSet.add(Number(match[1]));
+      return { ...r, "CASE LINK_url": override };
+    });
+
+    const { rows: parsed } = mapSheetRows(patchedRows);
     const { rows: feesClosedParsed } = mapFeesClosedRows(feesClosedRaw);
 
     const seenCandidates = new Set<number>();

@@ -194,6 +194,7 @@ export default function SheetSyncModal({
   const [selectedMissing, setSelectedMissing] = useState<Set<number>>(new Set());
   const [selectedMissingClosed, setSelectedMissingClosed] = useState<Set<number>>(new Set());
   const [archiving, setArchiving] = useState<"active" | "closed" | null>(null);
+  const [linkOverrides, setLinkOverrides] = useState<Record<number, string>>({});
 
   const doFetch = async () => {
     setFetching(true);
@@ -417,7 +418,12 @@ export default function SheetSyncModal({
       const res = await fetch("/api/sheets/sync?mode=upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedClientIds: [...selected] }),
+        body: JSON.stringify({
+          selectedClientIds: [...selected],
+          linkOverrides: Object.fromEntries(
+            Object.entries(linkOverrides).filter(([, v]) => v.trim() !== ""),
+          ),
+        }),
         signal: controller.signal,
       });
       let json: Record<string, unknown> = {};
@@ -695,14 +701,26 @@ export default function SheetSyncModal({
                         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                         {needsLinkRows.length} row{needsLinkRows.length === 1 ? "" : "s"} {needsLinkRows.length === 1 ? "has" : "have"} no MyCase link — skipped
                       </div>
-                      <p className="opacity-80 mb-2">These rows will not be synced until a valid MyCase URL is added to the sheet.</p>
-                      <ul className="space-y-0.5 max-h-36 overflow-y-auto">
-                        {needsLinkRows.slice(0, 25).map((r, i) => (
-                          <li key={i}>Row {r.row}: {r.caseLink}</li>
+                      <p className="opacity-80 mb-2">Paste a MyCase URL to include the row in this sync — leave blank to skip.</p>
+                      <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {needsLinkRows.slice(0, 25).map((r) => (
+                          <li key={r.row} className="flex flex-col gap-0.5">
+                            <span className="opacity-80">Row {r.row}: {r.caseLink}</span>
+                            <input
+                              type="url"
+                              aria-label={`MyCase URL for row ${r.row}: ${r.caseLink}`}
+                              placeholder="https://app.mycase.com/court_cases/…"
+                              value={linkOverrides[r.row] ?? ""}
+                              onChange={(e) =>
+                                setLinkOverrides((prev) => ({ ...prev, [r.row]: e.target.value }))
+                              }
+                              className={`w-full h-6 px-2 rounded border text-[10px] outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-600" : "bg-white border-neutral-300 text-neutral-800 placeholder:text-neutral-400"}`}
+                            />
+                          </li>
                         ))}
                       </ul>
                       {needsLinkRows.length > 25 && (
-                        <p className="mt-1 opacity-70">…and {needsLinkRows.length - 25} more</p>
+                        <p className="mt-1 opacity-70">…and {needsLinkRows.length - 25} more (add URLs directly in the sheet)</p>
                       )}
                     </div>
                   )}
