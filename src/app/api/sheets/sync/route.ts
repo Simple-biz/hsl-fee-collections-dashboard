@@ -6,6 +6,7 @@ import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
 import {
   mapSheetRows,
+  MYCASE_URL_RE,
   MOCK_SHEET_ROWS,
   SYNTHETIC_ID_BASE,
   type SheetRow,
@@ -396,14 +397,17 @@ export const POST = async (req: NextRequest) => {
       : await Promise.all([fetchMasterListRows(), fetchFeesClosedSheetRows()]);
     if (!cached) sheetCache = { masterRows: rawRows, feesClosedRows: feesClosedRaw, ts: Date.now() };
 
-    const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
     const patchedRows = rawRows.map((r, i) => {
       const override = rawOverrides[String(i + 2)];
       if (!override) return r;
-      const match = override.match(MYCASE_URL_RE);
-      if (!match) return r;
-      selectedSet.add(Number(match[1]));
+      if (!MYCASE_URL_RE.test(override)) return r;
       return { ...r, "CASE LINK_url": override };
+    });
+    rawRows.forEach((_, i) => {
+      const override = rawOverrides[String(i + 2)];
+      if (!override) return;
+      const match = override.match(MYCASE_URL_RE);
+      if (match) selectedSet.add(Number(match[1]));
     });
 
     const { rows: parsed } = mapSheetRows(patchedRows);

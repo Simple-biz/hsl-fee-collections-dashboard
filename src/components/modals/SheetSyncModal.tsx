@@ -204,6 +204,7 @@ export default function SheetSyncModal({
     setFcPreviewError(null);
     setSelectedMissing(new Set());
     setSelectedMissingClosed(new Set());
+    setLinkOverrides({});
 
     const mainController = new AbortController();
     const fcController = new AbortController();
@@ -707,7 +708,7 @@ export default function SheetSyncModal({
                           <li key={r.row} className="flex flex-col gap-0.5">
                             <span className="opacity-80">Row {r.row}: {r.caseLink}</span>
                             <input
-                              type="url"
+                              type="text"
                               aria-label={`MyCase URL for row ${r.row}: ${r.caseLink}`}
                               placeholder="https://app.mycase.com/court_cases/…"
                               value={linkOverrides[r.row] ?? ""}
