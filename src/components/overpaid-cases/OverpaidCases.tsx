@@ -1209,7 +1209,7 @@ export const OverpaidCases = () => {
                     Assigned To {sortIcon("assignedTo")}
                   </button>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Region</th>
+                <th className={`${thBase} ${t.textSub} text-left min-w-32 sticky top-0 z-20 ${stickyHeaderBg}`}>Region</th>
                 <th
                   aria-sort={ariaSortFor("feesReceived")}
                   className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}

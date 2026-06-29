@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   CaseRow,
   DashboardSummary,
@@ -35,6 +35,8 @@ const EMPTY_SUMMARY: DashboardSummary = {
   pif: 0,
   syncErrors: 0,
   synced: 0,
+  feesCollectedMTD: 0,
+  casesClosedMTD: 0,
 };
 
 export const useDashboard = (): DashboardData => {
@@ -51,7 +53,15 @@ export const useDashboard = (): DashboardData => {
   const [casesLoading, setCasesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+  const cancelledRef = useRef(false);
+
   const fetchAll = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    cancelledRef.current = false;
+
     setLoading(true);
     setCasesLoading(true);
     setError(null);
@@ -61,15 +71,17 @@ export const useDashboard = (): DashboardData => {
     // dropdowns in the fee records table.
     const summaryTask = (async () => {
       const [dashRes, teamRes, optRes] = await Promise.all([
-        fetch("/api/dashboard"),
-        fetch("/api/team-members"),
-        fetch("/api/settings/dropdown-options"),
+        fetch("/api/dashboard", { signal: controller.signal }),
+        fetch("/api/team-members", { signal: controller.signal }),
+        fetch("/api/settings/dropdown-options", { signal: controller.signal }),
       ]);
-      if (!dashRes.ok || !teamRes.ok) {
-        throw new Error("Failed to fetch dashboard data");
-      }
+      if (!dashRes.ok)
+        throw new Error(`Failed to fetch dashboard data (${dashRes.status})`);
+      if (!teamRes.ok)
+        throw new Error(`Failed to fetch team data (${teamRes.status})`);
       const dashJson = await dashRes.json();
       const teamJson = await teamRes.json();
+      if (cancelledRef.current) return;
       setSummary(dashJson.summary);
       setMonthlyData(dashJson.monthlyData);
       setTeam(teamJson.data);
@@ -83,6 +95,7 @@ export const useDashboard = (): DashboardData => {
         for (const o of all) {
           (grouped[o.category] ||= []).push(o);
         }
+        if (cancelledRef.current) return;
         setDropdownOptions(grouped);
         setApprovedByOptions(grouped.approved_by || []);
       }
@@ -95,26 +108,44 @@ export const useDashboard = (): DashboardData => {
       // Pull the full active set in one request — the table paginates/filters
       // client-side, so it needs every row, not the API's default page of 50.
       // Active caseload is hundreds to low-thousands; a high limit is fine.
-      const casesRes = await fetch("/api/cases?isClosed=false&limit=100000");
-      if (!casesRes.ok) throw new Error("Failed to fetch cases");
+      const casesRes = await fetch("/api/cases?isClosed=false&limit=100000", {
+        signal: controller.signal,
+      });
+      if (!casesRes.ok)
+        throw new Error(`Failed to fetch cases (${casesRes.status})`);
       const casesJson = await casesRes.json();
+      if (cancelledRef.current) return;
       setCases(casesJson.data);
     })();
 
     // Both fetches run in parallel; flip each loading flag as it settles.
     await Promise.all([
       summaryTask
-        .catch((err: unknown) => setError((err as Error).message))
-        .finally(() => setLoading(false)),
+        .catch((err: unknown) => {
+          if ((err as Error).name === "AbortError") return;
+          if (!cancelledRef.current) setError((err as Error).message);
+        })
+        .finally(() => {
+          if (!cancelledRef.current) setLoading(false);
+        }),
       casesTask
-        .catch((err: unknown) => setError((err as Error).message))
-        .finally(() => setCasesLoading(false)),
+        .catch((err: unknown) => {
+          if ((err as Error).name === "AbortError") return;
+          if (!cancelledRef.current) setError((err as Error).message);
+        })
+        .finally(() => {
+          if (!cancelledRef.current) setCasesLoading(false);
+        }),
     ]);
   }, []);
 
   useEffect(() => {
-    // Deliberate fetch-on-mount; fetchAll owns its loading/error state.
+    cancelledRef.current = false;
     fetchAll();
+    return () => {
+      cancelledRef.current = true;
+      abortRef.current?.abort();
+    };
   }, [fetchAll]);
 
   return {

@@ -183,6 +183,13 @@
       "when": 1782501445109,
       "tag": "0025_add_inbound_call_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782755458168,
+      "tag": "0026_fee_payments_table",
+      "breakpoints": true
     }
   ]
 }

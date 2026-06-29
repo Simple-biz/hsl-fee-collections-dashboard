@@ -159,6 +159,9 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   const recordsControllerRef = useRef<AbortController | null>(null);
   const pocControllerRef = useRef<AbortController | null>(null);
   const pocSaveControllerRef = useRef<AbortController | null>(null);
+  const patchAbortRef = useRef<Map<number, AbortController>>(new Map());
+  const addRowAbortRef = useRef<AbortController | null>(null);
+  const deleteAbortRef = useRef<AbortController | null>(null);
   const fetchCancelledRef = useRef(false);
 
   // ── fetch available weeks ───────────────────────────────────────────────────
@@ -222,6 +225,10 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
       fetchCancelledRef.current = true;
       pocControllerRef.current?.abort();
       recordsControllerRef.current?.abort();
+      for (const ctrl of patchAbortRef.current.values()) ctrl.abort();
+      patchAbortRef.current.clear();
+      addRowAbortRef.current?.abort();
+      deleteAbortRef.current?.abort();
     };
   }, [selectedWeek, fetchPoc, fetchRecords]);
 
@@ -268,18 +275,26 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   // ── record field update ────────────────────────────────────────────────────
 
   const updateRecord = async (id: number, field: string, value: string | boolean | null) => {
+    patchAbortRef.current.get(id)?.abort();
+    const controller = new AbortController();
+    patchAbortRef.current.set(id, controller);
     setSaving((prev) => ({ ...prev, [id]: true }));
     try {
       const res = await fetch(`/api/inbound-calls/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       // silently fail — row stays with local edit
     } finally {
-      setSaving((prev) => ({ ...prev, [id]: false }));
+      if (patchAbortRef.current.get(id) === controller) {
+        patchAbortRef.current.delete(id);
+        setSaving((prev) => ({ ...prev, [id]: false }));
+      }
     }
   };
 
@@ -292,6 +307,9 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   // ── add row ────────────────────────────────────────────────────────────────
 
   const addRow = async () => {
+    addRowAbortRef.current?.abort();
+    const controller = new AbortController();
+    addRowAbortRef.current = controller;
     setAddingRow(true);
     try {
       const res = await fetch("/api/inbound-calls", {
@@ -301,25 +319,36 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           weekStart: selectedWeek,
           callDate: todayEasternIso(),
         }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Failed to add row (${res.status})`);
       const row = await res.json();
+      if (fetchCancelledRef.current) return;
       setRecords((prev) => [...prev, row]);
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       // silently fail
     } finally {
-      setAddingRow(false);
+      if (!fetchCancelledRef.current) setAddingRow(false);
     }
   };
 
   // ── delete row ─────────────────────────────────────────────────────────────
 
   const confirmDelete = async (id: number) => {
+    deleteAbortRef.current?.abort();
+    const controller = new AbortController();
+    deleteAbortRef.current = controller;
     setPendingDelete(null);
     setRecords((prev) => prev.filter((r) => r.id !== id));
     try {
-      await fetch(`/api/inbound-calls/${id}`, { method: "DELETE" });
-    } catch {
+      const res = await fetch(`/api/inbound-calls/${id}`, {
+        method: "DELETE",
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       if (!fetchCancelledRef.current) fetchRecords(selectedWeek);
     }
   };
@@ -567,7 +596,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         value={row.callDate}
                         onChange={(e) => handleFieldChange(row.id, "callDate", e.target.value)}
                         onBlur={(e) => updateRecord(row.id, "callDate", e.target.value)}
-                        className={inputCls}
+                        className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
                       />
                     </td>
                     {/* Number */}
@@ -578,7 +607,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         placeholder="Phone number"
                         onChange={(e) => handleFieldChange(row.id, "number", e.target.value)}
                         onBlur={(e) => updateRecord(row.id, "number", e.target.value || null)}
-                        className={inputCls}
+                        className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
                       />
                     </td>
                     {/* Transcript */}
@@ -589,7 +618,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         rows={2}
                         onChange={(e) => handleFieldChange(row.id, "transcript", e.target.value)}
                         onBlur={(e) => updateRecord(row.id, "transcript", e.target.value || null)}
-                        className={`${inputCls} resize-none`}
+                        className={`${inputCls} resize-none disabled:opacity-50 disabled:cursor-default`}
                       />
                     </td>
                     {/* Case Link */}
@@ -600,7 +629,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         placeholder="URL or case ID"
                         onChange={(e) => handleFieldChange(row.id, "caseLink", e.target.value)}
                         onBlur={(e) => updateRecord(row.id, "caseLink", e.target.value || null)}
-                        className={inputCls}
+                        className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
                       />
                     </td>
                     {/* Specialist */}
@@ -611,7 +640,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           handleFieldChange(row.id, "specialistAssigned", e.target.value);
                           updateRecord(row.id, "specialistAssigned", e.target.value || null);
                         }}
-                        className={`${inputCls} cursor-pointer`}
+                        className={`${inputCls} cursor-pointer disabled:opacity-50 disabled:cursor-default`}
                       >
                         <option value="">— Assign —</option>
                         {teamMembers.map((name) => (

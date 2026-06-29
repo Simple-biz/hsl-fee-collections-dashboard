@@ -62,10 +62,10 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
     items: [
       { path: "/", icon: Home, label: "Overview" },
       { path: "/master-fees", icon: TableProperties, label: "Master Fees" },
-      { path: "/inbound-calls", icon: PhoneIncoming, label: "Inbound Calls" },
       { path: "/fees-closed", icon: CheckCircle2, label: "Fees Closed" },
       { path: "/fee-petitions", icon: Gavel, label: "Fee Petitions" },
       { path: "/overpaid-cases", icon: TrendingDown, label: "Overpaid Cases" },
+      { path: "/inbound-calls", icon: PhoneIncoming, label: "Inbound Calls" },
       { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/reports", icon: FileText, label: "Reports" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
