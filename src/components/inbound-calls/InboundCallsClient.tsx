@@ -12,8 +12,12 @@ import {
   Trash2,
   ChevronDown,
   Check,
+  Upload,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
+import { bulkImportInboundCalls } from "@/app/(dashboard)/inbound-calls/actions";
+import { parseBool, parseDate } from "@/lib/import/csv-parser";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -96,6 +100,30 @@ interface PocAssignments {
   5: string[];
 }
 
+// ── csv import config ─────────────────────────────────────────────────────────
+
+const IC_CSV_COLUMNS: ColumnDef[] = [
+  { key: "call_date", label: "Call Date", required: true, hint: "YYYY-MM-DD or MM/DD/YYYY (week_start is derived automatically)" },
+  { key: "number", label: "Number", hint: "Phone number (optional)" },
+  { key: "transcript", label: "Transcript", hint: "Call notes (optional)" },
+  { key: "case_link", label: "Case Link", hint: "URL or case ID (optional)" },
+  { key: "specialist_assigned", label: "Specialist Assigned", hint: "Name (optional)" },
+  { key: "called_back_resolved", label: "Called Back / Resolved", hint: "true/false/yes/no/1/0" },
+];
+
+const IC_TEMPLATE_CSV =
+  "call_date,number,transcript,case_link,specialist_assigned,called_back_resolved\n" +
+  "2024-01-15,555-1234,Caller asked about status,https://...,Jane Smith,false\n";
+
+const validateIcRow = (raw: Record<string, string>): string[] => {
+  const errors: string[] = [];
+  if (!raw["call_date"]?.trim() || !parseDate(raw["call_date"])) errors.push("Invalid or missing call_date");
+  if (raw["called_back_resolved"]?.trim() && parseBool(raw["called_back_resolved"]) === null) {
+    errors.push("Invalid called_back_resolved value");
+  }
+  return errors;
+};
+
 // ── component ─────────────────────────────────────────────────────────────────
 
 export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
@@ -126,6 +154,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [addingRow, setAddingRow] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
 
   const recordsControllerRef = useRef<AbortController | null>(null);
   const pocControllerRef = useRef<AbortController | null>(null);
@@ -306,6 +335,21 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   return (
     <div className="space-y-4">
+      {csvImportOpen && (
+        <CsvImportModal
+          dark={dark}
+          title="Import Inbound Calls"
+          description="Upload a CSV to bulk-insert call records. Each row creates a new record (no deduplication)."
+          columns={IC_CSV_COLUMNS}
+          templateFilename="inbound-calls-template.csv"
+          templateCsv={IC_TEMPLATE_CSV}
+          validateRow={validateIcRow}
+          onImport={bulkImportInboundCalls}
+          onClose={() => setCsvImportOpen(false)}
+          onSuccess={() => void fetchRecords(selectedWeek)}
+          defaultHeaderRow={2}
+        />
+      )}
       {/* ── header bar ── */}
       <div className={`${card} px-4 py-3 flex items-center justify-between gap-3 flex-wrap`}>
         <div className="flex items-center gap-3">
@@ -457,17 +501,27 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
               <span className={`ml-2 text-[11px] font-normal ${t.textMuted}`}>{records.length} record{records.length !== 1 ? "s" : ""}</span>
             )}
           </span>
-          <button
-            onClick={addRow}
-            disabled={addingRow}
-            className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {addingRow
-              ? <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />
-              : <Plus aria-hidden="true" className="h-3 w-3" />
-            }
-            Add row
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCsvImportOpen(true)}
+              className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-300 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"}`}
+              aria-label="Import call records from CSV"
+            >
+              <Upload aria-hidden="true" className="h-3 w-3" />
+              Import CSV
+            </button>
+            <button
+              onClick={addRow}
+              disabled={addingRow}
+              className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {addingRow
+                ? <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />
+                : <Plus aria-hidden="true" className="h-3 w-3" />
+              }
+              Add row
+            </button>
+          </div>
         </div>
 
         {recordsError && (
