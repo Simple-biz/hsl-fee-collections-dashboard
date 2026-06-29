@@ -20,6 +20,7 @@ import {
   X,
   Check,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt } from "@/lib/formatters";
 import {
@@ -187,7 +188,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [dirty, setDirty] = useState(false);
   const entryRef = useRef<HTMLDivElement>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const saveAbortRef = useRef<AbortController | null>(null);
   const cancelledRef = useRef(false);
+
+  const { data: session } = useSession();
+  const role = session?.user?.role;
+  const isAdmin = role === "admin" || role === "system_admin";
+  const isLead = role === "lead";
+  const userName = session?.user?.name;
+  const canEditAgent = (agentName: string) =>
+    isAdmin || isLead || (!!userName && agentName === userName);
 
   const currentYear = nowForInit.getFullYear();
   const yearOptions = useMemo(
@@ -299,12 +309,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     return () => {
       cancelledRef.current = true;
       fetchAbortRef.current?.abort();
+      saveAbortRef.current?.abort();
     };
   }, [fetchScoreboard]);
 
   useEffect(() => {
     if (entryOpen && entryRef.current) {
-      setTimeout(() => entryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      const timer = setTimeout(() => entryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      return () => clearTimeout(timer);
     }
   }, [entryOpen]);
 
@@ -358,9 +370,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   };
 
   const handleSave = async () => {
+    saveAbortRef.current?.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
     setSaving(true);
     setSaveMsg(null);
-    const controller = new AbortController();
     try {
       const entries: {
         agent: string; date: string;
@@ -385,7 +399,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entries }),
-        signal: controller.signal,
+        signal: saveAbortRef.current.signal,
       });
       if (!res.ok) throw new Error(`Failed to save (${res.status})`);
       setSaveMsg(`Saved ${entries.length} entries`);
@@ -805,6 +819,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               <tbody>
                 {data.agents.map((agent) => {
                   const totals = agentCellTotals(agent.agent);
+                  const editable = canEditAgent(agent.agent);
                   return (
                     <React.Fragment key={agent.agent}>
                       {/* SSA Calls */}
@@ -815,12 +830,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                               {agent.agent[0]}
                             </div>
                             {agent.agent}
+                            {!editable && (
+                              <span className={`text-[9px] font-normal ${t.textMuted}`}>(read-only)</span>
+                            )}
                           </div>
                         </td>
                         <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-blue-400" : "text-blue-600"}`}>SSA</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
+                              disabled={!editable}
                               value={getCell(agent.agent, day.date).ssaCalls}
                               onChange={(e) => setCell(agent.agent, day.date, "ssaCalls", e.target.value)}
                             />
@@ -838,6 +857,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
+                              disabled={!editable}
                               value={getCell(agent.agent, day.date).clientCallsIb}
                               onChange={(e) => setCell(agent.agent, day.date, "clientCallsIb", e.target.value)}
                             />
@@ -855,6 +875,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
+                              disabled={!editable}
                               value={getCell(agent.agent, day.date).clientCallsOb}
                               onChange={(e) => setCell(agent.agent, day.date, "clientCallsOb", e.target.value)}
                             />
@@ -872,6 +893,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
+                              disabled={!editable}
                               value={getCell(agent.agent, day.date).winSheetsCreated}
                               onChange={(e) => setCell(agent.agent, day.date, "winSheetsCreated", e.target.value)}
                             />

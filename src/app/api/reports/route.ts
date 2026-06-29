@@ -1,20 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { z } from "zod";
+import type { AgentRow } from "@/types";
+
+const querySchema = z.object({
+  from: z.string().date(),
+  to: z.string().date(),
+});
 
 // GET /api/reports?from=2026-02-17&to=2026-02-24
 export const GET = async (req: NextRequest) => {
-  try {
-    const { searchParams } = new URL(req.url);
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (!from || !to) {
-      return NextResponse.json(
-        { error: "from and to query params required" },
-        { status: 400 },
-      );
-    }
+  const parsed = querySchema.safeParse({
+    from: new URL(req.url).searchParams.get("from"),
+    to: new URL(req.url).searchParams.get("to"),
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "from and to must be valid dates (YYYY-MM-DD)" },
+      { status: 400 },
+    );
+  }
+  const { from, to } = parsed.data;
+
+  try {
 
     // 1. Agent call metrics aggregated for date range
     const callMetrics = await db.execute(sql`
@@ -113,7 +126,20 @@ export const GET = async (req: NextRequest) => {
       GROUP BY specialist_assigned
     `);
 
-    // 8. Recent activity entries (for the feed)
+    // 8. Active cases with no fee data at all
+    const [noFeesResult] = await db.execute(sql`
+      SELECT COUNT(*)::int AS count
+      FROM fee_records fr
+      WHERE fr.is_closed = false
+        AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
+        AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
+        AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
+        AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
+        AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
+        AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+    `) as unknown as [{ count: number }];
+
+    // 9. Recent activity entries (for the feed)
     const recentActivity = await db.execute(sql`
       SELECT
         al.id,
@@ -131,24 +157,6 @@ export const GET = async (req: NextRequest) => {
     `);
 
     // Merge into unified agent rows
-    interface AgentRow {
-      name: string;
-      ssaCalls: number;
-      clientCallsIb: number;
-      clientCallsOb: number;
-      totalCalls: number;
-      daysActive: number;
-      activityCount: number;
-      casesTouched: number;
-      statusChanges: number;
-      casesWithPayment: number;
-      collected: number;
-      totalAssigned: number;
-      pifCount: number;
-      activeCount: number;
-      pendingCount: number;
-    }
-
     const agentMap = new Map<string, AgentRow>();
 
     const ensure = (name: string): AgentRow => {
@@ -270,6 +278,7 @@ export const GET = async (req: NextRequest) => {
         to,
         agents,
         totals,
+        noFeesCasesCount: Number(noFeesResult?.count) || 0,
         dailyBreakdown: (
           dailyBreakdown as unknown as {
             date: string;
@@ -308,9 +317,7 @@ export const GET = async (req: NextRequest) => {
     });
   } catch (error) {
     console.error("GET /api/reports error:", error);
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 500 },
-    );
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 };
