@@ -58,6 +58,8 @@ export const feeMethodEnum = pgEnum("fee_method_enum", [
   "fee_petition",
 ]);
 
+export const feeTypeEnum = pgEnum("fee_type_enum", ["t16", "t2", "aux"]);
+
 // ============================================================================
 // CASES
 // ============================================================================
@@ -773,6 +775,32 @@ export const adminActivityLog = pgTable(
 );
 
 // ============================================================================
+// FEE_PAYMENTS — Individual payment installments per fee type per case
+// ============================================================================
+
+export const feePayments = pgTable(
+  "fee_payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    feeType: feeTypeEnum("fee_type").notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    receivedDate: date("received_date").notNull(),
+    note: varchar("note", { length: 200 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_fee_payments_case_id").on(table.caseId),
+    index("idx_fee_payments_fee_type").on(table.feeType),
+    index("idx_fee_payments_received_date").on(table.receivedDate),
+  ],
+);
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 
@@ -812,6 +840,14 @@ export const feeRecordsRelations = relations(feeRecords, ({ one, many }) => ({
     references: [cases.clientId],
   }),
   activityLogs: many(activityLog),
+  payments: many(feePayments),
+}));
+
+export const feePaymentsRelations = relations(feePayments, ({ one }) => ({
+  case: one(cases, {
+    fields: [feePayments.caseId],
+    references: [cases.clientId],
+  }),
 }));
 
 export const activityLogRelations = relations(activityLog, ({ one }) => ({

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
+import { FeePaymentPanel } from "@/components/cases/FeePaymentPanel";
 import {
   fmtFull,
   fmtDate,
@@ -149,6 +150,7 @@ export const FeeRecordsTable = ({
   const { data: session } = useSession();
   const isAdmin =
     session?.user?.role === "admin" || session?.user?.role === "system_admin";
+  const isLead = session?.user?.role === "lead";
   const { can } = useCapabilities();
   const canCreate = can("case.create");
   const canFinalize = can("case.finalize");
@@ -220,9 +222,14 @@ export const FeeRecordsTable = ({
   const [overpaidOverrides, setOverpaidOverrides] = useState<
     Record<number, boolean>
   >({});
+  // Optimistic overrides for fee payment totals after panel add/delete.
+  const [feeOverrides, setFeeOverrides] = useState<
+    Record<number, Partial<Pick<CaseRow, "t16FeeReceived" | "t16FeeReceivedDate" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxFeeReceived" | "auxFeeReceivedDate">>>
+  >({});
   const [batchLoading, setBatchLoading] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
+  const batchOverpaidAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     const abortMap = patchAbortRef.current;
     return () => {
@@ -251,6 +258,9 @@ export const FeeRecordsTable = ({
   const handleBatchOverpaid = async (mark: boolean) => {
     if (selectedIds.size === 0 || batchLoading) return;
     const ids = Array.from(selectedIds);
+    batchOverpaidAbortRef.current?.abort();
+    const controller = new AbortController();
+    batchOverpaidAbortRef.current = controller;
     setBatchLoading(true);
     // Optimistic override only when marking — removing the flag should not
     // immediately change the visual state in this table (it takes effect on
@@ -269,11 +279,13 @@ export const FeeRecordsTable = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseIds: ids, markedOverpaid: mark }),
+        signal: controller.signal,
       });
       if (!res.ok)
         throw new Error(`Failed to update overpaid flag (${res.status})`);
       setSelectedIds(new Set());
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       if (mark) {
         setOverpaidOverrides((prev) => {
           const next = { ...prev };
@@ -510,9 +522,9 @@ export const FeeRecordsTable = ({
       setPending((prev) => {
         const copy = { ...prev };
         if (copy[c.id]) {
-          const { [rowKey]: _drop, ...rest } = copy[c.id];
-          void _drop;
-          copy[c.id] = rest;
+          const next = { ...copy[c.id] };
+          delete (next as Record<string, unknown>)[rowKey];
+          copy[c.id] = next;
         }
         return copy;
       });
@@ -834,7 +846,7 @@ export const FeeRecordsTable = ({
                   className={`${thBase} ${t.textSub} text-left ${stickyGroup3}`}
                 />
                 <th
-                  colSpan={5}
+                  colSpan={6}
                   aria-hidden="true"
                   className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
                 />
@@ -877,7 +889,7 @@ export const FeeRecordsTable = ({
                   onClick={() => toggleSort("name")}
                 >
                   <span className="flex items-center gap-1">
-                    Case Name <ArrowUpDown className="h-3 w-3" />
+                    Case Name <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
                   </span>
                 </th>
                 <th
@@ -886,7 +898,7 @@ export const FeeRecordsTable = ({
                   title="Sort to group rows by assignee"
                 >
                   <span className="flex items-center gap-1">
-                    Assigned <ArrowUpDown className="h-3 w-3" />
+                    Assigned <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
                   </span>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left ${stickyTh3}`}>
@@ -900,7 +912,7 @@ export const FeeRecordsTable = ({
                   onClick={() => toggleSort("date")}
                 >
                   <span className="flex items-center gap-1">
-                    Approval <ArrowUpDown className="h-3 w-3" />
+                    Approval <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
                   </span>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet Status</th>
@@ -964,7 +976,7 @@ export const FeeRecordsTable = ({
                   onClick={() => toggleSort("expected")}
                 >
                   <span className="flex items-center justify-end gap-1">
-                    Expected <ArrowUpDown className="h-3 w-3" />
+                    Expected <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
                   </span>
                 </th>
                 <th
@@ -972,7 +984,7 @@ export const FeeRecordsTable = ({
                   onClick={() => toggleSort("paid")}
                 >
                   <span className="flex items-center justify-end gap-1">
-                    Paid <ArrowUpDown className="h-3 w-3" />
+                    Paid <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
                   </span>
                 </th>
 
@@ -993,17 +1005,18 @@ export const FeeRecordsTable = ({
                 </th>
                 <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
                 <th
-                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                  onClick={() => toggleSort("daysAfterApproval")}
+                  className={`${thBase} ${t.textSub} text-right ${mode !== "closed" ? "cursor-pointer" : ""}`}
+                  onClick={mode !== "closed" ? () => toggleSort("daysAfterApproval") : undefined}
                 >
                   <span className="flex items-center justify-end gap-1">
-                    Days <ArrowUpDown className="h-3 w-3" />
+                    {mode === "closed" ? "Closed On" : <>Days <ArrowUpDown className="h-3 w-3" aria-hidden="true" /></>}
                   </span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {paged.map((c) => {
+              {paged.map((rawC) => {
+                const c = { ...rawC, ...feeOverrides[rawC.id] };
                 const isOverpaid = overpaidOverrides[c.id] ?? c.markedOverpaid;
                 return (
                   <tr
@@ -1192,7 +1205,7 @@ export const FeeRecordsTable = ({
                           disabled={!canFinalize}
                           onChange={() => setReopenConfirmCase(c)}
                         />
-                      ) : isAdmin && canFinalize ? (
+                      ) : (isAdmin || isLead) && canFinalize ? (
                         <input
                           type="checkbox"
                           checked={false}
@@ -1490,8 +1503,27 @@ export const FeeRecordsTable = ({
                     >
                       {currency(c.t16Pending)}
                     </td>
-                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                      {dateStr(c.t16FeeReceivedDate)}
+                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                      <FeePaymentPanel
+                        caseId={c.id}
+                        feeType="t16"
+                        currentTotal={c.t16FeeReceived}
+                        mostRecentDate={c.t16FeeReceivedDate}
+                        canEdit={isAdmin || isLead}
+                        dark={dark}
+                        onAdded={(amount, receivedDate) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
+                          }))
+                        }
+                        onDeleted={(amount) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
+                          }))
+                        }
+                      />
                     </td>
 
                     {/* T2 */}
@@ -1515,8 +1547,27 @@ export const FeeRecordsTable = ({
                     >
                       {currency(c.t2Pending)}
                     </td>
-                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                      {dateStr(c.t2FeeReceivedDate)}
+                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                      <FeePaymentPanel
+                        caseId={c.id}
+                        feeType="t2"
+                        currentTotal={c.t2FeeReceived}
+                        mostRecentDate={c.t2FeeReceivedDate}
+                        canEdit={isAdmin || isLead}
+                        dark={dark}
+                        onAdded={(amount, receivedDate) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
+                          }))
+                        }
+                        onDeleted={(amount) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
+                          }))
+                        }
+                      />
                     </td>
 
                     {/* AUX */}
@@ -1540,8 +1591,27 @@ export const FeeRecordsTable = ({
                     >
                       {currency(c.auxPending)}
                     </td>
-                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                      {dateStr(c.auxFeeReceivedDate)}
+                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                      <FeePaymentPanel
+                        caseId={c.id}
+                        feeType="aux"
+                        currentTotal={c.auxFeeReceived}
+                        mostRecentDate={c.auxFeeReceivedDate}
+                        canEdit={isAdmin || isLead}
+                        dark={dark}
+                        onAdded={(amount, receivedDate) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
+                          }))
+                        }
+                        onDeleted={(amount) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
+                          }))
+                        }
+                      />
                     </td>
 
                     {/* Totals */}
@@ -1712,14 +1782,16 @@ export const FeeRecordsTable = ({
                             : "No notes yet"
                         }
                       >
-                        <MessageSquare className="h-3 w-3" />
+                        <MessageSquare className="h-3 w-3" aria-hidden="true" />
                         {c.notesCount}
                       </button>
                     </td>
                     <td
-                      className={`${tdBase} text-right tabular-nums font-medium ${AGING_COLORS(c.approvalCategory, dark)}`}
+                      className={`${tdBase} text-right tabular-nums font-medium ${mode === "closed" ? t.textSub : AGING_COLORS(c.approvalCategory, dark)}`}
                     >
-                      {c.daysAfterApproval !== null ? (
+                      {mode === "closed" ? (
+                        dateStr(c.closedAt ? c.closedAt.slice(0, 10) : null)
+                      ) : c.daysAfterApproval !== null ? (
                         <span>
                           {c.daysAfterApproval}d{" "}
                           <span className="text-[9px] opacity-70">
@@ -1740,7 +1812,7 @@ export const FeeRecordsTable = ({
           <div
             className={`absolute inset-0 z-40 flex items-center justify-center gap-2 text-sm font-medium ${t.text} ${dark ? "bg-neutral-900/60" : "bg-white/60"}`}
           >
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             Loading rows…
           </div>
         )}

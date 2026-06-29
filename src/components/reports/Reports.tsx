@@ -19,25 +19,9 @@ import {
 } from "@/components/scoreboard/ScoreboardSummaryCards";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull, fmtDate } from "@/lib/formatters";
+import type { AgentRow } from "@/types";
 
 // ---------- types ----------
-interface AgentRow {
-  name: string;
-  ssaCalls: number;
-  clientCallsIb: number;
-  clientCallsOb: number;
-  totalCalls: number;
-  daysActive: number;
-  activityCount: number;
-  casesTouched: number;
-  statusChanges: number;
-  casesWithPayment: number;
-  collected: number;
-  totalAssigned: number;
-  pifCount: number;
-  activeCount: number;
-  pendingCount: number;
-}
 
 interface Totals {
   ssaCalls: number;
@@ -55,6 +39,7 @@ interface ReportData {
   to: string;
   agents: AgentRow[];
   totals: Totals;
+  openCasesFeesStatus: { noFees: number; partial: number; pif: number };
 }
 
 // ---------- helpers ----------
@@ -164,12 +149,13 @@ export const Reports = () => {
       const res = await fetch(`/api/reports?from=${fromDate}&to=${toDate}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to load report (${res.status})`);
       const json = await res.json();
+      if (controller.signal.aborted) return;
       setData(json.data);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setError((err as Error).message);
+      if (!controller.signal.aborted) setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [fromDate, toDate]);
 
@@ -253,6 +239,7 @@ export const Reports = () => {
 
   const SortIcon = ({ col }: { col: SortKey }) => (
     <ArrowUpDown
+      aria-hidden="true"
       className={`h-3 w-3 inline ml-0.5 ${sortKey === col ? (dark ? "text-neutral-100" : "text-neutral-900") : ""}`}
     />
   );
@@ -316,9 +303,9 @@ export const Reports = () => {
                 onClick={() => setShowPresets(!showPresets)}
                 className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
               >
-                <Calendar className="h-3 w-3" />
+                <Calendar className="h-3 w-3" aria-hidden="true" />
                 Presets
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3 w-3" aria-hidden="true" />
               </button>
               {showPresets && (
                 <div
@@ -363,9 +350,9 @@ export const Reports = () => {
               className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
             >
               {loading ? (
-                <RefreshCw className="h-3 w-3 animate-spin" />
+                <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
               ) : (
-                <RefreshCw className="h-3 w-3" />
+                <RefreshCw className="h-3 w-3" aria-hidden="true" />
               )}
               Run
             </button>
@@ -375,7 +362,7 @@ export const Reports = () => {
               disabled={!data}
               className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40`}
             >
-              <Download className="h-3 w-3" /> CSV
+              <Download className="h-3 w-3" aria-hidden="true" /> CSV
             </button>
           </div>
         </div>
@@ -384,6 +371,7 @@ export const Reports = () => {
       {/* Error */}
       {error && (
         <div
+          role="alert"
           className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
           <span className="text-sm">{error}</span>
@@ -393,7 +381,7 @@ export const Reports = () => {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-16">
-          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
+          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} aria-hidden="true" />
           <span className={`ml-2 text-sm ${t.textSub}`}>
             Generating report...
           </span>
@@ -408,6 +396,26 @@ export const Reports = () => {
           dark={dark}
           t={t}
         />
+      )}
+
+      {data && !loading && (
+        <div className={`${sectionCard} overflow-hidden`}>
+          <div className={`px-4 py-2.5 text-center text-xs font-bold ${t.text} border-b ${t.borderLight}`}>
+            Open Cases (Fees Status)
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-dashed">
+            {[
+              { label: "No Fees",          value: data.openCasesFeesStatus.noFees,  tone: dark ? "text-amber-400" : "text-amber-600" },
+              { label: "Partial / Pending", value: data.openCasesFeesStatus.partial, tone: dark ? "text-blue-400"  : "text-blue-600"  },
+              { label: "Paid in Full",      value: data.openCasesFeesStatus.pif,     tone: dark ? "text-emerald-400" : "text-emerald-600" },
+            ].map(({ label, value, tone }) => (
+              <div key={label} className={`py-3 text-center border-dashed ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
+                <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
+                <div className={`text-xl font-extrabold tabular-nums ${tone}`}>{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {data && !loading && (

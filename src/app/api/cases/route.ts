@@ -58,14 +58,17 @@ export const GET = async (req: NextRequest) => {
         t16FeeDue: feeRecords.t16FeeDue,
         t16FeeReceived: feeRecords.t16FeeReceived,
         t16Pending: feeRecords.t16Pending,
+        t16FeeReceivedDate: feeRecords.t16FeeReceivedDate,
         t2Retro: feeRecords.t2Retro,
         t2FeeDue: feeRecords.t2FeeDue,
         t2FeeReceived: feeRecords.t2FeeReceived,
         t2Pending: feeRecords.t2Pending,
+        t2FeeReceivedDate: feeRecords.t2FeeReceivedDate,
         auxRetro: feeRecords.auxRetro,
         auxFeeDue: feeRecords.auxFeeDue,
         auxFeeReceived: feeRecords.auxFeeReceived,
         auxPending: feeRecords.auxPending,
+        auxFeeReceivedDate: feeRecords.auxFeeReceivedDate,
         totalRetroDue: feeRecords.totalRetroDue,
         totalFeesExpected: feeRecords.totalFeesExpected,
         totalFeesPaid: feeRecords.totalFeesPaid,
@@ -187,21 +190,21 @@ export const GET = async (req: NextRequest) => {
         t16FeeDue: Number(r.t16FeeDue) || 0,
         t16FeeReceived: Number(r.t16FeeReceived) || 0,
         t16Pending: Number(r.t16Pending) || 0,
-        t16FeeReceivedDate: null,
+        t16FeeReceivedDate: r.t16FeeReceivedDate ?? null,
 
         // T2
         t2Retro: Number(r.t2Retro) || 0,
         t2FeeDue: Number(r.t2FeeDue) || 0,
         t2FeeReceived: Number(r.t2FeeReceived) || 0,
         t2Pending: Number(r.t2Pending) || 0,
-        t2FeeReceivedDate: null,
+        t2FeeReceivedDate: r.t2FeeReceivedDate ?? null,
 
         // AUX
         auxRetro: Number(r.auxRetro) || 0,
         auxFeeDue: Number(r.auxFeeDue) || 0,
         auxFeeReceived: Number(r.auxFeeReceived) || 0,
         auxPending: Number(r.auxPending) || 0,
-        auxFeeReceivedDate: null,
+        auxFeeReceivedDate: r.auxFeeReceivedDate ?? null,
 
         // Totals
         totalRetroDue: Number(r.totalRetroDue) || 0,

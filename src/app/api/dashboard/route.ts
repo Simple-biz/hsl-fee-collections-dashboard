@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cases, feeRecords } from "@/lib/db/schema";
 import { eq, sql, count } from "drizzle-orm";
 
 // GET /api/dashboard — Summary stats + monthly collections data
 export const GET = async () => {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     // Summary stats (active rows only — closed cases live on /fees-closed).
     // expected/paid are computed from the per-benefit subtotals (T16 + T2 +
@@ -40,6 +44,22 @@ export const GET = async () => {
 
     const expected = Number(stats.totalExpected);
     const paid = Number(stats.totalPaid);
+
+    // MTD: fees collected and cases closed in the current calendar month.
+    const [mtd] = await db.execute(sql`
+      SELECT
+        (
+          SELECT COALESCE(SUM(amount::numeric), 0)
+          FROM fee_payments
+          WHERE DATE_TRUNC('month', received_date::date) = DATE_TRUNC('month', CURRENT_DATE)
+        ) AS fees_collected_mtd,
+        (
+          SELECT COUNT(*)
+          FROM fee_records
+          WHERE closed_at IS NOT NULL
+            AND DATE_TRUNC('month', closed_at) = DATE_TRUNC('month', NOW())
+        ) AS cases_closed_mtd
+    `) as unknown as [{ fees_collected_mtd: string; cases_closed_mtd: string }];
 
     // Monthly collections data (last 6 months). Same dataset as the summary
     // above — closed cases excluded, totals computed from T16+T2+AUX
@@ -88,14 +108,14 @@ export const GET = async () => {
         pif: stats.pif,
         syncErrors: stats.syncErrors,
         synced: stats.synced,
+        feesCollectedMTD: Number(mtd?.fees_collected_mtd) || 0,
+        casesClosedMTD: Number(mtd?.cases_closed_mtd) || 0,
       },
       monthlyData,
     });
   } catch (error) {
     console.error("GET /api/dashboard error:", error);
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 500 },
-    );
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 };

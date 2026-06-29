@@ -112,6 +112,18 @@ export interface DashboardSummary {
   pif: number;
   syncErrors: number;
   synced: number;
+  feesCollectedMTD: number;
+  casesClosedMTD: number;
+}
+
+export interface FeePayment {
+  id: string;
+  caseId: number;
+  feeType: "t16" | "t2" | "aux";
+  amount: number;
+  receivedDate: string;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface MonthlyData {
@@ -238,4 +250,22 @@ export interface CaseDetailData {
 
   // Activity log
   activities: ActivityLogEntry[];
+}
+
+export interface AgentRow {
+  name: string;
+  ssaCalls: number;
+  clientCallsIb: number;
+  clientCallsOb: number;
+  totalCalls: number;
+  daysActive: number;
+  activityCount: number;
+  casesTouched: number;
+  statusChanges: number;
+  casesWithPayment: number;
+  collected: number;
+  totalAssigned: number;
+  pifCount: number;
+  activeCount: number;
+  pendingCount: number;
 }
