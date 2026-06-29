@@ -3,7 +3,7 @@ import type { ParsedCaseRow } from "./xlsx-mapper";
 export type SheetRow = Record<string, string | number | null | undefined>;
 
 export const SYNTHETIC_ID_BASE = 900_000_000;
-const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
+export const MYCASE_URL_RE = /mycase\.com\/court_cases\/(\d+)/i;
 
 const num = (v: unknown): string => {
   if (v === null || v === undefined || v === "") return "0";
