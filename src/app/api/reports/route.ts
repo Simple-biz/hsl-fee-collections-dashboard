@@ -126,18 +126,34 @@ export const GET = async (req: NextRequest) => {
       GROUP BY specialist_assigned
     `);
 
-    // 8. Active cases with no fee data at all
-    const [noFeesResult] = await db.execute(sql`
-      SELECT COUNT(*)::int AS count
+    const [feesStatus] = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE fr.pif_ready_to_close = true
+        )::int AS pif_count,
+        COUNT(*) FILTER (
+          WHERE fr.pif_ready_to_close IS NOT TRUE
+            AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
+            AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
+            AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
+            AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
+            AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
+            AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+        )::int AS no_fees_count,
+        COUNT(*) FILTER (
+          WHERE fr.pif_ready_to_close IS NOT TRUE
+            AND NOT (
+              COALESCE(fr.t16_fee_due, 0)::numeric = 0
+              AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
+              AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
+              AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
+              AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
+              AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+            )
+        )::int AS partial_count
       FROM fee_records fr
       WHERE fr.is_closed = false
-        AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
-        AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
-        AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
-        AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
-        AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
-        AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
-    `) as unknown as [{ count: number }];
+    `) as unknown as [{ pif_count: number; no_fees_count: number; partial_count: number }];
 
     // 9. Recent activity entries (for the feed)
     const recentActivity = await db.execute(sql`
@@ -278,7 +294,11 @@ export const GET = async (req: NextRequest) => {
         to,
         agents,
         totals,
-        noFeesCasesCount: Number(noFeesResult?.count) || 0,
+        openCasesFeesStatus: {
+          noFees: Number(feesStatus?.no_fees_count) || 0,
+          partial: Number(feesStatus?.partial_count) || 0,
+          pif: Number(feesStatus?.pif_count) || 0,
+        },
         dailyBreakdown: (
           dailyBreakdown as unknown as {
             date: string;

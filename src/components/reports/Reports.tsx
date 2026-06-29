@@ -39,7 +39,7 @@ interface ReportData {
   to: string;
   agents: AgentRow[];
   totals: Totals;
-  noFeesCasesCount: number;
+  openCasesFeesStatus: { noFees: number; partial: number; pif: number };
 }
 
 // ---------- helpers ----------
@@ -398,13 +398,23 @@ export const Reports = () => {
         />
       )}
 
-      {data && !loading && data.noFeesCasesCount > 0 && (
-        <div className={`${sectionCard} px-4 py-3 flex items-center gap-3`}>
-          <div className={`w-2 h-2 rounded-full shrink-0 ${dark ? "bg-amber-400" : "bg-amber-500"}`} aria-hidden="true" />
-          <p className={`text-[12px] ${t.textSub}`}>
-            <span className={`font-semibold ${dark ? "text-amber-400" : "text-amber-600"}`}>{data.noFeesCasesCount}</span>
-            {" "}active {data.noFeesCasesCount === 1 ? "case has" : "cases have"} no fee data (all T16, T2, and AUX amounts are zero).
-          </p>
+      {data && !loading && (
+        <div className={`${sectionCard} overflow-hidden`}>
+          <div className={`px-4 py-2.5 text-center text-xs font-bold ${t.text} border-b ${t.borderLight}`}>
+            Open Cases (Fees Status)
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-dashed">
+            {[
+              { label: "No Fees",          value: data.openCasesFeesStatus.noFees,  tone: dark ? "text-amber-400" : "text-amber-600" },
+              { label: "Partial / Pending", value: data.openCasesFeesStatus.partial, tone: dark ? "text-blue-400"  : "text-blue-600"  },
+              { label: "Paid in Full",      value: data.openCasesFeesStatus.pif,     tone: dark ? "text-emerald-400" : "text-emerald-600" },
+            ].map(({ label, value, tone }) => (
+              <div key={label} className={`py-3 text-center border-dashed ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
+                <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
+                <div className={`text-xl font-extrabold tabular-nums ${tone}`}>{value}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
