@@ -18,11 +18,18 @@ import {
  */
 export function useCapabilities() {
   const { data: session } = useSession();
+  const role = session?.user?.role;
   const rawCaps = session?.user?.capabilities;
+  // Admins always derive from role defaults (= ALL) so a stale JWT that
+  // predates a newly-added capability never silently blocks them.
+  // Non-admins use JWT caps with a role-default fallback for pre-capability tokens.
+  const isAdmin = role === "admin" || role === "system_admin";
   const capabilities = (
-    Array.isArray(rawCaps) && rawCaps.length > 0
-      ? rawCaps
-      : roleCapabilityDefaults(session?.user?.role)
+    isAdmin
+      ? roleCapabilityDefaults(role)
+      : Array.isArray(rawCaps) && rawCaps.length > 0
+        ? rawCaps
+        : roleCapabilityDefaults(role)
   ) as CapabilityKey[];
 
   return {

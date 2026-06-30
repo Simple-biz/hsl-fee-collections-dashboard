@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { feePayments, feeRecords } from "@/lib/db/schema";
 import { and, eq, asc, sql } from "drizzle-orm";
 import { z } from "zod";
+import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+import { auth } from "@/auth";
 
 const feeTypeValues = ["t16", "t2", "aux"] as const;
 
@@ -61,14 +62,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const role = session.user?.role;
-  const isAdmin = role === "admin" || role === "system_admin";
-  const isLead = role === "lead";
-  if (!isAdmin && !isLead) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const guard = await requireCapability("fees.edit");
+  if (!guard.ok) {
+    return NextResponse.json({ error: "You don't have permission to add fee payments." }, { status: guardStatus(guard.error) });
   }
 
   const { id } = await params;
