@@ -63,6 +63,67 @@ function FeesConfBadge({ value, dark }: { value: string | null | undefined; dark
   );
 }
 
+interface FeeAmountCellProps {
+  active: boolean;
+  value: number;
+  draft: string;
+  saving: boolean;
+  error: string | null;
+  canEdit: boolean;
+  saveLabel: string;
+  inputBg: string;
+  hoverCls: string;
+  textMuted: string;
+  onEdit: () => void;
+  onDraftChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function FeeAmountCell({
+  active, value, draft, saving, error, canEdit,
+  saveLabel, inputBg, hoverCls, textMuted,
+  onEdit, onDraftChange, onSave, onCancel,
+}: FeeAmountCellProps) {
+  if (active) {
+    return (
+      <div className="flex flex-col items-end gap-1 min-w-[110px]">
+        <div className="flex items-center gap-0.5">
+          <input
+            type="number" min="0" step="0.01" value={draft} autoFocus
+            onChange={(e) => onDraftChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+            className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${inputBg}`}
+          />
+          {saving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" />
+          ) : (
+            <>
+              <button type="button" onClick={onSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label={`Save ${saveLabel}`}>
+                <Check className="h-3 w-3" aria-hidden="true" />
+              </button>
+              <button type="button" onClick={onCancel} className={`p-0.5 rounded transition-colors ${hoverCls}`} aria-label="Cancel">
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </>
+          )}
+        </div>
+        {error && <p role="alert" className="text-[10px] text-red-500">{error}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <span>{currency(value)}</span>
+      {canEdit && (
+        <button type="button" onClick={onEdit} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${hoverCls}`} aria-label={`Edit ${saveLabel}`}>
+          <Pencil className={`h-3 w-3 ${textMuted}`} aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface FeeRecordsTableProps {
   cases: CaseRow[];
   dateRange?: { from: string; to: string } | null;
@@ -1575,77 +1636,29 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input type="number" min="0" step="0.01" value={feeAmountEdit.draft} autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleFeeAmountSave(); if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); } }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`} />
-                            {feeAmountSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" /> : <>
-                              <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save T16 retro"><Check className="h-3 w-3" aria-hidden="true" /></button>
-                              <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel"><X className="h-3 w-3" aria-hidden="true" /></button>
-                            </>}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.t16Retro)}</span>
-                          {canEditFees && <button type="button" onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "t16Retro", draft: String(c.t16Retro) }); setFeeAmountError(null); }} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`} aria-label="Edit T16 retro"><Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" /></button>}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro"}
+                        value={c.t16Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="T16 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Retro", draft: String(c.t16Retro) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={feeAmountEdit.draft}
-                              autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleFeeAmountSave();
-                                if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); }
-                              }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`}
-                            />
-                            {feeAmountSaving ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" />
-                            ) : (
-                              <>
-                                <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save T16 fee due">
-                                  <Check className="h-3 w-3" aria-hidden="true" />
-                                </button>
-                                <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel">
-                                  <X className="h-3 w-3" aria-hidden="true" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.t16FeeDue)}</span>
-                          {canEditFees && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: String(c.t16FeeDue) }); setFeeAmountError(null); }}
-                              className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`}
-                              aria-label="Edit T16 fee due"
-                            >
-                              <Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
+                        value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: String(c.t16FeeDue) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
@@ -1656,26 +1669,15 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Pending" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input type="number" min="0" step="0.01" value={feeAmountEdit.draft} autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleFeeAmountSave(); if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); } }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`} />
-                            {feeAmountSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" /> : <>
-                              <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save T16 pending"><Check className="h-3 w-3" aria-hidden="true" /></button>
-                              <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel"><X className="h-3 w-3" aria-hidden="true" /></button>
-                            </>}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.t16Pending)}</span>
-                          {canEditFees && <button type="button" onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "t16Pending", draft: String(c.t16Pending) }); setFeeAmountError(null); }} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`} aria-label="Edit T16 pending"><Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" /></button>}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Pending"}
+                        value={c.t16Pending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="T16 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Pending", draft: String(c.t16Pending) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
                       <FeePaymentPanel
@@ -1705,77 +1707,29 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input type="number" min="0" step="0.01" value={feeAmountEdit.draft} autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleFeeAmountSave(); if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); } }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`} />
-                            {feeAmountSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" /> : <>
-                              <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save T2 retro"><Check className="h-3 w-3" aria-hidden="true" /></button>
-                              <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel"><X className="h-3 w-3" aria-hidden="true" /></button>
-                            </>}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.t2Retro)}</span>
-                          {canEditFees && <button type="button" onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "t2Retro", draft: String(c.t2Retro) }); setFeeAmountError(null); }} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`} aria-label="Edit T2 retro"><Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" /></button>}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro"}
+                        value={c.t2Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="T2 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Retro", draft: String(c.t2Retro) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={feeAmountEdit.draft}
-                              autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleFeeAmountSave();
-                                if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); }
-                              }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`}
-                            />
-                            {feeAmountSaving ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" />
-                            ) : (
-                              <>
-                                <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save T2 fee due">
-                                  <Check className="h-3 w-3" aria-hidden="true" />
-                                </button>
-                                <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel">
-                                  <X className="h-3 w-3" aria-hidden="true" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.t2FeeDue)}</span>
-                          {canEditFees && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: String(c.t2FeeDue) }); setFeeAmountError(null); }}
-                              className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`}
-                              aria-label="Edit T2 fee due"
-                            >
-                              <Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
+                        value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: String(c.t2FeeDue) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
@@ -1786,26 +1740,15 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Pending" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input type="number" min="0" step="0.01" value={feeAmountEdit.draft} autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleFeeAmountSave(); if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); } }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`} />
-                            {feeAmountSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" /> : <>
-                              <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save T2 pending"><Check className="h-3 w-3" aria-hidden="true" /></button>
-                              <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel"><X className="h-3 w-3" aria-hidden="true" /></button>
-                            </>}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.t2Pending)}</span>
-                          {canEditFees && <button type="button" onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "t2Pending", draft: String(c.t2Pending) }); setFeeAmountError(null); }} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`} aria-label="Edit T2 pending"><Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" /></button>}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Pending"}
+                        value={c.t2Pending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="T2 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Pending", draft: String(c.t2Pending) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
                       <FeePaymentPanel
@@ -1835,77 +1778,29 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input type="number" min="0" step="0.01" value={feeAmountEdit.draft} autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleFeeAmountSave(); if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); } }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`} />
-                            {feeAmountSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" /> : <>
-                              <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save AUX retro"><Check className="h-3 w-3" aria-hidden="true" /></button>
-                              <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel"><X className="h-3 w-3" aria-hidden="true" /></button>
-                            </>}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.auxRetro)}</span>
-                          {canEditFees && <button type="button" onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "auxRetro", draft: String(c.auxRetro) }); setFeeAmountError(null); }} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`} aria-label="Edit AUX retro"><Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" /></button>}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro"}
+                        value={c.auxRetro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="AUX retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxRetro", draft: String(c.auxRetro) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={feeAmountEdit.draft}
-                              autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleFeeAmountSave();
-                                if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); }
-                              }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`}
-                            />
-                            {feeAmountSaving ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" />
-                            ) : (
-                              <>
-                                <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save AUX fee due">
-                                  <Check className="h-3 w-3" aria-hidden="true" />
-                                </button>
-                                <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel">
-                                  <X className="h-3 w-3" aria-hidden="true" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.auxFeeDue)}</span>
-                          {canEditFees && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: String(c.auxFeeDue) }); setFeeAmountError(null); }}
-                              className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`}
-                              aria-label="Edit AUX fee due"
-                            >
-                              <Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
+                        value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: String(c.auxFeeDue) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
@@ -1916,26 +1811,15 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
                       onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
                     >
-                      {canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxPending" ? (
-                        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-                          <div className="flex items-center gap-0.5">
-                            <input type="number" min="0" step="0.01" value={feeAmountEdit.draft} autoFocus
-                              onChange={(e) => setFeeAmountEdit((p) => p ? { ...p, draft: e.target.value } : p)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleFeeAmountSave(); if (e.key === "Escape") { setFeeAmountEdit(null); setFeeAmountError(null); } }}
-                              className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${t.inputBg}`} />
-                            {feeAmountSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" /> : <>
-                              <button type="button" onClick={handleFeeAmountSave} className="p-0.5 rounded text-emerald-500 hover:bg-emerald-500/10 transition-colors" aria-label="Save AUX pending"><Check className="h-3 w-3" aria-hidden="true" /></button>
-                              <button type="button" onClick={() => { setFeeAmountEdit(null); setFeeAmountError(null); }} className={`p-0.5 rounded transition-colors ${t.hover}`} aria-label="Cancel"><X className="h-3 w-3" aria-hidden="true" /></button>
-                            </>}
-                          </div>
-                          {feeAmountError && <p role="alert" className="text-[10px] text-red-500">{feeAmountError}</p>}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currency(c.auxPending)}</span>
-                          {canEditFees && <button type="button" onClick={(e) => { e.stopPropagation(); setFeeAmountEdit({ caseId: c.id, field: "auxPending", draft: String(c.auxPending) }); setFeeAmountError(null); }} className={`opacity-0 group-hover:opacity-100 transition-colors p-0.5 rounded ${t.hover}`} aria-label="Edit AUX pending"><Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" /></button>}
-                        </div>
-                      )}
+                      <FeeAmountCell
+                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxPending"}
+                        value={c.auxPending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                        canEdit={canEditFees} saveLabel="AUX pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxPending", draft: String(c.auxPending) }); setFeeAmountError(null); }}
+                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                        onSave={handleFeeAmountSave}
+                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                      />
                     </td>
                     <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
                       <FeePaymentPanel
