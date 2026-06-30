@@ -506,6 +506,7 @@ export const dailyMetrics = pgTable(
     clientCallsIb: integer("client_calls_ib").notNull().default(0),
     clientCallsOb: integer("client_calls_ob").notNull().default(0),
     winSheetsCreated: integer("win_sheets_created").notNull().default(0),
+    faxSent: integer("fax_sent").notNull().default(0),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

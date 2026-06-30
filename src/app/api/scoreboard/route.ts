@@ -171,7 +171,12 @@ export const GET = async (req: NextRequest) => {
         COALESCE((SELECT SUM(dm.win_sheets_created) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
          AND dm.metric_date >= ${startDate}::date
-         AND dm.metric_date < ${endExclusive}::date), 0) AS week_win_sheets_created
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_win_sheets_created,
+
+        COALESCE((SELECT SUM(dm.fax_sent) FROM daily_metrics dm
+         WHERE dm.agent_name = tm.name
+         AND dm.metric_date >= ${startDate}::date
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_fax_sent
 
       FROM team_members tm
       WHERE tm.is_active = TRUE
@@ -187,6 +192,7 @@ export const GET = async (req: NextRequest) => {
         dm.client_calls_ib,
         dm.client_calls_ob,
         dm.win_sheets_created,
+        dm.fax_sent,
         dm.notes
       FROM daily_metrics dm
       WHERE dm.metric_date >= ${startDate}::date
@@ -214,6 +220,7 @@ export const GET = async (req: NextRequest) => {
         casesFullFee: Number(r.cases_full_fee),
         weekSsaCalls: Number(r.week_ssa_calls),
         weekClientCalls: Number(r.week_client_calls),
+        weekFaxSent: Number(r.week_fax_sent),
       }),
     );
 
@@ -275,9 +282,43 @@ export const GET = async (req: NextRequest) => {
         clientCallsIb: Number(r.client_calls_ib),
         clientCallsOb: Number(r.client_calls_ob),
         winSheetsCreated: Number(r.win_sheets_created),
+        faxSent: Number(r.fax_sent),
         notes: r.notes ? String(r.notes) : null,
       }),
     );
+
+    const [feesStatus] = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE pif_ready_to_close = true)::int AS pif_count,
+        COUNT(*) FILTER (
+          WHERE pif_ready_to_close IS NOT TRUE
+            AND COALESCE(t16_fee_due, 0)::numeric = 0
+            AND COALESCE(t2_fee_due, 0)::numeric = 0
+            AND COALESCE(aux_fee_due, 0)::numeric = 0
+            AND COALESCE(t16_fee_received, 0)::numeric = 0
+            AND COALESCE(t2_fee_received, 0)::numeric = 0
+            AND COALESCE(aux_fee_received, 0)::numeric = 0
+        )::int AS no_fees_count,
+        COUNT(*) FILTER (
+          WHERE pif_ready_to_close IS NOT TRUE
+            AND NOT (
+              COALESCE(t16_fee_due, 0)::numeric = 0
+              AND COALESCE(t2_fee_due, 0)::numeric = 0
+              AND COALESCE(aux_fee_due, 0)::numeric = 0
+              AND COALESCE(t16_fee_received, 0)::numeric = 0
+              AND COALESCE(t2_fee_received, 0)::numeric = 0
+              AND COALESCE(aux_fee_received, 0)::numeric = 0
+            )
+        )::int AS partial_count
+      FROM fee_records
+      WHERE is_closed = false
+    `) as unknown as [{ pif_count: number; no_fees_count: number; partial_count: number }];
+
+    const openCasesFeesStatus = {
+      noFees:  Number(feesStatus?.no_fees_count)  || 0,
+      partial: Number(feesStatus?.partial_count)   || 0,
+      pif:     Number(feesStatus?.pif_count)        || 0,
+    };
 
     return NextResponse.json({
       week: monday,
@@ -287,6 +328,7 @@ export const GET = async (req: NextRequest) => {
       agents,
       teams,
       daily,
+      openCasesFeesStatus,
     });
   } catch (error) {
     console.error("GET /api/scoreboard error:", error);

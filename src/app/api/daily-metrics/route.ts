@@ -22,6 +22,7 @@ export const GET = async (req: NextRequest) => {
           dm.client_calls_ib,
           dm.client_calls_ob,
           dm.win_sheets_created,
+          dm.fax_sent,
           dm.notes
         FROM daily_metrics dm
         WHERE dm.metric_date >= ${week}::date
@@ -39,6 +40,7 @@ export const GET = async (req: NextRequest) => {
             client_calls_ib: number;
             client_calls_ob: number;
             win_sheets_created: number;
+            fax_sent: number;
             notes: string | null;
           }[]
         ).map((r) => ({
@@ -48,6 +50,7 @@ export const GET = async (req: NextRequest) => {
           clientCallsIb: r.client_calls_ib,
           clientCallsOb: r.client_calls_ob,
           winSheetsCreated: r.win_sheets_created,
+          faxSent: r.fax_sent,
           notes: r.notes,
         })),
       });
@@ -80,6 +83,7 @@ export const GET = async (req: NextRequest) => {
         ssaCalls: 0,
         clientCallsIb: 0,
         clientCallsOb: 0,
+        faxSent: 0,
         notes: null,
       });
     }
@@ -91,6 +95,7 @@ export const GET = async (req: NextRequest) => {
       clientCallsIb: row.clientCallsIb,
       clientCallsOb: row.clientCallsOb,
       winSheetsCreated: row.winSheetsCreated,
+      faxSent: row.faxSent,
       notes: row.notes,
     });
   } catch (error) {
@@ -113,18 +118,19 @@ export const POST = async (req: NextRequest) => {
     if (body.entries && Array.isArray(body.entries)) {
       const results = [];
       for (const entry of body.entries) {
-        const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, notes } =
+        const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } =
           entry;
         if (!agent || !date) continue;
 
         await db.execute(sql`
-          INSERT INTO daily_metrics (id, agent_name, metric_date, ssa_calls, client_calls_ib, client_calls_ob, win_sheets_created, notes, created_at, updated_at)
-          VALUES (gen_random_uuid(), ${agent}, ${date}::date, ${ssaCalls ?? 0}, ${clientCallsIb ?? 0}, ${clientCallsOb ?? 0}, ${winSheetsCreated ?? 0}, ${notes || null}, NOW(), NOW())
+          INSERT INTO daily_metrics (id, agent_name, metric_date, ssa_calls, client_calls_ib, client_calls_ob, win_sheets_created, fax_sent, notes, created_at, updated_at)
+          VALUES (gen_random_uuid(), ${agent}, ${date}::date, ${ssaCalls ?? 0}, ${clientCallsIb ?? 0}, ${clientCallsOb ?? 0}, ${winSheetsCreated ?? 0}, ${faxSent ?? 0}, ${notes || null}, NOW(), NOW())
           ON CONFLICT (agent_name, metric_date) DO UPDATE SET
             ssa_calls = EXCLUDED.ssa_calls,
             client_calls_ib = EXCLUDED.client_calls_ib,
             client_calls_ob = EXCLUDED.client_calls_ob,
             win_sheets_created = EXCLUDED.win_sheets_created,
+            fax_sent = EXCLUDED.fax_sent,
             notes = EXCLUDED.notes,
             updated_at = NOW()
         `);
@@ -135,6 +141,7 @@ export const POST = async (req: NextRequest) => {
           clientCallsIb: clientCallsIb ?? 0,
           clientCallsOb: clientCallsOb ?? 0,
           winSheetsCreated: winSheetsCreated ?? 0,
+          faxSent: faxSent ?? 0,
         });
       }
       return NextResponse.json({
@@ -145,7 +152,7 @@ export const POST = async (req: NextRequest) => {
     }
 
     // Single mode
-    const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, notes } = body;
+    const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } = body;
 
     if (!agent) {
       return NextResponse.json({ error: "agent is required" }, { status: 400 });
@@ -154,13 +161,14 @@ export const POST = async (req: NextRequest) => {
     const metricDate = date || new Date().toISOString().split("T")[0];
 
     await db.execute(sql`
-      INSERT INTO daily_metrics (id, agent_name, metric_date, ssa_calls, client_calls_ib, client_calls_ob, win_sheets_created, notes, created_at, updated_at)
-      VALUES (gen_random_uuid(), ${agent}, ${metricDate}::date, ${ssaCalls ?? 0}, ${clientCallsIb ?? 0}, ${clientCallsOb ?? 0}, ${winSheetsCreated ?? 0}, ${notes || null}, NOW(), NOW())
+      INSERT INTO daily_metrics (id, agent_name, metric_date, ssa_calls, client_calls_ib, client_calls_ob, win_sheets_created, fax_sent, notes, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${agent}, ${metricDate}::date, ${ssaCalls ?? 0}, ${clientCallsIb ?? 0}, ${clientCallsOb ?? 0}, ${winSheetsCreated ?? 0}, ${faxSent ?? 0}, ${notes || null}, NOW(), NOW())
       ON CONFLICT (agent_name, metric_date) DO UPDATE SET
         ssa_calls = EXCLUDED.ssa_calls,
         client_calls_ib = EXCLUDED.client_calls_ib,
         client_calls_ob = EXCLUDED.client_calls_ob,
         win_sheets_created = EXCLUDED.win_sheets_created,
+        fax_sent = EXCLUDED.fax_sent,
         notes = EXCLUDED.notes,
         updated_at = NOW()
     `);
@@ -174,6 +182,7 @@ export const POST = async (req: NextRequest) => {
         clientCallsIb: clientCallsIb ?? 0,
         clientCallsOb: clientCallsOb ?? 0,
         winSheetsCreated: winSheetsCreated ?? 0,
+        faxSent: faxSent ?? 0,
       },
     });
   } catch (error) {
