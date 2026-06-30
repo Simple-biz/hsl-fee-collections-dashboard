@@ -126,6 +126,7 @@ export const useDashboard = (): DashboardData => {
           if (!cancelledRef.current) setError((err as Error).message);
         })
         .finally(() => {
+          // cancelledRef resets on re-mount (Strict Mode) before this fires; signal stays aborted
           if (!controller.signal.aborted && !cancelledRef.current) setLoading(false);
         }),
       casesTask
@@ -134,6 +135,7 @@ export const useDashboard = (): DashboardData => {
           if (!cancelledRef.current) setError((err as Error).message);
         })
         .finally(() => {
+          // same Strict Mode guard as summaryTask above
           if (!controller.signal.aborted && !cancelledRef.current) setCasesLoading(false);
         }),
     ]);
