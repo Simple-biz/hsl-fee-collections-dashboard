@@ -9,19 +9,11 @@ import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
 
 type AgingFilter = "all" | "unpaid_60" | "unpaid_90";
-type ApproverFilter = "all" | "georgia" | "lori" | "deanne";
 
 const AGING_OPTIONS: { value: AgingFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "unpaid_60", label: "Unpaid >60d" },
   { value: "unpaid_90", label: "Unpaid >90d" },
-];
-
-const APPROVER_OPTIONS: { value: ApproverFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "georgia", label: "Georgia" },
-  { value: "lori", label: "Lori" },
-  { value: "deanne", label: "DeAnne" },
 ];
 
 export default function MasterFeesPage() {
@@ -39,7 +31,7 @@ export default function MasterFeesPage() {
   const t = themeClasses(dark);
 
   const [agingFilter, setAgingFilter] = useState<AgingFilter>("all");
-  const [approverFilter, setApproverFilter] = useState<ApproverFilter>("all");
+  const [approverFilter, setApproverFilter] = useState("all");
 
   if (error) {
     return (
@@ -89,9 +81,6 @@ export default function MasterFeesPage() {
   const presetInactive = dark
     ? "border-neutral-700 text-neutral-400 hover:border-neutral-500"
     : "border-neutral-200 text-neutral-500 hover:border-neutral-400";
-  const approverActive = dark
-    ? "bg-emerald-800 border-emerald-600 text-white"
-    : "bg-emerald-50 border-emerald-400 text-emerald-800";
 
   return (
     <div className="space-y-3">
@@ -109,27 +98,7 @@ export default function MasterFeesPage() {
             {label}
           </button>
         ))}
-        {agingFilter !== "all" && approverFilter === "all" && (
-          <span className={`ml-auto text-[11px] ${t.textMuted}`}>
-            {displayCases.length} case{displayCases.length !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
-      <div className={`rounded-xl border ${t.card} px-4 py-2.5 flex items-center gap-2 flex-wrap`}>
-        <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>
-          Ready to Close:
-        </span>
-        {APPROVER_OPTIONS.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => setApproverFilter(value)}
-            aria-pressed={approverFilter === value}
-            className={`${presetBase} ${approverFilter === value ? (value === "all" ? presetInactive : approverActive) : presetInactive}`}
-          >
-            {label}
-          </button>
-        ))}
-        {approverFilter !== "all" && (
+        {agingFilter !== "all" && (
           <span className={`ml-auto text-[11px] ${t.textMuted}`}>
             {displayCases.length} case{displayCases.length !== 1 ? "s" : ""}
           </span>
@@ -141,6 +110,8 @@ export default function MasterFeesPage() {
         onImported={refresh}
         approvedByOptions={approvedByOptions}
         dropdownOptions={dropdownOptions}
+        approverFilter={approverFilter}
+        onApproverFilterChange={setApproverFilter}
       />
     </div>
   );

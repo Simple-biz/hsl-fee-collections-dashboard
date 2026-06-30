@@ -53,6 +53,23 @@ const FEES_CONF_COLORS: Record<string, { badge: string; badgeDark: string }> = {
 };
 const FEES_CONF_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
 
+const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
+  "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
+  "T2":   { badge: "bg-violet-50 text-violet-700 border-violet-300", badgeDark: "bg-violet-900/40 text-violet-300 border-violet-700" },
+  "CONC": { badge: "bg-amber-50 text-amber-700 border-amber-300",   badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"   },
+};
+const CLAIM_TYPE_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
+
+function ClaimTypeBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
+  if (!value) return <span className="text-neutral-400">—</span>;
+  const colors = CLAIM_TYPE_COLORS[value] ?? CLAIM_TYPE_FALLBACK;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+      {value}
+    </span>
+  );
+}
+
 function FeesConfBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
   if (!value) return <span className="text-neutral-400">—</span>;
   const colors = FEES_CONF_COLORS[value] ?? FEES_CONF_FALLBACK;
@@ -136,6 +153,10 @@ interface FeeRecordsTableProps {
   // Fees Confirmation, Case Status). Optional — an empty list just yields
   // an empty dropdown with the current value preserved as a fallback.
   dropdownOptions?: DropdownOptionsByCategory;
+  // Optional approver filter rendered in the toolbar before the Sync button.
+  // Only the master-fees page passes this; fees-closed omits it.
+  approverFilter?: string;
+  onApproverFilterChange?: (value: string) => void;
 }
 
 // Whether a field lives on the `fee_records` row or the `cases` row.
@@ -223,6 +244,8 @@ export const FeeRecordsTable = ({
   mode = "active",
   approvedByOptions = [],
   dropdownOptions = {},
+  approverFilter,
+  onApproverFilterChange,
 }: FeeRecordsTableProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
@@ -287,6 +310,7 @@ export const FeeRecordsTable = ({
   // instead of hard-freezing the main thread during that render.
   const [isPending, startTransition] = useTransition();
   const [feesConfEditId, setFeesConfEditId] = useState<number | null>(null);
+  const [claimEditId, setClaimEditId] = useState<number | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -868,6 +892,18 @@ export const FeeRecordsTable = ({
             <option value="T16">T16</option>
             <option value="CONC">CONC</option>
           </select>
+          {onApproverFilterChange && (
+            <select
+              value={approverFilter ?? "all"}
+              onChange={(e) => onApproverFilterChange(e.target.value)}
+              className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+            >
+              <option value="all">All Approvers</option>
+              <option value="georgia">Georgia</option>
+              <option value="lori">Lori</option>
+              <option value="deanne">DeAnne</option>
+            </select>
+          )}
           {isAdmin && (
             <>
               <button
@@ -1418,10 +1454,13 @@ export const FeeRecordsTable = ({
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
+                      {claimEditId === c.id ? (
+                        <select
+                          autoFocus
                           value={cellValue(c, "claim")}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
+                          onBlur={() => setClaimEditId(null)}
+                          onChange={(e) => {
                             handleVarcharChange(
                               c,
                               "case",
@@ -1429,8 +1468,9 @@ export const FeeRecordsTable = ({
                               "claim",
                               "Claim Type",
                               e.target.value,
-                            )
-                          }
+                            );
+                            setClaimEditId(null);
+                          }}
                           className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             claimTypeOptions.length === 0
@@ -1459,6 +1499,15 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setClaimEditId(c.id); }}
+                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                          aria-label={`Edit claim type: ${cellValue(c, "claim") || "not set"}`}
+                        >
+                          <ClaimTypeBadge value={cellValue(c, "claim")} dark={dark} />
+                        </button>
+                      )}
                     </td>
                     <td className={`${tdBase} ${t.textSub} tabular-nums`}>
                       {dateStr(c.date)}
