@@ -356,6 +356,60 @@ export const GET = async (req: NextRequest) => {
       pif:     Number(feesStatus?.pif_count)        || 0,
     };
 
+    // No Fees Cases — open cases with zero fees due/received (same predicate
+    // as openCasesFeesStatus.noFees above), aged over 60 days by approval_date.
+    // Returns the actual case rows (not just a count) so the Reports page can
+    // list them for reporting; over60/over90 counts are derived from this
+    // same list below so the card and the table can never disagree.
+    const noFeesCaseRows = await db.execute(sql`
+      SELECT
+        c.client_id AS id,
+        c.first_name AS first_name,
+        c.last_name AS last_name,
+        c.external_id AS external_id,
+        fr.assigned_to AS assigned,
+        c.claim_type_label AS claim_type_label,
+        c.approval_date AS approval_date,
+        (CURRENT_DATE - c.approval_date)::int AS days_since_approval
+      FROM fee_records fr
+      JOIN cases c ON c.client_id = fr.case_id
+      WHERE fr.is_closed = FALSE
+        AND fr.pif_ready_to_close IS NOT TRUE
+        AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
+        AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
+        AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
+        AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
+        AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
+        AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+        AND c.approval_date IS NOT NULL
+        AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
+      ORDER BY c.approval_date ASC
+    `) as unknown as {
+      id: number;
+      first_name: string | null;
+      last_name: string | null;
+      external_id: string | null;
+      assigned: string | null;
+      claim_type_label: string | null;
+      approval_date: string | null;
+      days_since_approval: number;
+    }[];
+
+    const noFeesCases = noFeesCaseRows.map((r) => ({
+      id: r.id,
+      name: `${r.last_name ?? ""}, ${r.first_name ?? ""}`,
+      externalId: r.external_id,
+      assigned: r.assigned || "—",
+      claim: r.claim_type_label === "T2_T16" ? "CONC" : r.claim_type_label || "—",
+      approvalDate: r.approval_date,
+      daysSinceApproval: Number(r.days_since_approval) || 0,
+    }));
+
+    const noFeesAging = {
+      over60: noFeesCases.length,
+      over90: noFeesCases.filter((c) => c.daysSinceApproval > 90).length,
+    };
+
     return NextResponse.json({
       week: monday,
       start: startDate,
@@ -365,6 +419,8 @@ export const GET = async (req: NextRequest) => {
       teams,
       daily,
       openCasesFeesStatus,
+      noFeesAging,
+      noFeesCases,
     });
   } catch (error) {
     console.error("GET /api/scoreboard error:", error);
