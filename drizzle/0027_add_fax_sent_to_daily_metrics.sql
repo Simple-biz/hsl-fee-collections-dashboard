@@ -1,0 +1,1 @@
+ALTER TABLE "daily_metrics" ADD COLUMN "fax_sent" integer DEFAULT 0 NOT NULL;

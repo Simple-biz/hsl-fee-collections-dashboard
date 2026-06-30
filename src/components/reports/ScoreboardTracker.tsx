@@ -50,6 +50,7 @@ interface AgentScore {
   casesFullFee: number;
   weekSsaCalls: number;
   weekClientCalls: number;
+  weekFaxSent: number;
 }
 
 interface DailyEntry {
@@ -59,6 +60,7 @@ interface DailyEntry {
   clientCallsIb: number;
   clientCallsOb: number;
   winSheetsCreated: number;
+  faxSent: number;
   notes: string | null;
 }
 
@@ -67,6 +69,7 @@ interface TrackerData {
   daily: DailyEntry[];
   summary: ScoreboardSummary | null;
   teams: ScoreboardTeam[];
+  openCasesFeesStatus: { noFees: number; partial: number; pif: number };
 }
 
 type CellKey = `${string}|${string}`;
@@ -75,6 +78,7 @@ interface CellValues {
   clientCallsIb: string;
   clientCallsOb: string;
   winSheetsCreated: string;
+  faxSent: string;
 }
 
 type MetricFocus = "all" | "aging" | "fees";
@@ -86,13 +90,16 @@ const FOCUS_OPTIONS: { value: MetricFocus; label: string }[] = [
 ];
 
 const COL_FOCUS: Record<string, MetricFocus[]> = {
-  cases:     ["aging", "fees"],
-  winsheets: ["fees"],
-  t2:        ["aging"],
-  t16:       ["aging"],
-  conc:      ["aging"],
-  collected: ["fees"],
-  fullfee:   ["fees"],
+  cases:       ["aging", "fees"],
+  ssacalls:    [],
+  clientcalls: [],
+  faxsent:     [],
+  winsheets:   ["fees"],
+  t2:          ["aging"],
+  t16:         ["aging"],
+  conc:        ["aging"],
+  collected:   ["fees"],
+  fullfee:     ["fees"],
 };
 
 type DateMode = "week" | "month" | "range" | "day";
@@ -143,7 +150,7 @@ const fmtRangeDate = (iso: string): string =>
   });
 
 const cellKey = (agent: string, date: string): CellKey => `${agent}|${date}`;
-const EMPTY_CELL: CellValues = { ssaCalls: "", clientCallsIb: "", clientCallsOb: "", winSheetsCreated: "" };
+const EMPTY_CELL: CellValues = { ssaCalls: "", clientCallsIb: "", clientCallsOb: "", winSheetsCreated: "", faxSent: "" };
 
 const hasOverdue = (a: AgentScore, t2d: 60 | 90, t16d: 60 | 90, concd: 60 | 90) =>
   (t2d === 60 ? a.unpaidT2Over60 : a.unpaidT2Over90) +
@@ -279,10 +286,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           unpaidT2Over90:   a.unpaidT2Over90   ?? 0,
           unpaidT16Over90:  a.unpaidT16Over90  ?? 0,
           unpaidConcOver90: a.unpaidConcOver90 ?? 0,
+          weekFaxSent:      a.weekFaxSent      ?? 0,
         })),
         daily: json.daily ?? [],
         summary: json.summary ?? null,
         teams: json.teams ?? [],
+        openCasesFeesStatus: json.openCasesFeesStatus ?? { noFees: 0, partial: 0, pif: 0 },
       });
       const map = new Map<CellKey, CellValues>();
       for (const d of (json.daily ?? []) as DailyEntry[]) {
@@ -291,6 +300,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           clientCallsIb:   d.clientCallsIb   > 0 ? String(d.clientCallsIb)   : "",
           clientCallsOb:   d.clientCallsOb   > 0 ? String(d.clientCallsOb)   : "",
           winSheetsCreated: d.winSheetsCreated > 0 ? String(d.winSheetsCreated) : "",
+          faxSent:         d.faxSent         > 0 ? String(d.faxSent)         : "",
         });
       }
       setCells(map);
@@ -332,6 +342,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
 
   const filteredTotals = useMemo(() => ({
     casesAssigned:      filteredAgents.reduce((s, a) => s + a.casesAssigned, 0),
+    weekSsaCalls:       filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
+    weekClientCalls:    filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
+    weekFaxSent:        filteredAgents.reduce((s, a) => s + a.weekFaxSent, 0),
     completedWinSheets: filteredAgents.reduce((s, a) => s + a.completedWinSheets, 0),
     unpaidT2Over60:     filteredAgents.reduce((s, a) => s + a.unpaidT2Over60, 0),
     unpaidT16Over60:    filteredAgents.reduce((s, a) => s + a.unpaidT16Over60, 0),
@@ -358,15 +371,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   };
 
   const agentCellTotals = (agent: string) => {
-    let ssa = 0, ib = 0, ob = 0, ws = 0;
+    let ssa = 0, ib = 0, ob = 0, ws = 0, fax = 0;
     for (const day of entryDays) {
       const c = getCell(agent, day.date);
       ssa += parseInt(c.ssaCalls) || 0;
       ib  += parseInt(c.clientCallsIb) || 0;
       ob  += parseInt(c.clientCallsOb) || 0;
       ws  += parseInt(c.winSheetsCreated) || 0;
+      fax += parseInt(c.faxSent) || 0;
     }
-    return { ssa, ib, ob, ws, total: ssa + ib + ob };
+    return { ssa, ib, ob, ws, fax, total: ssa + ib + ob };
   };
 
   const handleSave = async () => {
@@ -378,7 +392,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     try {
       const entries: {
         agent: string; date: string;
-        ssaCalls: number; clientCallsIb: number; clientCallsOb: number; winSheetsCreated: number;
+        ssaCalls: number; clientCallsIb: number; clientCallsOb: number; winSheetsCreated: number; faxSent: number;
       }[] = [];
       if (data) {
         for (const agent of data.agents) {
@@ -388,8 +402,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             const ib  = parseInt(c.clientCallsIb) || 0;
             const ob  = parseInt(c.clientCallsOb) || 0;
             const ws  = parseInt(c.winSheetsCreated) || 0;
-            if (ssa > 0 || ib > 0 || ob > 0 || ws > 0 || cells.has(cellKey(agent.agent, day.date))) {
-              entries.push({ agent: agent.agent, date: day.date, ssaCalls: ssa, clientCallsIb: ib, clientCallsOb: ob, winSheetsCreated: ws });
+            const fax = parseInt(c.faxSent) || 0;
+            if (ssa > 0 || ib > 0 || ob > 0 || ws > 0 || fax > 0 || cells.has(cellKey(agent.agent, day.date))) {
+              entries.push({ agent: agent.agent, date: day.date, ssaCalls: ssa, clientCallsIb: ib, clientCallsOb: ob, winSheetsCreated: ws, faxSent: fax });
             }
           }
         }
@@ -438,6 +453,27 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             t={t}
             showMiniCards={false}
           />
+        </div>
+      )}
+
+      {/* Open Cases — Fees Status */}
+      {data?.openCasesFeesStatus && (
+        <div className={`rounded-xl border ${t.card} overflow-hidden`}>
+          <div className={`px-4 py-2.5 text-center text-xs font-bold ${t.text} border-b ${t.borderLight}`}>
+            Open Cases (Fees Status)
+          </div>
+          <div className={`grid grid-cols-3 divide-x divide-dashed ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
+            {[
+              { label: "No Fees",           value: data.openCasesFeesStatus.noFees,  tone: dark ? "text-amber-400"   : "text-amber-600"   },
+              { label: "Partial / Pending",  value: data.openCasesFeesStatus.partial, tone: dark ? "text-blue-400"    : "text-blue-600"    },
+              { label: "Paid in Full",       value: data.openCasesFeesStatus.pif,     tone: dark ? "text-emerald-400" : "text-emerald-600" },
+            ].map(({ label, value, tone }) => (
+              <div key={label} className="py-3 text-center">
+                <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
+                <div className={`text-xl font-extrabold tabular-nums ${tone}`}>{value}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -674,8 +710,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <thead>
                   <tr className={`border-b ${t.borderLight}`}>
                     <th className={`${thBase} ${t.textSub} text-left`}>Agent</th>
-                    {showCol("cases")     && <th className={`${thBase} ${t.textSub} text-right`}>Cases</th>}
-                    {showCol("winsheets") && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
+                    {showCol("cases")       && <th className={`${thBase} ${t.textSub} text-right`}>Cases</th>}
+                    {showCol("ssacalls")    && <th className={`${thBase} ${t.textSub} text-right`}>SSA Calls</th>}
+                    {showCol("clientcalls") && <th className={`${thBase} ${t.textSub} text-right`}>Client Calls</th>}
+                    {showCol("faxsent")     && <th className={`${thBase} ${t.textSub} text-right`}>Fax Sent</th>}
+                    {showCol("winsheets")   && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
                     {showCol("t2") && (
                       <th className={`${thBase} text-right`}>
                         <button
@@ -729,8 +768,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   ) : filteredAgents.map((a) => (
                     <tr key={a.agent} className={`border-b ${rowBorder} ${rowHover} transition-colors`}>
                       <td className={`${tdBase} ${t.text} font-semibold`}>{a.agent}</td>
-                      {showCol("cases")     && <td className={`${tdBase} text-right ${t.text}`}>{a.casesAssigned}</td>}
-                      {showCol("winsheets") && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
+                      {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.casesAssigned}</td>}
+                      {showCol("ssacalls")    && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekSsaCalls}</td>}
+                      {showCol("clientcalls") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekClientCalls}</td>}
+                      {showCol("faxsent")     && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekFaxSent}</td>}
+                      {showCol("winsheets")   && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
                       {showCol("t2")  && <td className={`${tdBase} text-right ${(t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90)   > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90}</td>}
                       {showCol("t16") && <td className={`${tdBase} text-right ${(t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90)  > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90}</td>}
                       {showCol("conc") && <td className={`${tdBase} text-right ${(concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90) > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90}</td>}
@@ -746,8 +788,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <tfoot>
                   <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
                     <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
-                    {showCol("cases")     && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesAssigned}</td>}
-                    {showCol("winsheets") && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
+                    {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesAssigned}</td>}
+                    {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekSsaCalls}</td>}
+                    {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekClientCalls}</td>}
+                    {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
+                    {showCol("winsheets")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
                     {showCol("t2")   && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t2Days   === 60 ? filteredTotals.unpaidT2Over60   : filteredTotals.unpaidT2Over90}</td>}
                     {showCol("t16")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t16Days  === 60 ? filteredTotals.unpaidT16Over60  : filteredTotals.unpaidT16Over90}</td>}
                     {showCol("conc") && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{concDays === 60 ? filteredTotals.unpaidConcOver60 : filteredTotals.unpaidConcOver90}</td>}
@@ -824,7 +869,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <React.Fragment key={agent.agent}>
                       {/* SSA Calls */}
                       <tr className={rowBorder}>
-                        <td className={`${tdBase} ${t.text} font-semibold align-middle`} rowSpan={4}>
+                        <td className={`${tdBase} ${t.text} font-semibold align-middle`} rowSpan={5}>
                           <div className="flex items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-200 text-neutral-600"}`}>
                               {agent.agent[0]}
@@ -888,7 +933,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         )}
                       </tr>
                       {/* Win Sheets */}
-                      <tr className={`border-b ${rowBorder}`}>
+                      <tr className={rowBorder}>
                         <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-violet-400" : "text-violet-600"}`}>Win Sheets</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
@@ -902,6 +947,24 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         {entryDays.length > 1 && (
                           <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ws > 0 ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
                             {totals.ws || "—"}
+                          </td>
+                        )}
+                      </tr>
+                      {/* Fax Sent */}
+                      <tr className={`border-b ${rowBorder}`}>
+                        <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-rose-400" : "text-rose-600"}`}>Fax Sent</td>
+                        {entryDays.map((day) => (
+                          <td key={day.date} className="px-1 py-1 text-center">
+                            <input type="number" min="0" placeholder="0" className={miniInput}
+                              disabled={!editable}
+                              value={getCell(agent.agent, day.date).faxSent}
+                              onChange={(e) => setCell(agent.agent, day.date, "faxSent", e.target.value)}
+                            />
+                          </td>
+                        ))}
+                        {entryDays.length > 1 && (
+                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.fax > 0 ? (dark ? "text-rose-400" : "text-rose-600") : t.textMuted}`}>
+                            {totals.fax || "—"}
                           </td>
                         )}
                       </tr>
