@@ -31,6 +31,7 @@ export default function MasterFeesPage() {
   const t = themeClasses(dark);
 
   const [agingFilter, setAgingFilter] = useState<AgingFilter>("all");
+  const [approverFilter, setApproverFilter] = useState("all");
 
   if (error) {
     return (
@@ -56,16 +57,21 @@ export default function MasterFeesPage() {
     );
   }
 
-  const nonPetitionCases = cases.filter((c) => c.level !== "FEE_PETITION");
-
-  const displayCases =
+  const agingFiltered =
     agingFilter === "all"
-      ? nonPetitionCases
-      : nonPetitionCases.filter(
+      ? cases
+      : cases.filter(
           (c) =>
             c.paid === 0 &&
             c.daysAfterApproval != null &&
             c.daysAfterApproval > (agingFilter === "unpaid_60" ? 60 : 90),
+        );
+
+  const displayCases =
+    approverFilter === "all"
+      ? agingFiltered
+      : agingFiltered.filter((c) =>
+          c.approvedBy?.toLowerCase().includes(approverFilter),
         );
 
   const presetBase = `px-3 py-1 rounded-full text-[11px] font-medium border transition-colors`;
@@ -104,6 +110,8 @@ export default function MasterFeesPage() {
         onImported={refresh}
         approvedByOptions={approvedByOptions}
         dropdownOptions={dropdownOptions}
+        approverFilter={approverFilter}
+        onApproverFilterChange={setApproverFilter}
       />
     </div>
   );

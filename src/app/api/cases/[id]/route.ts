@@ -9,6 +9,14 @@ import { requireCapability, requireAdmin, guardStatus } from "@/lib/auth-helpers
 // reopen, mark overpaid, or sign off "OK to close").
 const FINALIZE_FEE_FIELDS = ["isClosed", "markedOverpaid", "approvedBy"] as const;
 
+// Fee fields that require the fees.edit capability — raw monetary amounts that
+// only designated users (e.g. Ms. Jazz) should be able to modify directly.
+const FEE_AMOUNT_FIELDS = [
+  "t16Retro", "t16FeeDue", "t16FeeReceived", "t16Pending", "t16FeeReceivedDate",
+  "t2Retro", "t2FeeDue", "t2FeeReceived", "t2Pending", "t2FeeReceivedDate",
+  "auxRetro", "auxFeeDue", "auxFeeReceived", "auxPending", "auxFeeReceivedDate",
+] as const;
+
 const resolveParams = async (context: {
   params: { id: string } | Promise<{ id: string }>;
 }) => {
@@ -351,6 +359,19 @@ export const PATCH = async (
       }
     }
 
+    const touchesFeeAmounts =
+      feeFields &&
+      FEE_AMOUNT_FIELDS.some((k) => k in feeFields);
+    if (touchesFeeAmounts) {
+      const feeEdit = await requireCapability("fees.edit");
+      if (!feeEdit.ok) {
+        return NextResponse.json(
+          { error: "You don't have permission to edit fee amounts." },
+          { status: guardStatus(feeEdit.error) },
+        );
+      }
+    }
+
     if (
       feeFields &&
       ("feesConfirmation" in feeFields || "feesClosedTrigger" in feeFields)
@@ -385,6 +406,7 @@ export const PATCH = async (
         t16Decision: "t16_decision",
         approvalDate: "approval_date",
         officeWithJurisdiction: "office_with_jurisdiction",
+        externalId: "external_id",
       };
 
       const updates = Object.entries(caseFields)

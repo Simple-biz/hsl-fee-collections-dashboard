@@ -24,6 +24,7 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
+import { CompletedPetitions } from "./CompletedPetitions";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
@@ -35,6 +36,7 @@ interface FeePetitionRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
+  feesReceived: number | null;
   noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
@@ -55,7 +57,6 @@ type CheckboxKey =
   | "faxConfFeePet";
 type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress";
 type SortDir = "asc" | "desc";
-type StatusFilter = "all" | "complete" | "incomplete";
 type TouchedFilter = "" | "none";
 type MissingFilter = "" | CheckboxKey;
 type AgingFilter = "" | "unpaid_60" | "unpaid_90";
@@ -78,10 +79,8 @@ const formatRelativeDate = (dateStr: string): string => {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
-const STATUS_VALUES: StatusFilter[] = ["all", "complete", "incomplete"];
 const DEFAULTS = {
   search: "",
-  status: "all" as StatusFilter,
   touched: "" as TouchedFilter,
   missing: "" as MissingFilter,
   aging: "" as AgingFilter,
@@ -153,9 +152,6 @@ export const FeePetitions = () => {
   const urlParams = useSearchParams();
   const initialState = useRef({
     search: urlParams.get("q") ?? DEFAULTS.search,
-    status: (STATUS_VALUES.includes(urlParams.get("status") as StatusFilter)
-      ? (urlParams.get("status") as StatusFilter)
-      : DEFAULTS.status) as StatusFilter,
     touched: (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter,
     missing: (CHECKBOX_KEYS.includes(urlParams.get("missing") as CheckboxKey) ? urlParams.get("missing") : "") as MissingFilter,
     aging: (["unpaid_60", "unpaid_90"].includes(urlParams.get("aging") ?? "") ? urlParams.get("aging") : "") as AgingFilter,
@@ -182,7 +178,6 @@ export const FeePetitions = () => {
   const [pageSize, setPageSize] = useState(initialState.pageSize);
   const [total, setTotal] = useState(0);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialState.status);
   const [touchedFilter, setTouchedFilter] = useState<TouchedFilter>(initialState.touched);
   const [missingFilter, setMissingFilter] = useState<MissingFilter>(initialState.missing);
   const [agingFilter, setAgingFilter] = useState<AgingFilter>(initialState.aging);
@@ -212,7 +207,6 @@ export const FeePetitions = () => {
   useEffect(() => {
     const params = new URLSearchParams();
     if (appliedSearch) params.set("q", appliedSearch);
-    if (statusFilter !== DEFAULTS.status) params.set("status", statusFilter);
     if (touchedFilter) params.set("touched", touchedFilter);
     if (missingFilter) params.set("missing", missingFilter);
     if (agingFilter) params.set("aging", agingFilter);
@@ -230,15 +224,11 @@ export const FeePetitions = () => {
       { scroll: false },
     );
     urlMethodRef.current = "replace";
-  }, [appliedSearch, statusFilter, touchedFilter, missingFilter, agingFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
+  }, [appliedSearch, touchedFilter, missingFilter, agingFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
 
   // Sync URL → state (back/forward)
   useEffect(() => {
     const urlSearch = urlParams.get("q") ?? DEFAULTS.search;
-    const urlStatusRaw = urlParams.get("status") as StatusFilter | null;
-    const urlStatus = STATUS_VALUES.includes(urlStatusRaw as StatusFilter)
-      ? (urlStatusRaw as StatusFilter)
-      : DEFAULTS.status;
     const urlTouched = (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter;
     const urlMissingRaw = urlParams.get("missing");
     const urlMissing = (CHECKBOX_KEYS.includes(urlMissingRaw as CheckboxKey) ? urlMissingRaw : "") as MissingFilter;
@@ -254,7 +244,6 @@ export const FeePetitions = () => {
     const urlSize = PAGE_SIZE_OPTIONS.includes(sizeNum) ? sizeNum : DEFAULTS.pageSize;
 
     if (urlSearch !== appliedSearch) { setSearch(urlSearch); setAppliedSearch(urlSearch); }
-    if (urlStatus !== statusFilter) setStatusFilter(urlStatus);
     if (urlTouched !== touchedFilter) setTouchedFilter(urlTouched);
     if (urlMissing !== missingFilter) setMissingFilter(urlMissing);
     if (urlAging !== agingFilter) setAgingFilter(urlAging);
@@ -310,8 +299,8 @@ export const FeePetitions = () => {
         page: String(page),
         limit: String(pageSize),
       });
+      params.set("status", "incomplete");
       if (appliedSearch) params.set("search", appliedSearch);
-      if (statusFilter !== "all") params.set("status", statusFilter);
       if (touchedFilter) params.set("touched", touchedFilter);
       if (missingFilter) params.set("missing", missingFilter);
       if (agingFilter) params.set("aging", agingFilter);
@@ -340,7 +329,7 @@ export const FeePetitions = () => {
     } finally {
       if (fetchAbortRef.current === controller) setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, statusFilter, touchedFilter, missingFilter, agingFilter, sortKey, sortDir]);
+  }, [page, pageSize, appliedSearch, touchedFilter, missingFilter, agingFilter, sortKey, sortDir]);
 
   useEffect(() => {
     fetchPetitions();
@@ -358,7 +347,6 @@ export const FeePetitions = () => {
 
   const hasFilters =
     appliedSearch !== DEFAULTS.search ||
-    statusFilter !== DEFAULTS.status ||
     touchedFilter !== DEFAULTS.touched ||
     missingFilter !== DEFAULTS.missing ||
     agingFilter !== DEFAULTS.aging;
@@ -367,7 +355,6 @@ export const FeePetitions = () => {
     urlMethodRef.current = "push";
     setSearch(DEFAULTS.search);
     setAppliedSearch(DEFAULTS.search);
-    setStatusFilter(DEFAULTS.status);
     setTouchedFilter(DEFAULTS.touched);
     setMissingFilter(DEFAULTS.missing);
     setAgingFilter(DEFAULTS.aging);
@@ -432,15 +419,8 @@ export const FeePetitions = () => {
             : r,
         ),
       );
-      setStats((s) => ({
-        ...s,
-        completeCount: s.completeCount + notYetComplete,
-        incompleteCount: Math.max(0, s.incompleteCount - notYetComplete),
-      }));
-      if (statusFilter === "incomplete") {
-        setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-        setTotal((tot) => Math.max(0, tot - ids.length));
-      }
+      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+      setTotal((tot) => Math.max(0, tot - ids.length));
       clearSelection();
       if (snapshot.length > 0) {
         setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
@@ -460,22 +440,7 @@ export const FeePetitions = () => {
       const result = await bulkRestoreChecklists({ rows: snapshot });
       if (!result.ok) throw new Error(result.error);
       setUndoInfo(null);
-      if (statusFilter === "incomplete") {
-        fetchPetitions();
-      } else {
-        const byId = new Map(snapshot.map((r) => [r.caseId, r.fields]));
-        setRows((prev) =>
-          prev.map((r) => {
-            const f = byId.get(r.id);
-            return f ? { ...r, ...f } : r;
-          }),
-        );
-        setStats((s) => ({
-          ...s,
-          completeCount: Math.max(0, s.completeCount - snapshot.length),
-          incompleteCount: s.incompleteCount + snapshot.length,
-        }));
-      }
+      fetchPetitions();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -584,7 +549,6 @@ export const FeePetitions = () => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
     const next = !prevRow[key];
-    const wasComplete = CHECKBOX_COLUMNS.every((c) => prevRow[c.key]);
     const isComplete = CHECKBOX_COLUMNS.every((c) =>
       c.key === key ? next : prevRow[c.key],
     );
@@ -595,34 +559,9 @@ export const FeePetitions = () => {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
       const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
       setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
-      if (statusFilter === "all") {
-        // Row stays visible — keep the Complete/Incomplete stat cards in sync.
-        if (wasComplete !== isComplete) {
-          setStats((s) => ({
-            ...s,
-            completeCount: Math.max(0, s.completeCount + (isComplete ? 1 : -1)),
-            incompleteCount: Math.max(0, s.incompleteCount + (isComplete ? -1 : 1)),
-          }));
-        }
-      } else {
-        const stillMatches = statusFilter === "complete" ? isComplete : !isComplete;
-        if (!stillMatches) {
-          // Row no longer matches the active filter — drop it and keep the
-          // filtered stat count aligned with the new total.
-          setRows((prev) => prev.filter((r) => r.id !== id));
-          setTotal((tot) => Math.max(0, tot - 1));
-          setStats((s) => ({
-            ...s,
-            completeCount:
-              statusFilter === "complete"
-                ? Math.max(0, s.completeCount - 1)
-                : s.completeCount,
-            incompleteCount:
-              statusFilter === "incomplete"
-                ? Math.max(0, s.incompleteCount - 1)
-                : s.incompleteCount,
-          }));
-        }
+      if (isComplete) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setTotal((tot) => Math.max(0, tot - 1));
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
@@ -665,8 +604,8 @@ export const FeePetitions = () => {
         all = rows.filter((r) => selectedIds.has(r.id));
       } else {
         const params = new URLSearchParams({ page: "1", limit: "10000" });
+        params.set("status", "incomplete");
         if (appliedSearch) params.set("search", appliedSearch);
-        if (statusFilter !== "all") params.set("status", statusFilter);
         if (touchedFilter) params.set("touched", touchedFilter);
         if (missingFilter) params.set("missing", missingFilter);
         if (agingFilter) params.set("aging", agingFilter);
@@ -742,7 +681,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 7;
+  const colSpan = CHECKBOX_COLUMNS.length + 8;
 
   return (
     <div className="space-y-4">
@@ -777,26 +716,14 @@ export const FeePetitions = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {[
-          { label: "Total Cases", value: isInitialLoad ? "—" : String(total), sub: "at fee petition stage" },
-          {
-            label: "Complete",
-            value: isInitialLoad ? "—" : `${stats.completeCount} / ${total}`,
-            sub: "all steps done",
-            color: dark ? "text-emerald-400" : "text-emerald-600",
-          },
-          {
-            label: "Incomplete",
-            value: isInitialLoad ? "—" : `${stats.incompleteCount} / ${total}`,
-            sub: "pending steps",
-            color: dark ? "text-amber-400" : "text-amber-600",
-          },
+          { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
           { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
-            <p className={`text-xl font-bold mt-1 ${"color" in s ? s.color : t.text}`}>{s.value}</p>
+            <p className={`text-xl font-bold mt-1 ${t.text}`}>{s.value}</p>
             <p className={`text-[10px] ${t.textMuted} mt-0.5`}>{s.sub}</p>
           </div>
         ))}
@@ -961,16 +888,6 @@ export const FeePetitions = () => {
               />
             </div>
             <select
-              value={statusFilter}
-              onChange={(e) => { urlMethodRef.current = "push"; setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
-              aria-label="Filter by completion status"
-              className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
-            >
-              <option value="all">All</option>
-              <option value="complete">Complete</option>
-              <option value="incomplete">Incomplete</option>
-            </select>
-            <select
               value={missingFilter}
               onChange={(e) => { urlMethodRef.current = "push"; setMissingFilter(e.target.value as MissingFilter); setPage(1); }}
               aria-label="Filter by missing step"
@@ -1019,18 +936,6 @@ export const FeePetitions = () => {
         <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
           <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
           <button
-            onClick={() => { urlMethodRef.current = "push"; setStatusFilter((v) => (v === "incomplete" ? "all" : "incomplete")); setPage(1); }}
-            className={`${presetBase} ${statusFilter === "incomplete" ? presetActive : t.outlineBtn}`}
-          >
-            Incomplete
-          </button>
-          <button
-            onClick={() => { urlMethodRef.current = "push"; setStatusFilter((v) => (v === "complete" ? "all" : "complete")); setPage(1); }}
-            className={`${presetBase} ${statusFilter === "complete" ? presetActive : t.outlineBtn}`}
-          >
-            Complete
-          </button>
-          <button
             onClick={() => { urlMethodRef.current = "push"; setTouchedFilter((v) => (v === "none" ? "" : "none")); setPage(1); }}
             className={`${presetBase} ${touchedFilter === "none" ? presetActive : t.outlineBtn}`}
           >
@@ -1059,14 +964,6 @@ export const FeePetitions = () => {
               <span className={chipBase}>
                 Search: {appliedSearch}
                 <button aria-label="Clear search filter" onClick={() => { setSearch(""); setAppliedSearch(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
-                  <X aria-hidden="true" className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-            {statusFilter !== "all" && (
-              <span className={chipBase}>
-                Status: {statusFilter === "complete" ? "Complete" : "Incomplete"}
-                <button aria-label="Clear status filter" onClick={() => { urlMethodRef.current = "push"; setStatusFilter("all"); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
@@ -1129,7 +1026,10 @@ export const FeePetitions = () => {
                   </button>
                 </th>
                 <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[200px] top-0 z-30 ${stickyHeaderBg}`}>
-                  Fee Amount
+                  Fee Requested
+                </th>
+                <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
+                  Fees Received
                 </th>
                 <th
                   aria-sort={ariaSortFor("approvalDate")}
@@ -1248,6 +1148,9 @@ export const FeePetitions = () => {
                       <td className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}>
                         {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                       </td>
+                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
+                        {row.feesReceived != null && row.feesReceived > 0 ? fmt(row.feesReceived) : "—"}
+                      </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
                         <div className="flex items-center gap-1.5">
                           <span>{fmtDate(row.approvalDate)}</span>
@@ -1354,6 +1257,8 @@ export const FeePetitions = () => {
           </div>
         </div>
       </div>
+
+      <CompletedPetitions dark={dark} canFinalize={canFinalize} />
     </div>
   );
 };
