@@ -234,6 +234,7 @@ export default function CaseDetailSheet({
     claimTypeLabel: "",
     ssnLast4: "",
     chronicleId: "",
+    externalId: "",
     t16Retro: "",
     t16FeeDue: "",
     t16FeeReceived: "",
@@ -338,6 +339,7 @@ export default function CaseDetailSheet({
         claimTypeLabel: data.claim ?? "",
         ssnLast4: myCaseData?.ssnLast4 ?? "",
         chronicleId: data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "",
+        externalId: data.externalId ?? "",
         t16Retro: data.t16Retro > 0 ? String(data.t16Retro) : "",
         t16FeeDue: data.t16FeeDue > 0 ? String(data.t16FeeDue) : "",
         t16FeeReceived: data.t16FeeReceived > 0 ? String(data.t16FeeReceived) : "",
@@ -378,6 +380,8 @@ export default function CaseDetailSheet({
       caseFields.levelWon = editValues.levelWon || null;
     if (editValues.claimTypeLabel !== (data.claim ?? ""))
       caseFields.claimTypeLabel = editValues.claimTypeLabel || null;
+    if (editValues.externalId !== (data.externalId ?? ""))
+      caseFields.externalId = editValues.externalId || null;
 
     const origSsn = myCaseData?.ssnLast4 ?? "";
     if (editValues.ssnLast4 !== origSsn)
@@ -614,7 +618,7 @@ export default function CaseDetailSheet({
                     <p className={`${val} text-indigo-500`}>#{data.id}</p>
                   </div>
                   <a
-                    href={`https://rgdr.mycase.com/court_cases/${data.id}`}
+                    href={data.externalId || `https://rgdr.mycase.com/court_cases/${data.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
@@ -669,6 +673,29 @@ export default function CaseDetailSheet({
                     {data.daysAfterApproval != null ? `${data.daysAfterApproval} days` : "—"}
                   </p>
                 </div>
+              </div>
+              <div className="mt-3">
+                <p className={lbl}>MyCase Link</p>
+                {isEditing ? (
+                  <input
+                    type="url"
+                    value={editValues.externalId}
+                    onChange={(e) => setEditValues((v) => ({ ...v, externalId: e.target.value }))}
+                    placeholder="https://..."
+                    className={inp}
+                  />
+                ) : data.externalId ? (
+                  <a
+                    href={data.externalId}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${val} flex items-center gap-1 hover:underline text-indigo-500 truncate`}
+                  >
+                    {data.externalId} <ExternalLink aria-hidden="true" className="h-3 w-3 shrink-0" />
+                  </a>
+                ) : (
+                  <p className={val}>—</p>
+                )}
               </div>
             </div>
 
