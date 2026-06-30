@@ -37,6 +37,11 @@ export const CAPABILITIES = [
     label: "Edit client PII",
     description: "Edit sensitive client details (SSN and identity fields).",
   },
+  {
+    key: "fees.edit",
+    label: "Edit fee amounts",
+    description: "Edit fee due amounts and manage fee payment records.",
+  },
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];

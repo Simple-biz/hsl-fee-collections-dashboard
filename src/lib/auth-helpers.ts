@@ -48,11 +48,14 @@ export async function requireCapability(
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Unauthenticated" };
 
+  const role = session.user.role;
   const rawCaps = session.user.capabilities;
-  const caps =
-    rawCaps && rawCaps.length > 0
+  const isAdmin = role === "admin" || role === "system_admin";
+  const caps = isAdmin
+    ? roleCapabilityDefaults(role)
+    : rawCaps && rawCaps.length > 0
       ? rawCaps
-      : roleCapabilityDefaults(session.user.role);
+      : roleCapabilityDefaults(role);
   if (!hasCapability(caps, capability)) {
     return { ok: false, error: "Forbidden" };
   }
