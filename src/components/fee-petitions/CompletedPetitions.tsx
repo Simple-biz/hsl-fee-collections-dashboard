@@ -405,7 +405,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                   <p className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
                     Completed
                     {isRefreshing && (
-                      <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                      <Loader2 aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                     )}
                   </p>
                   <p className={`text-[11px] ${t.textMuted} mt-0.5`}>

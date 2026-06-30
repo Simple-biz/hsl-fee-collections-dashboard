@@ -1148,7 +1148,7 @@ export const FeePetitions = () => {
                       <td className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}>
                         {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                       </td>
-                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? "text-emerald-500" : t.textMuted}`}>
+                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
                         {row.feesReceived != null && row.feesReceived > 0 ? fmt(row.feesReceived) : "—"}
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
