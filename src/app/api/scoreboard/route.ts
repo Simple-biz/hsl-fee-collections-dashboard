@@ -176,7 +176,40 @@ export const GET = async (req: NextRequest) => {
         COALESCE((SELECT SUM(dm.fax_sent) FROM daily_metrics dm
          WHERE dm.agent_name = tm.name
          AND dm.metric_date >= ${startDate}::date
-         AND dm.metric_date < ${endExclusive}::date), 0) AS week_fax_sent
+         AND dm.metric_date < ${endExclusive}::date), 0) AS week_fax_sent,
+
+        -- Open cases fees status per agent (current snapshot)
+        (SELECT COUNT(*) FROM fee_records fr
+         WHERE fr.assigned_to = tm.name
+         AND fr.is_closed = FALSE
+         AND fr.pif_ready_to_close IS NOT TRUE
+         AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
+         AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
+         AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
+         AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
+         AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
+         AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+        )::int AS open_no_fees,
+
+        (SELECT COUNT(*) FROM fee_records fr
+         WHERE fr.assigned_to = tm.name
+         AND fr.is_closed = FALSE
+         AND fr.pif_ready_to_close IS NOT TRUE
+         AND NOT (
+           COALESCE(fr.t16_fee_due, 0)::numeric = 0
+           AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
+           AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
+           AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
+           AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
+           AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+         )
+        )::int AS open_partial,
+
+        (SELECT COUNT(*) FROM fee_records fr
+         WHERE fr.assigned_to = tm.name
+         AND fr.is_closed = FALSE
+         AND fr.pif_ready_to_close = TRUE
+        )::int AS open_pif
 
       FROM team_members tm
       WHERE tm.is_active = TRUE
@@ -221,6 +254,9 @@ export const GET = async (req: NextRequest) => {
         weekSsaCalls: Number(r.week_ssa_calls),
         weekClientCalls: Number(r.week_client_calls),
         weekFaxSent: Number(r.week_fax_sent),
+        openNoFees: Number(r.open_no_fees),
+        openPartial: Number(r.open_partial),
+        openPif: Number(r.open_pif),
       }),
     );
 

@@ -51,6 +51,9 @@ interface AgentScore {
   weekSsaCalls: number;
   weekClientCalls: number;
   weekFaxSent: number;
+  openNoFees: number;
+  openPartial: number;
+  openPif: number;
 }
 
 interface DailyEntry {
@@ -90,7 +93,8 @@ const FOCUS_OPTIONS: { value: MetricFocus; label: string }[] = [
 ];
 
 const COL_FOCUS: Record<string, MetricFocus[]> = {
-  cases:       ["aging", "fees"],
+  cases:        ["aging", "fees"],
+  closedcases:  ["aging", "fees"],
   ssacalls:    [],
   clientcalls: [],
   faxsent:     [],
@@ -100,6 +104,9 @@ const COL_FOCUS: Record<string, MetricFocus[]> = {
   conc:        ["aging"],
   collected:   ["fees"],
   fullfee:     ["fees"],
+  opennofees:  ["fees"],
+  openpartial: ["fees"],
+  openpif:     ["fees"],
 };
 
 type DateMode = "week" | "month" | "range" | "day";
@@ -287,6 +294,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           unpaidT16Over90:  a.unpaidT16Over90  ?? 0,
           unpaidConcOver90: a.unpaidConcOver90 ?? 0,
           weekFaxSent:      a.weekFaxSent      ?? 0,
+          openNoFees:       a.openNoFees       ?? 0,
+          openPartial:      a.openPartial      ?? 0,
+          openPif:          a.openPif          ?? 0,
         })),
         daily: json.daily ?? [],
         summary: json.summary ?? null,
@@ -342,6 +352,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
 
   const filteredTotals = useMemo(() => ({
     casesAssigned:      filteredAgents.reduce((s, a) => s + a.casesAssigned, 0),
+    openCases:          filteredAgents.reduce((s, a) => s + a.openCases, 0),
+    casesClosed:        filteredAgents.reduce((s, a) => s + a.casesClosed, 0),
     weekSsaCalls:       filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
     weekClientCalls:    filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
     weekFaxSent:        filteredAgents.reduce((s, a) => s + a.weekFaxSent, 0),
@@ -354,6 +366,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     unpaidConcOver90:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver90, 0),
     totalCollected:     filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
     casesFullFee:       filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
+    openNoFees:         filteredAgents.reduce((s, a) => s + a.openNoFees, 0),
+    openPartial:        filteredAgents.reduce((s, a) => s + a.openPartial, 0),
+    openPif:            filteredAgents.reduce((s, a) => s + a.openPif, 0),
   }), [filteredAgents]);
 
   const getCell = (agent: string, date: string): CellValues =>
@@ -710,11 +725,15 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <thead>
                   <tr className={`border-b ${t.borderLight}`}>
                     <th className={`${thBase} ${t.textSub} text-left`}>Agent</th>
-                    {showCol("cases")       && <th className={`${thBase} ${t.textSub} text-right`}>Cases</th>}
+                    {showCol("cases")       && <th className={`${thBase} ${t.textSub} text-right`}>Open</th>}
+                    {showCol("closedcases") && <th className={`${thBase} ${t.textSub} text-right`}>Closed</th>}
                     {showCol("ssacalls")    && <th className={`${thBase} ${t.textSub} text-right`}>SSA Calls</th>}
                     {showCol("clientcalls") && <th className={`${thBase} ${t.textSub} text-right`}>Client Calls</th>}
                     {showCol("faxsent")     && <th className={`${thBase} ${t.textSub} text-right`}>Fax Sent</th>}
                     {showCol("winsheets")   && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
+                    {showCol("opennofees")  && <th className={`${thBase} text-right ${dark ? "text-amber-400" : "text-amber-600"}`}>No Fees</th>}
+                    {showCol("openpartial") && <th className={`${thBase} text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>Partial</th>}
+                    {showCol("openpif")     && <th className={`${thBase} text-right ${dark ? "text-emerald-400" : "text-emerald-600"}`}>PIF</th>}
                     {showCol("t2") && (
                       <th className={`${thBase} text-right`}>
                         <button
@@ -768,11 +787,15 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   ) : filteredAgents.map((a) => (
                     <tr key={a.agent} className={`border-b ${rowBorder} ${rowHover} transition-colors`}>
                       <td className={`${tdBase} ${t.text} font-semibold`}>{a.agent}</td>
-                      {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.casesAssigned}</td>}
+                      {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}
+                      {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
                       {showCol("ssacalls")    && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekSsaCalls}</td>}
                       {showCol("clientcalls") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekClientCalls}</td>}
                       {showCol("faxsent")     && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekFaxSent}</td>}
                       {showCol("winsheets")   && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
+                      {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
+                      {showCol("openpartial") && <td className={`${tdBase} text-right ${a.openPartial > 0 ? (dark ? "text-blue-400"    : "text-blue-600")    : t.textMuted}`}>{a.openPartial}</td>}
+                      {showCol("openpif")     && <td className={`${tdBase} text-right ${a.openPif     > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>{a.openPif}</td>}
                       {showCol("t2")  && <td className={`${tdBase} text-right ${(t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90)   > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90}</td>}
                       {showCol("t16") && <td className={`${tdBase} text-right ${(t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90)  > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90}</td>}
                       {showCol("conc") && <td className={`${tdBase} text-right ${(concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90) > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90}</td>}
@@ -788,11 +811,15 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <tfoot>
                   <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
                     <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
-                    {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesAssigned}</td>}
+                    {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.openCases}</td>}
+                    {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
                     {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekSsaCalls}</td>}
                     {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
                     {showCol("winsheets")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
+                    {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
+                    {showCol("openpartial") && <td className={`${tdBase} text-right font-bold ${dark ? "text-blue-400"    : "text-blue-600"}`}>{filteredTotals.openPartial}</td>}
+                    {showCol("openpif")     && <td className={`${tdBase} text-right font-bold ${dark ? "text-emerald-400" : "text-emerald-600"}`}>{filteredTotals.openPif}</td>}
                     {showCol("t2")   && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t2Days   === 60 ? filteredTotals.unpaidT2Over60   : filteredTotals.unpaidT2Over90}</td>}
                     {showCol("t16")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t16Days  === 60 ? filteredTotals.unpaidT16Over60  : filteredTotals.unpaidT16Over90}</td>}
                     {showCol("conc") && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{concDays === 60 ? filteredTotals.unpaidConcOver60 : filteredTotals.unpaidConcOver90}</td>}
