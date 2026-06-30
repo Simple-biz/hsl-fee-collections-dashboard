@@ -168,7 +168,13 @@ export const FeePetitions = () => {
   const [rows, setRows] = useState<FeePetitionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({ completeCount: 0, incompleteCount: 0, neverTouchedCount: 0 });
+  const [stats, setStats] = useState({
+    completeCount: 0,
+    incompleteCount: 0,
+    neverTouchedCount: 0,
+    totalFeeRequested: 0,
+    totalFeesReceived: 0,
+  });
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -321,6 +327,8 @@ export const FeePetitions = () => {
         completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
         incompleteCount: typeof json.incompleteCount === "number" ? json.incompleteCount : 0,
         neverTouchedCount: typeof json.neverTouchedCount === "number" ? json.neverTouchedCount : 0,
+        totalFeeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
+        totalFeesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
       });
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
@@ -716,10 +724,12 @@ export const FeePetitions = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
           { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
+          { label: "Fees Requested", value: isInitialLoad ? "—" : fmt(stats.totalFeeRequested), sub: "across pending petitions" },
+          { label: "Fees Received", value: isInitialLoad ? "—" : fmt(stats.totalFeesReceived), sub: "across pending petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
