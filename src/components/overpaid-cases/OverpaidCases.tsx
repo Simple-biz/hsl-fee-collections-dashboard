@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Download,
   Upload,
+  Plus,
   X,
   Undo2,
 } from "lucide-react";
@@ -24,7 +25,10 @@ import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull } from "@/lib/formatters";
 import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkImportOverpaidCases } from "@/app/(dashboard)/overpaid-cases/actions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
+import AddCaseModal from "@/components/modals/AddCaseModal";
 import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
+import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
+import type { ApprovedByOption } from "@/types";
 
 // ---------- types ----------
 interface OverpaidCaseRow {
@@ -687,6 +691,48 @@ export const OverpaidCases = () => {
 
   const [exporting, setExporting] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [addCaseOpen, setAddCaseOpen] = useState(false);
+  const [dropdownOptions, setDropdownOptions] = useState<DropdownOptionsByCategory>({});
+
+  // Lazy-loaded the first time the Add Case modal opens — this page doesn't
+  // otherwise need the full dropdown-options set, so there's no reason to
+  // fetch it on every page load.
+  const openAddCase = async () => {
+    if (Object.keys(dropdownOptions).length === 0) {
+      try {
+        const res = await fetch("/api/settings/dropdown-options");
+        if (res.ok) {
+          const json = await res.json();
+          const all: (ApprovedByOption & { category: string })[] = json.data || [];
+          const grouped: DropdownOptionsByCategory = {};
+          for (const o of all) {
+            (grouped[o.category as keyof DropdownOptionsByCategory] ||= []).push(o);
+          }
+          setDropdownOptions(grouped);
+        }
+      } catch {
+        /* non-critical — modal falls back to empty dropdowns */
+      }
+    }
+    setAddCaseOpen(true);
+  };
+
+  // A manually-added case has no fee_records row marked overpaid yet (it
+  // isn't part of a Sheets/MyCase sync, just created bare via AddCaseModal),
+  // so flip that flag right after creation — this is what actually makes it
+  // show up in this page's own list.
+  const markNewCaseOverpaid = async (clientId: number) => {
+    const res = await fetch("/api/cases/bulk-overpaid", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseIds: [clientId], markedOverpaid: true }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error || `Failed to mark case overpaid (${res.status})`);
+    }
+    await fetchCases();
+  };
 
   const downloadCsv = async () => {
     setExporting(true);
@@ -785,6 +831,14 @@ export const OverpaidCases = () => {
           onImport={bulkImportOverpaidCases}
           onClose={() => setCsvImportOpen(false)}
           onSuccess={fetchCases}
+        />
+      )}
+      {addCaseOpen && (
+        <AddCaseModal
+          dark={dark}
+          dropdownOptions={dropdownOptions}
+          onClose={() => setAddCaseOpen(false)}
+          onCreated={markNewCaseOverpaid}
         />
       )}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
@@ -1036,6 +1090,15 @@ export const OverpaidCases = () => {
             >
               <Upload aria-hidden="true" className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Import</span>
+            </button>
+            <button
+              onClick={openAddCase}
+              className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
+              aria-label="Manually add an overpaid case"
+              title="For cases handled here that never came through Master Fees"
+            >
+              <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Add Case</span>
             </button>
           </div>
         </div>
