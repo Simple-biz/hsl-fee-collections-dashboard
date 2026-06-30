@@ -126,7 +126,7 @@ export const useDashboard = (): DashboardData => {
           if (!cancelledRef.current) setError((err as Error).message);
         })
         .finally(() => {
-          if (!cancelledRef.current) setLoading(false);
+          if (!controller.signal.aborted && !cancelledRef.current) setLoading(false);
         }),
       casesTask
         .catch((err: unknown) => {
@@ -134,7 +134,7 @@ export const useDashboard = (): DashboardData => {
           if (!cancelledRef.current) setError((err as Error).message);
         })
         .finally(() => {
-          if (!cancelledRef.current) setCasesLoading(false);
+          if (!controller.signal.aborted && !cancelledRef.current) setCasesLoading(false);
         }),
     ]);
   }, []);
