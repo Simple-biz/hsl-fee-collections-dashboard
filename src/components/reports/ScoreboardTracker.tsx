@@ -462,13 +462,13 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           <div className={`px-4 py-2.5 text-center text-xs font-bold ${t.text} border-b ${t.borderLight}`}>
             Open Cases (Fees Status)
           </div>
-          <div className="grid grid-cols-3 divide-x divide-dashed">
+          <div className={`grid grid-cols-3 divide-x divide-dashed ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
             {[
               { label: "No Fees",           value: data.openCasesFeesStatus.noFees,  tone: dark ? "text-amber-400"   : "text-amber-600"   },
               { label: "Partial / Pending",  value: data.openCasesFeesStatus.partial, tone: dark ? "text-blue-400"    : "text-blue-600"    },
               { label: "Paid in Full",       value: data.openCasesFeesStatus.pif,     tone: dark ? "text-emerald-400" : "text-emerald-600" },
             ].map(({ label, value, tone }) => (
-              <div key={label} className={`py-3 text-center ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
+              <div key={label} className="py-3 text-center">
                 <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
                 <div className={`text-xl font-extrabold tabular-nums ${tone}`}>{value}</div>
               </div>
