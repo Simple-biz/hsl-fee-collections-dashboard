@@ -454,7 +454,7 @@ export const POST = async (req: NextRequest) => {
               win_sheet_link           = COALESCE(fee_records.win_sheet_link, EXCLUDED.win_sheet_link),
               win_sheet_link_text      = COALESCE(fee_records.win_sheet_link_text, EXCLUDED.win_sheet_link_text),
               case_status              = EXCLUDED.case_status,
-              fees_confirmation        = EXCLUDED.fees_confirmation,
+              fees_confirmation        = CASE WHEN EXCLUDED.fees_confirmation IS NOT NULL THEN EXCLUDED.fees_confirmation ELSE fee_records.fees_confirmation END,
               date_assigned_to_agent   = COALESCE(fee_records.date_assigned_to_agent, EXCLUDED.date_assigned_to_agent),
               approved_by              = COALESCE(fee_records.approved_by, EXCLUDED.approved_by),
               t16_retro                = EXCLUDED.t16_retro,
