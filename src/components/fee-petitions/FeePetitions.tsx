@@ -172,7 +172,6 @@ export const FeePetitions = () => {
   const [stats, setStats] = useState({
     completeCount: 0,
     incompleteCount: 0,
-    neverTouchedCount: 0,
     totalFeeRequested: 0,
     totalFeesReceived: 0,
   });
@@ -285,13 +284,34 @@ export const FeePetitions = () => {
 
   const fetchAbortRef = useRef<AbortController | null>(null);
   const bulkCloseAbortRef = useRef<AbortController | null>(null);
+  const completedCountAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       bulkCloseAbortRef.current?.abort();
+      completedCountAbortRef.current?.abort();
     };
+  }, []);
+
+  const [completedCount, setCompletedCount] = useState<number | null>(null);
+
+  // fetchPetitions always filters to status=incomplete, so its own
+  // completeCount aggregate is trivially 0 — fetch the real completed total
+  // separately, the same way CompletedPetitions.tsx gets its own badge count.
+  useEffect(() => {
+    const controller = new AbortController();
+    completedCountAbortRef.current = controller;
+    fetch(`/api/fee-petitions?status=complete&page=1&limit=1`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json != null && mountedRef.current) {
+          setCompletedCount(typeof json.total === "number" ? json.total : 0);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const fetchPetitions = useCallback(async () => {
@@ -327,7 +347,6 @@ export const FeePetitions = () => {
       setStats({
         completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
         incompleteCount: typeof json.incompleteCount === "number" ? json.incompleteCount : 0,
-        neverTouchedCount: typeof json.neverTouchedCount === "number" ? json.neverTouchedCount : 0,
         totalFeeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
         totalFeesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
       });
@@ -728,7 +747,7 @@ export const FeePetitions = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
-          { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
+          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fees received & filed" },
           { label: "Fees Requested", value: isInitialLoad ? "—" : fmt(stats.totalFeeRequested), sub: "across pending petitions" },
           { label: "Fees Received", value: isInitialLoad ? "—" : fmt(stats.totalFeesReceived), sub: "across pending petitions" },
         ].map((s) => (
