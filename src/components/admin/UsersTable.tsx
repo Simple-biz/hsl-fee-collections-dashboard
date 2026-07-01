@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   UserPlus,
@@ -424,8 +424,12 @@ function NewUserDialog({
   const [mustChangePassword, setMustChangePassword] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleOpenChange = (v: boolean) => {
-    if (v) {
+  // `open` is set externally (the "New user" button calls onOpenChange
+  // directly), so this dialog never unmounts — reset on the `open` prop
+  // itself rather than a Dialog onOpenChange callback, which only fires for
+  // interactions inside the dialog (Escape, overlay click), not this one.
+  useEffect(() => {
+    if (open) {
       setEmail("");
       setName("");
       setPassword(generatePassword());
@@ -434,8 +438,7 @@ function NewUserDialog({
       setRole("member");
       setMustChangePassword(true);
     }
-    onOpenChange(v);
-  };
+  }, [open]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(password).then(() => {
@@ -456,7 +459,7 @@ function NewUserDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New user</DialogTitle>
@@ -604,15 +607,17 @@ function ResetPasswordDialog({
   const [mustChangePassword, setMustChangePassword] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleOpenChange = (v: boolean) => {
-    if (!v) onClose();
-    if (v) {
+  // `target` is set externally via a row action, not through Dialog's own
+  // onOpenChange — reset on `target` itself so switching straight from one
+  // user's reset dialog to another's doesn't carry over the old password.
+  useEffect(() => {
+    if (target) {
       setPassword(generatePassword());
       setShowPassword(false);
       setCopied(false);
       setMustChangePassword(true);
     }
-  };
+  }, [target]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(password).then(() => {
@@ -633,7 +638,7 @@ function ResetPasswordDialog({
   };
 
   return (
-    <Dialog open={target != null} onOpenChange={handleOpenChange}>
+    <Dialog open={target != null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Reset password</DialogTitle>
