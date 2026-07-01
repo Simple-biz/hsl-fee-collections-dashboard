@@ -28,6 +28,7 @@ import { CompletedPetitions } from "./CompletedPetitions";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
+import { NoteField } from "@/components/shared/NoteField";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -1196,23 +1197,14 @@ export const FeePetitions = () => {
                         </td>
                       ))}
                       <td className={`${tdBase}`}>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={row.updateNote}
-                            onChange={(e) => setUpdateNoteLocal(row.id, e.target.value)}
-                            onBlur={() => persistUpdateNote(row)}
-                            placeholder="Add a note..."
-                            maxLength={5000}
-                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
-                          />
-                          {noteState[row.id] === "saving" && (
-                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
-                          )}
-                          {noteState[row.id] === "saved" && (
-                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
-                          )}
-                        </div>
+                        <NoteField
+                          value={row.updateNote}
+                          onChange={(v) => setUpdateNoteLocal(row.id, v)}
+                          onSave={() => persistUpdateNote(row)}
+                          dark={dark}
+                          t={t}
+                          status={noteState[row.id]}
+                        />
                       </td>
                     </tr>
                   );
