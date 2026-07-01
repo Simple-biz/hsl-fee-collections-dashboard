@@ -19,6 +19,27 @@ export const fmtDate = (d: string | null | undefined): string => {
   return `${m}/${day}/${y}`;
 };
 
+// Monday (YYYY-MM-DD) of the current week, shifted by `offset` weeks.
+// Shared by the week-nav tabs on Notifications and Reports.
+export const getMonday = (offset = 0): string => {
+  const d = new Date();
+  const day = d.getDay();
+  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1) + offset * 7);
+  return d.toISOString().split("T")[0];
+};
+
+// "Jun 29 – Jul 3, 2026"-style label for the week starting at `monday`.
+// `spanDays` is the offset to the END of the displayed week — 4 for a
+// Mon-Fri business week (Audit Log, Recent Activity), 6 for a full Mon-Sun
+// week (New Cases, which counts cases added every day, not just weekdays).
+export const formatWeekLabel = (monday: string, spanDays = 4): string => {
+  const start = new Date(monday + "T00:00:00");
+  const end = new Date(monday + "T00:00:00");
+  end.setDate(end.getDate() + spanDays);
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${start.toLocaleDateString("en-US", opts)} – ${end.toLocaleDateString("en-US", { ...opts, year: "numeric" })}`;
+};
+
 // Timestamp for notes/activity — e.g. "May 3, 8:00 PM". Takes a full ISO
 // timestamp (with time), unlike fmtDate which takes a date-only string.
 export const fmtDateTime = (iso: string | null | undefined): string => {

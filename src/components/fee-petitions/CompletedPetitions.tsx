@@ -73,6 +73,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<CompletedRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [totals, setTotals] = useState({ feeRequested: 0, feesReceived: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -160,6 +161,10 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
       const data: CompletedRow[] = json.data || [];
       setRows(data);
       setTotal(typeof json.total === "number" ? json.total : 0);
+      setTotals({
+        feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
+        feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
+      });
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -313,7 +318,12 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
   const colSpan = CHECKBOX_COLUMNS.length + 7;
 
   return (
-    <div className={`rounded-xl border ${t.card}`}>
+    // contain:layout stops the sticky frozen-column/header cells in the table
+    // below from leaking their scroll overflow into <main>'s ancestor chain
+    // (a Chromium quirk where nested position:sticky cells inflate the
+    // document's scrollHeight past the viewport, leaving a blank gap below
+    // the dashboard shell once this section is expanded and scrolled).
+    <div className={`rounded-xl border ${t.card} [contain:layout]`}>
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -413,6 +423,11 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                       ? "0 petitions"
                       : `Showing ${rangeStart}–${rangeEnd} of ${safeTotal} petitions`}
                   </p>
+                  {safeTotal > 0 && (
+                    <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                      Fees Requested {fmt(totals.feeRequested)} · Fees Received {fmt(totals.feesReceived)}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -482,7 +497,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
             <table className="w-full min-w-250">
               <thead>
                 <tr className={`border-b ${t.borderLight}`}>
-                  <th className={`${thBase} w-10 text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
+                  <th className={`${thBase} w-10 min-w-10 max-w-10 text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
                     <input
                       ref={selectAllRef}
                       type="checkbox"
@@ -493,7 +508,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                   </th>
                   <th
                     aria-sort={sortKey === "claimant" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-                    className={`${thBase} w-40 ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
+                    className={`${thBase} w-40 min-w-40 max-w-40 ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
                   >
                     <button
                       type="button"
@@ -503,7 +518,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                       Claimant {sortIcon("claimant")}
                     </button>
                   </th>
-                  <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[200px] top-0 z-30 ${stickyHeaderBg}`}>
+                  <th className={`${thBase} w-24 min-w-24 max-w-24 ${t.textSub} text-right sticky left-[200px] top-0 z-30 ${stickyHeaderBg}`}>
                     Fee Requested
                   </th>
                   <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
@@ -577,7 +592,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                         key={row.id}
                         className={`group/row border-b ${rowBorder} ${dark ? "bg-emerald-900/40" : "bg-emerald-100/80"} ${rowHover} transition-colors`}
                       >
-                        <td className={`${tdBase} text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
+                        <td className={`${tdBase} w-10 min-w-10 max-w-10 text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -587,7 +602,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                           />
                         </td>
                         <td
-                          className={`${tdBase} ${t.text} font-semibold w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
+                          className={`${tdBase} ${t.text} font-semibold w-40 min-w-40 max-w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                           title={row.claimant}
                         >
                           <Link
@@ -603,7 +618,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                           )}
                         </td>
                         <td
-                          className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}
+                          className={`${tdBase} w-24 min-w-24 max-w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}
                         >
                           {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                         </td>

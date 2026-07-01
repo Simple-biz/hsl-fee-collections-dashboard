@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Clock, AlertCircle } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { getMonday, formatWeekLabel } from "@/lib/formatters";
 
 interface ActivityEntry {
   id: string;
@@ -17,21 +18,6 @@ interface RecentActivityTabProps {
   dark: boolean;
   t: ReturnType<typeof themeClasses>;
 }
-
-const getMonday = (offset = 0): string => {
-  const d = new Date();
-  const day = d.getDay();
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1) + offset * 7);
-  return d.toISOString().split("T")[0];
-};
-
-const formatWeekLabel = (monday: string): string => {
-  const start = new Date(monday + "T00:00:00");
-  const end = new Date(monday + "T00:00:00");
-  end.setDate(end.getDate() + 4);
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  return `${start.toLocaleDateString("en-US", opts)} – ${end.toLocaleDateString("en-US", { ...opts, year: "numeric" })}`;
-};
 
 const fmtDateOnly = (iso: string): string =>
   new Date(iso).toLocaleDateString("en-US", {
