@@ -19,10 +19,11 @@ import {
   Save,
   X,
   Check,
+  ExternalLink,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt } from "@/lib/formatters";
+import { fmt, fmtDate } from "@/lib/formatters";
 import {
   ScoreboardSummaryCards,
   ScoreboardSummary,
@@ -67,12 +68,24 @@ interface DailyEntry {
   notes: string | null;
 }
 
+interface NoFeesCaseRow {
+  id: number;
+  name: string;
+  externalId: string | null;
+  assigned: string;
+  claim: string;
+  approvalDate: string | null;
+  daysSinceApproval: number;
+}
+
 interface TrackerData {
   agents: AgentScore[];
   daily: DailyEntry[];
   summary: ScoreboardSummary | null;
   teams: ScoreboardTeam[];
   openCasesFeesStatus: { noFees: number; partial: number; pif: number };
+  noFeesAging: { over60: number; over90: number };
+  noFeesCases: NoFeesCaseRow[];
 }
 
 type CellKey = `${string}|${string}`;
@@ -302,6 +315,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         summary: json.summary ?? null,
         teams: json.teams ?? [],
         openCasesFeesStatus: json.openCasesFeesStatus ?? { noFees: 0, partial: 0, pif: 0 },
+        noFeesAging: json.noFeesAging ?? { over60: 0, over90: 0 },
+        noFeesCases: json.noFeesCases ?? [],
       });
       const map = new Map<CellKey, CellValues>();
       for (const d of (json.daily ?? []) as DailyEntry[]) {
@@ -489,6 +504,70 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* No Fees Cases — actual aging cases, for reporting */}
+      {data?.noFeesAging && (
+        <div className={`rounded-xl border ${t.card} overflow-hidden`}>
+          <div className={`px-4 py-2.5 flex items-center justify-between border-b ${t.borderLight}`}>
+            <span className={`text-xs font-bold ${t.text}`}>No Fees Cases</span>
+            <span className="text-[11px] font-medium tabular-nums">
+              <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} over 60 days</span>
+              <span className={t.textMuted}> · </span>
+              <span className={dark ? "text-red-400" : "text-red-600"}>{data.noFeesAging.over90} over 90 days</span>
+            </span>
+          </div>
+          {data.noFeesCases.length === 0 ? (
+            <div className={`py-6 text-center text-xs ${t.textMuted}`}>No aging no-fee cases.</div>
+          ) : (
+            <div className="overflow-x-auto max-h-80 overflow-y-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className={`border-b ${t.borderLight}`}>
+                    <th className={`${thBase} ${t.textSub} text-left`}>Case Name</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>Assigned</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>Approval</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.noFeesCases.map((c) => (
+                    <tr key={c.id} className={`border-b ${rowBorder} ${rowHover}`}>
+                      <td className={`${tdBase} ${t.text} font-medium`}>
+                        {c.externalId ? (
+                          <a
+                            href={c.externalId}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 hover:underline"
+                          >
+                            {c.name}
+                            <ExternalLink className="h-3 w-3 opacity-50" aria-hidden="true" />
+                          </a>
+                        ) : (
+                          c.name
+                        )}
+                      </td>
+                      <td className={`${tdBase} ${t.textSub}`}>{c.assigned}</td>
+                      <td className={`${tdBase} ${t.textSub}`}>{c.claim}</td>
+                      <td className={`${tdBase} ${t.textSub}`}>{fmtDate(c.approvalDate)}</td>
+                      <td
+                        className={`${tdBase} text-right font-semibold ${
+                          c.daysSinceApproval > 90
+                            ? dark ? "text-red-400" : "text-red-600"
+                            : dark ? "text-amber-400" : "text-amber-600"
+                        }`}
+                      >
+                        {c.daysSinceApproval}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

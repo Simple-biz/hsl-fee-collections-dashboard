@@ -13,7 +13,10 @@ import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 interface AddCaseModalProps {
   dark: boolean;
   onClose: () => void;
-  onCreated: () => Promise<void> | void;
+  // Receives the newly created case's Client ID — e.g. so a caller can chain
+  // a follow-up action (Overpaid Cases marks the new case overpaid) before
+  // refreshing its own list.
+  onCreated: (clientId: number) => Promise<void> | void;
   dropdownOptions?: DropdownOptionsByCategory;
 }
 
@@ -178,8 +181,12 @@ export default function AddCaseModal({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `Failed (${res.status})`);
+      // Run the caller's follow-up before showing success, so a failure in it
+      // (e.g. a chained "mark overpaid" call) surfaces as an error instead of
+      // a false "done" — the case row was created either way, but the caller
+      // may not have finished what it needed to do with it yet.
+      await onCreated(json.clientId);
       setDone(true);
-      await onCreated();
     } catch (e) {
       setError((e as Error).message);
     } finally {

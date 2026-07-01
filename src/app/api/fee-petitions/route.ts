@@ -94,12 +94,16 @@ export const GET = async (req: NextRequest) => {
       ${agingClause}
     `;
 
-    // Single aggregate for stats + count
+    // Single aggregate for stats + count. Fee totals sum across the FULL
+    // filtered set (not just the current page), so they stay accurate
+    // regardless of pagination.
     const [agg] = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
         completeCount: sql<number>`COUNT(*) FILTER (WHERE ${allChecked})::int`,
         neverTouchedCount: sql<number>`COUNT(*) FILTER (WHERE ${feePetitions.updatedAt} IS NULL)::int`,
+        totalFeeRequested: sql<number>`COALESCE(SUM(${feeRecords.totalFeesExpected}), 0)::numeric`,
+        totalFeesReceived: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}), 0)::numeric`,
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
@@ -110,6 +114,8 @@ export const GET = async (req: NextRequest) => {
     const completeCount = agg?.completeCount ?? 0;
     const incompleteCount = total - completeCount;
     const neverTouchedCount = agg?.neverTouchedCount ?? 0;
+    const totalFeeRequested = Number(agg?.totalFeeRequested) || 0;
+    const totalFeesReceived = Number(agg?.totalFeesReceived) || 0;
 
     const orderClause =
       sort === "claimant"
@@ -163,7 +169,17 @@ export const GET = async (req: NextRequest) => {
       updateNote: r.updateNote ?? "",
     }));
 
-    return NextResponse.json({ data, page, limit, total, completeCount, incompleteCount, neverTouchedCount });
+    return NextResponse.json({
+      data,
+      page,
+      limit,
+      total,
+      completeCount,
+      incompleteCount,
+      neverTouchedCount,
+      totalFeeRequested,
+      totalFeesReceived,
+    });
   } catch (error) {
     console.error("GET /api/fee-petitions error:", error);
     return NextResponse.json(

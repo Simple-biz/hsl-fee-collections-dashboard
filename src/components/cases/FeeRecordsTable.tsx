@@ -234,7 +234,8 @@ type SortKey =
   | "date"
   | "expected"
   | "paid"
-  | "daysAfterApproval";
+  | "daysAfterApproval"
+  | "closedAt";
 type SortDir = "asc" | "desc";
 
 export const FeeRecordsTable = ({
@@ -528,6 +529,10 @@ export const FeeRecordsTable = ({
         case "daysAfterApproval":
           av = a.daysAfterApproval ?? 0;
           bv = b.daysAfterApproval ?? 0;
+          break;
+        case "closedAt":
+          av = a.closedAt || "";
+          bv = b.closedAt || "";
           break;
       }
       if (av < bv) return sortDir === "asc" ? -1 : 1;
@@ -847,17 +852,6 @@ export const FeeRecordsTable = ({
             />
           </div>
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
-          >
-            <option value="all">All Status</option>
-            <option value="not_started">Not Started</option>
-            <option value="started">Started</option>
-            <option value="finished">Finished</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select
             value={assignedFilter}
             onChange={(e) => setAssignedFilter(e.target.value)}
             className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
@@ -892,13 +886,24 @@ export const FeeRecordsTable = ({
             <option value="T16">T16</option>
             <option value="CONC">CONC</option>
           </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+          >
+            <option value="all">All Status</option>
+            <option value="not_started">Not Started</option>
+            <option value="started">Started</option>
+            <option value="finished">Finished</option>
+            <option value="closed">Closed</option>
+          </select>
           {onApproverFilterChange && (
             <select
               value={approverFilter ?? "all"}
               onChange={(e) => onApproverFilterChange(e.target.value)}
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
-              <option value="all">All Approvers</option>
+              <option value="all">Cases Approved</option>
               <option value="georgia">Georgia</option>
               <option value="lori">Lori</option>
               <option value="deanne">DeAnne</option>
@@ -1179,11 +1184,12 @@ export const FeeRecordsTable = ({
                 </th>
                 <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
                 <th
-                  className={`${thBase} ${t.textSub} text-right ${mode !== "closed" ? "cursor-pointer" : ""}`}
-                  onClick={mode !== "closed" ? () => toggleSort("daysAfterApproval") : undefined}
+                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
+                  onClick={() => toggleSort(mode === "closed" ? "closedAt" : "daysAfterApproval")}
                 >
                   <span className="flex items-center justify-end gap-1">
-                    {mode === "closed" ? "Closed On" : <>Days <ArrowUpDown className="h-3 w-3" aria-hidden="true" /></>}
+                    {mode === "closed" ? "Closed On" : "Days"}
+                    <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
                   </span>
                 </th>
               </tr>
@@ -1364,7 +1370,7 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      ) : isAdmin && mode !== "closed" ? (
+                      ) : isAdmin ? (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setFeesConfEditId(c.id); }}
