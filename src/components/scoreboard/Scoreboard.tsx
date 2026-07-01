@@ -13,6 +13,7 @@ import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 interface AgentWeekData {
   agent: string;
   team: string;
+  role: string | null;
   casesClosed: number;
 }
 
@@ -133,6 +134,7 @@ export const Scoreboard = () => {
             agents: (json.agents ?? []).map((a: AgentWeekData) => ({
               agent: a.agent,
               team: a.team ?? "",
+              role: a.role ?? null,
               casesClosed: a.casesClosed ?? 0,
             })),
           }))
@@ -156,7 +158,7 @@ export const Scoreboard = () => {
   const currentWeekMax = Math.max(
     ...TEAMS.flatMap(({ key }) =>
       (weeks[0]?.agents ?? [])
-        .filter((a) => a.team === key)
+        .filter((a) => a.team === key && a.role !== "team_lead")
         .map((a) => a.casesClosed)
     ),
     1
@@ -246,7 +248,12 @@ export const Scoreboard = () => {
       {!loading && !error && weeks.length > 0 && (
         <div>
           {TEAMS.map(({ key, label, headerBg }) => {
-            const currentAgents = (weeks[0]?.agents ?? []).filter((a) => a.team === key);
+            // Team leads (e.g. supervisors) are excluded from the per-agent
+            // ranking rows — they're still counted in team-level financial
+            // totals elsewhere (Reports), just not scored individually here.
+            const currentAgents = (weeks[0]?.agents ?? []).filter(
+              (a) => a.team === key && a.role !== "team_lead",
+            );
             const rows = currentAgents
               .map((a) => ({
                 agent: a.agent,
