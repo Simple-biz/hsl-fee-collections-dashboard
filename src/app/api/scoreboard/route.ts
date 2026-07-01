@@ -58,6 +58,7 @@ export const GET = async (req: NextRequest) => {
       SELECT
         tm.name AS agent,
         tm.team AS team,
+        tm.role AS role,
 
         -- Cases assigned (current snapshot)
         (SELECT COUNT(*) FROM fee_records fr WHERE fr.assigned_to = tm.name) AS cases_assigned,
@@ -237,6 +238,7 @@ export const GET = async (req: NextRequest) => {
       (r) => ({
         agent: String(r.agent),
         team: r.team ? String(r.team) : null,
+        role: r.role ? String(r.role) : null,
         casesAssigned: Number(r.cases_assigned),
         openCases: Number(r.open_cases),
         casesClosed: Number(r.cases_closed),

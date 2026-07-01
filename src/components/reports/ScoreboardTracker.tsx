@@ -301,7 +301,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       const json = await res.json();
       if (cancelledRef.current) return;
       setData({
-        agents: (json.agents ?? []).map((a: AgentScore) => ({
+        // Team leads are counted in data.teams' financial rollups (computed
+        // server-side from the full roster) but excluded from this per-agent
+        // breakdown — they aren't scored individually like line agents.
+        agents: (json.agents ?? [])
+          .filter((a: AgentScore & { role?: string | null }) => a.role !== "team_lead")
+          .map((a: AgentScore) => ({
           ...a,
           unpaidT2Over90:   a.unpaidT2Over90   ?? 0,
           unpaidT16Over90:  a.unpaidT16Over90  ?? 0,

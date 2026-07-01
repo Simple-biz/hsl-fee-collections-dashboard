@@ -38,6 +38,7 @@ interface TeamMemberFull {
 
 const ROLES = [
   { value: "collections_specialist", label: "Collections Specialist" },
+  { value: "team_lead", label: "Team Lead" },
   { value: "collections_manager", label: "Collections Manager" },
   { value: "paralegal", label: "Paralegal" },
   { value: "attorney", label: "Attorney" },
