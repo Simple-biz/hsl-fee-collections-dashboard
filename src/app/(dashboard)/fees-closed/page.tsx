@@ -7,7 +7,7 @@ import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
 import { useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
 import type { CaseRow, ApprovedByOption } from "@/types";
-import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
+import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 
 type LevelFilter = "all" | "fee_petition";
 
@@ -52,18 +52,14 @@ export default function FeesClosedPage() {
   // list instead, so it needs this separately.
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/settings/dropdown-options", { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (!json) return;
-        const all: (ApprovedByOption & { category: string })[] = json.data || [];
-        const grouped: DropdownOptionsByCategory = {};
-        for (const o of all) {
-          (grouped[o.category as keyof DropdownOptionsByCategory] ||= []).push(o);
-        }
+    fetchDropdownOptions(controller.signal)
+      .then((grouped) => {
         setDropdownOptions(grouped);
         setApprovedByOptions(grouped.approved_by || []);
       })
+      // Includes AbortError on unmount — fetchDropdownOptions doesn't catch
+      // it internally, so it lands here and we correctly skip the setState
+      // calls above instead of firing them after unmount.
       .catch(() => {});
     return () => controller.abort();
   }, []);
