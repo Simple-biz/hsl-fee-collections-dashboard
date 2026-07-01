@@ -51,6 +51,13 @@ export const GET = async (req: NextRequest) => {
       AND COALESCE(${feePetitions.faxConfFeePet}, false)
     )`;
 
+    // A petition only belongs in "Completed Petitions" once the checklist is
+    // done AND fees have actually been received — finishing the paperwork
+    // alone isn't enough to file it as complete. `allChecked` on its own
+    // still drives the per-row checklist progress badge (7/7) client-side,
+    // which intentionally stays independent of fee timing.
+    const isFullyComplete = sql`(${allChecked} AND COALESCE(${feeRecords.totalFeesPaid}, 0)::numeric > 0)`;
+
     // Sum of checked boxes — used for progress sort
     const progressExpr = sql`(
       COALESCE(${feePetitions.noa}, false)::int +
@@ -64,9 +71,9 @@ export const GET = async (req: NextRequest) => {
 
     const statusClause =
       status === "complete"
-        ? sql`AND ${allChecked}`
+        ? sql`AND ${isFullyComplete}`
         : status === "incomplete"
-          ? sql`AND NOT ${allChecked}`
+          ? sql`AND NOT ${isFullyComplete}`
           : sql``;
 
     const searchClause = search
@@ -100,7 +107,7 @@ export const GET = async (req: NextRequest) => {
     const [agg] = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
-        completeCount: sql<number>`COUNT(*) FILTER (WHERE ${allChecked})::int`,
+        completeCount: sql<number>`COUNT(*) FILTER (WHERE ${isFullyComplete})::int`,
         neverTouchedCount: sql<number>`COUNT(*) FILTER (WHERE ${feePetitions.updatedAt} IS NULL)::int`,
         totalFeeRequested: sql<number>`COALESCE(SUM(${feeRecords.totalFeesExpected}), 0)::numeric`,
         totalFeesReceived: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}), 0)::numeric`,

@@ -28,6 +28,7 @@ import { CompletedPetitions } from "./CompletedPetitions";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
+import { NoteField } from "@/components/shared/NoteField";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -171,7 +172,6 @@ export const FeePetitions = () => {
   const [stats, setStats] = useState({
     completeCount: 0,
     incompleteCount: 0,
-    neverTouchedCount: 0,
     totalFeeRequested: 0,
     totalFeesReceived: 0,
   });
@@ -284,13 +284,34 @@ export const FeePetitions = () => {
 
   const fetchAbortRef = useRef<AbortController | null>(null);
   const bulkCloseAbortRef = useRef<AbortController | null>(null);
+  const completedCountAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       bulkCloseAbortRef.current?.abort();
+      completedCountAbortRef.current?.abort();
     };
+  }, []);
+
+  const [completedCount, setCompletedCount] = useState<number | null>(null);
+
+  // fetchPetitions always filters to status=incomplete, so its own
+  // completeCount aggregate is trivially 0 — fetch the real completed total
+  // separately, the same way CompletedPetitions.tsx gets its own badge count.
+  useEffect(() => {
+    const controller = new AbortController();
+    completedCountAbortRef.current = controller;
+    fetch(`/api/fee-petitions?status=complete&page=1&limit=1`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json != null && mountedRef.current) {
+          setCompletedCount(typeof json.total === "number" ? json.total : 0);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const fetchPetitions = useCallback(async () => {
@@ -326,7 +347,6 @@ export const FeePetitions = () => {
       setStats({
         completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
         incompleteCount: typeof json.incompleteCount === "number" ? json.incompleteCount : 0,
-        neverTouchedCount: typeof json.neverTouchedCount === "number" ? json.neverTouchedCount : 0,
         totalFeeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
         totalFeesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
       });
@@ -727,7 +747,7 @@ export const FeePetitions = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
-          { label: "Never Touched", value: isInitialLoad ? "—" : String(stats.neverTouchedCount), sub: "not yet started" },
+          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fees received & filed" },
           { label: "Fees Requested", value: isInitialLoad ? "—" : fmt(stats.totalFeeRequested), sub: "across pending petitions" },
           { label: "Fees Received", value: isInitialLoad ? "—" : fmt(stats.totalFeesReceived), sub: "across pending petitions" },
         ].map((s) => (
@@ -1196,23 +1216,14 @@ export const FeePetitions = () => {
                         </td>
                       ))}
                       <td className={`${tdBase}`}>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={row.updateNote}
-                            onChange={(e) => setUpdateNoteLocal(row.id, e.target.value)}
-                            onBlur={() => persistUpdateNote(row)}
-                            placeholder="Add a note..."
-                            maxLength={5000}
-                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
-                          />
-                          {noteState[row.id] === "saving" && (
-                            <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
-                          )}
-                          {noteState[row.id] === "saved" && (
-                            <Check aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`} />
-                          )}
-                        </div>
+                        <NoteField
+                          value={row.updateNote}
+                          onChange={(v) => setUpdateNoteLocal(row.id, v)}
+                          onSave={() => persistUpdateNote(row)}
+                          dark={dark}
+                          t={t}
+                          status={noteState[row.id]}
+                        />
                       </td>
                     </tr>
                   );

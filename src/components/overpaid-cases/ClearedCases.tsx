@@ -7,7 +7,6 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
-  Check,
   CheckCircle2,
   Loader2,
   ChevronLeft,
@@ -15,77 +14,67 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  ArchiveX,
+  Undo2,
   RefreshCw,
+  TrendingDown,
+  Download,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate } from "@/lib/formatters";
-import { upsertFeePetition } from "@/app/(dashboard)/fee-petitions/actions";
+import { fmt, fmtFull, fmtDateLong } from "@/lib/formatters";
+import { upsertOverpaidCase, bulkRestoreCleared } from "@/app/(dashboard)/overpaid-cases/actions";
 import { NoteField } from "@/components/shared/NoteField";
 
-interface CompletedRow {
+interface ClearedRow {
   id: number;
   claimant: string;
-  approvalDate: string | null;
-  updatedAt: string | null;
-  feeAmount: number | null;
-  feesReceived: number | null;
-  noa: boolean;
-  timeDelineation: boolean;
-  feePetitionDoc: boolean;
-  ltrToClmt: boolean;
-  ltrToClmtWithSignature: boolean;
-  ltrToAlj: boolean;
-  faxConfFeePet: boolean;
+  assignedTo: string | null;
+  region: string | null;
+  feesReceived: number;
+  overpaidAmount: number | null;
+  feesConfirmation: string | null;
+  opLtrDate: string | null;
+  opLtrReceived: string | null;
+  checksCleared: boolean;
+  checksClearedAt: string | null;
   updateNote: string;
+  updatedAt: string | null;
 }
 
-type SortKey = "claimant" | "approvalDate" | "updatedAt";
+type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
-const CHECKBOX_COLUMNS = [
-  { key: "noa", label: "NOA" },
-  { key: "timeDelineation", label: "Time Delineation" },
-  { key: "feePetitionDoc", label: "Fee Petition Doc" },
-  { key: "ltrToClmt", label: "Ltr to Clmt" },
-  { key: "ltrToClmtWithSignature", label: "Ltr to Clmt w/ Signature" },
-  { key: "ltrToAlj", label: "Ltr to ALJ" },
-  { key: "faxConfFeePet", label: "Fax Conf Fee Pet" },
-] as const;
-
-const formatRelativeDate = (dateStr: string): string => {
-  const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
-
 interface Props {
   dark: boolean;
-  canFinalize: boolean;
+  t: ReturnType<typeof themeClasses>;
+  // Bumped by the parent whenever a case is marked/un-marked cleared from the
+  // main pending table, so this section's badge (and list, if expanded)
+  // refreshes without waiting for a manual refresh click.
+  refreshToken: number;
+  // Called after this section restores a case to Pending, so the parent's
+  // pending table picks it back up.
+  onRestored: () => void;
 }
 
-export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
-  const t = themeClasses(dark);
+export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
   const [expanded, setExpanded] = useState(false);
-  const [rows, setRows] = useState<CompletedRow[]>([]);
+  const [rows, setRows] = useState<ClearedRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
-  const [totals, setTotals] = useState({ feeRequested: 0, feesReceived: 0 });
+  const [totalOverpaid, setTotalOverpaid] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
+  const [sortKey, setSortKey] = useState<SortKey>("overpaidAmount");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [closeConfirming, setCloseConfirming] = useState(false);
-  const [closing, setClosing] = useState(false);
+  const [restoreConfirming, setRestoreConfirming] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [uncheckingIds, setUncheckingIds] = useState<Set<number>>(new Set());
+  const [exporting, setExporting] = useState(false);
   const [liveMessage, setLiveMessage] = useState("");
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
 
@@ -106,11 +95,14 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
     };
   }, []);
 
-  // Fetch count badge on mount without loading the full table
+  // Fetch count badge on mount and whenever a cleared-status change happens
+  // elsewhere — skipped while expanded, since fetchCleared's own effect below
+  // already keeps `total` current with the full list in that case.
   useEffect(() => {
+    if (expanded) return;
     const controller = new AbortController();
     countAbortRef.current = controller;
-    fetch(`/api/fee-petitions?status=complete&page=1&limit=1`, { signal: controller.signal })
+    fetch(`/api/overpaid-cases?status=cleared&page=1&limit=1`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (json != null && mountedRef.current) {
@@ -119,7 +111,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
       })
       .catch(() => {});
     return () => controller.abort();
-  }, []);
+  }, [expanded, refreshToken]);
 
   useEffect(() => {
     const timers = savedTimerRef.current;
@@ -140,7 +132,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
     };
   }, [search]);
 
-  const fetchCompleted = useCallback(async () => {
+  const fetchCleared = useCallback(async () => {
     fetchAbortRef.current?.abort();
     const controller = new AbortController();
     fetchAbortRef.current = controller;
@@ -148,24 +140,21 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
     setError(null);
     try {
       const params = new URLSearchParams({
-        status: "complete",
+        status: "cleared",
         page: String(page),
         limit: String(pageSize),
         sort: sortKey,
         dir: sortDir,
       });
       if (appliedSearch) params.set("search", appliedSearch);
-      const res = await fetch(`/api/fee-petitions?${params}`, { signal: controller.signal });
-      if (!res.ok) throw new Error(`Failed to load completed petitions (${res.status})`);
+      const res = await fetch(`/api/overpaid-cases?${params}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to load cleared cases (${res.status})`);
       const json = await res.json();
       if (!mountedRef.current) return;
-      const data: CompletedRow[] = json.data || [];
+      const data: ClearedRow[] = json.data || [];
       setRows(data);
       setTotal(typeof json.total === "number" ? json.total : 0);
-      setTotals({
-        feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-        feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
-      });
+      setTotalOverpaid(typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -178,11 +167,11 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
 
   useEffect(() => {
     if (!expanded) return;
-    fetchCompleted();
+    fetchCleared();
     return () => {
       fetchAbortRef.current?.abort();
     };
-  }, [expanded, fetchCompleted]);
+  }, [expanded, fetchCleared, refreshToken]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;
@@ -222,57 +211,107 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
       : <ArrowDown aria-hidden="true" className="h-3 w-3" />;
   };
 
-  const handleClose = async () => {
-    if (closing) return;
-    setClosing(true);
+  const downloadCsv = async () => {
+    setExporting(true);
+    const controller = new AbortController();
+    try {
+      let all: ClearedRow[];
+      if (selectedIds.size > 0) {
+        all = rows.filter((r) => selectedIds.has(r.id));
+      } else {
+        const params = new URLSearchParams({ status: "cleared", page: "1", limit: "10000" });
+        if (appliedSearch) params.set("search", appliedSearch);
+        params.set("sort", sortKey);
+        params.set("dir", sortDir);
+        const res = await fetch(`/api/overpaid-cases?${params.toString()}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Export failed (${res.status})`);
+        const json = await res.json();
+        all = json.data || [];
+      }
+      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Fees Confirmation", "Notice Received", "Notes", "Cleared On", "Last Updated"];
+      const escape = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
+      const csvRows = [
+        headers.join(","),
+        ...all.map((r) =>
+          [
+            escape(r.claimant),
+            escape(r.assignedTo ?? ""),
+            escape(r.region ?? ""),
+            r.feesReceived.toFixed(2),
+            r.overpaidAmount != null ? r.overpaidAmount.toFixed(2) : "",
+            escape(r.feesConfirmation ?? ""),
+            r.opLtrReceived ?? "",
+            escape(r.updateNote),
+            r.checksClearedAt ?? "",
+            r.updatedAt ? new Date(r.updatedAt).toLocaleDateString("en-US") : "",
+          ].join(","),
+        ),
+      ].join("\n");
+      const blob = new Blob([csvRows], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `overpaid-cases-cleared-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setError((err as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (restoring) return;
+    setRestoring(true);
     const ids = [...selectedIds];
     try {
-      const results = await Promise.allSettled(
-        ids.map((id) =>
-          fetch(`/api/cases/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              feeFields: { isClosed: true },
-              logMessage: "Fee petition complete — case moved to Fees Closed.",
-            }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const j = await res.json().catch(() => ({}));
-              throw new Error(j.error || `Failed to close case ${id} (${res.status})`);
-            }
-            return id;
-          }),
-        ),
-      );
-
+      const result = await bulkRestoreCleared({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
       if (!mountedRef.current) return;
-
-      const succeeded = results
-        .filter((r): r is PromiseFulfilledResult<number> => r.status === "fulfilled")
-        .map((r) => r.value);
-      const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
-
-      if (succeeded.length > 0) {
-        setRows((prev) => prev.filter((r) => !succeeded.includes(r.id)));
-        setTotal((prev) => (prev != null ? Math.max(0, prev - succeeded.length) : prev));
-        setLiveMessage(
-          `${succeeded.length} case${succeeded.length === 1 ? "" : "s"} moved to Fees Closed`,
-        );
-      }
-
+      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+      setTotal((prev) => (prev != null ? Math.max(0, prev - ids.length) : prev));
+      setLiveMessage(`${ids.length} case${ids.length === 1 ? "" : "s"} restored to Pending`);
       setSelectedIds(new Set());
-      setCloseConfirming(false);
-
-      if (failures.length > 0) {
-        setError(
-          failures.length === 1
-            ? (failures[0].reason as Error).message
-            : `${failures.length} of ${ids.length} cases failed to close.`,
-        );
-      }
+      setRestoreConfirming(false);
+      onRestored();
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
-      if (mountedRef.current) setClosing(false);
+      if (mountedRef.current) setRestoring(false);
+    }
+  };
+
+  // Single-row uncheck — a quick undo for an accidental "checks cleared" press,
+  // without going through select-all-then-bulk-restore.
+  const toggleClear = async (row: ClearedRow) => {
+    if (uncheckingIds.has(row.id)) return;
+    setUncheckingIds((prev) => new Set(prev).add(row.id));
+    try {
+      const result = await upsertOverpaidCase({ caseId: row.id, fields: { checksCleared: false } });
+      if (!result.ok) throw new Error(result.error);
+      if (!mountedRef.current) return;
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setTotal((prev) => (prev != null ? Math.max(0, prev - 1) : prev));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
+      setLiveMessage(`${row.claimant} restored to Pending`);
+      onRestored();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUncheckingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
     }
   };
 
@@ -280,13 +319,13 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updateNote: value } : r)));
   };
 
-  const persistNote = async (row: CompletedRow) => {
+  const persistNote = async (row: ClearedRow) => {
     if (noteSnapshot.current.get(row.id) === row.updateNote) return;
     const existingTimer = savedTimerRef.current.get(row.id);
     if (existingTimer) clearTimeout(existingTimer);
     setNoteState((s) => ({ ...s, [row.id]: "saving" }));
     try {
-      const result = await upsertFeePetition({ caseId: row.id, fields: { updateNote: row.updateNote } });
+      const result = await upsertOverpaidCase({ caseId: row.id, fields: { updateNote: row.updateNote } });
       if (!result.ok) throw new Error(result.error);
       noteSnapshot.current.set(row.id, row.updateNote);
       setNoteState((s) => ({ ...s, [row.id]: "saved" }));
@@ -315,15 +354,12 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
-  // checkbox + claimant + fee + approved + completed + 7 checkbox cols + note
-  const colSpan = CHECKBOX_COLUMNS.length + 7;
+  const colSpan = 11;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
-    // below from leaking their scroll overflow into <main>'s ancestor chain
-    // (a Chromium quirk where nested position:sticky cells inflate the
-    // document's scrollHeight past the viewport, leaving a blank gap below
-    // the dashboard shell once this section is expanded and scrolled).
+    // below from leaking their scroll overflow into <main>'s ancestor chain —
+    // see the identical note in CompletedPetitions.tsx.
     <div className={`rounded-xl border ${t.card} [contain:layout]`}>
       <button
         type="button"
@@ -336,7 +372,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
             aria-hidden="true"
             className={`h-4 w-4 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
           />
-          <span className={`text-sm font-bold ${t.text}`}>Completed Petitions</span>
+          <span className={`text-sm font-bold ${t.text}`}>Cleared Cases</span>
           {total != null && total > 0 && (
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
@@ -363,24 +399,24 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
             <div>
               {selectedIds.size > 0 ? (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {closeConfirming ? (
+                  {restoreConfirming ? (
                     <>
                       <span className={`text-sm ${t.textMuted}`}>
-                        Close {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} to Fees Closed?
+                        Restore {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} to Pending?
                       </span>
                       <button
-                        onClick={handleClose}
-                        disabled={closing}
+                        onClick={handleRestore}
+                        disabled={restoring}
                         className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-indigo-700 hover:bg-indigo-600 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                       >
-                        {closing
+                        {restoring
                           ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                          : <ArchiveX aria-hidden="true" className="h-3 w-3" />}
+                          : <Undo2 aria-hidden="true" className="h-3 w-3" />}
                         Confirm
                       </button>
                       <button
-                        onClick={() => setCloseConfirming(false)}
-                        disabled={closing}
+                        onClick={() => setRestoreConfirming(false)}
+                        disabled={restoring}
                         className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} disabled:opacity-40`}
                       >
                         Cancel
@@ -391,16 +427,14 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                       <span className={`text-sm font-bold ${t.text}`}>
                         {selectedIds.size} selected
                       </span>
-                      {canFinalize && (
-                        <button
-                          onClick={() => setCloseConfirming(true)}
-                          aria-label="Move selected cases to Fees Closed"
-                          className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} transition-colors`}
-                        >
-                          <ArchiveX aria-hidden="true" className="h-3 w-3" />
-                          Close to Fees Closed
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setRestoreConfirming(true)}
+                        aria-label="Restore selected cases to Pending"
+                        className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} transition-colors`}
+                      >
+                        <Undo2 aria-hidden="true" className="h-3 w-3" />
+                        Restore to Pending
+                      </button>
                       <button
                         onClick={() => setSelectedIds(new Set())}
                         aria-label="Clear selection"
@@ -414,19 +448,19 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
               ) : (
                 <>
                   <p className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
-                    Completed
+                    Cleared
                     {isRefreshing && (
                       <Loader2 aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                     )}
                   </p>
                   <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
                     {safeTotal === 0
-                      ? "0 petitions"
-                      : `Showing ${rangeStart}–${rangeEnd} of ${safeTotal} petitions`}
+                      ? "0 cases"
+                      : `Showing ${rangeStart}–${rangeEnd} of ${safeTotal} cases`}
                   </p>
                   {safeTotal > 0 && (
                     <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
-                      Fees Requested {fmt(totals.feeRequested)} · Fees Received {fmt(totals.feesReceived)}
+                      Total Overpaid {fmt(totalOverpaid)}
                     </p>
                   )}
                 </>
@@ -449,7 +483,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search claimants..."
-                  aria-label="Search completed claimants"
+                  aria-label="Search cleared claimants"
                   className={`h-8 pl-8 pr-3 w-full sm:w-48 rounded-md border text-xs outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                 />
               </div>
@@ -464,9 +498,22 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                 ))}
               </select>
               <button
-                onClick={fetchCompleted}
+                onClick={downloadCsv}
+                disabled={exporting || safeTotal === 0}
+                aria-label={selectedIds.size > 0 ? `Export ${selectedIds.size} selected to CSV` : "Export cleared cases to CSV"}
+                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                {exporting
+                  ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                  : <Download aria-hidden="true" className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">
+                  {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
+                </span>
+              </button>
+              <button
+                onClick={fetchCleared}
                 disabled={loading}
-                aria-label="Refresh completed petitions"
+                aria-label="Refresh cleared cases"
                 className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1 ${t.outlineBtn} disabled:opacity-40`}
               >
                 <RefreshCw
@@ -485,7 +532,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
             >
               <span className="text-sm">{error}</span>
               <button
-                onClick={() => { setError(null); fetchCompleted(); }}
+                onClick={() => { setError(null); fetchCleared(); }}
                 className="ml-auto text-xs font-medium underline"
               >
                 Retry
@@ -495,7 +542,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
 
           {/* Table */}
           <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
-            <table className="w-full min-w-250">
+            <table className="w-full min-w-200">
               <thead>
                 <tr className={`border-b ${t.borderLight}`}>
                   <th className={`${thBase} w-10 min-w-10 max-w-10 text-center sticky left-0 top-0 z-30 ${stickyHeaderBg}`}>
@@ -503,63 +550,75 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                       ref={selectAllRef}
                       type="checkbox"
                       onChange={toggleSelectAll}
-                      aria-label="Select all completed rows"
+                      aria-label="Select all cleared rows"
                       className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                     />
                   </th>
                   <th
                     aria-sort={sortKey === "claimant" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-                    className={`${thBase} w-40 min-w-40 max-w-40 ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
+                    className={`${thBase} ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
                   >
                     <button
                       type="button"
                       onClick={() => toggleSort("claimant")}
                       className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                     >
-                      Claimant {sortIcon("claimant")}
+                      Case {sortIcon("claimant")}
                     </button>
                   </th>
-                  <th className={`${thBase} w-24 min-w-24 max-w-24 ${t.textSub} text-right sticky left-[200px] top-0 z-30 ${stickyHeaderBg}`}>
-                    Fee Requested
-                  </th>
-                  <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    Fees Received
-                  </th>
                   <th
-                    aria-sort={sortKey === "approvalDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                    aria-sort={sortKey === "assignedTo" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                     className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                   >
                     <button
                       type="button"
-                      onClick={() => toggleSort("approvalDate")}
+                      onClick={() => toggleSort("assignedTo")}
                       className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                     >
-                      Approved {sortIcon("approvalDate")}
+                      Assigned To {sortIcon("assignedTo")}
+                    </button>
+                  </th>
+                  <th className={`${thBase} ${t.textSub} text-left min-w-32 sticky top-0 z-20 ${stickyHeaderBg}`}>Region</th>
+                  <th
+                    aria-sort={sortKey === "feesReceived" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                    className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSort("feesReceived")}
+                      className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                    >
+                      Fees Received {sortIcon("feesReceived")}
                     </button>
                   </th>
                   <th
-                    aria-sort={sortKey === "updatedAt" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                    aria-sort={sortKey === "overpaidAmount" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                    className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSort("overpaidAmount")}
+                      className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                    >
+                      Overpaid Amount {sortIcon("overpaidAmount")}
+                    </button>
+                  </th>
+                  <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
+                  <th
+                    aria-sort={sortKey === "opLtrDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                     className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
                   >
                     <button
                       type="button"
-                      onClick={() => toggleSort("updatedAt")}
+                      onClick={() => toggleSort("opLtrDate")}
                       className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
                     >
-                      Completed {sortIcon("updatedAt")}
+                      Notice Received {sortIcon("opLtrDate")}
                     </button>
                   </th>
-                  {CHECKBOX_COLUMNS.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}
-                    >
-                      {col.label}
-                    </th>
-                  ))}
-                  <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    Update
-                  </th>
+                  <th className={`${thBase} ${t.textSub} text-left min-w-48 sticky top-0 z-20 ${stickyHeaderBg}`}>Notes</th>
+                  <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Cleared On</th>
+                  <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>Checks Cleared</th>
                 </tr>
               </thead>
               <tbody>
@@ -568,7 +627,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                     <td colSpan={colSpan} className={`${tdBase} text-center py-8 ${t.textMuted}`}>
                       <span className="inline-flex items-center gap-2">
                         <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
-                        Loading completed petitions...
+                        Loading cleared cases...
                       </span>
                     </td>
                   </tr>
@@ -576,11 +635,11 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                   <tr>
                     <td colSpan={colSpan} className={`${tdBase} text-center py-10 ${t.textMuted}`}>
                       <div className="flex flex-col items-center gap-2">
-                        <Check aria-hidden="true" className="h-7 w-7 opacity-30" />
+                        <TrendingDown aria-hidden="true" className="h-7 w-7 opacity-30" />
                         <p className="text-sm font-medium">
                           {appliedSearch
-                            ? "No completed petitions match your search."
-                            : "No completed petitions yet."}
+                            ? "No cleared cases match your search."
+                            : "No cleared cases yet."}
                         </p>
                       </div>
                     </td>
@@ -603,7 +662,7 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                           />
                         </td>
                         <td
-                          className={`${tdBase} ${t.text} font-semibold w-40 min-w-40 max-w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
+                          className={`${tdBase} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                           title={row.claimant}
                         >
                           <Link
@@ -612,30 +671,15 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                           >
                             {row.claimant}
                           </Link>
-                          {row.updatedAt && (
-                            <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
-                              Completed {formatRelativeDate(row.updatedAt)}
-                            </p>
-                          )}
                         </td>
-                        <td
-                          className={`${tdBase} w-24 min-w-24 max-w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}
-                        >
-                          {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
+                        <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo ?? "—"}</td>
+                        <td className={`${tdBase} ${t.textMuted}`}>{row.region ?? "—"}</td>
+                        <td className={`${tdBase} ${t.textMuted} text-right`}>{fmt(row.feesReceived)}</td>
+                        <td className={`${tdBase} text-right font-medium tabular-nums ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                          {row.overpaidAmount != null ? fmt(row.overpaidAmount) : "—"}
                         </td>
-                        <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                          {row.feesReceived != null && row.feesReceived > 0 ? fmt(row.feesReceived) : "—"}
-                        </td>
-                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
-                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>
-                        {CHECKBOX_COLUMNS.map((col) => (
-                          <td key={col.key} className={`${tdBase} text-center`}>
-                            <Check
-                              aria-hidden="true"
-                              className={`h-3.5 w-3.5 mx-auto ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                            />
-                          </td>
-                        ))}
+                        <td className={`${tdBase} ${t.textMuted}`}>{row.feesConfirmation ?? "—"}</td>
+                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDateLong(row.opLtrReceived)}</td>
                         <td className={`${tdBase}`}>
                           <NoteField
                             value={row.updateNote}
@@ -646,11 +690,39 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                             status={noteState[row.id]}
                           />
                         </td>
+                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDateLong(row.checksClearedAt)}</td>
+                        <td className={`${tdBase} text-center`}>
+                          {uncheckingIds.has(row.id) ? (
+                            <Loader2 aria-hidden="true" className={`h-3.5 w-3.5 animate-spin mx-auto ${t.textMuted}`} />
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={row.checksCleared}
+                              onChange={() => toggleClear(row)}
+                              aria-label={`Checks cleared for ${row.claimant} — uncheck to restore to Pending`}
+                              title="Uncheck to restore to Pending (e.g. if this was checked by accident)"
+                              className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                            />
+                          )}
+                        </td>
                       </tr>
                     );
                   })
                 )}
               </tbody>
+              {!loading && rows.length > 0 && (
+                <tfoot>
+                  <tr className={`border-t-2 ${dark ? "border-neutral-700 bg-neutral-800/60" : "border-neutral-300 bg-neutral-50"}`}>
+                    <td colSpan={5} className={`${tdBase} font-semibold ${t.textSub}`}>
+                      Page Total <span className={`font-normal ${t.textMuted}`}>({rows.length} rows)</span>
+                    </td>
+                    <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                      {fmtFull(rows.reduce((s, r) => s + (r.overpaidAmount ?? 0), 0))}
+                    </td>
+                    <td colSpan={5} />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
 
