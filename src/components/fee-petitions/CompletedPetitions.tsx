@@ -21,6 +21,7 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { upsertFeePetition } from "@/app/(dashboard)/fee-petitions/actions";
+import { NoteField } from "@/components/shared/NoteField";
 
 interface CompletedRow {
   id: number;
@@ -636,29 +637,14 @@ export const CompletedPetitions = ({ dark, canFinalize }: Props) => {
                           </td>
                         ))}
                         <td className={`${tdBase}`}>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={row.updateNote}
-                              onChange={(e) => setNoteLocal(row.id, e.target.value)}
-                              onBlur={() => persistNote(row)}
-                              placeholder="Add a note..."
-                              maxLength={5000}
-                              className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
-                            />
-                            {noteState[row.id] === "saving" && (
-                              <Loader2
-                                aria-hidden="true"
-                                className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`}
-                              />
-                            )}
-                            {noteState[row.id] === "saved" && (
-                              <Check
-                                aria-hidden="true"
-                                className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                              />
-                            )}
-                          </div>
+                          <NoteField
+                            value={row.updateNote}
+                            onChange={(v) => setNoteLocal(row.id, v)}
+                            onSave={() => persistNote(row)}
+                            dark={dark}
+                            t={t}
+                            status={noteState[row.id]}
+                          />
                         </td>
                       </tr>
                     );
