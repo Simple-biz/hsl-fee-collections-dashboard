@@ -19,13 +19,11 @@ import {
   Upload,
   X,
   Undo2,
-  ArchiveX,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { CompletedPetitions } from "./CompletedPetitions";
-import { useCapabilities } from "@/hooks/useCapabilities";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
 import { NoteField } from "@/components/shared/NoteField";
@@ -199,13 +197,8 @@ export const FeePetitions = () => {
     expiresAt: number;
   } | null>(null);
   const [undoing, setUndoing] = useState(false);
-  const [bulkCloseConfirming, setBulkCloseConfirming] = useState(false);
-  const [bulkClosing, setBulkClosing] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
-
-  const { can } = useCapabilities();
-  const canFinalize = can("case.finalize");
 
   const urlMethodRef = useRef<"push" | "replace">("replace");
 
@@ -283,14 +276,12 @@ export const FeePetitions = () => {
   }, [search]);
 
   const fetchAbortRef = useRef<AbortController | null>(null);
-  const bulkCloseAbortRef = useRef<AbortController | null>(null);
   const completedCountAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      bulkCloseAbortRef.current?.abort();
       completedCountAbortRef.current?.abort();
     };
   }, []);
@@ -342,7 +333,6 @@ export const FeePetitions = () => {
       setRows(data);
       setSelectedIds(new Set());
       setBulkConfirming(false);
-      setBulkCloseConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
       setStats({
         completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
@@ -392,7 +382,6 @@ export const FeePetitions = () => {
   const clearSelection = () => {
     setSelectedIds(new Set());
     setBulkConfirming(false);
-    setBulkCloseConfirming(false);
   };
 
   const toggleSelectAll = () => {
@@ -501,69 +490,6 @@ export const FeePetitions = () => {
   const ariaSortFor = (key: SortKey): "ascending" | "descending" | "none" => {
     if (sortKey !== key) return "none";
     return sortDir === "asc" ? "ascending" : "descending";
-  };
-
-  const handleBulkClosePetitions = async () => {
-    if (bulkClosing) return;
-    setBulkClosing(true);
-    const ids = [...selectedIds];
-    const closingRows = rows.filter((r) => ids.includes(r.id));
-    const controller = new AbortController();
-    bulkCloseAbortRef.current = controller;
-    try {
-      const results = await Promise.allSettled(
-        ids.map((id) =>
-          fetch(`/api/cases/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              feeFields: { isClosed: true },
-              logMessage: "Fee petition complete — case moved to Fees Closed.",
-            }),
-            signal: controller.signal,
-          }).then(async (res) => {
-            if (!res.ok) {
-              const j = await res.json().catch(() => ({}));
-              throw new Error(j.error || `Failed to close case ${id} (${res.status})`);
-            }
-            return id;
-          }),
-        ),
-      );
-
-      if (!mountedRef.current) return;
-
-      const succeeded = results
-        .filter((r): r is PromiseFulfilledResult<number> => r.status === "fulfilled")
-        .map((r) => r.value);
-      const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
-
-      if (succeeded.length > 0) {
-        const closedRows = closingRows.filter((r) => succeeded.includes(r.id));
-        const closedComplete = closedRows.filter((r) => CHECKBOX_COLUMNS.every((c) => r[c.key])).length;
-        const closedIncomplete = closedRows.length - closedComplete;
-        setRows((prev) => prev.filter((r) => !succeeded.includes(r.id)));
-        setTotal((t) => Math.max(0, t - succeeded.length));
-        setStats((s) => ({
-          ...s,
-          completeCount: Math.max(0, s.completeCount - closedComplete),
-          incompleteCount: Math.max(0, s.incompleteCount - closedIncomplete),
-        }));
-      }
-
-      setSelectedIds(new Set());
-      setBulkCloseConfirming(false);
-
-      if (failures.length > 0) {
-        setError(
-          failures.length === 1
-            ? (failures[0].reason as Error).message
-            : `${failures.length} of ${ids.length} cases failed to close — the rest were moved successfully.`,
-        );
-      }
-    } finally {
-      if (mountedRef.current) setBulkClosing(false);
-    }
   };
 
   const sortIcon = (key: SortKey) => {
@@ -825,29 +751,6 @@ export const FeePetitions = () => {
                       Cancel
                     </button>
                   </>
-                ) : bulkCloseConfirming ? (
-                  <>
-                    <span className={`text-sm ${t.textMuted}`}>
-                      Close {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} to Fees Closed?
-                    </span>
-                    <button
-                      onClick={handleBulkClosePetitions}
-                      disabled={bulkClosing}
-                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-indigo-700 hover:bg-indigo-600 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
-                    >
-                      {bulkClosing
-                        ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                        : <ArchiveX aria-hidden="true" className="h-3 w-3" />}
-                      Confirm
-                    </button>
-                    <button
-                      onClick={() => setBulkCloseConfirming(false)}
-                      disabled={bulkClosing}
-                      className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn} disabled:opacity-40`}
-                    >
-                      Cancel
-                    </button>
-                  </>
                 ) : (
                   <>
                     <span className={`text-sm font-bold ${t.text}`}>
@@ -868,16 +771,6 @@ export const FeePetitions = () => {
                       <Check aria-hidden="true" className="h-3 w-3" />
                       Mark Complete
                     </button>
-                    {canFinalize && (
-                      <button
-                        onClick={() => setBulkCloseConfirming(true)}
-                        aria-label="Move selected cases to Fees Closed"
-                        className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} transition-colors`}
-                      >
-                        <ArchiveX aria-hidden="true" className="h-3 w-3" />
-                        Close to Fees Closed
-                      </button>
-                    )}
                     <button
                       onClick={clearSelection}
                       aria-label="Clear selection"
@@ -1279,7 +1172,7 @@ export const FeePetitions = () => {
         </div>
       </div>
 
-      <CompletedPetitions dark={dark} canFinalize={canFinalize} />
+      <CompletedPetitions dark={dark} />
     </div>
   );
 };
