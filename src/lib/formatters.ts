@@ -54,6 +54,16 @@ export const fmtDateTime = (iso: string | null | undefined): string => {
   });
 };
 
+// Date with year for ISO timestamps — e.g. "Jul 1, 2026". Takes a full ISO
+// timestamp like fmtDateTime, but omits the time (used where only the day
+// matters, e.g. "Cleared On"/"Notice Received" columns).
+export const fmtDateLong = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
 // Claim type display: T2_T16 → CONC, T2/T16 → CONC.
 // Worksheet-style values (CONC, DWB, DAC, AUX) pass through unchanged so
 // rows saved directly via the dashboard dropdowns render verbatim.

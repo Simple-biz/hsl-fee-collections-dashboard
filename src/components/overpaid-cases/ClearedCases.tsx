@@ -18,9 +18,10 @@ import {
   Undo2,
   RefreshCw,
   TrendingDown,
+  Download,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtFull } from "@/lib/formatters";
+import { fmt, fmtFull, fmtDateLong } from "@/lib/formatters";
 import { upsertOverpaidCase, bulkRestoreCleared } from "@/app/(dashboard)/overpaid-cases/actions";
 
 interface ClearedRow {
@@ -36,15 +37,13 @@ interface ClearedRow {
   checksCleared: boolean;
   checksClearedAt: string | null;
   updateNote: string;
+  updatedAt: string | null;
 }
 
 type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
-
-const fmtDate = (iso: string | null): string =>
-  iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 interface Props {
   dark: boolean;
@@ -75,6 +74,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
   const [restoreConfirming, setRestoreConfirming] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [uncheckingIds, setUncheckingIds] = useState<Set<number>>(new Set());
+  const [exporting, setExporting] = useState(false);
   const [liveMessage, setLiveMessage] = useState("");
   const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
 
@@ -209,6 +209,60 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
     return sortDir === "asc"
       ? <ArrowUp aria-hidden="true" className="h-3 w-3" />
       : <ArrowDown aria-hidden="true" className="h-3 w-3" />;
+  };
+
+  const downloadCsv = async () => {
+    setExporting(true);
+    const controller = new AbortController();
+    try {
+      let all: ClearedRow[];
+      if (selectedIds.size > 0) {
+        all = rows.filter((r) => selectedIds.has(r.id));
+      } else {
+        const params = new URLSearchParams({ status: "cleared", page: "1", limit: "10000" });
+        if (appliedSearch) params.set("search", appliedSearch);
+        params.set("sort", sortKey);
+        params.set("dir", sortDir);
+        const res = await fetch(`/api/overpaid-cases?${params.toString()}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Export failed (${res.status})`);
+        const json = await res.json();
+        all = json.data || [];
+      }
+      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Fees Confirmation", "Notice Received", "Notes", "Cleared On", "Last Updated"];
+      const escape = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
+      const csvRows = [
+        headers.join(","),
+        ...all.map((r) =>
+          [
+            escape(r.claimant),
+            escape(r.assignedTo ?? ""),
+            escape(r.region ?? ""),
+            r.feesReceived.toFixed(2),
+            r.overpaidAmount != null ? r.overpaidAmount.toFixed(2) : "",
+            escape(r.feesConfirmation ?? ""),
+            r.opLtrReceived ?? "",
+            escape(r.updateNote),
+            r.checksClearedAt ?? "",
+            r.updatedAt ? new Date(r.updatedAt).toLocaleDateString("en-US") : "",
+          ].join(","),
+        ),
+      ].join("\n");
+      const blob = new Blob([csvRows], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `overpaid-cases-cleared-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setError((err as Error).message);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleRestore = async () => {
@@ -444,6 +498,19 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                 ))}
               </select>
               <button
+                onClick={downloadCsv}
+                disabled={exporting || safeTotal === 0}
+                aria-label={selectedIds.size > 0 ? `Export ${selectedIds.size} selected to CSV` : "Export cleared cases to CSV"}
+                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                {exporting
+                  ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                  : <Download aria-hidden="true" className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">
+                  {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
+                </span>
+              </button>
+              <button
                 onClick={fetchCleared}
                 disabled={loading}
                 aria-label="Refresh cleared cases"
@@ -612,7 +679,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                           {row.overpaidAmount != null ? fmt(row.overpaidAmount) : "—"}
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{row.feesConfirmation ?? "—"}</td>
-                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.opLtrReceived)}</td>
+                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDateLong(row.opLtrReceived)}</td>
                         <td className={`${tdBase}`}>
                           <div className="relative">
                             <input
@@ -638,7 +705,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                             )}
                           </div>
                         </td>
-                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.checksClearedAt)}</td>
+                        <td className={`${tdBase} ${t.textMuted}`}>{fmtDateLong(row.checksClearedAt)}</td>
                         <td className={`${tdBase} text-center`}>
                           {uncheckingIds.has(row.id) ? (
                             <Loader2 aria-hidden="true" className={`h-3.5 w-3.5 animate-spin mx-auto ${t.textMuted}`} />

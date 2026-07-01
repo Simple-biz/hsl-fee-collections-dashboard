@@ -394,7 +394,6 @@ export const OverpaidCases = () => {
     if (selectedIds.size === 0 || bulkClearing) return;
     setBulkClearing(true);
     const ids = Array.from(selectedIds);
-    const previouslyUnclearedIds = rows.filter((r) => ids.includes(r.id) && !r.checksCleared).map((r) => r.id);
     try {
       const result = await bulkMarkCleared({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
@@ -403,9 +402,7 @@ export const OverpaidCases = () => {
       setSelectedIds(new Set());
       setBulkConfirming(false);
       setClearedRefreshToken((v) => v + 1);
-      if (previouslyUnclearedIds.length > 0) {
-        setUndoInfo({ caseIds: previouslyUnclearedIds, expiresAt: Date.now() + 8000 });
-      }
+      setUndoInfo({ caseIds: ids, expiresAt: Date.now() + 8000 });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -767,8 +764,6 @@ export const OverpaidCases = () => {
 
   const { pageFeesReceived, pageOverpaid } = pageTotals;
 
-  const selectedUnclearedCount = rows.filter((r) => selectedIds.has(r.id) && !r.checksCleared).length;
-
   const isInitialLoad = loading && rows.length === 0;
   const isRefreshing = loading && rows.length > 0;
 
@@ -907,11 +902,11 @@ export const OverpaidCases = () => {
                 {bulkConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
-                      Mark {selectedUnclearedCount} case{selectedUnclearedCount !== 1 ? "s" : ""} as cleared?
+                      Mark {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} as cleared?
                     </span>
                     <button
                       onClick={handleBulkMarkCleared}
-                      disabled={bulkClearing || selectedUnclearedCount === 0}
+                      disabled={bulkClearing}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       {bulkClearing
@@ -930,17 +925,10 @@ export const OverpaidCases = () => {
                   <>
                     <span className={`text-sm font-bold ${t.text}`}>
                       {selectedIds.size} selected
-                      {selectedUnclearedCount < selectedIds.size && (
-                        <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-                          ({selectedUnclearedCount} to clear)
-                        </span>
-                      )}
                     </span>
                     <button
                       onClick={() => setBulkConfirming(true)}
-                      disabled={selectedUnclearedCount === 0}
                       aria-label="Mark selected cases as cleared"
-                      title={selectedUnclearedCount === 0 ? "All selected cases are already cleared" : undefined}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
