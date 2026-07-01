@@ -362,12 +362,17 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
 
   const filteredAgents = useMemo(() => {
     const q = agentSearch.trim().toLowerCase();
-    return (data?.agents ?? []).filter((a) => {
-      if (q && !a.agent.toLowerCase().includes(q)) return false;
-      if (teamFilter !== "all" && a.team !== teamFilter) return false;
-      if (needsAttention && !hasOverdue(a, t2Days, t16Days, concDays)) return false;
-      return true;
-    });
+    return (data?.agents ?? [])
+      .filter((a) => {
+        if (q && !a.agent.toLowerCase().includes(q)) return false;
+        if (teamFilter !== "all" && a.team !== teamFilter) return false;
+        if (needsAttention && !hasOverdue(a, t2Days, t16Days, concDays)) return false;
+        return true;
+      })
+      // Alphabetical by name — the underlying query orders by team then
+      // name, which left agents with no team (a handful of departed staff)
+      // clustered at the very bottom instead of sorted in with everyone else.
+      .sort((a, b) => a.agent.localeCompare(b.agent));
   }, [data, agentSearch, teamFilter, t2Days, t16Days, concDays, needsAttention]);
 
   const filteredTotals = useMemo(() => ({
