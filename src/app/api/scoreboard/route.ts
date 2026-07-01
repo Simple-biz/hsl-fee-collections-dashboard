@@ -196,14 +196,7 @@ export const GET = async (req: NextRequest) => {
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
          AND fr.pif_ready_to_close IS NOT TRUE
-         AND NOT (
-           COALESCE(fr.t16_fee_due, 0)::numeric = 0
-           AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
-           AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
-           AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
-           AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
-           AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
-         )
+         AND fr.fees_confirmation IN ('Partial Payment', 'Pending (full/partial)')
         )::int AS open_partial,
 
         (SELECT COUNT(*) FROM fee_records fr
@@ -339,14 +332,7 @@ export const GET = async (req: NextRequest) => {
         )::int AS no_fees_count,
         COUNT(*) FILTER (
           WHERE pif_ready_to_close IS NOT TRUE
-            AND NOT (
-              COALESCE(t16_fee_due, 0)::numeric = 0
-              AND COALESCE(t2_fee_due, 0)::numeric = 0
-              AND COALESCE(aux_fee_due, 0)::numeric = 0
-              AND COALESCE(t16_fee_received, 0)::numeric = 0
-              AND COALESCE(t2_fee_received, 0)::numeric = 0
-              AND COALESCE(aux_fee_received, 0)::numeric = 0
-            )
+            AND fees_confirmation IN ('Partial Payment', 'Pending (full/partial)')
         )::int AS partial_count
       FROM fee_records
       WHERE is_closed = false
