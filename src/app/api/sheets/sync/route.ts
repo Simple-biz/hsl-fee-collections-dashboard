@@ -208,6 +208,12 @@ export const POST = async (req: NextRequest) => {
         const s = (field: string, a: string | null | undefined, b: string | null | undefined) => {
           if ((a ?? null) !== (b ?? null)) f.push({ field, sheet: String(a ?? ""), db: String(b ?? "") });
         };
+        // Like `s`, but for fields the upsert preserves rather than blanks
+        // when the sheet has no value — a blank sheet cell isn't a "change"
+        // since the DB value survives the sync untouched.
+        const sPreserveOnBlank = (field: string, a: string | null | undefined, b: string | null | undefined) => {
+          if (a != null && a !== (b ?? null)) f.push({ field, sheet: String(a), db: String(b ?? "") });
+        };
         // Compare monetary amounts with 1-cent tolerance. The sheet formula (0.25 × retro)
         // produces sub-cent values like 4760.695. Postgres decimal(12,2) stores 4760.70 (rounds
         // up), but JavaScript IEEE 754 stores 4760.695 as 4760.6949... and any JS rounding
@@ -233,7 +239,7 @@ export const POST = async (req: NextRequest) => {
         s("assignedTo", r.assignedTo, db.assignedTo);
         s("winSheetStatus", r.winSheetStatus, db.winSheetStatus ?? "not_started");
         s("caseStatus", r.caseStatus, db.caseStatus);
-        s("feesConfirmation", r.feesConfirmation, db.feesConfirmation);
+        sPreserveOnBlank("feesConfirmation", r.feesConfirmation, db.feesConfirmation);
         s("dateAssignedToAgent", r.dateAssignedToAgent, db.dateAssignedToAgent);
         s("approvedBy", r.approvedBy, db.approvedBy);
         n("t16Retro", r.t16Retro, db.t16Retro);
