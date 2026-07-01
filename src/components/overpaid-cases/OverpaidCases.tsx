@@ -27,8 +27,7 @@ import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestor
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import AddCaseModal from "@/components/modals/AddCaseModal";
 import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
-import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
-import type { ApprovedByOption } from "@/types";
+import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 
 // ---------- types ----------
 interface OverpaidCaseRow {
@@ -700,16 +699,7 @@ export const OverpaidCases = () => {
   const openAddCase = async () => {
     if (Object.keys(dropdownOptions).length === 0) {
       try {
-        const res = await fetch("/api/settings/dropdown-options");
-        if (res.ok) {
-          const json = await res.json();
-          const all: (ApprovedByOption & { category: string })[] = json.data || [];
-          const grouped: DropdownOptionsByCategory = {};
-          for (const o of all) {
-            (grouped[o.category as keyof DropdownOptionsByCategory] ||= []).push(o);
-          }
-          setDropdownOptions(grouped);
-        }
+        setDropdownOptions(await fetchDropdownOptions());
       } catch {
         /* non-critical — modal falls back to empty dropdowns */
       }

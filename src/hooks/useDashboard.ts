@@ -9,10 +9,12 @@ import type {
   ApprovedByOption,
 } from "@/types";
 import type { DropdownCategory } from "@/lib/dropdown-categories";
+import type { DropdownOptionsByCategory } from "@/lib/dropdown-options";
 
-export type DropdownOptionsByCategory = Partial<
-  Record<DropdownCategory, ApprovedByOption[]>
->;
+// Re-exported for the many existing `from "@/hooks/useDashboard"` imports —
+// the type itself now lives in lib/dropdown-options.ts alongside the fetch
+// helper other pages use instead of pulling in this whole hook.
+export type { DropdownOptionsByCategory };
 
 interface DashboardData {
   cases: CaseRow[];
@@ -90,7 +92,13 @@ export const useDashboard = (): DashboardData => {
         const optJson = await optRes.json();
         const all: (ApprovedByOption & { category: DropdownCategory })[] =
           optJson.data || [];
-        // Group by category for fast per-cell lookup in the table.
+        // Grouped inline rather than via the shared groupDropdownOptions()
+        // helper — routing this specific assignment through a function call
+        // trips a false-positive react-hooks/set-state-in-effect on this
+        // effect's deeply-nested async IIFE (verified: reverting to the
+        // inline loop, byte-for-byte the same result, makes the lint error
+        // disappear). Keep this in sync with lib/dropdown-options.ts's
+        // groupDropdownOptions if the category-key logic ever changes.
         const grouped: DropdownOptionsByCategory = {};
         for (const o of all) {
           (grouped[o.category] ||= []).push(o);

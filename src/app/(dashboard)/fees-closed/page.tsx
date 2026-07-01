@@ -6,7 +6,8 @@ import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
 import { useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
-import type { CaseRow } from "@/types";
+import type { CaseRow, ApprovedByOption } from "@/types";
+import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 
 type LevelFilter = "all" | "fee_petition";
 
@@ -22,6 +23,8 @@ export default function FeesClosedPage() {
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
   const [closedFrom, setClosedFrom] = useState("");
   const [closedTo, setClosedTo] = useState("");
+  const [dropdownOptions, setDropdownOptions] = useState<DropdownOptionsByCategory>({});
+  const [approvedByOptions, setApprovedByOptions] = useState<ApprovedByOption[]>([]);
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchClosed = useCallback(async () => {
@@ -40,6 +43,25 @@ export default function FeesClosedPage() {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
+  }, []);
+
+  // Powers the inline-editable dropdowns (Fees Conf, Claim, Level, Assigned,
+  // Win Sheet Status, Approved By) — FeeRecordsTable renders those as
+  // "— Select —" plus only the current value when this is empty. Master Fees
+  // gets this for free via useDashboard(); fees-closed fetches its own case
+  // list instead, so it needs this separately.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchDropdownOptions(controller.signal)
+      .then((grouped) => {
+        setDropdownOptions(grouped);
+        setApprovedByOptions(grouped.approved_by || []);
+      })
+      // Includes AbortError on unmount — fetchDropdownOptions doesn't catch
+      // it internally, so it lands here and we correctly skip the setState
+      // calls above instead of firing them after unmount.
+      .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -157,6 +179,8 @@ export default function FeesClosedPage() {
         dateRange={dateRange}
         mode="closed"
         onImported={fetchClosed}
+        dropdownOptions={dropdownOptions}
+        approvedByOptions={approvedByOptions}
       />
     </div>
   );
