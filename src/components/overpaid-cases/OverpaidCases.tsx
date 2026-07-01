@@ -29,6 +29,7 @@ import AddCaseModal from "@/components/modals/AddCaseModal";
 import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
 import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 import { NoteField } from "@/components/shared/NoteField";
+import { ClearedCases } from "@/components/overpaid-cases/ClearedCases";
 
 // ---------- types ----------
 interface OverpaidCaseRow {
@@ -50,16 +51,13 @@ interface OverpaidCaseRow {
 type CheckboxKey = "checksCleared";
 type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo";
 type SortDir = "asc" | "desc";
-type StatusFilter = "all" | "cleared" | "pending";
 type LtrFilter = "" | "none";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const SORT_KEYS: SortKey[] = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo"];
-const STATUS_VALUES: StatusFilter[] = ["all", "cleared", "pending"];
 const DEFAULTS = {
   search: "",
-  status: "all" as StatusFilter,
   agent: "",
   ltr: "" as LtrFilter,
   minAmount: "",
@@ -127,9 +125,6 @@ export const OverpaidCases = () => {
   const urlParams = useSearchParams();
   const initialState = useRef({
     search: urlParams.get("q") ?? DEFAULTS.search,
-    status: (STATUS_VALUES.includes(urlParams.get("status") as StatusFilter)
-      ? (urlParams.get("status") as StatusFilter)
-      : DEFAULTS.status) as StatusFilter,
     agent: urlParams.get("agent") ?? DEFAULTS.agent,
     ltr: (urlParams.get("ltr") === "none" ? "none" : "") as LtrFilter,
     minAmount: urlParams.get("minAmount") ?? DEFAULTS.minAmount,
@@ -147,7 +142,7 @@ export const OverpaidCases = () => {
   const [rows, setRows] = useState<OverpaidCaseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({ totalOverpaid: 0, clearedCount: 0, ltrCount: 0 });
+  const [stats, setStats] = useState({ totalOverpaid: 0, ltrCount: 0 });
   const [pageTotals, setPageTotals] = useState({ pageFeesReceived: 0, pageOverpaid: 0 });
   const [agents, setAgents] = useState<{ name: string; count: number }[]>([]);
 
@@ -159,7 +154,6 @@ export const OverpaidCases = () => {
   const [pageSize, setPageSize] = useState(initialState.pageSize);
   const [total, setTotal] = useState(0);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialState.status);
   const [agentFilter, setAgentFilter] = useState(initialState.agent);
   const [ltrFilter, setLtrFilter] = useState<LtrFilter>(initialState.ltr);
   const [minAmount, setMinAmount] = useState(initialState.minAmount);
@@ -176,6 +170,10 @@ export const OverpaidCases = () => {
   const [bulkConfirming, setBulkConfirming] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{ caseIds: number[]; expiresAt: number } | null>(null);
   const [undoing, setUndoing] = useState(false);
+  // Bumped whenever a case is marked/un-marked cleared from this table, so
+  // the independently-fetching ClearedCases section below knows to refresh
+  // its badge (and its list, if already expanded).
+  const [clearedRefreshToken, setClearedRefreshToken] = useState(0);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const urlMethodRef = useRef<"push" | "replace">("replace");
@@ -184,7 +182,6 @@ export const OverpaidCases = () => {
   useEffect(() => {
     const params = new URLSearchParams();
     if (appliedSearch) params.set("q", appliedSearch);
-    if (statusFilter !== DEFAULTS.status) params.set("status", statusFilter);
     if (agentFilter !== DEFAULTS.agent) params.set("agent", agentFilter);
     if (ltrFilter) params.set("ltr", ltrFilter);
     if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
@@ -203,15 +200,11 @@ export const OverpaidCases = () => {
       { scroll: false },
     );
     urlMethodRef.current = "replace";
-  }, [appliedSearch, statusFilter, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
+  }, [appliedSearch, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
 
   // Sync URL → state (back/forward)
   useEffect(() => {
     const urlSearch = urlParams.get("q") ?? DEFAULTS.search;
-    const urlStatusRaw = urlParams.get("status") as StatusFilter | null;
-    const urlStatus = STATUS_VALUES.includes(urlStatusRaw as StatusFilter)
-      ? (urlStatusRaw as StatusFilter)
-      : DEFAULTS.status;
     const urlSortRaw = urlParams.get("sort") as SortKey | null;
     const urlSort = SORT_KEYS.includes(urlSortRaw as SortKey)
       ? (urlSortRaw as SortKey)
@@ -226,7 +219,6 @@ export const OverpaidCases = () => {
     const urlMax = urlParams.get("maxAmount") ?? DEFAULTS.maxAmount;
 
     if (urlSearch !== appliedSearch) { setSearch(urlSearch); setAppliedSearch(urlSearch); }
-    if (urlStatus !== statusFilter) setStatusFilter(urlStatus);
     if (urlAgent !== agentFilter) setAgentFilter(urlAgent);
     if (urlLtr !== ltrFilter) setLtrFilter(urlLtr);
     if (urlMin !== appliedMinAmount) { setMinAmount(urlMin); setAppliedMinAmount(urlMin); }
@@ -298,7 +290,7 @@ export const OverpaidCases = () => {
         limit: String(pageSize),
       });
       if (appliedSearch) params.set("search", appliedSearch);
-      if (statusFilter !== "all") params.set("status", statusFilter);
+      params.set("status", "pending");
       if (agentFilter) params.set("agent", agentFilter);
       if (ltrFilter) params.set("ltr", ltrFilter);
       if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
@@ -317,7 +309,6 @@ export const OverpaidCases = () => {
       setTotal(typeof json.total === "number" ? json.total : data.length);
       setStats({
         totalOverpaid: typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0,
-        clearedCount: typeof json.clearedCount === "number" ? json.clearedCount : 0,
         ltrCount: typeof json.ltrCount === "number" ? json.ltrCount : 0,
       });
       setPageTotals({
@@ -337,7 +328,7 @@ export const OverpaidCases = () => {
     } finally {
       if (fetchAbortRef.current === controller) setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, statusFilter, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir]);
+  }, [page, pageSize, appliedSearch, agentFilter, ltrFilter, appliedMinAmount, appliedMaxAmount, sortKey, sortDir]);
 
   useEffect(() => {
     fetchCases();
@@ -355,7 +346,6 @@ export const OverpaidCases = () => {
 
   const hasFilters =
     appliedSearch !== DEFAULTS.search ||
-    statusFilter !== DEFAULTS.status ||
     agentFilter !== DEFAULTS.agent ||
     ltrFilter !== DEFAULTS.ltr ||
     appliedMinAmount !== DEFAULTS.minAmount ||
@@ -365,7 +355,6 @@ export const OverpaidCases = () => {
     urlMethodRef.current = "push";
     setSearch(DEFAULTS.search);
     setAppliedSearch(DEFAULTS.search);
-    setStatusFilter(DEFAULTS.status);
     setAgentFilter(DEFAULTS.agent);
     setLtrFilter(DEFAULTS.ltr);
     setMinAmount(DEFAULTS.minAmount);
@@ -409,14 +398,11 @@ export const OverpaidCases = () => {
     try {
       const result = await bulkMarkCleared({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
-      setRows((prev) => prev.map((r) => ids.includes(r.id) ? { ...r, checksCleared: true } : r));
-      setStats((s) => ({ ...s, clearedCount: s.clearedCount + previouslyUnclearedIds.length }));
-      if (statusFilter === "pending") {
-        setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-        setTotal((tot) => Math.max(0, tot - ids.length));
-      }
+      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+      setTotal((tot) => Math.max(0, tot - ids.length));
       setSelectedIds(new Set());
       setBulkConfirming(false);
+      setClearedRefreshToken((v) => v + 1);
       if (previouslyUnclearedIds.length > 0) {
         setUndoInfo({ caseIds: previouslyUnclearedIds, expiresAt: Date.now() + 8000 });
       }
@@ -435,12 +421,8 @@ export const OverpaidCases = () => {
       const result = await bulkRestoreCleared({ caseIds: restoreIds });
       if (!result.ok) throw new Error(result.error);
       setUndoInfo(null);
-      if (statusFilter === "pending") {
-        fetchCases();
-      } else {
-        setRows((prev) => prev.map((r) => restoreIds.includes(r.id) ? { ...r, checksCleared: false } : r));
-        setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount - restoreIds.length) }));
-      }
+      fetchCases();
+      setClearedRefreshToken((v) => v + 1);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -493,20 +475,14 @@ export const OverpaidCases = () => {
     try {
       await patchCase(id, { [key]: next });
       if (key === "checksCleared") {
-        setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount + (next ? 1 : -1)) }));
-      }
-      if (statusFilter === "cleared" && key === "checksCleared" && !next) {
-        setRows((prev) => prev.filter((r) => r.id !== id));
-        setTotal((tot) => Math.max(0, tot - 1));
-      } else if (statusFilter === "pending" && key === "checksCleared" && next) {
-        setRows((prev) => prev.filter((r) => r.id !== id));
-        setTotal((tot) => Math.max(0, tot - 1));
+        setClearedRefreshToken((v) => v + 1);
+        if (next) {
+          setRows((prev) => prev.filter((r) => r.id !== id));
+          setTotal((tot) => Math.max(0, tot - 1));
+        }
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next, ...( key === "checksCleared" ? { checksClearedAt: prevRow.checksClearedAt } : {}) } : r)));
-      if (key === "checksCleared") {
-        setStats((s) => ({ ...s, clearedCount: Math.max(0, s.clearedCount + (next ? -1 : 1)) }));
-      }
       setError((err as Error).message);
     }
   };
@@ -735,7 +711,7 @@ export const OverpaidCases = () => {
       } else {
         const params = new URLSearchParams({ page: "1", limit: "10000" });
         if (appliedSearch) params.set("search", appliedSearch);
-        if (statusFilter !== "all") params.set("status", statusFilter);
+        params.set("status", "pending");
         if (agentFilter) params.set("agent", agentFilter);
         if (ltrFilter) params.set("ltr", ltrFilter);
         if (appliedMinAmount) params.set("minAmount", appliedMinAmount);
@@ -821,7 +797,7 @@ export const OverpaidCases = () => {
           validateRow={validateOcRow}
           onImport={bulkImportOverpaidCases}
           onClose={() => setCsvImportOpen(false)}
-          onSuccess={fetchCases}
+          onSuccess={() => { fetchCases(); setClearedRefreshToken((v) => v + 1); }}
         />
       )}
       {addCaseOpen && (
@@ -856,31 +832,16 @@ export const OverpaidCases = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className={`${sectionCard} p-4`}>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Cases</p>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Pending Cases</p>
           <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : String(total)}</p>
-          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>with overpayment</p>
+          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>awaiting cleared checks</p>
         </div>
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
           <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{isInitialLoad ? "—" : fmtFull(stats.totalOverpaid)}</p>
           <p className={`text-[10px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
-        </div>
-        <div className={`${sectionCard} p-4`}>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Checks Cleared</p>
-          <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : `${stats.clearedCount} / ${total}`}</p>
-          {!isInitialLoad && total > 0 && (
-            <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
-              <div
-                className="h-1.5 rounded-full bg-emerald-500 transition-[width] duration-300"
-                style={{ width: `${Math.min(100, (stats.clearedCount / total) * 100)}%` }}
-              />
-            </div>
-          )}
-          <p className={`text-[10px] ${t.textMuted} mt-1`}>
-            {!isInitialLoad && total > 0 ? `${Math.round((stats.clearedCount / total) * 100)}% resolved` : "cases resolved"}
-          </p>
         </div>
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
@@ -1031,16 +992,6 @@ export const OverpaidCases = () => {
               />
             </div>
             <select
-              value={statusFilter}
-              onChange={(e) => { urlMethodRef.current = "push"; setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
-              aria-label="Filter by status"
-              className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
-            >
-              <option value="all">All</option>
-              <option value="cleared">Checks Cleared</option>
-              <option value="pending">Pending</option>
-            </select>
-            <select
               value={agentFilter}
               onChange={(e) => { urlMethodRef.current = "push"; setAgentFilter(e.target.value); setPage(1); }}
               aria-label="Filter by assigned agent"
@@ -1121,16 +1072,6 @@ export const OverpaidCases = () => {
           >
             No LTR Sent
           </button>
-          <button
-            onClick={() => {
-              urlMethodRef.current = "push";
-              setStatusFilter((v) => (v === "pending" ? "all" : "pending"));
-              setPage(1);
-            }}
-            className={`${presetBase} ${statusFilter === "pending" ? presetActive : t.outlineBtn}`}
-          >
-            Pending
-          </button>
           <div className="ml-auto flex items-center gap-1.5 shrink-0">
             <span className={`text-[11px] ${t.textMuted}`}>$</span>
             <input
@@ -1162,14 +1103,6 @@ export const OverpaidCases = () => {
               <span className={chipBase}>
                 Search: {appliedSearch}
                 <button aria-label="Clear search filter" onClick={() => { setSearch(""); setAppliedSearch(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
-                  <X aria-hidden="true" className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-            {statusFilter !== "all" && (
-              <span className={chipBase}>
-                Status: {statusFilter === "cleared" ? "Checks Cleared" : "Pending"}
-                <button aria-label="Clear status filter" onClick={() => { urlMethodRef.current = "push"; setStatusFilter("all"); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
@@ -1334,23 +1267,15 @@ export const OverpaidCases = () => {
                 </tr>
               ) : (
                 rows.map((row) => {
-                  const isCleared = row.checksCleared;
                   const isHighValue = row.overpaidAmount != null && row.overpaidAmount >= 3000;
                   const isSelected = selectedIds.has(row.id);
-                  const needsAttention = !isCleared && !row.feesConfirmation && !row.opLtrReceived && !row.updateNote;
-                  const clearedBg = isCleared
-                    ? dark ? "bg-emerald-900/40" : "bg-emerald-100/80"
-                    : "";
-                  const stickyBg = isCleared
-                    ? dark ? "bg-emerald-900" : "bg-emerald-100"
-                    : dark ? "bg-neutral-900" : "bg-white";
-                  const stickyHover = isCleared
-                    ? dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200"
-                    : dark ? "group-hover/row:bg-neutral-800" : "group-hover/row:bg-neutral-50";
+                  const needsAttention = !row.feesConfirmation && !row.opLtrReceived && !row.updateNote;
+                  const stickyBg = dark ? "bg-neutral-900" : "bg-white";
+                  const stickyHover = dark ? "group-hover/row:bg-neutral-800" : "group-hover/row:bg-neutral-50";
                   return (
                     <tr
                       key={row.id}
-                      className={`group/row border-b ${rowBorder} ${clearedBg} ${rowHover} transition-colors ${isHighValue ? "border-l-2 border-l-amber-500" : ""}`}
+                      className={`group/row border-b ${rowBorder} ${rowHover} transition-colors ${isHighValue ? "border-l-2 border-l-amber-500" : ""}`}
                     >
                       <td className={`${tdBase} text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
                         <input
@@ -1490,20 +1415,13 @@ export const OverpaidCases = () => {
                         />
                       </td>
                       <td className={`${tdBase} text-center`}>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <input
-                            type="checkbox"
-                            checked={row.checksCleared}
-                            onChange={() => toggleCheckbox(row.id, "checksCleared")}
-                            aria-label="Checks cleared"
-                            className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-                          />
-                          {row.checksClearedAt && (
-                            <p className={`text-[10px] ${t.textMuted}`}>
-                              {new Date(row.checksClearedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            </p>
-                          )}
-                        </div>
+                        <input
+                          type="checkbox"
+                          checked={row.checksCleared}
+                          onChange={() => toggleCheckbox(row.id, "checksCleared")}
+                          aria-label="Checks cleared"
+                          className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+                        />
                       </td>
                     </tr>
                   );
@@ -1570,6 +1488,8 @@ export const OverpaidCases = () => {
           </div>
         </div>
       </div>
+
+      <ClearedCases dark={dark} t={t} refreshToken={clearedRefreshToken} onRestored={fetchCases} />
     </div>
   );
 };
