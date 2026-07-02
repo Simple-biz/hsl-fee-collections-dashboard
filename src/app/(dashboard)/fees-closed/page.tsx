@@ -25,6 +25,9 @@ export default function FeesClosedPage() {
   const [closedTo, setClosedTo] = useState("");
   const [dropdownOptions, setDropdownOptions] = useState<DropdownOptionsByCategory>({});
   const [approvedByOptions, setApprovedByOptions] = useState<ApprovedByOption[]>([]);
+  const [teamMembers, setTeamMembers] = useState<
+    { name: string; team: string | null; role: string }[]
+  >([]);
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchClosed = useCallback(async () => {
@@ -60,6 +63,18 @@ export default function FeesClosedPage() {
       // Includes AbortError on unmount — fetchDropdownOptions doesn't catch
       // it internally, so it lands here and we correctly skip the setState
       // calls above instead of firing them after unmount.
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  // Colors the Assigned dropdown by team — master-fees gets this for free via
+  // useDashboard(); fees-closed needs its own fetch same as the dropdown
+  // options above.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/team-members", { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((json) => setTeamMembers(json.data || []))
       .catch(() => {});
     return () => controller.abort();
   }, []);
@@ -181,6 +196,7 @@ export default function FeesClosedPage() {
         onImported={fetchClosed}
         dropdownOptions={dropdownOptions}
         approvedByOptions={approvedByOptions}
+        teamMembers={teamMembers}
       />
     </div>
   );

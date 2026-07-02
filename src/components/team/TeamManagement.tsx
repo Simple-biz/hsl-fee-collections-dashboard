@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { teamBadgeClasses } from "@/lib/team-colors";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -452,13 +453,7 @@ export const TeamManagement = () => {
                     <td className="px-4 py-2.5">
                       {m.team ? (
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            m.team === "T2"
-                              ? dark ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-700"
-                              : m.team === "T16"
-                              ? dark ? "bg-purple-900/30 text-purple-400" : "bg-purple-50 text-purple-700"
-                              : dark ? "bg-teal-900/30 text-teal-400" : "bg-teal-50 text-teal-700"
-                          }`}
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${teamBadgeClasses(m.team, dark)}`}
                         >
                           {m.team}
                         </span>

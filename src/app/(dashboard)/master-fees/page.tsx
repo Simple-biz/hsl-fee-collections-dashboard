@@ -19,12 +19,18 @@ const AGING_OPTIONS: { value: AgingFilter; label: string }[] = [
 export default function MasterFeesPage() {
   const {
     cases,
+    team,
     approvedByOptions,
     dropdownOptions,
     casesLoading,
     error,
     refresh,
   } = useDashboard();
+  const teamMembers = team.map((m) => ({
+    name: m.name,
+    team: m.team,
+    role: m.role,
+  }));
   const { dateRange } = useDateRange();
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
@@ -110,6 +116,7 @@ export default function MasterFeesPage() {
         onImported={refresh}
         approvedByOptions={approvedByOptions}
         dropdownOptions={dropdownOptions}
+        teamMembers={teamMembers}
         approverFilter={approverFilter}
         onApproverFilterChange={setApproverFilter}
       />

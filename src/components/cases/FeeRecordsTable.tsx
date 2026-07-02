@@ -43,12 +43,17 @@ import MyCaseSyncModal from "@/components/modals/MyCaseSyncModal";
 import NotesModal from "@/components/modals/NotesModal";
 import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
+import { Listbox } from "@/components/shared/Listbox";
+import { caseLevelVisual } from "@/lib/case-level-icons";
+import { buildListboxOptions } from "@/lib/listbox-options";
+import { teamRowTint } from "@/lib/team-colors";
+import { memberRowTint } from "@/lib/member-colors";
 
 const FEES_CONF_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "Paid In Full":           { badge: "bg-emerald-50 text-emerald-700 border-emerald-300",  badgeDark: "bg-emerald-900/40 text-emerald-300 border-emerald-700" },
   "Partial Payment":        { badge: "bg-red-50 text-red-700 border-red-300",              badgeDark: "bg-red-900/40 text-red-300 border-red-700"             },
   "Pending (full/partial)": { badge: "bg-blue-50 text-blue-700 border-blue-300",           badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"          },
-  "No Fees Due":            { badge: "bg-purple-50 text-purple-700 border-purple-300",     badgeDark: "bg-purple-900/40 text-purple-300 border-purple-700"    },
+  "No Fees Due":            { badge: "bg-neutral-100 text-black border-neutral-400",        badgeDark: "bg-neutral-800 text-white border-neutral-600"          },
   "Overpaid":               { badge: "bg-amber-50 text-amber-700 border-amber-300",        badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"       },
 };
 const FEES_CONF_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
@@ -153,6 +158,10 @@ interface FeeRecordsTableProps {
   // Fees Confirmation, Case Status). Optional — an empty list just yields
   // an empty dropdown with the current value preserved as a fallback.
   dropdownOptions?: DropdownOptionsByCategory;
+  // Team members (name + team + role) — colors the Assigned dropdown by
+  // team, and highlights team_lead members by team in the Approved By
+  // dropdown so it's obvious who can actually sign off on closing a case.
+  teamMembers?: { name: string; team: string | null; role: string }[];
   // Optional approver filter rendered in the toolbar before the Sync button.
   // Only the master-fees page passes this; fees-closed omits it.
   approverFilter?: string;
@@ -245,6 +254,7 @@ export const FeeRecordsTable = ({
   mode = "active",
   approvedByOptions = [],
   dropdownOptions = {},
+  teamMembers = [],
   approverFilter,
   onApproverFilterChange,
 }: FeeRecordsTableProps) => {
@@ -266,6 +276,7 @@ export const FeeRecordsTable = ({
   const caseLevelOptions = dropdownOptions.case_level ?? [];
   const claimTypeOptions = dropdownOptions.claim_type ?? [];
   const winSheetStatusOptions = dropdownOptions.win_sheet_status ?? [];
+  const leaders = teamMembers.filter((m) => m.role === "team_lead");
 
   // Keys for varchar cells that support inline-edit dropdowns. `status` is
   // the win_sheet_status row field; `level`/`claim` live on the cases row.
@@ -1276,48 +1287,34 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} ${t.textSub} ${stickyTd2}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
-                          value={cellValue(c, "assigned")}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "assignedTo",
-                              "assigned",
-                              "Assigned To",
-                              e.target.value,
-                            )
-                          }
-                          className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            assignedOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "assigned");
-                            return (
-                              v &&
-                              !assignedOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {assignedOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "assigned"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
+                      <Listbox
+                        value={cellValue(c, "assigned")}
+                        onChange={(v) =>
+                          handleVarcharChange(
+                            c,
+                            "fee",
+                            "assignedTo",
+                            "assigned",
+                            "Assigned To",
+                            v,
+                          )
+                        }
+                        dark={dark}
+                        t={t}
+                        aria-label="Assigned To"
+                        className="w-full"
+                        title={
+                          assignedOptions.length === 0
+                            ? "No options configured — add them in Settings"
+                            : undefined
+                        }
+                        options={buildListboxOptions(
+                          assignedOptions,
+                          cellValue(c, "assigned"),
+                          undefined,
+                          (name) => memberRowTint(name, dark),
+                        )}
+                      />
                     </td>
                     {/* Fees Confirmation — 3rd frozen column */}
                     <td
@@ -1413,47 +1410,37 @@ export const FeeRecordsTable = ({
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
-                          value={cellValue(c, "level")}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
-                            handleVarcharChange(
-                              c,
-                              "case",
-                              "levelWon",
-                              "level",
-                              "Case Level",
-                              e.target.value,
-                            )
-                          }
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            caseLevelOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "level");
-                            return (
-                              v &&
-                              !caseLevelOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {caseLevelOptions
-                            .filter(
-                              (o) =>
-                                o.isActive || o.name === cellValue(c, "level"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
+                      <Listbox
+                        value={cellValue(c, "level")}
+                        onChange={(v) =>
+                          handleVarcharChange(
+                            c,
+                            "case",
+                            "levelWon",
+                            "level",
+                            "Case Level",
+                            v,
+                          )
+                        }
+                        dark={dark}
+                        t={t}
+                        aria-label="Case Level"
+                        title={
+                          caseLevelOptions.length === 0
+                            ? "No options configured — add them in Settings"
+                            : undefined
+                        }
+                        options={buildListboxOptions(
+                          caseLevelOptions,
+                          cellValue(c, "level"),
+                          (name) => {
+                            const visual = caseLevelVisual(name, dark);
+                            return visual
+                              ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
+                              : undefined;
+                          },
+                        )}
+                      />
                     </td>
                     {/* Claim — varchar; lives on the cases row. */}
                     <td
@@ -1933,48 +1920,36 @@ export const FeeRecordsTable = ({
                       {mode === "closed" || !canFinalize ? (
                         cellValue(c, "approvedBy") || "—"
                       ) : (
-                        <select
+                        <Listbox
                           value={cellValue(c, "approvedBy")}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             handleVarcharChange(
                               c,
                               "fee",
                               "approvedBy",
                               "approvedBy",
                               "Approved By",
-                              e.target.value,
+                              v,
                             )
                           }
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          dark={dark}
+                          t={t}
+                          aria-label="Approved By"
                           title={
                             approvedByOptions.length === 0
                               ? "No options configured — add them in Settings"
                               : undefined
                           }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "approvedBy");
-                            return (
-                              v &&
-                              !approvedByOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {approvedByOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "approvedBy"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
+                          options={buildListboxOptions(
+                            approvedByOptions,
+                            cellValue(c, "approvedBy"),
+                            undefined,
+                            (name) => {
+                              const leader = leaders.find((l) => l.name === name);
+                              return leader ? teamRowTint(leader.team, dark) : undefined;
+                            },
+                          )}
+                        />
                       )}
                     </td>
                     {/* Remarks */}
