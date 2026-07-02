@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Pencil,
   Check,
-  TrendingDown,
   Plus,
   X,
   Archive,
@@ -337,9 +336,6 @@ export const FeeRecordsTable = ({
   const [archivePendingSource, setArchivePendingSource] = useState<
     "active_sheet" | "fees_closed_sheet"
   >("active_sheet");
-  const [overpaidOverrides, setOverpaidOverrides] = useState<
-    Record<number, boolean>
-  >({});
   // Optimistic overrides for fee payment totals after panel add/delete.
   const [feeOverrides, setFeeOverrides] = useState<
     Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16Pending" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2Pending" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxPending" | "auxFeeReceived" | "auxFeeReceivedDate">>>
@@ -353,10 +349,8 @@ export const FeeRecordsTable = ({
   const [feeAmountSaving, setFeeAmountSaving] = useState(false);
   const [feeAmountError, setFeeAmountError] = useState<string | null>(null);
   const feeAmountAbortRef = useRef<AbortController | null>(null);
-  const [batchLoading, setBatchLoading] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
-  const batchOverpaidAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     const abortMap = patchAbortRef.current;
     const feeAmountRef = feeAmountAbortRef;
@@ -382,52 +376,6 @@ export const FeeRecordsTable = ({
     setSelectedIds(
       allSelected ? new Set() : new Set(filtered.map((c) => c.id)),
     );
-  };
-
-  const handleBatchOverpaid = async (mark: boolean) => {
-    if (selectedIds.size === 0 || batchLoading) return;
-    const ids = Array.from(selectedIds);
-    batchOverpaidAbortRef.current?.abort();
-    const controller = new AbortController();
-    batchOverpaidAbortRef.current = controller;
-    setBatchLoading(true);
-    // Optimistic override only when marking — removing the flag should not
-    // immediately change the visual state in this table (it takes effect on
-    // the next data refresh so the row highlight isn't stripped mid-session).
-    if (mark) {
-      setOverpaidOverrides((prev) => {
-        const next = { ...prev };
-        ids.forEach((id) => {
-          next[id] = true;
-        });
-        return next;
-      });
-    }
-    try {
-      const res = await fetch("/api/cases/bulk-overpaid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseIds: ids, markedOverpaid: mark }),
-        signal: controller.signal,
-      });
-      if (!res.ok)
-        throw new Error(`Failed to update overpaid flag (${res.status})`);
-      setSelectedIds(new Set());
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      if (mark) {
-        setOverpaidOverrides((prev) => {
-          const next = { ...prev };
-          ids.forEach((id) => {
-            delete next[id];
-          });
-          return next;
-        });
-      }
-      window.alert((err as Error).message);
-    } finally {
-      setBatchLoading(false);
-    }
   };
 
   const handleBatchArchive = () => {
@@ -988,37 +936,24 @@ export const FeeRecordsTable = ({
         </div>
       </div>
 
-      {/* Floating batch action pill — fixed to the viewport bottom */}
-      {selectedIds.size > 0 && (canFinalize || isAdmin) && (
+      {/* Floating batch action pill — fixed to the viewport bottom. Archive is
+          the only batch action; marking a case overpaid is Fees Conf-only
+          now (see the "Fees Confirmation" column) so it's a single,
+          unambiguous path instead of two ways to do the same thing. */}
+      {selectedIds.size > 0 && isAdmin && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex justify-center">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
             <span className="text-[11px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
             </span>
-            {canFinalize && (
-              <button
-                onClick={() => handleBatchOverpaid(true)}
-                disabled={batchLoading}
-                className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-gray-900 transition-colors disabled:opacity-50"
-              >
-                {batchLoading ? (
-                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                ) : (
-                  <TrendingDown aria-hidden="true" className="h-3 w-3" />
-                )}
-                Mark as Overpaid
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={handleBatchArchive}
-                disabled={batchLoading || archiveConfirmOpen}
-                className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
-              >
-                <Archive aria-hidden="true" className="h-3 w-3" />
-                Archive
-              </button>
-            )}
+            <button
+              onClick={handleBatchArchive}
+              disabled={archiveConfirmOpen}
+              className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
+            >
+              <Archive aria-hidden="true" className="h-3 w-3" />
+              Archive
+            </button>
             <button
               onClick={() => setSelectedIds(new Set())}
               aria-label="Clear selection"
@@ -1264,7 +1199,7 @@ export const FeeRecordsTable = ({
             <tbody>
               {paged.map((rawC) => {
                 const c = { ...rawC, ...feeOverrides[rawC.id] };
-                const isOverpaid = overpaidOverrides[c.id] ?? c.markedOverpaid;
+                const isOverpaid = c.markedOverpaid;
                 return (
                   <tr
                     key={c.id}
