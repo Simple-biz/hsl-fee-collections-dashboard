@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import type { themeClasses } from "@/lib/theme-classes";
@@ -34,6 +34,10 @@ interface ListboxProps {
 // stylable on a native <option> across browsers. Renders the open panel via
 // a portal positioned from the trigger's bounding rect so it isn't clipped
 // by the fee table's scroll containers or sticky columns.
+// Type-ahead resets the buffer if the user pauses this long between keys —
+// matches native <select> behavior closely enough without a debounce lib.
+const TYPEAHEAD_RESET_MS = 350;
+
 export function Listbox({
   value,
   options,
@@ -47,8 +51,11 @@ export function Listbox({
 }: ListboxProps) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const typeaheadRef = useRef({ buffer: "", timer: null as ReturnType<typeof setTimeout> | null });
 
   const selected = options.find((o) => o.value === value);
 
@@ -60,30 +67,123 @@ export function Listbox({
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
       setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
     // Scroll happens inside the fee table's own overflow containers, so this
     // needs the capture phase to hear it — repositioning on every scroll
     // isn't worth the complexity here, closing is enough.
     window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close);
     document.addEventListener("mousedown", onClickAway);
-    document.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("scroll", close, true);
       window.removeEventListener("resize", close);
       document.removeEventListener("mousedown", onClickAway);
-      document.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
-  const toggle = () => {
-    if (!open) {
-      const r = triggerRef.current?.getBoundingClientRect();
-      if (r) setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 170) });
+  // Roving focus: whichever option is "highlighted" actually holds DOM focus,
+  // so arrow keys/type-ahead work the way a native <select> or an ARIA
+  // listbox would, instead of every option being its own Tab stop.
+  useEffect(() => {
+    if (open && highlightedIndex >= 0) {
+      optionRefs.current[highlightedIndex]?.focus();
     }
-    setOpen((v) => !v);
+  }, [open, highlightedIndex]);
+
+  const openAt = (index: number) => {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (r) setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 170) });
+    optionRefs.current = [];
+    setHighlightedIndex(index);
+    setOpen(true);
+  };
+
+  const close = () => setOpen(false);
+
+  const closeAndRefocus = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const initialIndex = () => {
+    if (options.length === 0) return -1;
+    const i = options.findIndex((o) => o.value === value);
+    return i >= 0 ? i : 0;
+  };
+
+  const commit = (index: number) => {
+    const o = options[index];
+    if (!o) return;
+    onChange(o.value);
+    closeAndRefocus();
+  };
+
+  const typeahead = (char: string) => {
+    const ta = typeaheadRef.current;
+    if (ta.timer) clearTimeout(ta.timer);
+    ta.buffer += char.toLowerCase();
+    ta.timer = setTimeout(() => {
+      ta.buffer = "";
+    }, TYPEAHEAD_RESET_MS);
+    const n = options.length;
+    if (n === 0) return;
+    const start = highlightedIndex >= 0 ? highlightedIndex : -1;
+    for (let step = 1; step <= n; step++) {
+      const i = (start + step) % n;
+      if (options[i].label.toLowerCase().startsWith(ta.buffer)) {
+        setHighlightedIndex(i);
+        return;
+      }
+    }
+  };
+
+  const onPanelKeyDown = (e: KeyboardEvent) => {
+    const n = options.length;
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (n > 0) setHighlightedIndex((i) => (i + 1) % n);
+        return;
+      case "ArrowUp":
+        e.preventDefault();
+        if (n > 0) setHighlightedIndex((i) => (i - 1 + n) % n);
+        return;
+      case "Home":
+        e.preventDefault();
+        if (n > 0) setHighlightedIndex(0);
+        return;
+      case "End":
+        e.preventDefault();
+        if (n > 0) setHighlightedIndex(n - 1);
+        return;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        commit(highlightedIndex);
+        return;
+      case "Escape":
+        e.preventDefault();
+        closeAndRefocus();
+        return;
+      case "Tab":
+        // Portal content isn't next to the trigger in DOM order, so letting
+        // Tab run its default course would jump focus somewhere unrelated —
+        // close and land back on the trigger instead.
+        e.preventDefault();
+        closeAndRefocus();
+        return;
+      default:
+        if (e.key.length === 1 && !e.altKey && !e.ctrlKey && !e.metaKey) {
+          typeahead(e.key);
+        }
+    }
+  };
+
+  const onTriggerKeyDown = (e: KeyboardEvent) => {
+    if (open) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      openAt(initialIndex());
+    }
   };
 
   return (
@@ -97,8 +197,10 @@ export function Listbox({
         title={title}
         onClick={(e) => {
           e.stopPropagation();
-          toggle();
+          if (open) close();
+          else openAt(initialIndex());
         }}
+        onKeyDown={onTriggerKeyDown}
         className={`h-7 px-2 rounded-md border text-[11px] outline-none flex items-center justify-between gap-1.5 cursor-pointer ${selected?.tint ?? t.inputBg} ${className}`}
       >
         <span className="flex items-center gap-1.5 truncate">
@@ -122,6 +224,7 @@ export function Listbox({
             <div
               ref={panelRef}
               role="listbox"
+              onKeyDown={onPanelKeyDown}
               style={{ position: "fixed", top: rect.top, left: rect.left, width: rect.width, zIndex: 9999 }}
               className={`rounded-lg border shadow-lg p-1 max-h-64 overflow-auto ${t.card}`}
             >
@@ -130,7 +233,7 @@ export function Listbox({
                   No options configured — add them in Settings
                 </div>
               ) : (
-                options.map((o) => {
+                options.map((o, i) => {
                   const isSelected = o.value === value;
                   const rowTone = o.tint
                     ? o.tint
@@ -144,9 +247,12 @@ export function Listbox({
                   return (
                     <button
                       key={o.value}
+                      ref={(el) => { optionRefs.current[i] = el; }}
                       type="button"
                       role="option"
+                      tabIndex={-1}
                       aria-selected={isSelected}
+                      onMouseEnter={() => setHighlightedIndex(i)}
                       onClick={(e) => {
                         e.stopPropagation();
                         onChange(o.value);
