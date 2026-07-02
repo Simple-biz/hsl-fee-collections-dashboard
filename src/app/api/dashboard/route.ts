@@ -46,12 +46,24 @@ export const GET = async () => {
     const paid = Number(stats.totalPaid);
 
     // MTD: fees collected and cases closed in the current calendar month.
+    // fees_collected_mtd reads each benefit type's own received-date column
+    // on fee_records rather than the fee_payments ledger — that ledger only
+    // gets a row when someone uses the "Add Payment" button on the case
+    // detail page, so a month where fees arrived via MyCase/Sheets sync or a
+    // CSV import (which write t16/t2/aux_fee_received directly) showed $0
+    // here even with real money recorded.
     const [mtd] = await db.execute(sql`
       SELECT
         (
-          SELECT COALESCE(SUM(amount::numeric), 0)
-          FROM fee_payments
-          WHERE DATE_TRUNC('month', received_date::date) = DATE_TRUNC('month', CURRENT_DATE)
+          SELECT COALESCE(SUM(
+            CASE WHEN DATE_TRUNC('month', t16_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
+              THEN COALESCE(t16_fee_received, 0)::numeric ELSE 0 END
+            + CASE WHEN DATE_TRUNC('month', t2_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
+              THEN COALESCE(t2_fee_received, 0)::numeric ELSE 0 END
+            + CASE WHEN DATE_TRUNC('month', aux_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
+              THEN COALESCE(aux_fee_received, 0)::numeric ELSE 0 END
+          ), 0)
+          FROM fee_records
         ) AS fees_collected_mtd,
         (
           SELECT COUNT(*)
