@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireCapability, requireAdmin, guardStatus } from "@/lib/auth-helpers";
+
+// Loose on purpose — the actual set of writable columns is whitelisted by
+// CASE_FIELD_MAP/FEE_FIELD_MAP/UD_FIELD_MAP below. This just rejects a
+// malformed body (wrong top-level shape, a field that isn't a scalar) before
+// any of that field-mapping logic runs.
+const scalarValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const patchBodySchema = z.object({
+  caseFields: z.record(z.string(), scalarValue).optional(),
+  feeFields: z.record(z.string(), scalarValue).optional(),
+  userDetailsFields: z.record(z.string(), scalarValue).optional(),
+  logMessage: z.string().optional(),
+});
 
 // Fee fields that count as "finalizing" a case — gated by case.finalize rather
 // than the broader case.update (members can record payments but not close,
@@ -328,11 +341,20 @@ export const PATCH = async (
       return NextResponse.json({ error: "Invalid case ID" }, { status: 400 });
     }
 
-    const body = await req.json();
+    const parsedBody = patchBodySchema.safeParse(await req.json());
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: "Invalid request body", details: parsedBody.error.flatten() },
+        { status: 422 },
+      );
+    }
     // NOTE: any client-supplied author is intentionally ignored — the activity
     // author is stamped from the authenticated session below so it can't be
     // spoofed.
-    const { caseFields, feeFields, userDetailsFields, logMessage } = body;
+    const { caseFields, feeFields, userDetailsFields, logMessage: clientLogMessage } = parsedBody.data;
+    // Mutable — the Overpaid auto-flag below appends to whatever the client
+    // sent so the activity log names the side effect, not just the edit.
+    let logMessage = clientLogMessage;
 
     // Authorize: any update needs case.update. Finalizing fields (close/reopen,
     // mark overpaid, approvedBy) additionally need case.finalize, and editing
@@ -476,6 +498,24 @@ export const PATCH = async (
         updates.push("closed_at = NOW()");
       } else if (feeFields.isClosed === false) {
         updates.push("closed_at = NULL");
+      }
+
+      // Setting Fees Confirmation to "Overpaid" also flags the case as
+      // overpaid — the same way a case shows up on Fee Petitions purely from
+      // its Level, it should show up on Overpaid Cases purely from this
+      // dropdown, without a separate manual "Mark Overpaid" step. Only
+      // auto-sets it on; correcting a mis-click back to another confirmation
+      // value doesn't auto-unmark it, since Overpaid Cases tracks its own
+      // resolution workflow (notices sent, checks cleared) that shouldn't
+      // silently disappear.
+      if (
+        feeFields.feesConfirmation === "Overpaid" &&
+        !("markedOverpaid" in feeFields)
+      ) {
+        updates.push("marked_overpaid = true");
+        logMessage = logMessage
+          ? `${logMessage} — also flagged as overpaid`
+          : "Flagged as overpaid (Fees Confirmation set to \"Overpaid\")";
       }
 
       if (updates.length > 0) {
