@@ -62,6 +62,7 @@ npm run db:studio     # open Drizzle Studio
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run user:create` | Create a new user via CLI script |
+| `npm run seed:test-users` | Seed the test accounts |
 | `npm test` | Run test suite (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
 

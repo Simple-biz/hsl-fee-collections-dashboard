@@ -17,7 +17,7 @@ collections, reporting, and admin.
   (`DATABASE_URL`) and a read-only MyCase mirror (`MYCASE_DB_URL`).
 - **NextAuth v5** (Credentials provider, JWT sessions)
 - React Hook Form + Zod, Recharts, Sonner (toasts), Vitest (tests)
-- **n8n** webhooks for external integrations (Sheets sync/push, MyCase docs,
+- **n8n** webhooks for external integrations (Sheets sync, MyCase docs,
   welcome emails)
 
 ## Commands
@@ -125,5 +125,3 @@ before considering import/mapper changes done.
 - `NEXT_PUBLIC_SHOW_TEST_LOGINS=true` reveals seeded test credentials on the
   login page (`src/app/login/test-accounts-hint.tsx`). Test-only — leave unset
   in production.
-- This is a Windows dev environment; the Bash tool runs Git Bash (POSIX), and
-  PowerShell is also available.
