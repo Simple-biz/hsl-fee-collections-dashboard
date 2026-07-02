@@ -478,6 +478,21 @@ export const PATCH = async (
         updates.push("closed_at = NULL");
       }
 
+      // Setting Fees Confirmation to "Overpaid" also flags the case as
+      // overpaid — the same way a case shows up on Fee Petitions purely from
+      // its Level, it should show up on Overpaid Cases purely from this
+      // dropdown, without a separate manual "Mark Overpaid" step. Only
+      // auto-sets it on; correcting a mis-click back to another confirmation
+      // value doesn't auto-unmark it, since Overpaid Cases tracks its own
+      // resolution workflow (notices sent, checks cleared) that shouldn't
+      // silently disappear.
+      if (
+        feeFields.feesConfirmation === "Overpaid" &&
+        !("markedOverpaid" in feeFields)
+      ) {
+        updates.push("marked_overpaid = true");
+      }
+
       if (updates.length > 0) {
         await db.execute(
           sql`UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
