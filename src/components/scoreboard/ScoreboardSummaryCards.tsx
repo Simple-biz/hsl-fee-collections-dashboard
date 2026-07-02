@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt } from "@/lib/formatters";
+import { teamCardClasses, teamAccentText, teamLabel } from "@/lib/team-colors";
 
 export interface ScoreboardSummary {
   totalCasesAssigned: number;
@@ -62,9 +63,12 @@ export function ScoreboardSummaryCards({
   const [t16Days, setT16Days] = useState<60 | 90>(60);
   const [concDays, setConcDays] = useState<60 | 90>(60);
 
-  const stats: { label: string; value: string | number; onClick?: () => void; toggled?: boolean }[] = [
-    { label: "Cases Assigned", value: summary.totalCasesAssigned },
-    { label: "Win Sheets", value: summary.totalCompletedWinSheets },
+  // Quiet per-metric accent (border + tint) on the plain cards — not used on
+  // the T2/T16/CONC toggle cards below, whose violet highlight is a state
+  // indicator (90D vs 60D), not a metric identity.
+  const stats: { label: string; value: string | number; onClick?: () => void; toggled?: boolean; accent?: string }[] = [
+    { label: "Cases Assigned", value: summary.totalCasesAssigned, accent: "#7c3aed" },
+    { label: "Win Sheets", value: summary.totalCompletedWinSheets, accent: "#0284c7" },
     {
       label: `T2 >${t2Days}D`,
       value: t2Days === 60 ? summary.totalUnpaidT2Over60 : summary.totalUnpaidT2Over90,
@@ -83,10 +87,10 @@ export function ScoreboardSummaryCards({
       onClick: () => setConcDays((v) => v === 60 ? 90 : 60),
       toggled: concDays === 90,
     },
-    { label: "Collected", value: fmt(summary.totalCollected) },
-    { label: "Full Fee", value: summary.totalCasesFullFee },
-    { label: "SSA Calls", value: summary.totalSsaCalls },
-    { label: "Client Calls", value: summary.totalClientCalls },
+    { label: "Collected", value: fmt(summary.totalCollected), accent: "#059669" },
+    { label: "Full Fee", value: summary.totalCasesFullFee, accent: "#d97706" },
+    { label: "SSA Calls", value: summary.totalSsaCalls, accent: "#7c3aed" },
+    { label: "Client Calls", value: summary.totalClientCalls, accent: "#0284c7" },
   ];
 
   return (
@@ -118,8 +122,19 @@ export function ScoreboardSummaryCards({
                 </p>
               </button>
             ) : (
-              <div key={item.label} className={`rounded-lg border p-3 ${t.card}`}>
-                <p className={`text-[10px] font-medium ${t.textMuted} uppercase`}>
+              <div
+                key={item.label}
+                className={`rounded-lg border p-3 border-l-[3px] ${t.card}`}
+                style={item.accent ? { borderLeftColor: item.accent } : undefined}
+              >
+                <p className={`flex items-center gap-1.5 text-[10px] font-medium ${t.textMuted} uppercase`}>
+                  {item.accent && (
+                    <span
+                      aria-hidden="true"
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: item.accent }}
+                    />
+                  )}
                   {item.label}
                 </p>
                 <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
@@ -137,41 +152,13 @@ export function ScoreboardSummaryCards({
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {teams.map((team) => {
-              const teamColor =
-                team.team === "T2"
-                  ? dark
-                    ? "border-blue-700/50 bg-blue-900/10"
-                    : "border-blue-200 bg-blue-50/60"
-                  : team.team === "T16"
-                    ? dark
-                      ? "border-purple-700/50 bg-purple-900/10"
-                      : "border-purple-200 bg-purple-50/60"
-                    : dark
-                      ? "border-teal-700/50 bg-teal-900/10"
-                      : "border-teal-200 bg-teal-50/60";
-              const teamLabel =
-                team.team === "T2"
-                  ? "T2 Team"
-                  : team.team === "T16"
-                    ? "T16 Team"
-                    : "Concurrent Team";
-              const accentText =
-                team.team === "T2"
-                  ? dark
-                    ? "text-blue-400"
-                    : "text-blue-700"
-                  : team.team === "T16"
-                    ? dark
-                      ? "text-purple-400"
-                      : "text-purple-700"
-                    : dark
-                      ? "text-teal-400"
-                      : "text-teal-700";
+              const teamColor = teamCardClasses(team.team, dark);
+              const accentText = teamAccentText(team.team, dark);
               return (
                 <div key={team.team} className={`rounded-lg border p-4 ${teamColor}`}>
                   <div className="flex items-center justify-between mb-3">
                     <span className={`text-xs font-bold ${accentText}`}>
-                      {teamLabel}
+                      {teamLabel(team.team)}
                     </span>
                     <span className={`text-[10px] ${t.textMuted}`}>
                       {team.agentCount} agent{team.agentCount !== 1 ? "s" : ""}

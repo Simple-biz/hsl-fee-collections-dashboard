@@ -44,6 +44,9 @@ import type {
   ApprovedByOption,
 } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
+import { Listbox } from "@/components/shared/Listbox";
+import { buildListboxOptions } from "@/lib/listbox-options";
+import { caseLevelVisual } from "@/lib/case-level-icons";
 
 interface CaseDetailSheetProps {
   caseId: number;
@@ -724,13 +727,24 @@ export default function CaseDetailSheet({
                     </div>
                     <div>
                       <p className={lbl}>Level Won</p>
-                      <select
+                      <Listbox
                         value={editValues.levelWon}
-                        onChange={(e) => setEditValues((v) => ({ ...v, levelWon: e.target.value }))}
-                        className={inp}
-                      >
-                        {dropdownOptionEls(caseLevelOptions, editValues.levelWon)}
-                      </select>
+                        onChange={(v) => setEditValues((val) => ({ ...val, levelWon: v }))}
+                        dark={dark}
+                        t={t}
+                        aria-label="Level Won"
+                        className="mt-1 w-full"
+                        options={buildListboxOptions(
+                          caseLevelOptions,
+                          editValues.levelWon,
+                          (name) => {
+                            const visual = caseLevelVisual(name, dark);
+                            return visual
+                              ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
+                              : undefined;
+                          },
+                        )}
+                      />
                     </div>
                     <div>
                       <p className={lbl}>T2 Decision</p>

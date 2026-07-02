@@ -135,6 +135,7 @@ export interface MonthlyData {
 export interface TeamMember {
   name: string;
   role: string;
+  team: string | null;
   cases: number;
   collected: string;
 }
