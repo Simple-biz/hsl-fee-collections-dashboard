@@ -24,6 +24,7 @@ import {
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
+import { teamBadgeClasses } from "@/lib/team-colors";
 import {
   ScoreboardSummaryCards,
   ScoreboardSummary,
@@ -875,7 +876,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     </tr>
                   ) : filteredAgents.map((a) => (
                     <tr key={a.agent} className={`border-b ${rowBorder} ${rowHover} transition-colors`}>
-                      <td className={`${tdBase} ${t.text} font-semibold`}>{a.agent}</td>
+                      <td className={`${tdBase} ${t.text} font-semibold`}>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${teamBadgeClasses(a.team, dark)}`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />
+                          {a.agent}
+                        </span>
+                      </td>
                       {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}
                       {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
                       {showCol("ssacalls")    && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekSsaCalls}</td>}

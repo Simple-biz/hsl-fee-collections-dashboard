@@ -31,6 +31,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
     sub?: string;
     detail: string;
     detailTone: "up" | "down" | "warn" | "neutral";
+    accent: string;
   };
 
   const cards: CardSpec[] = [
@@ -41,6 +42,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
       sub: "Active (non-closed)",
       detail: `${stats.pif} marked PIF`,
       detailTone: "neutral",
+      accent: "#7c3aed",
     },
     {
       icon: DollarSign,
@@ -49,6 +51,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
       sub: "Current calendar month",
       detail: stats.feesCollectedMTD > 0 ? "Collected this month" : "None yet this month",
       detailTone: stats.feesCollectedMTD > 0 ? "up" : "neutral",
+      accent: "#059669",
     },
     {
       icon: CalendarCheck,
@@ -57,6 +60,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
       sub: "Current calendar month",
       detail: stats.casesClosedMTD > 0 ? "Closed this month" : "None yet this month",
       detailTone: stats.casesClosedMTD > 0 ? "up" : "neutral",
+      accent: "#d97706",
     },
     {
       icon: RefreshCw,
@@ -66,6 +70,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
       detail:
         stats.syncErrors > 0 ? `${stats.syncErrors} error(s)` : "All clear",
       detailTone: stats.syncErrors > 0 ? "down" : "up",
+      accent: "#0284c7",
     },
   ];
 
@@ -86,13 +91,17 @@ export const StatCards = ({ stats }: StatCardsProps) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
       {cards.map((s, i) => (
-        <div key={i} className={`rounded-xl border p-4 ${t.card}`}>
+        <div
+          key={i}
+          className={`rounded-xl border p-4 border-l-[3px] ${t.card}`}
+          style={{ borderLeftColor: s.accent }}
+        >
           <div className="flex items-start justify-between">
             <div>
               <div
                 className={`flex items-center gap-1.5 text-xs ${t.textSub} font-medium`}
               >
-                <s.icon className="h-3.5 w-3.5" aria-hidden="true" /> {s.label}
+                <s.icon className="h-3.5 w-3.5" style={{ color: s.accent }} aria-hidden="true" /> {s.label}
               </div>
               <div className={`text-2xl font-extrabold ${t.text} mt-1`}>
                 {s.value}

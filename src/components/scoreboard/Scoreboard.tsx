@@ -7,6 +7,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
+import { teamHeaderBg } from "@/lib/team-colors";
 
 // ---------- types ----------
 
@@ -50,9 +51,9 @@ const thisWeekCellColor = (value: number, max: number): string => {
 };
 
 const TEAMS = [
-  { key: "Concurrent", label: "Concurrent Team", headerBg: "bg-teal-700" },
-  { key: "T2",         label: "T2 Team",         headerBg: "bg-blue-800" },
-  { key: "T16",        label: "T16 Team",         headerBg: "bg-red-700"  },
+  { key: "Concurrent", label: "Concurrent Team", headerBg: teamHeaderBg("Concurrent") },
+  { key: "T2",         label: "T2 Team",         headerBg: teamHeaderBg("T2") },
+  { key: "T16",        label: "T16 Team",         headerBg: teamHeaderBg("T16") },
 ];
 
 // ---------- state ----------
