@@ -11,6 +11,17 @@ const computePending = (due: number, received: number) =>
   Math.max(due - received, 0);
 const toStr = (v: number) => (v > 0 ? String(v) : "");
 
+// Fee Due/Pending auto-calculate from Retro/Received, but a case can already
+// carry a value that doesn't match the formula (a negotiated fee, an old
+// sheet import) — start those in "override" mode instead of silently
+// snapping them to the computed number when the modal opens.
+type OverrideKey =
+  | "t16DueOverride" | "t16PendOverride"
+  | "t2DueOverride" | "t2PendOverride"
+  | "auxDueOverride" | "auxPendOverride";
+const initOverride = (savedValue: number, autoValue: number) =>
+  Math.abs(savedValue - autoValue) > 0.001 ? savedValue.toFixed(2) : null;
+
 interface FeeEditModalProps {
   dark: boolean;
   feeCap: number;
@@ -49,26 +60,43 @@ export default function FeeEditModal({
     t16Retro: toStr(orig.t16Retro),
     t16Rcv: toStr(orig.t16FeeReceived),
     t16Dt: orig.t16FeeReceivedDate || "",
+    t16DueOverride: initOverride(orig.t16FeeDue, computeFeeDue(orig.t16Retro, feeCap)),
+    t16PendOverride: initOverride(orig.t16Pending, computePending(orig.t16FeeDue, orig.t16FeeReceived)),
     t2Retro: toStr(orig.t2Retro),
     t2Rcv: toStr(orig.t2FeeReceived),
     t2Dt: orig.t2FeeReceivedDate || "",
+    t2DueOverride: initOverride(orig.t2FeeDue, computeFeeDue(orig.t2Retro, feeCap)),
+    t2PendOverride: initOverride(orig.t2Pending, computePending(orig.t2FeeDue, orig.t2FeeReceived)),
     auxRetro: toStr(orig.auxRetro),
     auxRcv: toStr(orig.auxFeeReceived),
     auxDt: orig.auxFeeReceivedDate || "",
+    auxDueOverride: initOverride(orig.auxFeeDue, computeFeeDue(orig.auxRetro, feeCap)),
+    auxPendOverride: initOverride(orig.auxPending, computePending(orig.auxFeeDue, orig.auxFeeReceived)),
   });
   const [saving, setSaving] = useState(false);
 
   const set =
     (key: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setF((prev) => ({ ...prev, [key]: e.target.value }));
+  const resetOverride = (key: OverrideKey) => () =>
+    setF((prev) => ({ ...prev, [key]: null }));
 
-  // Computed
-  const t16Due = computeFeeDue(parseFloat(f.t16Retro) || 0, feeCap);
-  const t16Pend = computePending(t16Due, parseFloat(f.t16Rcv) || 0);
-  const t2Due = computeFeeDue(parseFloat(f.t2Retro) || 0, feeCap);
-  const t2Pend = computePending(t2Due, parseFloat(f.t2Rcv) || 0);
-  const auxDue = computeFeeDue(parseFloat(f.auxRetro) || 0, feeCap);
-  const auxPend = computePending(auxDue, parseFloat(f.auxRcv) || 0);
+  // Computed — each falls back to the formula unless the user has directly
+  // edited that field (tracked by its *Override string being non-null).
+  const t16DueAuto = computeFeeDue(parseFloat(f.t16Retro) || 0, feeCap);
+  const t16Due = f.t16DueOverride != null ? parseFloat(f.t16DueOverride) || 0 : t16DueAuto;
+  const t16PendAuto = computePending(t16Due, parseFloat(f.t16Rcv) || 0);
+  const t16Pend = f.t16PendOverride != null ? parseFloat(f.t16PendOverride) || 0 : t16PendAuto;
+
+  const t2DueAuto = computeFeeDue(parseFloat(f.t2Retro) || 0, feeCap);
+  const t2Due = f.t2DueOverride != null ? parseFloat(f.t2DueOverride) || 0 : t2DueAuto;
+  const t2PendAuto = computePending(t2Due, parseFloat(f.t2Rcv) || 0);
+  const t2Pend = f.t2PendOverride != null ? parseFloat(f.t2PendOverride) || 0 : t2PendAuto;
+
+  const auxDueAuto = computeFeeDue(parseFloat(f.auxRetro) || 0, feeCap);
+  const auxDue = f.auxDueOverride != null ? parseFloat(f.auxDueOverride) || 0 : auxDueAuto;
+  const auxPendAuto = computePending(auxDue, parseFloat(f.auxRcv) || 0);
+  const auxPend = f.auxPendOverride != null ? parseFloat(f.auxPendOverride) || 0 : auxPendAuto;
 
   const handleSave = async () => {
     setSaving(true);
@@ -153,8 +181,41 @@ export default function FeeEditModal({
   // Styles
   const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const inpCls = `mt-1 h-7 px-2 rounded border text-[12px] outline-none w-full ${t.inputBg}`;
-  const readonlyCls = `mt-1 h-7 px-2 rounded border text-[12px] font-semibold flex items-center select-none ${dark ? "border-neutral-700 bg-neutral-900/40" : "border-neutral-200 bg-neutral-100"}`;
   const amber = dark ? "text-amber-400" : "text-amber-600";
+
+  // Fee Due/Pending default to the formula but stay editable — typing into
+  // one switches it to "override" mode (its value sticks even if Retro or
+  // Received changes) until reset back to auto.
+  const autoField = (
+    label: string,
+    overrideKey: OverrideKey,
+    overrideVal: string | null,
+    autoVal: number,
+  ) => (
+    <div>
+      <p className={lbl}>
+        {label}{" "}
+        {overrideVal == null ? (
+          <span className="text-[8px] normal-case font-normal">(auto)</span>
+        ) : (
+          <button
+            type="button"
+            onClick={resetOverride(overrideKey)}
+            className={`text-[8px] normal-case font-normal underline ${amber}`}
+          >
+            reset to auto
+          </button>
+        )}
+      </p>
+      <input
+        type="number"
+        step="0.01"
+        value={overrideVal ?? autoVal.toFixed(2)}
+        onChange={set(overrideKey)}
+        className={inpCls}
+      />
+    </div>
+  );
 
   return (
     <div
@@ -171,7 +232,7 @@ export default function FeeEditModal({
             <h3 className={`text-sm font-bold ${t.text}`}>Edit Fee Amounts</h3>
             <p className={`text-[10px] ${t.textMuted} mt-0.5`}>
               Fee Due = MIN(Retro × 25%, {fmtFull(feeCap)}) · Pending = Fee Due
-              − Received
+              − Received — both editable; edits stick until reset to auto
             </p>
           </div>
           <button
@@ -201,10 +262,7 @@ export default function FeeEditModal({
                   className={inpCls}
                 />
               </div>
-              <div>
-                <p className={lbl}>Fee Due <span className="text-[8px] normal-case font-normal">(auto)</span></p>
-                <div className={`${readonlyCls} ${amber}`}>{fmtFull(t16Due)}</div>
-              </div>
+              {autoField("Fee Due", "t16DueOverride", f.t16DueOverride, t16DueAuto)}
               <div>
                 <p className={lbl}>Fee Received</p>
                 <input
@@ -215,10 +273,7 @@ export default function FeeEditModal({
                   className={inpCls}
                 />
               </div>
-              <div>
-                <p className={lbl}>Pending <span className="text-[8px] normal-case font-normal">(auto)</span></p>
-                <div className={`${readonlyCls} ${t16Pend > 0 ? amber : t.textMuted}`}>{fmtFull(t16Pend)}</div>
-              </div>
+              {autoField("Pending", "t16PendOverride", f.t16PendOverride, t16PendAuto)}
               <div>
                 <p className={lbl}>Date Received</p>
                 <input
@@ -249,10 +304,7 @@ export default function FeeEditModal({
                   className={inpCls}
                 />
               </div>
-              <div>
-                <p className={lbl}>Fee Due <span className="text-[8px] normal-case font-normal">(auto)</span></p>
-                <div className={`${readonlyCls} ${amber}`}>{fmtFull(t2Due)}</div>
-              </div>
+              {autoField("Fee Due", "t2DueOverride", f.t2DueOverride, t2DueAuto)}
               <div>
                 <p className={lbl}>Fee Received</p>
                 <input
@@ -263,10 +315,7 @@ export default function FeeEditModal({
                   className={inpCls}
                 />
               </div>
-              <div>
-                <p className={lbl}>Pending <span className="text-[8px] normal-case font-normal">(auto)</span></p>
-                <div className={`${readonlyCls} ${t2Pend > 0 ? amber : t.textMuted}`}>{fmtFull(t2Pend)}</div>
-              </div>
+              {autoField("Pending", "t2PendOverride", f.t2PendOverride, t2PendAuto)}
               <div>
                 <p className={lbl}>Date Received</p>
                 <input
@@ -297,10 +346,7 @@ export default function FeeEditModal({
                   className={inpCls}
                 />
               </div>
-              <div>
-                <p className={lbl}>Fee Due <span className="text-[8px] normal-case font-normal">(auto)</span></p>
-                <div className={`${readonlyCls} ${amber}`}>{fmtFull(auxDue)}</div>
-              </div>
+              {autoField("Fee Due", "auxDueOverride", f.auxDueOverride, auxDueAuto)}
               <div>
                 <p className={lbl}>Fee Received</p>
                 <input
@@ -311,10 +357,7 @@ export default function FeeEditModal({
                   className={inpCls}
                 />
               </div>
-              <div>
-                <p className={lbl}>Pending <span className="text-[8px] normal-case font-normal">(auto)</span></p>
-                <div className={`${readonlyCls} ${auxPend > 0 ? amber : t.textMuted}`}>{fmtFull(auxPend)}</div>
-              </div>
+              {autoField("Pending", "auxPendOverride", f.auxPendOverride, auxPendAuto)}
               <div>
                 <p className={lbl}>Date Received</p>
                 <input
