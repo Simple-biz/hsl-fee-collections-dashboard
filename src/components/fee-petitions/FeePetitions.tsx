@@ -277,8 +277,6 @@ export const FeePetitions = () => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      completedCountAbortRef.current?.abort();
-      allTotalsAbortRef.current?.abort();
     };
   }, []);
 
@@ -287,7 +285,11 @@ export const FeePetitions = () => {
   // fetchPetitions always filters to status=incomplete, so its own
   // completeCount aggregate is trivially 0 — fetch the real completed total
   // separately, the same way CompletedPetitions.tsx gets its own badge count.
-  useEffect(() => {
+  // Exposed as a callback (not just an effect) so in-page actions that move a
+  // petition from pending to complete can refresh it immediately instead of
+  // waiting for a reload.
+  const fetchCompletedCount = useCallback(() => {
+    completedCountAbortRef.current?.abort();
     const controller = new AbortController();
     completedCountAbortRef.current = controller;
     fetch(`/api/fee-petitions?status=complete&page=1&limit=1`, { signal: controller.signal })
@@ -298,7 +300,6 @@ export const FeePetitions = () => {
         }
       })
       .catch(() => {});
-    return () => controller.abort();
   }, []);
 
   const [allTotals, setAllTotals] = useState<{ feeRequested: number; feesReceived: number } | null>(null);
@@ -306,7 +307,11 @@ export const FeePetitions = () => {
   // Fees Requested/Received in the stats bar cover pending AND completed
   // petitions together — fetched with no status filter (unlike fetchPetitions,
   // which always scopes its own aggregate to incomplete for the row list).
-  useEffect(() => {
+  // These only change when a payment is recorded on the case detail page, not
+  // from anything this page itself does — refreshed on window focus below
+  // rather than tied to any local action.
+  const fetchAllTotals = useCallback(() => {
+    allTotalsAbortRef.current?.abort();
     const controller = new AbortController();
     allTotalsAbortRef.current = controller;
     fetch(`/api/fee-petitions?page=1&limit=1`, { signal: controller.signal })
@@ -320,8 +325,28 @@ export const FeePetitions = () => {
         }
       })
       .catch(() => {});
-    return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    fetchCompletedCount();
+    fetchAllTotals();
+    return () => {
+      completedCountAbortRef.current?.abort();
+      allTotalsAbortRef.current?.abort();
+    };
+  }, [fetchCompletedCount, fetchAllTotals]);
+
+  // Catches fee changes made elsewhere (e.g. a payment added from the case
+  // detail page) — neither count can react to that on its own, so refresh
+  // both whenever the user comes back to this tab.
+  useEffect(() => {
+    const onFocus = () => {
+      fetchCompletedCount();
+      fetchAllTotals();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchCompletedCount, fetchAllTotals]);
 
   const fetchPetitions = useCallback(async () => {
     fetchAbortRef.current?.abort();
@@ -450,6 +475,7 @@ export const FeePetitions = () => {
       );
       setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
       setTotal((tot) => Math.max(0, tot - ids.length));
+      fetchCompletedCount();
       clearSelection();
       if (snapshot.length > 0) {
         setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
@@ -470,6 +496,7 @@ export const FeePetitions = () => {
       if (!result.ok) throw new Error(result.error);
       setUndoInfo(null);
       fetchPetitions();
+      fetchCompletedCount();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -528,6 +555,7 @@ export const FeePetitions = () => {
       if (isComplete) {
         setRows((prev) => prev.filter((r) => r.id !== id));
         setTotal((tot) => Math.max(0, tot - 1));
+        fetchCompletedCount();
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
