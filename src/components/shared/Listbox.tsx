@@ -61,21 +61,32 @@ export function Listbox({
 
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
+    const closeOnResize = () => setOpen(false);
+    // Scroll happens inside the fee table's own overflow containers, so this
+    // needs the capture phase to hear it — repositioning on every scroll
+    // isn't worth the complexity here, closing is enough. But capture-phase
+    // listeners on window also intercept scroll events from the option list's
+    // own overflow-auto (a real scroll never bubbles there, capture still
+    // sees it on the way down) — ignore those so scrolling to reach an option
+    // further down the list, or the browser auto-scrolling the selected
+    // option into view on open, doesn't slam the panel shut.
+    const closeOnOutsideScroll = (e: Event) => {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) {
+        return;
+      }
+      setOpen(false);
+    };
     const onClickAway = (e: MouseEvent) => {
       const target = e.target as Node;
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
       setOpen(false);
     };
-    // Scroll happens inside the fee table's own overflow containers, so this
-    // needs the capture phase to hear it — repositioning on every scroll
-    // isn't worth the complexity here, closing is enough.
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
+    window.addEventListener("scroll", closeOnOutsideScroll, true);
+    window.addEventListener("resize", closeOnResize);
     document.addEventListener("mousedown", onClickAway);
     return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", closeOnOutsideScroll, true);
+      window.removeEventListener("resize", closeOnResize);
       document.removeEventListener("mousedown", onClickAway);
     };
   }, [open]);
