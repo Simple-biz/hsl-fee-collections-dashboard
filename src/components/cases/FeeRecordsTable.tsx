@@ -786,6 +786,12 @@ export const FeeRecordsTable = ({
   const colAssignedW = `w-32 min-w-32 max-w-32 sm:w-40 sm:min-w-40 sm:max-w-40`;
   // left offset: checkbox(40) + name(192) + assigned(160) = 392px = 24.5rem
   const colFeesConfW = `w-32 min-w-32 max-w-32 sm:w-36 sm:min-w-36 sm:max-w-36`;
+  // Closed On is a 4th frozen column, "closed" mode only, pinned in front of
+  // Case Name — fixed 112px at every breakpoint (unlike the others, it never
+  // needs to grow on desktop), so every other frozen offset below shifts
+  // right by exactly that much when mode === "closed".
+  const colClosedOnW = `w-28 min-w-28 max-w-28`;
+  const isClosedMode = mode === "closed";
 
   // Every header cell is sticky vertically by default — the column-header
   // row (row 2) parks 32px down. Baking this into `thBase` means the ~24
@@ -804,26 +810,53 @@ export const FeeRecordsTable = ({
   // Frozen column headers (row 2). Case Name freezes left on all screens;
   // Assigned freezes left only at sm+ (on mobile it keeps thBase's sticky-top
   // but scrolls horizontally). Corner cells use z-30 to cover both single-axis
-  // sticky neighbors during scroll.
-  const stickyTh1 = `left-10 z-30 ${colNameW} ${nameDivider}`;
+  // sticky neighbors during scroll. In "closed" mode, Closed On sits in front
+  // of Case Name, so Case Name/Assigned/Fees Conf's left offsets all shift
+  // right by colClosedOnW's 112px (7rem) — 40+112=152px=9.5rem, etc.
+  const stickyTh1 = isClosedMode
+    ? `left-[9.5rem] z-30 ${colNameW} ${nameDivider}`
+    : `left-10 z-30 ${colNameW} ${nameDivider}`;
   // z-30 only at sm+ (where Assigned is a frozen corner). On mobile Assigned
   // scrolls, so no sticky-left. Freeze boundary moved to Fees Conf, so no divider here.
   // scrolls, so it must stay at thBase's z-20 — BELOW the frozen Case Name
   // (z-30) — otherwise it paints over the frozen "front index" on scroll.
   // Assigned: no divider — freeze boundary now sits after Fees Conf.
-  const stickyTh2 = `sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
+  const stickyTh2 = isClosedMode
+    ? `sm:left-[21.5rem] sm:z-30 ${colAssignedW}`
+    : `sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
   // "Case Info" group label is split into cells so each part's freeze matches
-  // the column beneath it. Three frozen columns: Case Name, Assigned, Fees Conf.
-  const stickyGroup = `top-0! left-10 z-30 ${colNameW} ${nameDivider}`;
-  const stickyGroup2 = `top-0! sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
-  // Fees Conf is the 3rd frozen column (left offset = 40 + 192 + 160 = 392px = 24.5rem).
-  const stickyGroup3 = `top-0! sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
-  const stickyTh3 = `sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
-  const stickyTd1 = `sticky left-10 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
-  const stickyTd2 = `sm:sticky sm:left-[14.5rem] sm:z-10 ${colAssignedW} ${stickyColBg}`;
-  const stickyTd3 = `sm:sticky sm:left-[24.5rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`;
+  // the column beneath it. Three frozen columns: Case Name, Assigned, Fees
+  // Conf (four, with Closed On, in "closed" mode).
+  const stickyGroup = isClosedMode
+    ? `top-0! left-[9.5rem] z-30 ${colNameW} ${nameDivider}`
+    : `top-0! left-10 z-30 ${colNameW} ${nameDivider}`;
+  const stickyGroup2 = isClosedMode
+    ? `top-0! sm:left-[21.5rem] sm:z-30 ${colAssignedW}`
+    : `top-0! sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
+  // Fees Conf is the 3rd frozen column (left offset = 40 + 192 + 160 = 392px
+  // = 24.5rem; + colClosedOnW's 112px = 504px = 31.5rem in "closed" mode).
+  const stickyGroup3 = isClosedMode
+    ? `top-0! sm:left-[31.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`
+    : `top-0! sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
+  const stickyTh3 = isClosedMode
+    ? `sm:left-[31.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`
+    : `sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
+  const stickyTd1 = isClosedMode
+    ? `sticky left-[9.5rem] z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`
+    : `sticky left-10 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
+  const stickyTd2 = isClosedMode
+    ? `sm:sticky sm:left-[21.5rem] sm:z-10 ${colAssignedW} ${stickyColBg}`
+    : `sm:sticky sm:left-[14.5rem] sm:z-10 ${colAssignedW} ${stickyColBg}`;
+  const stickyTd3 = isClosedMode
+    ? `sm:sticky sm:left-[31.5rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`
+    : `sm:sticky sm:left-[24.5rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`;
   const stickyCheckTh = `sticky top-0! left-0 z-30 w-10 min-w-10 ${stickyBg}`;
   const stickyCheckTd = `sticky left-0 z-10 w-10 min-w-10 ${stickyBg} ${stickyHover}`;
+  // Closed On — new frozen column, "closed" mode only, sitting exactly where
+  // Case Name used to (left-10) now that it's first.
+  const stickyGroupClosedOn = `top-0! left-10 z-30 ${colClosedOnW}`;
+  const stickyThClosedOn = `left-10 z-30 ${colClosedOnW}`;
+  const stickyTdClosedOn = `sticky left-10 z-10 ${colClosedOnW} ${stickyBg} ${stickyHover}`;
 
   return (
     <div className={`relative rounded-xl border ${t.card}`}>
@@ -1017,6 +1050,15 @@ export const FeeRecordsTable = ({
                     className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                   />
                 </th>
+                {/* Closed On sits in front of Case Info's group, "closed" mode
+                    only — same blank-spacer pattern as the Assigned/Fees Conf
+                    cells below, just with nothing to label. */}
+                {isClosedMode && (
+                  <th
+                    aria-hidden="true"
+                    className={`${thBase} ${t.textSub} text-left ${stickyGroupClosedOn}`}
+                  />
+                )}
                 {/* "Case Info" label is split per column so each part's freeze
                   matches the column below it: the label cell over Case Name
                   freezes on all screens; the blank cell over Assigned freezes
@@ -1066,7 +1108,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={6}
+                  colSpan={isClosedMode ? 5 : 6}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -1074,6 +1116,16 @@ export const FeeRecordsTable = ({
               </tr>
               {/* Column headers */}
               <tr className={`border-b ${t.borderLight}`}>
+                {isClosedMode && (
+                  <th
+                    className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyThClosedOn}`}
+                    onClick={() => toggleSort("closedAt")}
+                  >
+                    <span className="flex items-center gap-1">
+                      Closed On <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </span>
+                  </th>
+                )}
                 <th
                   className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh1}`}
                   onClick={() => toggleSort("name")}
@@ -1194,15 +1246,19 @@ export const FeeRecordsTable = ({
                   Recent Update
                 </th>
                 <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
-                <th
-                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                  onClick={() => toggleSort(mode === "closed" ? "closedAt" : "daysAfterApproval")}
-                >
-                  <span className="flex items-center justify-end gap-1">
-                    {mode === "closed" ? "Closed On" : "Days"}
-                    <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                  </span>
-                </th>
+                {/* Closed On moved to the front (frozen) in "closed" mode —
+                    this trailing slot is Active-mode-only now. */}
+                {!isClosedMode && (
+                  <th
+                    className={`${thBase} ${t.textSub} text-right cursor-pointer`}
+                    onClick={() => toggleSort("daysAfterApproval")}
+                  >
+                    <span className="flex items-center justify-end gap-1">
+                      Days
+                      <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                    </span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -1228,6 +1284,13 @@ export const FeeRecordsTable = ({
                         className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                       />
                     </td>
+                    {/* Closed On — frozen, "closed" mode only, first data
+                        column so it's visible without scrolling. */}
+                    {isClosedMode && (
+                      <td className={`${tdBase} ${t.textSub} ${stickyTdClosedOn}`}>
+                        {dateStr(c.closedAt ? c.closedAt.slice(0, 10) : null)}
+                      </td>
+                    )}
                     {/* Case Info — first two columns are frozen.
                         Name deep-links to MyCase (external_id); a Chronicle
                         link and the long-form claim label sit on a sub-line. */}
@@ -2046,22 +2109,24 @@ export const FeeRecordsTable = ({
                         {c.notesCount}
                       </button>
                     </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums font-medium ${mode === "closed" ? t.textSub : AGING_COLORS(c.approvalCategory, dark)}`}
-                    >
-                      {mode === "closed" ? (
-                        dateStr(c.closedAt ? c.closedAt.slice(0, 10) : null)
-                      ) : c.daysAfterApproval !== null ? (
-                        <span>
-                          {c.daysAfterApproval}d{" "}
-                          <span className="text-[9px] opacity-70">
-                            {c.approvalCategory}
+                    {/* Closed On moved to the front (frozen) in "closed" mode —
+                        this trailing slot is Active-mode-only now. */}
+                    {!isClosedMode && (
+                      <td
+                        className={`${tdBase} text-right tabular-nums font-medium ${AGING_COLORS(c.approvalCategory, dark)}`}
+                      >
+                        {c.daysAfterApproval !== null ? (
+                          <span>
+                            {c.daysAfterApproval}d{" "}
+                            <span className="text-[9px] opacity-70">
+                              {c.approvalCategory}
+                            </span>
                           </span>
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
