@@ -167,12 +167,6 @@ export const FeePetitions = () => {
   const [rows, setRows] = useState<FeePetitionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({
-    completeCount: 0,
-    incompleteCount: 0,
-    totalFeeRequested: 0,
-    totalFeesReceived: 0,
-  });
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -277,12 +271,12 @@ export const FeePetitions = () => {
 
   const fetchAbortRef = useRef<AbortController | null>(null);
   const completedCountAbortRef = useRef<AbortController | null>(null);
+  const allTotalsAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      completedCountAbortRef.current?.abort();
     };
   }, []);
 
@@ -291,7 +285,11 @@ export const FeePetitions = () => {
   // fetchPetitions always filters to status=incomplete, so its own
   // completeCount aggregate is trivially 0 — fetch the real completed total
   // separately, the same way CompletedPetitions.tsx gets its own badge count.
-  useEffect(() => {
+  // Exposed as a callback (not just an effect) so in-page actions that move a
+  // petition from pending to complete can refresh it immediately instead of
+  // waiting for a reload.
+  const fetchCompletedCount = useCallback(() => {
+    completedCountAbortRef.current?.abort();
     const controller = new AbortController();
     completedCountAbortRef.current = controller;
     fetch(`/api/fee-petitions?status=complete&page=1&limit=1`, { signal: controller.signal })
@@ -302,8 +300,53 @@ export const FeePetitions = () => {
         }
       })
       .catch(() => {});
-    return () => controller.abort();
   }, []);
+
+  const [allTotals, setAllTotals] = useState<{ feeRequested: number; feesReceived: number } | null>(null);
+
+  // Fees Requested/Received in the stats bar cover pending AND completed
+  // petitions together — fetched with no status filter (unlike fetchPetitions,
+  // which always scopes its own aggregate to incomplete for the row list).
+  // These only change when a payment is recorded on the case detail page, not
+  // from anything this page itself does — refreshed on window focus below
+  // rather than tied to any local action.
+  const fetchAllTotals = useCallback(() => {
+    allTotalsAbortRef.current?.abort();
+    const controller = new AbortController();
+    allTotalsAbortRef.current = controller;
+    fetch(`/api/fee-petitions?page=1&limit=1`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json != null && mountedRef.current) {
+          setAllTotals({
+            feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
+            feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchCompletedCount();
+    fetchAllTotals();
+    return () => {
+      completedCountAbortRef.current?.abort();
+      allTotalsAbortRef.current?.abort();
+    };
+  }, [fetchCompletedCount, fetchAllTotals]);
+
+  // Catches fee changes made elsewhere (e.g. a payment added from the case
+  // detail page) — neither count can react to that on its own, so refresh
+  // both whenever the user comes back to this tab.
+  useEffect(() => {
+    const onFocus = () => {
+      fetchCompletedCount();
+      fetchAllTotals();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchCompletedCount, fetchAllTotals]);
 
   const fetchPetitions = useCallback(async () => {
     fetchAbortRef.current?.abort();
@@ -334,12 +377,6 @@ export const FeePetitions = () => {
       setSelectedIds(new Set());
       setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
-      setStats({
-        completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
-        incompleteCount: typeof json.incompleteCount === "number" ? json.incompleteCount : 0,
-        totalFeeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-        totalFeesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
-      });
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -438,6 +475,7 @@ export const FeePetitions = () => {
       );
       setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
       setTotal((tot) => Math.max(0, tot - ids.length));
+      fetchCompletedCount();
       clearSelection();
       if (snapshot.length > 0) {
         setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
@@ -458,6 +496,7 @@ export const FeePetitions = () => {
       if (!result.ok) throw new Error(result.error);
       setUndoInfo(null);
       fetchPetitions();
+      fetchCompletedCount();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -516,6 +555,7 @@ export const FeePetitions = () => {
       if (isComplete) {
         setRows((prev) => prev.filter((r) => r.id !== id));
         setTotal((tot) => Math.max(0, tot - 1));
+        fetchCompletedCount();
       }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
@@ -674,8 +714,8 @@ export const FeePetitions = () => {
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
           { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fees received & filed" },
-          { label: "Fees Requested", value: isInitialLoad ? "—" : fmt(stats.totalFeeRequested), sub: "across pending petitions" },
-          { label: "Fees Received", value: isInitialLoad ? "—" : fmt(stats.totalFeesReceived), sub: "across pending petitions" },
+          { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
+          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
