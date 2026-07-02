@@ -167,12 +167,6 @@ export const FeePetitions = () => {
   const [rows, setRows] = useState<FeePetitionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({
-    completeCount: 0,
-    incompleteCount: 0,
-    totalFeeRequested: 0,
-    totalFeesReceived: 0,
-  });
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -277,12 +271,14 @@ export const FeePetitions = () => {
 
   const fetchAbortRef = useRef<AbortController | null>(null);
   const completedCountAbortRef = useRef<AbortController | null>(null);
+  const allTotalsAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       completedCountAbortRef.current?.abort();
+      allTotalsAbortRef.current?.abort();
     };
   }, []);
 
@@ -299,6 +295,28 @@ export const FeePetitions = () => {
       .then((json) => {
         if (json != null && mountedRef.current) {
           setCompletedCount(typeof json.total === "number" ? json.total : 0);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  const [allTotals, setAllTotals] = useState<{ feeRequested: number; feesReceived: number } | null>(null);
+
+  // Fees Requested/Received in the stats bar cover pending AND completed
+  // petitions together — fetched with no status filter (unlike fetchPetitions,
+  // which always scopes its own aggregate to incomplete for the row list).
+  useEffect(() => {
+    const controller = new AbortController();
+    allTotalsAbortRef.current = controller;
+    fetch(`/api/fee-petitions?page=1&limit=1`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json != null && mountedRef.current) {
+          setAllTotals({
+            feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
+            feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
+          });
         }
       })
       .catch(() => {});
@@ -334,12 +352,6 @@ export const FeePetitions = () => {
       setSelectedIds(new Set());
       setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
-      setStats({
-        completeCount: typeof json.completeCount === "number" ? json.completeCount : 0,
-        incompleteCount: typeof json.incompleteCount === "number" ? json.incompleteCount : 0,
-        totalFeeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-        totalFeesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
-      });
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -674,8 +686,8 @@ export const FeePetitions = () => {
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
           { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fees received & filed" },
-          { label: "Fees Requested", value: isInitialLoad ? "—" : fmt(stats.totalFeeRequested), sub: "across pending petitions" },
-          { label: "Fees Received", value: isInitialLoad ? "—" : fmt(stats.totalFeesReceived), sub: "across pending petitions" },
+          { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
+          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
