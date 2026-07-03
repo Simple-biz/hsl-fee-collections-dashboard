@@ -672,7 +672,7 @@ export default function CaseDetailSheet({
                     />
                   ) : (
                     <p className={`${val} flex items-center gap-1`}>
-                      <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(myCaseData?.approvalDate ?? data.approvalDate)}
+                      <CalendarDays aria-hidden="true" className="h-3 w-3 text-indigo-500" /> {dateStr(data.approvalDate)}
                     </p>
                   )}
                 </div>
