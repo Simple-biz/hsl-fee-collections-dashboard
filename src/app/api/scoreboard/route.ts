@@ -179,30 +179,25 @@ export const GET = async (req: NextRequest) => {
          AND dm.metric_date >= ${startDate}::date
          AND dm.metric_date < ${endExclusive}::date), 0) AS week_fax_sent,
 
-        -- Open cases fees status per agent (current snapshot)
+        -- Open cases fees status per agent (current snapshot), bucketed by
+        -- fees_confirmation alone so the three counts are mutually exclusive
+        -- and always sum to that agent's total open cases.
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
-         AND fr.pif_ready_to_close IS NOT TRUE
-         AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
-         AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
-         AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
-         AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
-         AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
-         AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+         AND (fr.fees_confirmation IS NULL OR fr.fees_confirmation = '')
         )::int AS open_no_fees,
 
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
-         AND fr.pif_ready_to_close IS NOT TRUE
          AND fr.fees_confirmation IN ('Partial Payment', 'Pending (full/partial)')
         )::int AS open_partial,
 
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
-         AND fr.pif_ready_to_close = TRUE
+         AND fr.fees_confirmation = 'Paid In Full'
         )::int AS open_pif
 
       FROM team_members tm
@@ -318,37 +313,24 @@ export const GET = async (req: NextRequest) => {
       }),
     );
 
+    // Bucketed by fees_confirmation alone so this always matches the same
+    // definition used by the No Fees Cases aging query below.
     const [feesStatus] = await db.execute(sql`
-      SELECT
-        COUNT(*) FILTER (WHERE pif_ready_to_close = true)::int AS pif_count,
-        COUNT(*) FILTER (
-          WHERE pif_ready_to_close IS NOT TRUE
-            AND COALESCE(t16_fee_due, 0)::numeric = 0
-            AND COALESCE(t2_fee_due, 0)::numeric = 0
-            AND COALESCE(aux_fee_due, 0)::numeric = 0
-            AND COALESCE(t16_fee_received, 0)::numeric = 0
-            AND COALESCE(t2_fee_received, 0)::numeric = 0
-            AND COALESCE(aux_fee_received, 0)::numeric = 0
-        )::int AS no_fees_count,
-        COUNT(*) FILTER (
-          WHERE pif_ready_to_close IS NOT TRUE
-            AND fees_confirmation IN ('Partial Payment', 'Pending (full/partial)')
-        )::int AS partial_count
+      SELECT COUNT(*) FILTER (WHERE fees_confirmation IS NULL OR fees_confirmation = '')::int AS no_fees_count
       FROM fee_records
       WHERE is_closed = false
-    `) as unknown as [{ pif_count: number; no_fees_count: number; partial_count: number }];
+    `) as unknown as [{ no_fees_count: number }];
 
     const openCasesFeesStatus = {
-      noFees:  Number(feesStatus?.no_fees_count)  || 0,
-      partial: Number(feesStatus?.partial_count)   || 0,
-      pif:     Number(feesStatus?.pif_count)        || 0,
+      noFees: Number(feesStatus?.no_fees_count) || 0,
     };
 
-    // No Fees Cases — open cases with zero fees due/received (same predicate
-    // as openCasesFeesStatus.noFees above), aged over 60 days by approval_date.
-    // Returns the actual case rows (not just a count) so the Reports page can
-    // list them for reporting; over60/over90 counts are derived from this
-    // same list below so the card and the table can never disagree.
+    // No Fees Cases — open cases with no fees_confirmation set (same
+    // predicate as openCasesFeesStatus.noFees above), aged over 60 days by
+    // approval_date. Returns the actual case rows (not just a count) so the
+    // Reports page can list them for reporting; over60/over90 counts are
+    // derived from this same list below so the card and the table can never
+    // disagree.
     const noFeesCaseRows = await db.execute(sql`
       SELECT
         c.client_id AS id,
@@ -362,13 +344,7 @@ export const GET = async (req: NextRequest) => {
       FROM fee_records fr
       JOIN cases c ON c.client_id = fr.case_id
       WHERE fr.is_closed = FALSE
-        AND fr.pif_ready_to_close IS NOT TRUE
-        AND COALESCE(fr.t16_fee_due, 0)::numeric = 0
-        AND COALESCE(fr.t2_fee_due, 0)::numeric = 0
-        AND COALESCE(fr.aux_fee_due, 0)::numeric = 0
-        AND COALESCE(fr.t16_fee_received, 0)::numeric = 0
-        AND COALESCE(fr.t2_fee_received, 0)::numeric = 0
-        AND COALESCE(fr.aux_fee_received, 0)::numeric = 0
+        AND (fr.fees_confirmation IS NULL OR fr.fees_confirmation = '')
         AND c.approval_date IS NOT NULL
         AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
       ORDER BY c.approval_date ASC
