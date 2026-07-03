@@ -52,6 +52,11 @@ export const CAPABILITIES = [
     label: "View & post leader notes",
     description: "See and add to the leader-only notes thread on a case — hidden from members entirely.",
   },
+  {
+    key: "feesConfirmation.edit",
+    label: "Edit Fees Confirmation",
+    description: "Change the Fees Confirmation dropdown on a case. Doesn't include Fees Closed, which stays admin-only.",
+  },
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];
@@ -67,15 +72,17 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 //
 // - admin / system_admin: everything.
 // - lead: full update incl. finalize + PII + logging calls for others +
-//   leader notes, but NOT create, delete, or editing fee amounts received.
+//   leader notes + Fees Confirmation, but NOT create, delete, editing fee
+//   amounts received, or Fees Closed (stays admin-only).
 // - member: day-to-day collections — update (record payments, status, notes)
 //   only, and only their own daily call log. No create/delete, no finalize
-//   (close/overpaid/approvedBy), no PII, no leader notes. Admins can widen
-//   any of these per-user via the access overrides modal.
+//   (close/overpaid/approvedBy), no PII, no leader notes, no Fees
+//   Confirmation. Admins can widen any of these per-user via the access
+//   overrides modal.
 export const ROLE_CAPABILITY_DEFAULTS: Record<Role, CapabilityKey[]> = {
   system_admin: ALL,
   admin: ALL,
-  lead: ["case.update", "case.finalize", "case.editPii", "dailyMetrics.editOthers", "leaderNotes.access"],
+  lead: ["case.update", "case.finalize", "case.editPii", "dailyMetrics.editOthers", "leaderNotes.access", "feesConfirmation.edit"],
   member: ["case.update"],
 };
 
