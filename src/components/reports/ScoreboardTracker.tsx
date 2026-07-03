@@ -84,7 +84,7 @@ interface TrackerData {
   daily: DailyEntry[];
   summary: ScoreboardSummary | null;
   teams: ScoreboardTeam[];
-  openCasesFeesStatus: { noFees: number; partial: number; pif: number };
+  openCasesFeesStatus: { noFees: number };
   noFeesAging: { over60: number; over90: number };
   noFeesCases: NoFeesCaseRow[];
 }
@@ -320,7 +320,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         daily: json.daily ?? [],
         summary: json.summary ?? null,
         teams: json.teams ?? [],
-        openCasesFeesStatus: json.openCasesFeesStatus ?? { noFees: 0, partial: 0, pif: 0 },
+        openCasesFeesStatus: json.openCasesFeesStatus ?? { noFees: 0 },
         noFeesAging: json.noFeesAging ?? { over60: 0, over90: 0 },
         noFeesCases: json.noFeesCases ?? [],
       });
@@ -505,9 +505,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           </div>
           <div className={`grid grid-cols-3 divide-x divide-dashed ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
             {[
-              { label: "No Fees",           value: data.openCasesFeesStatus.noFees,  tone: dark ? "text-amber-400"   : "text-amber-600"   },
-              { label: "Partial / Pending",  value: data.openCasesFeesStatus.partial, tone: dark ? "text-blue-400"    : "text-blue-600"    },
-              { label: "Paid in Full",       value: data.openCasesFeesStatus.pif,     tone: dark ? "text-emerald-400" : "text-emerald-600" },
+              { label: "No Fees",              value: data.openCasesFeesStatus.noFees, tone: dark ? "text-amber-400" : "text-amber-600" },
+              { label: "No Fees Over 60 Days",  value: data.noFeesAging.over60,         tone: dark ? "text-orange-400" : "text-orange-600" },
+              { label: "No Fees Over 90 Days",  value: data.noFeesAging.over90,         tone: dark ? "text-red-400"   : "text-red-600"   },
             ].map(({ label, value, tone }) => (
               <div key={label} className="py-3 text-center">
                 <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
