@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog, userDetails, feePetitions } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, leaderNotes, userDetails, feePetitions } from "@/lib/db/schema";
 import { eq, ilike, sql, desc } from "drizzle-orm";
-import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+import { requireCapability, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
 
 // GET /api/cases — List cases with fee records + latest activity
 export const GET = async (req: NextRequest) => {
   try {
+    // leaderNotesCount is only computed/returned for sessions with
+    // leaderNotes.access — members shouldn't learn even the count exists.
+    const session = await auth();
+    const canSeeLeaderNotes = sessionHasCapability(session, "leaderNotes.access");
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status");
@@ -113,14 +119,15 @@ export const GET = async (req: NextRequest) => {
 
     let activities: { caseId: number; message: string }[] = [];
     let notesCounts: { caseId: number; count: number }[] = [];
+    let leaderNotesCounts: { caseId: number; count: number }[] = [];
     if (caseIds.length > 0) {
       const inClause = sql`${activityLog.caseId} IN (${sql.join(
         caseIds.map((id) => sql`${id}`),
         sql`, `,
       )})`;
 
-      // Both depend only on caseIds, so fire them together.
-      [activities, notesCounts] = await Promise.all([
+      // All independent of each other, so fire them together.
+      [activities, notesCounts, leaderNotesCounts] = await Promise.all([
         db
           .selectDistinctOn([activityLog.caseId], {
             caseId: activityLog.caseId,
@@ -137,11 +144,29 @@ export const GET = async (req: NextRequest) => {
           .from(activityLog)
           .where(inClause)
           .groupBy(activityLog.caseId),
+        canSeeLeaderNotes
+          ? db
+              .select({
+                caseId: leaderNotes.caseId,
+                count: sql<number>`COUNT(*)::int`,
+              })
+              .from(leaderNotes)
+              .where(
+                sql`${leaderNotes.caseId} IN (${sql.join(
+                  caseIds.map((id) => sql`${id}`),
+                  sql`, `,
+                )})`,
+              )
+              .groupBy(leaderNotes.caseId)
+          : Promise.resolve([]),
       ]);
     }
 
     const activityMap = new Map(activities.map((a) => [a.caseId, a.message]));
     const notesCountMap = new Map(notesCounts.map((n) => [n.caseId, n.count]));
+    const leaderNotesCountMap = new Map(
+      leaderNotesCounts.map((n) => [n.caseId, n.count]),
+    );
 
     // Shape response
     const data = rows.map((r) => {
@@ -237,6 +262,10 @@ export const GET = async (req: NextRequest) => {
         monthAssignedToAgent: r.monthAssignedToAgent ?? null,
         office: r.officeWithJurisdiction || "—",
         notesCount: notesCountMap.get(r.clientId) ?? 0,
+        // Always 0 for sessions without leaderNotes.access, regardless of
+        // the real count — the field must never leak that leader notes
+        // exist on a case to a member inspecting the response.
+        leaderNotesCount: leaderNotesCountMap.get(r.clientId) ?? 0,
         winSheetLink: r.winSheetLink ?? null,
         winSheetLinkText: r.winSheetLinkText ?? null,
       };

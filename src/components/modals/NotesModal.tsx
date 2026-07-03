@@ -21,6 +21,12 @@ interface NotesModalProps {
   // Called after a note is added or removed so the caller can refresh the
   // table's notes-count badge. Optional.
   onChanged?: () => void;
+  // "notes" (default): the general Notes thread — anyone with case.update
+  // can post, case.delete to remove. "leader-notes": a separate, quieter
+  // thread hidden from members entirely — leaderNotes.access gates viewing,
+  // posting, AND deleting (audience is already narrow, so any lead who can
+  // post can also clean up their own entry).
+  variant?: "notes" | "leader-notes";
 }
 
 export default function NotesModal({
@@ -29,10 +35,13 @@ export default function NotesModal({
   caseName,
   onClose,
   onChanged,
+  variant = "notes",
 }: NotesModalProps) {
   const t = themeClasses(dark);
   const { can } = useCapabilities();
-  const canDelete = can("case.delete");
+  const isLeader = variant === "leader-notes";
+  const apiPath = `/api/cases/${caseId}/${isLeader ? "leader-notes" : "notes"}`;
+  const canDelete = can(isLeader ? "leaderNotes.access" : "case.delete");
 
   const [notes, setNotes] = useState<NoteEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +56,7 @@ export default function NotesModal({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/cases/${caseId}/notes`);
+        const res = await fetch(apiPath);
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
         if (!cancelled) setNotes(json.data);
@@ -58,7 +67,7 @@ export default function NotesModal({
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [apiPath]);
 
   const addNote = async () => {
     const message = draft.trim();
@@ -66,7 +75,7 @@ export default function NotesModal({
     setAdding(true);
     setActionError(null);
     try {
-      const res = await fetch(`/api/cases/${caseId}/notes`, {
+      const res = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
@@ -89,7 +98,7 @@ export default function NotesModal({
     setDeletingId(id);
     setActionError(null);
     try {
-      const res = await fetch(`/api/cases/${caseId}/notes/${id}`, {
+      const res = await fetch(`${apiPath}/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -120,7 +129,7 @@ export default function NotesModal({
       >
         <div className="flex items-start justify-between mb-5">
           <div>
-            <h3 className={`text-sm font-bold ${t.text}`}>Case Notes</h3>
+            <h3 className={`text-sm font-bold ${t.text}`}>{isLeader ? "Leader Notes" : "Case Log"}</h3>
             <p
               className={`text-[11px] ${t.textMuted} mt-0.5 truncate max-w-md`}
             >
@@ -166,9 +175,9 @@ export default function NotesModal({
           </div>
         </div>
 
-        {/* Notes History */}
+        {/* History */}
         <h4 className={`text-[11px] font-semibold ${t.text} mb-2`}>
-          Notes History ({count})
+          {isLeader ? "Notes History" : "Log History"} ({count})
         </h4>
 
         {notes === null && !error && (
@@ -193,7 +202,7 @@ export default function NotesModal({
             className={`flex flex-col items-center justify-center py-10 ${t.textMuted}`}
           >
             <FileText className="h-6 w-6 mb-2" />
-            <p className="text-xs">No notes for this case yet.</p>
+            <p className="text-xs">{isLeader ? "No notes for this case yet." : "No log entries for this case yet."}</p>
           </div>
         )}
 
