@@ -737,9 +737,14 @@ export const FeeRecordsTable = ({
         const j = await res.json().catch(() => ({}));
         throw new Error((j as { error?: string }).error ?? `Save failed (${res.status})`);
       }
+      const j = await res.json().catch(() => ({}));
+      // The server also auto-recalculates the sibling Pending amount when
+      // Fee Due/Received changes — merge it in so the row reflects it
+      // immediately instead of waiting for the next full refetch.
+      const computed = (j as { computed?: Record<string, number> }).computed ?? {};
       setFeeOverrides((prev) => ({
         ...prev,
-        [caseId]: { ...prev[caseId], [field]: amount },
+        [caseId]: { ...prev[caseId], [field]: amount, ...computed },
       }));
       setFeeAmountEdit(null);
     } catch (err) {

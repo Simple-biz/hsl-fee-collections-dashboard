@@ -356,6 +356,10 @@ export const PATCH = async (
     // Mutable — the Overpaid auto-flag below appends to whatever the client
     // sent so the activity log names the side effect, not just the edit.
     let logMessage = clientLogMessage;
+    // Populated by the Pending auto-calc below and returned to the client so
+    // optimistic UI updates (which only know the field they explicitly sent)
+    // can pick up the server-computed sibling value without a refetch.
+    const computedFields: Record<string, number> = {};
 
     // Authorize: any update needs case.update. Finalizing fields (close/reopen,
     // mark overpaid, approvedBy) additionally need case.finalize, and editing
@@ -520,9 +524,24 @@ export const PATCH = async (
       }
 
       if (updates.length > 0) {
-        await db.execute(
-          sql`UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE case_id = ${caseId}`,
-        );
+        // t16/t2/aux_pending are auto-recomputed as Due − Received (floored
+        // at 0) by the trg_fee_records_compute_totals DB trigger on every
+        // write — it always wins, an explicit Pending in `updates` above is
+        // silently overwritten. RETURNING reads its result back so
+        // optimistic client updates (which only know the field they
+        // explicitly sent) can sync without a refetch.
+        const [updated] = (await db.execute(sql`
+          UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
+          WHERE case_id = ${caseId}
+          RETURNING t16_pending, t2_pending, aux_pending
+        `)) as unknown as [
+          { t16_pending: string; t2_pending: string; aux_pending: string } | undefined,
+        ];
+        if (updated) {
+          computedFields.t16Pending = Number(updated.t16_pending);
+          computedFields.t2Pending = Number(updated.t2_pending);
+          computedFields.auxPending = Number(updated.aux_pending);
+        }
       }
     }
 
@@ -568,7 +587,7 @@ export const PATCH = async (
       });
     }
 
-    return NextResponse.json({ status: "ok", updated: caseId });
+    return NextResponse.json({ status: "ok", updated: caseId, computed: computedFields });
   } catch (error) {
     console.error("PATCH /api/cases/[id] error:", error);
     return NextResponse.json(
