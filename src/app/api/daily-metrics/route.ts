@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { dailyMetrics } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { sessionHasCapability } from "@/lib/auth-helpers";
+
+// Members can only log their own calls — agent_name is matched against the
+// session's display name (team_members.name mirrors users.name for real
+// accounts). dailyMetrics.editOthers (lead/admin by default, grantable
+// per-user via the access overrides modal) can log for anyone.
+const canWriteAgent = (session: Session, agent: string): boolean =>
+  sessionHasCapability(session, "dailyMetrics.editOthers") ||
+  agent === session.user?.name;
 
 // GET /api/daily-metrics?agent=Drake&date=2026-02-20
 // GET /api/daily-metrics?week=2026-02-17  (returns all agents for the week)
 export const GET = async (req: NextRequest) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const agent = searchParams.get("agent");
     const date = searchParams.get("date");
@@ -112,15 +128,25 @@ export const GET = async (req: NextRequest) => {
 // Supports batch:  { entries: [{ agent, date, ssaCalls, clientCallsIb, clientCallsOb, notes }] }
 export const POST = async (req: NextRequest) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
     const body = await req.json();
 
     // Batch mode
     if (body.entries && Array.isArray(body.entries)) {
       const results = [];
+      let skipped = 0;
       for (const entry of body.entries) {
         const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } =
           entry;
         if (!agent || !date) continue;
+        if (!canWriteAgent(session, agent)) {
+          skipped++;
+          continue;
+        }
 
         await db.execute(sql`
           INSERT INTO daily_metrics (id, agent_name, metric_date, ssa_calls, client_calls_ib, client_calls_ob, win_sheets_created, fax_sent, notes, created_at, updated_at)
@@ -147,6 +173,7 @@ export const POST = async (req: NextRequest) => {
       return NextResponse.json({
         status: "ok",
         count: results.length,
+        skipped,
         data: results,
       });
     }
@@ -156,6 +183,12 @@ export const POST = async (req: NextRequest) => {
 
     if (!agent) {
       return NextResponse.json({ error: "agent is required" }, { status: 400 });
+    }
+    if (!canWriteAgent(session, agent)) {
+      return NextResponse.json(
+        { error: "You can only log your own calls." },
+        { status: 403 },
+      );
     }
 
     const metricDate = date || new Date().toISOString().split("T")[0];

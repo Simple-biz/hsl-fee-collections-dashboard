@@ -25,6 +25,7 @@ import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { teamBadgeClasses } from "@/lib/team-colors";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import {
   ScoreboardSummaryCards,
   ScoreboardSummary,
@@ -220,12 +221,10 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const cancelledRef = useRef(false);
 
   const { data: session } = useSession();
-  const role = session?.user?.role;
-  const isAdmin = role === "admin" || role === "system_admin";
-  const isLead = role === "lead";
   const userName = session?.user?.name;
+  const { can } = useCapabilities();
   const canEditAgent = (agentName: string) =>
-    isAdmin || isLead || (!!userName && agentName === userName);
+    can("dailyMetrics.editOthers") || (!!userName && agentName === userName);
 
   const currentYear = nowForInit.getFullYear();
   const yearOptions = useMemo(
@@ -436,7 +435,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         ssaCalls: number; clientCallsIb: number; clientCallsOb: number; winSheetsCreated: number; faxSent: number;
       }[] = [];
       if (data) {
-        for (const agent of data.agents) {
+        for (const agent of data.agents.filter((a) => canEditAgent(a.agent))) {
           for (const day of entryDays) {
             const c = getCell(agent.agent, day.date);
             const ssa = parseInt(c.ssaCalls) || 0;
@@ -458,7 +457,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         signal: saveAbortRef.current.signal,
       });
       if (!res.ok) throw new Error(`Failed to save (${res.status})`);
-      setSaveMsg(`Saved ${entries.length} entries`);
+      const json = await res.json();
+      setSaveMsg(`Saved ${json.count ?? entries.length} entries`);
       setDirty(false);
       await fetchScoreboard();
     } catch (err) {

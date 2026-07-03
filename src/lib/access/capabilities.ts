@@ -42,6 +42,11 @@ export const CAPABILITIES = [
     label: "Edit fee amounts",
     description: "Record fees received and manage fee payment records.",
   },
+  {
+    key: "dailyMetrics.editOthers",
+    label: "Log calls for other agents",
+    description: "Edit any agent's daily call log, not just their own — includes bulk CSV import.",
+  },
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];
@@ -56,14 +61,16 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 // Role → default capabilities.
 //
 // - admin / system_admin: everything.
-// - lead: full update incl. finalize + PII, but NOT create or delete.
+// - lead: full update incl. finalize + PII + logging calls for others, but
+//   NOT create, delete, or editing fee amounts received.
 // - member: day-to-day collections — update (record payments, status, notes)
-//   only. No create/delete, no finalize (close/overpaid/approvedBy), no PII.
-//   Admins can widen any of these per-user via the access overrides modal.
+//   only, and only their own daily call log. No create/delete, no finalize
+//   (close/overpaid/approvedBy), no PII. Admins can widen any of these
+//   per-user via the access overrides modal.
 export const ROLE_CAPABILITY_DEFAULTS: Record<Role, CapabilityKey[]> = {
   system_admin: ALL,
   admin: ALL,
-  lead: ["case.update", "case.finalize", "case.editPii"],
+  lead: ["case.update", "case.finalize", "case.editPii", "dailyMetrics.editOthers"],
   member: ["case.update"],
 };
 
