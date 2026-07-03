@@ -8,6 +8,7 @@ import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportMod
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 // ---------- types ----------
 
@@ -107,6 +108,8 @@ export const Scoreboard = () => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+  const { can } = useCapabilities();
+  const canImport = can("dailyMetrics.editOthers");
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
@@ -193,14 +196,16 @@ export const Scoreboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => setCsvImportOpen(true)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
-            aria-label="Import daily metrics from CSV"
-          >
-            <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-            Import
-          </button>
+          {canImport && (
+            <button
+              onClick={() => setCsvImportOpen(true)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+              aria-label="Import daily metrics from CSV"
+            >
+              <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+              Import
+            </button>
+          )}
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
