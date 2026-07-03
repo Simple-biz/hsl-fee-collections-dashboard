@@ -436,7 +436,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         ssaCalls: number; clientCallsIb: number; clientCallsOb: number; winSheetsCreated: number; faxSent: number;
       }[] = [];
       if (data) {
-        for (const agent of data.agents) {
+        for (const agent of data.agents.filter((a) => canEditAgent(a.agent))) {
           for (const day of entryDays) {
             const c = getCell(agent.agent, day.date);
             const ssa = parseInt(c.ssaCalls) || 0;
@@ -458,7 +458,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         signal: saveAbortRef.current.signal,
       });
       if (!res.ok) throw new Error(`Failed to save (${res.status})`);
-      setSaveMsg(`Saved ${entries.length} entries`);
+      const json = await res.json();
+      setSaveMsg(`Saved ${json.count ?? entries.length} entries`);
       setDirty(false);
       await fetchScoreboard();
     } catch (err) {

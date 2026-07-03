@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useReducer, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { RefreshCw, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -107,6 +108,9 @@ export const Scoreboard = () => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+  const { data: session } = useSession();
+  const role = session?.user?.role;
+  const canImport = role === "admin" || role === "system_admin" || role === "lead";
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
@@ -193,14 +197,16 @@ export const Scoreboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => setCsvImportOpen(true)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
-            aria-label="Import daily metrics from CSV"
-          >
-            <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-            Import
-          </button>
+          {canImport && (
+            <button
+              onClick={() => setCsvImportOpen(true)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+              aria-label="Import daily metrics from CSV"
+            >
+              <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+              Import
+            </button>
+          )}
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
