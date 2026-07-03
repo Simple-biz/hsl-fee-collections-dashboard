@@ -363,6 +363,7 @@ export const FeeRecordsTable = ({
   const [assignedFilter, setAssignedFilter] = useState("all");
   const [feesConfFilter, setFeesConfFilter] = useState("all");
   const [claimFilter, setClaimFilter] = useState("all");
+  const [caseStatusFilter, setCaseStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Client-side pagination over the filtered+sorted set. Page size is
@@ -458,6 +459,17 @@ export const FeeRecordsTable = ({
     return Array.from(set).sort();
   }, [cases]);
 
+  // Unique Remarks values present in the data for the quick-filter dropdown.
+  // Remarks predates the case_status dropdown catalog, so this includes
+  // whatever free-text values are actually on records today, not just the
+  // admin-configured options.
+  const caseStatusValues = useMemo(() => {
+    const set = new Set(
+      cases.map((c) => c.caseStatus).filter((v): v is string => v != null),
+    );
+    return Array.from(set).sort();
+  }, [cases]);
+
   const filtered = useMemo(() => {
     let d = [...cases];
     // Date range filter (approval date)
@@ -508,6 +520,8 @@ export const FeeRecordsTable = ({
       d = d.filter((c) => c.feesConfirmation === feesConfFilter);
     if (claimFilter !== "all")
       d = d.filter((c) => c.claim === claimFilter);
+    if (caseStatusFilter !== "all")
+      d = d.filter((c) => c.caseStatus === caseStatusFilter);
 
     d.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -563,6 +577,7 @@ export const FeeRecordsTable = ({
     assignedFilter,
     feesConfFilter,
     claimFilter,
+    caseStatusFilter,
     sortKey,
     sortDir,
     dateRange,
@@ -591,6 +606,7 @@ export const FeeRecordsTable = ({
     assignedFilter,
     feesConfFilter,
     claimFilter,
+    caseStatusFilter,
     sortKey,
     sortDir,
     pageSize,
@@ -948,6 +964,18 @@ export const FeeRecordsTable = ({
             <option value="started">Started</option>
             <option value="finished">Finished</option>
             <option value="closed">Closed</option>
+          </select>
+          <select
+            value={caseStatusFilter}
+            onChange={(e) => setCaseStatusFilter(e.target.value)}
+            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+          >
+            <option value="all">All Remarks</option>
+            {caseStatusValues.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
           </select>
           {onApproverFilterChange && (
             <select
