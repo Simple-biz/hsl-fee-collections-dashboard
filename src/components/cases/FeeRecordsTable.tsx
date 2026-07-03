@@ -84,6 +84,58 @@ function FeesConfBadge({ value, dark }: { value: string | null | undefined; dark
   );
 }
 
+// Keyed on what's actually stored in fee_records.win_sheet_status today —
+// a mix of the dropdown-configured "Started"/"Finished" and older
+// lowercase/underscored values written by the MyCase sync ("not_started",
+// "started", "closed").
+const WIN_SHEET_STATUS_COLORS: Record<string, { badge: string; badgeDark: string }> = {
+  "not_started": { badge: "bg-neutral-100 text-neutral-600 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" },
+  "started":     { badge: "bg-amber-50 text-amber-700 border-amber-300",       badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"     },
+  "Started":     { badge: "bg-amber-50 text-amber-700 border-amber-300",       badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"     },
+  "closed":      { badge: "bg-emerald-50 text-emerald-700 border-emerald-300", badgeDark: "bg-emerald-900/40 text-emerald-300 border-emerald-700" },
+  "Finished":    { badge: "bg-emerald-50 text-emerald-700 border-emerald-300", badgeDark: "bg-emerald-900/40 text-emerald-300 border-emerald-700" },
+};
+const WIN_SHEET_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
+
+function WinSheetStatusBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
+  if (!value) return <span className="text-neutral-400">—</span>;
+  const colors = WIN_SHEET_STATUS_COLORS[value] ?? WIN_SHEET_STATUS_FALLBACK;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+      {value}
+    </span>
+  );
+}
+
+// Keyed on both the dropdown-configured categories and the pre-dropdown
+// free-text values still sitting on older fee_records rows (e.g. "Ready for
+// Review" vs. the current "Ready for Review (Specialist)"). One-off custom
+// remarks not listed here fall through to the neutral fallback below.
+const CASE_STATUS_COLORS: Record<string, { badge: string; badgeDark: string }> = {
+  "Ready for Review (Specialist)": { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
+  "Ready for Review":              { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
+  "Pending for Review":            { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
+  "Reviewing (Management)":        { badge: "bg-violet-50 text-violet-700 border-violet-300", badgeDark: "bg-violet-900/40 text-violet-300 border-violet-700" },
+  "For follow up":                 { badge: "bg-amber-50 text-amber-700 border-amber-300",     badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"    },
+  "For follow-up":                 { badge: "bg-amber-50 text-amber-700 border-amber-300",     badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"    },
+  "Overpaid but ready to close":   { badge: "bg-amber-50 text-amber-700 border-amber-300",     badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"    },
+  "Not ready to close":            { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
+  "Incomplete win sheet":          { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
+  "Missing fees":                  { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
+  "NEED AUX FEE":                  { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
+};
+const CASE_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
+
+function CaseStatusBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
+  if (!value) return <span className="text-neutral-400">—</span>;
+  const colors = CASE_STATUS_COLORS[value] ?? CASE_STATUS_FALLBACK;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+      {value}
+    </span>
+  );
+}
+
 interface FeeAmountCellProps {
   active: boolean;
   value: number;
@@ -267,6 +319,7 @@ export const FeeRecordsTable = ({
   const { can } = useCapabilities();
   const canCreate = can("case.create");
   const canFinalize = can("case.finalize");
+  const canEditFeeDue = can("case.update");
   const canEditFees = can("fees.edit");
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
@@ -322,6 +375,8 @@ export const FeeRecordsTable = ({
   const [isPending, startTransition] = useTransition();
   const [feesConfEditId, setFeesConfEditId] = useState<number | null>(null);
   const [claimEditId, setClaimEditId] = useState<number | null>(null);
+  const [winSheetStatusEditId, setWinSheetStatusEditId] = useState<number | null>(null);
+  const [caseStatusEditId, setCaseStatusEditId] = useState<number | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -1508,10 +1563,13 @@ export const FeeRecordsTable = ({
                       className={`${tdBase}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
+                      {winSheetStatusEditId === c.id ? (
+                        <select
+                          autoFocus
                           value={cellValue(c, "status")}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
+                          onBlur={() => setWinSheetStatusEditId(null)}
+                          onChange={(e) => {
                             handleVarcharChange(
                               c,
                               "fee",
@@ -1519,8 +1577,9 @@ export const FeeRecordsTable = ({
                               "status",
                               "Win Sheet Status",
                               e.target.value,
-                            )
-                          }
+                            );
+                            setWinSheetStatusEditId(null);
+                          }}
                           className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             winSheetStatusOptions.length === 0
@@ -1549,6 +1608,15 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setWinSheetStatusEditId(c.id); }}
+                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                          aria-label={`Edit Win Sheet Status: ${cellValue(c, "status") || "not set"}`}
+                        >
+                          <WinSheetStatusBadge value={cellValue(c, "status")} dark={dark} />
+                        </button>
+                      )}
                     </td>
 
                     {/* Win Sheet Link — hover pen to edit; HoverCard shows URL + text */}
@@ -1674,12 +1742,12 @@ export const FeeRecordsTable = ({
                     {/* T16 */}
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro"}
                         value={c.t16Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="T16 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="T16 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Retro", draft: String(c.t16Retro) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1688,12 +1756,12 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
                         value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: String(c.t16FeeDue) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1707,12 +1775,12 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Pending"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Pending"}
                         value={c.t16Pending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="T16 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="T16 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Pending", draft: String(c.t16Pending) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1745,12 +1813,12 @@ export const FeeRecordsTable = ({
                     {/* T2 */}
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro"}
                         value={c.t2Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="T2 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="T2 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Retro", draft: String(c.t2Retro) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1759,12 +1827,12 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
                         value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: String(c.t2FeeDue) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1778,12 +1846,12 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Pending"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Pending"}
                         value={c.t2Pending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="T2 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="T2 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Pending", draft: String(c.t2Pending) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1816,12 +1884,12 @@ export const FeeRecordsTable = ({
                     {/* AUX */}
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro"}
                         value={c.auxRetro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="AUX retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="AUX retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxRetro", draft: String(c.auxRetro) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1830,12 +1898,12 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
                         value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: String(c.auxFeeDue) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1849,12 +1917,12 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                      onClick={canEditFees ? (e) => e.stopPropagation() : undefined}
+                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
                     >
                       <FeeAmountCell
-                        active={canEditFees && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxPending"}
+                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxPending"}
                         value={c.auxPending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFees} saveLabel="AUX pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                        canEdit={canEditFeeDue} saveLabel="AUX pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
                         onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxPending", draft: String(c.auxPending) }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
@@ -1955,10 +2023,13 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} ${t.textSub}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <select
+                      {caseStatusEditId === c.id ? (
+                        <select
+                          autoFocus
                           value={cellValue(c, "caseStatus")}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
+                          onBlur={() => setCaseStatusEditId(null)}
+                          onChange={(e) => {
                             handleVarcharChange(
                               c,
                               "fee",
@@ -1966,8 +2037,9 @@ export const FeeRecordsTable = ({
                               "caseStatus",
                               "Remarks",
                               e.target.value,
-                            )
-                          }
+                            );
+                            setCaseStatusEditId(null);
+                          }}
                           className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             caseStatusOptions.length === 0
@@ -1997,6 +2069,15 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setCaseStatusEditId(c.id); }}
+                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                          aria-label={`Edit Remarks: ${cellValue(c, "caseStatus") || "not set"}`}
+                        >
+                          <CaseStatusBadge value={cellValue(c, "caseStatus")} dark={dark} />
+                        </button>
+                      )}
                     </td>
                     <td className={`${tdBase} ${t.textSub} max-w-65`}>
                       {c.update && c.update !== "—" ? (

@@ -22,12 +22,13 @@ const patchBodySchema = z.object({
 // reopen, mark overpaid, or sign off "OK to close").
 const FINALIZE_FEE_FIELDS = ["isClosed", "markedOverpaid", "approvedBy"] as const;
 
-// Fee fields that require the fees.edit capability — raw monetary amounts that
-// only designated users (e.g. Ms. Jazz) should be able to modify directly.
-const FEE_AMOUNT_FIELDS = [
-  "t16Retro", "t16FeeDue", "t16FeeReceived", "t16Pending", "t16FeeReceivedDate",
-  "t2Retro", "t2FeeDue", "t2FeeReceived", "t2Pending", "t2FeeReceivedDate",
-  "auxRetro", "auxFeeDue", "auxFeeReceived", "auxPending", "auxFeeReceivedDate",
+// Fee fields that require the fees.edit capability — members can edit what's
+// due (case.update, below), but only designated users (e.g. Ms. Jazz) can
+// record what's actually been received.
+const FEE_RECEIVED_FIELDS = [
+  "t16FeeReceived", "t16FeeReceivedDate",
+  "t2FeeReceived", "t2FeeReceivedDate",
+  "auxFeeReceived", "auxFeeReceivedDate",
 ] as const;
 
 const resolveParams = async (context: {
@@ -381,14 +382,14 @@ export const PATCH = async (
       }
     }
 
-    const touchesFeeAmounts =
+    const touchesFeeReceived =
       feeFields &&
-      FEE_AMOUNT_FIELDS.some((k) => k in feeFields);
-    if (touchesFeeAmounts) {
+      FEE_RECEIVED_FIELDS.some((k) => k in feeFields);
+    if (touchesFeeReceived) {
       const feeEdit = await requireCapability("fees.edit");
       if (!feeEdit.ok) {
         return NextResponse.json(
-          { error: "You don't have permission to edit fee amounts." },
+          { error: "You don't have permission to record fees received." },
           { status: guardStatus(feeEdit.error) },
         );
       }
