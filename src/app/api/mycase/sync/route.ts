@@ -370,7 +370,11 @@ export const POST = async (req: NextRequest) => {
               case_link          = v.case_link,
               first_name         = v.first_name,
               last_name          = v.last_name,
-              approval_date      = v.approval_date::date,
+              -- Once set, a sync never overwrites approval_date — it's editable
+              -- in the dashboard and shouldn't get silently clobbered by
+              -- whatever MyCase currently reports (matches how
+              -- fees_confirmation/approved_by are protected below).
+              approval_date      = COALESCE(cases.approval_date, v.approval_date::date),
               level_won          = v.level_won,
               claim_type         = v.claim_type::text[],
               claim_type_label   = v.claim_type_label,
