@@ -374,6 +374,32 @@ export const activityLog = pgTable(
 );
 
 // ============================================================================
+// LEADER_NOTES — a separate, quieter notes thread gated to the
+// leaderNotes.access capability (lead/admin by default). Mirrors
+// activityLog's shape but deliberately never mixes with it, since that
+// thread also carries every auto-generated field-change message.
+// ============================================================================
+
+export const leaderNotes = pgTable(
+  "leader_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    createdBy: varchar("created_by", { length: 100 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_leader_notes_case_id").on(table.caseId),
+    index("idx_leader_notes_created_at").on(table.createdAt),
+  ],
+);
+
+// ============================================================================
 // SYNC_LOGS
 // ============================================================================
 

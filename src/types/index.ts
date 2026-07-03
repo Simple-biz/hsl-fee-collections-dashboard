@@ -90,6 +90,9 @@ export interface CaseRow {
 
   // Notes
   notesCount: number;
+  // Separate, quieter leader-only thread — always 0 for sessions without
+  // leaderNotes.access, regardless of the real count.
+  leaderNotesCount: number;
 
   // Win Sheet
   winSheetLink: string | null;

@@ -321,6 +321,7 @@ export const FeeRecordsTable = ({
   const canFinalize = can("case.finalize");
   const canEditFeeDue = can("case.update");
   const canEditFees = can("fees.edit");
+  const canSeeLeaderNotes = can("leaderNotes.access");
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -384,6 +385,9 @@ export const FeeRecordsTable = ({
   const [syncOpen, setSyncOpen] = useState(false);
   const [myCaseSyncOpen, setMyCaseSyncOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
+    null,
+  );
+  const [leaderNotesFor, setLeaderNotesFor] = useState<{ id: number; name: string } | null>(
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -1184,6 +1188,9 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Win Sheet
                 </th>
+                {canSeeLeaderNotes && (
+                  <th className={`${thBase} ${t.textSub} text-center`}>Leader Notes</th>
+                )}
 
                 {/* T16 */}
                 <th
@@ -1268,7 +1275,7 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Recent Update
                 </th>
-                <th className={`${thBase} ${t.textSub} text-center`}>Notes</th>
+                <th className={`${thBase} ${t.textSub} text-center`}>Logs</th>
                 {/* Closed On moved to the front (frozen) in "closed" mode —
                     this trailing slot is Active-mode-only now. */}
                 {!isClosedMode && (
@@ -1772,6 +1779,41 @@ export const FeeRecordsTable = ({
                       )}
                     </td>
 
+                    {/* Leader Notes — separate, quieter thread; column
+                        (header + cell) only renders for leaderNotes.access,
+                        so members never see it exists. Small icon only —
+                        text shown in the modal on click, not inline. */}
+                    {canSeeLeaderNotes && (
+                      <td
+                        className={`${tdBase} text-center`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLeaderNotesFor({ id: c.id, name: c.name });
+                          }}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                            c.leaderNotesCount > 0
+                              ? dark
+                                ? "bg-violet-900/40 text-violet-400 hover:bg-violet-900/60"
+                                : "bg-violet-50 text-violet-700 hover:bg-violet-100"
+                              : dark
+                                ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
+                                : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
+                          }`}
+                          title={
+                            c.leaderNotesCount > 0
+                              ? `View ${c.leaderNotesCount} leader note${c.leaderNotesCount === 1 ? "" : "s"}`
+                              : "No leader notes yet"
+                          }
+                        >
+                          <MessageSquare className="h-3 w-3" aria-hidden="true" />
+                          {c.leaderNotesCount}
+                        </button>
+                      </td>
+                    )}
+
                     {/* T16 */}
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
@@ -2150,8 +2192,8 @@ export const FeeRecordsTable = ({
                         }`}
                         title={
                           c.notesCount > 0
-                            ? `View ${c.notesCount} note${c.notesCount === 1 ? "" : "s"}`
-                            : "No notes yet"
+                            ? `View ${c.notesCount} log entr${c.notesCount === 1 ? "y" : "ies"}`
+                            : "No log entries yet"
                         }
                       >
                         <MessageSquare className="h-3 w-3" aria-hidden="true" />
@@ -2306,6 +2348,17 @@ export const FeeRecordsTable = ({
           caseId={notesFor.id}
           caseName={notesFor.name}
           onClose={() => setNotesFor(null)}
+          onChanged={() => onImported?.()}
+        />
+      )}
+
+      {leaderNotesFor && (
+        <NotesModal
+          dark={dark}
+          caseId={leaderNotesFor.id}
+          caseName={leaderNotesFor.name}
+          variant="leader-notes"
+          onClose={() => setLeaderNotesFor(null)}
           onChanged={() => onImported?.()}
         />
       )}
