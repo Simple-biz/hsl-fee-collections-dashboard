@@ -23,7 +23,7 @@ export const ROLE_PAGE_DEFAULTS: Record<AccessRole, PageKey[]> = {
   // Everything operational except user management + app settings.
   lead: PAGE_KEYS.filter((k) => k !== "admin" && k !== "settings" && k !== "archive"),
   // Front-line collections pages only.
-  member: ["overview", "master_fees", "fees_closed", "fee_petitions", "scoreboard", "reports", "notifications", "inbound_calls"],
+  member: ["overview", "master_fees", "fees_closed", "fee_petitions", "overpaid_cases", "scoreboard", "reports", "notifications", "inbound_calls"],
 };
 
 export const rolePageDefaults = (role: string | null | undefined): PageKey[] =>
