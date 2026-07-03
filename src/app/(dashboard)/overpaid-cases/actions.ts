@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
 import { resolveCaseId } from "@/lib/import/resolve-case";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
+import { requireCapability } from "@/lib/auth-helpers";
 
 const FIELD_KEYS = ["overpaidAmount", "opLtrDate", "opLtrReceived", "checksCleared", "updateNote", "region"] as const;
 
@@ -126,6 +127,13 @@ export async function updateFeesConfirmation(input: {
   feesConfirmation: string;
 }): Promise<Result<void>> {
   try {
+    // Same gate as the Master Fees table's Fees Confirmation cell — this
+    // action was the last unguarded path to the same field.
+    const guard = await requireCapability("feesConfirmation.edit");
+    if (!guard.ok) {
+      return { ok: false, error: "You don't have permission to update Fees Confirmation." };
+    }
+
     if (!Number.isFinite(input.caseId)) {
       return { ok: false, error: "Invalid case ID" };
     }
@@ -149,6 +157,19 @@ export async function updateFeesConfirmation(input: {
 export async function bulkImportOverpaidCases(
   rawRows: Record<string, string>[],
 ): Promise<ImportResult> {
+  // Marks every imported case's fee record as overpaid — the same mutation
+  // POST /api/cases/bulk-overpaid gates behind case.finalize (lead/admin by
+  // default). This CSV path was the one place that skipped the check.
+  const guard = await requireCapability("case.finalize");
+  if (!guard.ok) {
+    return {
+      imported: 0,
+      failed: 0,
+      rowErrors: [],
+      error: "You don't have permission to import overpaid cases.",
+    };
+  }
+
   let imported = 0;
   const rowErrors: ImportResult["rowErrors"] = [];
 
