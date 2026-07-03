@@ -25,6 +25,7 @@ import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { teamBadgeClasses } from "@/lib/team-colors";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import {
   ScoreboardSummaryCards,
   ScoreboardSummary,
@@ -220,12 +221,10 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const cancelledRef = useRef(false);
 
   const { data: session } = useSession();
-  const role = session?.user?.role;
-  const isAdmin = role === "admin" || role === "system_admin";
-  const isLead = role === "lead";
   const userName = session?.user?.name;
+  const { can } = useCapabilities();
   const canEditAgent = (agentName: string) =>
-    isAdmin || isLead || (!!userName && agentName === userName);
+    can("dailyMetrics.editOthers") || (!!userName && agentName === userName);
 
   const currentYear = nowForInit.getFullYear();
   const yearOptions = useMemo(

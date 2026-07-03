@@ -6,22 +6,23 @@ import { dailyMetrics } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
+import { sessionHasCapability } from "@/lib/auth-helpers";
 
 // Bulk CSV import writes daily_metrics rows for every agent named in the
-// file — a supervisory action, not a "log my own calls" one — so it's
-// restricted to lead/admin rather than the self-only rule in
+// file — a supervisory action, not a "log my own calls" one — so it requires
+// dailyMetrics.editOthers (lead/admin by default, grantable per-user via the
+// access overrides modal) rather than the self-only rule in
 // /api/daily-metrics.
 export async function bulkImportDailyMetrics(
   rawRows: Record<string, string>[],
 ): Promise<ImportResult> {
   const session = await auth();
-  const role = session?.user?.role;
-  const isPrivileged = role === "admin" || role === "system_admin" || role === "lead";
-  if (!isPrivileged) {
+  if (!sessionHasCapability(session, "dailyMetrics.editOthers")) {
     return {
       imported: 0,
-      failed: rawRows.length,
-      rowErrors: [{ row: 0, error: "You don't have permission to import daily metrics." }],
+      failed: 0,
+      rowErrors: [],
+      error: "You don't have permission to import daily metrics.",
     };
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useReducer, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { RefreshCw, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -9,6 +8,7 @@ import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportMod
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 // ---------- types ----------
 
@@ -108,9 +108,8 @@ export const Scoreboard = () => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
-  const { data: session } = useSession();
-  const role = session?.user?.role;
-  const canImport = role === "admin" || role === "system_admin" || role === "lead";
+  const { can } = useCapabilities();
+  const canImport = can("dailyMetrics.editOthers");
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [csvImportOpen, setCsvImportOpen] = useState(false);

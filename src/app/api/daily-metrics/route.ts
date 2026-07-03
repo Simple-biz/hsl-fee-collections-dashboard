@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { dailyMetrics } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { sessionHasCapability } from "@/lib/auth-helpers";
 
 // Members can only log their own calls — agent_name is matched against the
 // session's display name (team_members.name mirrors users.name for real
-// accounts). Leads/admins can log for anyone.
-const canWriteAgent = (
-  role: string | null | undefined,
-  sessionName: string | null | undefined,
-  agent: string,
-): boolean =>
-  role === "admin" || role === "system_admin" || role === "lead"
-    ? true
-    : !!sessionName && agent === sessionName;
+// accounts). dailyMetrics.editOthers (lead/admin by default, grantable
+// per-user via the access overrides modal) can log for anyone.
+const canWriteAgent = (session: Session, agent: string): boolean =>
+  sessionHasCapability(session, "dailyMetrics.editOthers") ||
+  agent === session.user?.name;
 
 // GET /api/daily-metrics?agent=Drake&date=2026-02-20
 // GET /api/daily-metrics?week=2026-02-17  (returns all agents for the week)
@@ -134,8 +132,6 @@ export const POST = async (req: NextRequest) => {
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
-    const role = session.user.role;
-    const sessionName = session.user.name;
 
     const body = await req.json();
 
@@ -147,7 +143,7 @@ export const POST = async (req: NextRequest) => {
         const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } =
           entry;
         if (!agent || !date) continue;
-        if (!canWriteAgent(role, sessionName, agent)) {
+        if (!canWriteAgent(session, agent)) {
           skipped++;
           continue;
         }
@@ -188,7 +184,7 @@ export const POST = async (req: NextRequest) => {
     if (!agent) {
       return NextResponse.json({ error: "agent is required" }, { status: 400 });
     }
-    if (!canWriteAgent(role, sessionName, agent)) {
+    if (!canWriteAgent(session, agent)) {
       return NextResponse.json(
         { error: "You can only log your own calls." },
         { status: 403 },

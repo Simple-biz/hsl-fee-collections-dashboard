@@ -37,17 +37,19 @@ export type CapabilityGuard =
   | { ok: false; error: "Unauthenticated" | "Forbidden" };
 
 /**
- * Server-side guard for a capability (e.g. "case.create"). Reads the effective
- * capability set baked into the session at sign-in. Tokens minted before
- * capabilities existed have no `capabilities` array — for those we fall back to
- * the role defaults so existing sessions behave correctly until next login.
+ * True iff an already-fetched session has the given capability. Reads the
+ * effective capability set baked into the session at sign-in. Tokens minted
+ * before capabilities existed have no `capabilities` array — for those we
+ * fall back to the role defaults so existing sessions behave correctly until
+ * next login. Use this (over requireCapability) when a route needs the
+ * session regardless of the capability check's outcome — e.g. a "self or
+ * this capability" rule where acting on your own resource is always allowed.
  */
-export async function requireCapability(
+export const sessionHasCapability = (
+  session: Session | null | undefined,
   capability: CapabilityKey,
-): Promise<CapabilityGuard> {
-  const session = await auth();
-  if (!session?.user) return { ok: false, error: "Unauthenticated" };
-
+): boolean => {
+  if (!session?.user) return false;
   const role = session.user.role;
   const rawCaps = session.user.capabilities;
   const isAdmin = role === "admin" || role === "system_admin";
@@ -56,7 +58,20 @@ export async function requireCapability(
     : rawCaps && rawCaps.length > 0
       ? rawCaps
       : roleCapabilityDefaults(role);
-  if (!hasCapability(caps, capability)) {
+  return hasCapability(caps, capability);
+};
+
+/**
+ * Server-side guard for a capability (e.g. "case.create"). Rejects outright
+ * when the session lacks it — use sessionHasCapability directly for routes
+ * that need the session even when the capability check fails.
+ */
+export async function requireCapability(
+  capability: CapabilityKey,
+): Promise<CapabilityGuard> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Unauthenticated" };
+  if (!sessionHasCapability(session, capability)) {
     return { ok: false, error: "Forbidden" };
   }
   return { ok: true, session };

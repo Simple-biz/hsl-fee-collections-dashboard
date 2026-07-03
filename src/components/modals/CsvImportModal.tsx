@@ -26,6 +26,9 @@ export interface ImportResult {
   imported: number;
   failed: number;
   rowErrors: Array<{ row: number; error: string }>;
+  /** Set when the whole import was rejected before any row was processed
+   *  (e.g. a permission check) — rendered instead of the row-by-row summary. */
+  error?: string;
 }
 
 interface ParsedRow {
@@ -571,35 +574,46 @@ export default function CsvImportModal({
           {/* ── DONE ── */}
           {step === "done" && importResult && (
             <div className="py-8">
-              <div className={`max-w-md mx-auto rounded-lg border p-5 ${
-                importResult.imported > 0
-                  ? dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"
-                  : dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
-              }`}>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
-                  <div className="text-[13px]">
-                    <p className="font-bold">
-                      {importResult.imported} row{importResult.imported !== 1 ? "s" : ""} imported.
-                    </p>
-                    {importResult.failed > 0 && (
-                      <p className="opacity-90 mt-1">
-                        {importResult.failed} row{importResult.failed !== 1 ? "s" : ""} failed.
-                      </p>
-                    )}
+              {importResult.error ? (
+                <div className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800"}`}>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
+                    <p className="text-[13px] font-bold">{importResult.error}</p>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className={`max-w-md mx-auto rounded-lg border p-5 ${
+                    importResult.imported > 0
+                      ? dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                      : dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
+                      <div className="text-[13px]">
+                        <p className="font-bold">
+                          {importResult.imported} row{importResult.imported !== 1 ? "s" : ""} imported.
+                        </p>
+                        {importResult.failed > 0 && (
+                          <p className="opacity-90 mt-1">
+                            {importResult.failed} row{importResult.failed !== 1 ? "s" : ""} failed.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-              {importResult.rowErrors.length > 0 && (
-                <div className={`mt-3 max-w-md mx-auto rounded-md border p-3 text-[11px] ${warnBg}`}>
-                  <p className="font-semibold mb-1">Row errors:</p>
-                  <ul className="space-y-0.5 max-h-32 overflow-y-auto">
-                    {importResult.rowErrors.map((e, i) => (
-                      <li key={i}>Row {e.row}: {e.error}</li>
-                    ))}
-                  </ul>
-                </div>
+                  {importResult.rowErrors.length > 0 && (
+                    <div className={`mt-3 max-w-md mx-auto rounded-md border p-3 text-[11px] ${warnBg}`}>
+                      <p className="font-semibold mb-1">Row errors:</p>
+                      <ul className="space-y-0.5 max-h-32 overflow-y-auto">
+                        {importResult.rowErrors.map((e, i) => (
+                          <li key={i}>Row {e.row}: {e.error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
