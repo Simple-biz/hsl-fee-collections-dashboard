@@ -322,6 +322,7 @@ export const FeeRecordsTable = ({
   const canEditFeeDue = can("case.update");
   const canEditFees = can("fees.edit");
   const canSeeLeaderNotes = can("leaderNotes.access");
+  const canEditFeesConf = can("feesConfirmation.edit");
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -1414,7 +1415,7 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} ${t.textSub} ${stickyTd3}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {isAdmin && feesConfEditId === c.id ? (
+                      {canEditFeesConf && feesConfEditId === c.id ? (
                         <select
                           autoFocus
                           value={cellValue(c, "feesConfirmation")}
@@ -1460,7 +1461,7 @@ export const FeeRecordsTable = ({
                               </option>
                             ))}
                         </select>
-                      ) : isAdmin ? (
+                      ) : canEditFeesConf ? (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setFeesConfEditId(c.id); }}

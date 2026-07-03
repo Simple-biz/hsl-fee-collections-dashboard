@@ -399,14 +399,21 @@ export const PATCH = async (
       }
     }
 
-    if (
-      feeFields &&
-      ("feesConfirmation" in feeFields || "feesClosedTrigger" in feeFields)
-    ) {
+    if (feeFields && "feesConfirmation" in feeFields) {
+      const feesConfGuard = await requireCapability("feesConfirmation.edit");
+      if (!feesConfGuard.ok) {
+        return NextResponse.json(
+          { error: "You don't have permission to update Fees Confirmation." },
+          { status: guardStatus(feesConfGuard.error) },
+        );
+      }
+    }
+
+    if (feeFields && "feesClosedTrigger" in feeFields) {
       const admin = await requireAdmin();
       if (!admin.ok) {
         return NextResponse.json(
-          { error: "Only admins can update Fees Confirmation or Fees Closed." },
+          { error: "Only admins can update Fees Closed." },
           { status: guardStatus(admin.error) },
         );
       }

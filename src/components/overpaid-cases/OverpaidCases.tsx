@@ -30,6 +30,7 @@ import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parse
 import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 import { NoteField } from "@/components/shared/NoteField";
 import { ClearedCases } from "@/components/overpaid-cases/ClearedCases";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 // ---------- types ----------
 interface OverpaidCaseRow {
@@ -119,6 +120,9 @@ export const OverpaidCases = () => {
   useEffect(() => setMounted(true), []);
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+  const { can } = useCapabilities();
+  const canFinalize = can("case.finalize");
+  const canEditFeesConf = can("feesConfirmation.edit");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -1013,23 +1017,27 @@ export const OverpaidCases = () => {
                 {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
               </span>
             </button>
-            <button
-              onClick={() => setCsvImportOpen(true)}
-              className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
-              aria-label="Import from CSV"
-            >
-              <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Import</span>
-            </button>
-            <button
-              onClick={openAddCase}
-              className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
-              aria-label="Manually add an overpaid case"
-              title="For cases handled here that never came through Master Fees"
-            >
-              <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Add Case</span>
-            </button>
+            {canFinalize && (
+              <button
+                onClick={() => setCsvImportOpen(true)}
+                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
+                aria-label="Import from CSV"
+              >
+                <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Import</span>
+              </button>
+            )}
+            {canFinalize && (
+              <button
+                onClick={openAddCase}
+                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
+                aria-label="Manually add an overpaid case"
+                title="For cases handled here that never came through Master Fees"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Case</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1346,7 +1354,9 @@ export const OverpaidCases = () => {
                             onBlur={() => persistConfirmation(row)}
                             placeholder="—"
                             maxLength={50}
-                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                            disabled={!canEditFeesConf}
+                            title={!canEditFeesConf ? "You don't have permission to update Fees Confirmation." : undefined}
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                           {confirmationState[row.id] === "saving" && (
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
