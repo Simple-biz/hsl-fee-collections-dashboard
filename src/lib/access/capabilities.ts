@@ -40,7 +40,7 @@ export const CAPABILITIES = [
   {
     key: "fees.edit",
     label: "Edit fee amounts",
-    description: "Edit fee due amounts and manage fee payment records.",
+    description: "Record fees received and manage fee payment records.",
   },
 ] as const;
 

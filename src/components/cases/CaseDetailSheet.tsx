@@ -47,6 +47,7 @@ import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import { Listbox } from "@/components/shared/Listbox";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { caseLevelVisual } from "@/lib/case-level-icons";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 interface CaseDetailSheetProps {
   caseId: number;
@@ -217,6 +218,8 @@ export default function CaseDetailSheet({
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
   const router = useRouter();
+  const { can } = useCapabilities();
+  const canEditFeeReceived = can("fees.edit");
 
   const claimTypeOptions = dropdownOptions.claim_type ?? [];
   const caseLevelOptions = dropdownOptions.case_level ?? [];
@@ -442,7 +445,10 @@ export default function CaseDetailSheet({
         body: JSON.stringify({ caseFields, feeFields, userDetailsFields }),
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(`Failed to save (${res.status})`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || `Failed to save (${res.status})`);
+      }
       setIsEditing(false);
       fetchCase();
       fetchMyCaseData();
@@ -878,11 +884,11 @@ export default function CaseDetailSheet({
                       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                         {(
                           [
-                            { label: "Retro",     field: `${b.key}Retro`            as keyof typeof editValues },
-                            { label: "Fee Due",   field: `${b.key}FeeDue`           as keyof typeof editValues },
-                            { label: "Received",  field: `${b.key}FeeReceived`      as keyof typeof editValues },
+                            { label: "Retro",     field: `${b.key}Retro`            as keyof typeof editValues, disabled: false },
+                            { label: "Fee Due",   field: `${b.key}FeeDue`           as keyof typeof editValues, disabled: false },
+                            { label: "Received",  field: `${b.key}FeeReceived`      as keyof typeof editValues, disabled: !canEditFeeReceived },
                           ] as const
-                        ).map(({ label, field }) => (
+                        ).map(({ label, field, disabled }) => (
                           <div key={field}>
                             <p className={lbl}>{label}</p>
                             <input
@@ -892,7 +898,9 @@ export default function CaseDetailSheet({
                               value={editValues[field]}
                               onChange={(e) => setEditValues((v) => ({ ...v, [field]: e.target.value }))}
                               placeholder="0"
-                              className={inp}
+                              disabled={disabled}
+                              title={disabled ? "You don't have permission to record fees received." : undefined}
+                              className={`${inp} disabled:opacity-50 disabled:cursor-not-allowed`}
                             />
                           </div>
                         ))}
@@ -902,7 +910,9 @@ export default function CaseDetailSheet({
                             type="date"
                             value={editValues[`${b.key}FeeReceivedDate` as keyof typeof editValues]}
                             onChange={(e) => setEditValues((v) => ({ ...v, [`${b.key}FeeReceivedDate`]: e.target.value }))}
-                            className={inp}
+                            disabled={!canEditFeeReceived}
+                            title={!canEditFeeReceived ? "You don't have permission to record fees received." : undefined}
+                            className={`${inp} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                         </div>
                       </div>
