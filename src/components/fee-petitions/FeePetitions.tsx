@@ -27,6 +27,8 @@ import { CompletedPetitions } from "./CompletedPetitions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
 import { NoteField } from "@/components/shared/NoteField";
+import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -36,6 +38,10 @@ interface FeePetitionRow {
   updatedAt: string | null;
   feeAmount: number | null;
   feesReceived: number | null;
+  // Which fee_records benefit type Fee Requested/Fees Received edit —
+  // resolved server-side to whichever type actually has data (falling back
+  // to the case's registered claim type when nothing's entered yet).
+  activeFeeType: "t16" | "t2" | "aux";
   noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
@@ -145,6 +151,8 @@ export const FeePetitions = () => {
   useEffect(() => setMounted(true), []);
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+  const { can } = useCapabilities();
+  const canEditFees = can("case.update");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -390,6 +398,70 @@ export const FeePetitions = () => {
     fetchPetitions();
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchPetitions]);
+
+  // Fee Requested/Fees Received have no single editable column of their own
+  // (they're sums of t16/t2/aux Fee Due and Fee Received) — each cell edits
+  // row.activeFeeType's column directly (resolved server-side to whichever
+  // benefit type the case is actually using).
+  type FeeAmountField = "feeAmount" | "feesReceived";
+  const [feeAmountEdit, setFeeAmountEdit] = useState<{
+    rowId: number;
+    field: FeeAmountField;
+    draft: string;
+  } | null>(null);
+  const [feeAmountSaving, setFeeAmountSaving] = useState(false);
+  const [feeAmountError, setFeeAmountError] = useState<string | null>(null);
+  const [feeAmountOverrides, setFeeAmountOverrides] = useState<
+    Record<number, Partial<Pick<FeePetitionRow, "feeAmount" | "feesReceived">>>
+  >({});
+  const feeAmountAbortRef = useRef<AbortController | null>(null);
+
+  const saveFeeAmount = useCallback(async () => {
+    if (!feeAmountEdit || feeAmountSaving) return;
+    const amount = parseFloat(feeAmountEdit.draft);
+    if (isNaN(amount) || amount < 0) {
+      setFeeAmountError("Enter a valid amount (0 or more).");
+      return;
+    }
+    const row = rows.find((r) => r.id === feeAmountEdit.rowId);
+    if (!row) return;
+    const dbField = feeAmountEdit.field === "feeAmount" ? "FeeDue" : "FeeReceived";
+    const patchField = `${row.activeFeeType}${dbField}`;
+    const typeLabel = row.activeFeeType === "t16" ? "T16" : row.activeFeeType === "t2" ? "T2" : "AUX";
+    const label = `${typeLabel} ${feeAmountEdit.field === "feeAmount" ? "Fee Due" : "Received"}`;
+
+    feeAmountAbortRef.current?.abort();
+    const controller = new AbortController();
+    feeAmountAbortRef.current = controller;
+    setFeeAmountSaving(true);
+    setFeeAmountError(null);
+    try {
+      const res = await fetch(`/api/cases/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feeFields: { [patchField]: amount },
+          logMessage: `${label} updated to ${fmt(amount)}`,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error ?? `Save failed (${res.status})`);
+      }
+      setFeeAmountOverrides((prev) => ({
+        ...prev,
+        [row.id]: { ...prev[row.id], [feeAmountEdit.field]: amount },
+      }));
+      setFeeAmountEdit(null);
+      fetchAllTotals();
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setFeeAmountError((err as Error).message);
+    } finally {
+      if (!controller.signal.aborted) setFeeAmountSaving(false);
+    }
+  }, [feeAmountEdit, feeAmountSaving, fetchAllTotals, rows]);
 
   // Update select-all indeterminate state
   useEffect(() => {
@@ -1065,7 +1137,8 @@ export const FeePetitions = () => {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                rows.map((rawRow) => {
+                  const row = { ...rawRow, ...feeAmountOverrides[rawRow.id] };
                   const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (row[c.key] ? 1 : 0), 0);
                   const isComplete = completedCount === CHECKBOX_COLUMNS.length;
                   const isSelected = selectedIds.has(row.id);
@@ -1108,11 +1181,47 @@ export const FeePetitions = () => {
                           </p>
                         )}
                       </td>
-                      <td className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}>
-                        {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
+                      <td
+                        className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}
+                      >
+                        <FeeAmountCell
+                          active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feeAmount"}
+                          value={row.feeAmount ?? 0}
+                          draft={feeAmountEdit?.draft ?? ""}
+                          saving={feeAmountSaving}
+                          error={feeAmountError}
+                          canEdit={canEditFees}
+                          saveLabel="Fee Requested"
+                          inputBg={t.inputBg}
+                          hoverCls={t.hover}
+                          textMuted={t.textMuted}
+                          pencilRevealClass="opacity-0 group-hover/row:opacity-100"
+                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feeAmount", draft: String(row.feeAmount ?? 0) }); setFeeAmountError(null); }}
+                          onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                          onSave={saveFeeAmount}
+                          onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                        />
                       </td>
-                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                        {row.feesReceived != null && row.feesReceived > 0 ? fmt(row.feesReceived) : "—"}
+                      <td
+                        className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}
+                      >
+                        <FeeAmountCell
+                          active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feesReceived"}
+                          value={row.feesReceived ?? 0}
+                          draft={feeAmountEdit?.draft ?? ""}
+                          saving={feeAmountSaving}
+                          error={feeAmountError}
+                          canEdit={canEditFees}
+                          saveLabel="Fees Received"
+                          inputBg={t.inputBg}
+                          hoverCls={t.hover}
+                          textMuted={t.textMuted}
+                          pencilRevealClass="opacity-0 group-hover/row:opacity-100"
+                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feesReceived", draft: String(row.feesReceived ?? 0) }); setFeeAmountError(null); }}
+                          onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                          onSave={saveFeeAmount}
+                          onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                        />
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
                         <div className="flex items-center gap-1.5">

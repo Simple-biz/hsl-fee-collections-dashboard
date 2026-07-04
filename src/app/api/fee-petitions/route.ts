@@ -6,6 +6,31 @@ import { eq, ilike, sql } from "drizzle-orm";
 const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 
+// Fee Requested/Received are sums across t16/t2/aux fee_records columns, but
+// the Fee Petitions table edits them as a single inline value — resolve to
+// whichever one benefit type the case is actually using. Cases labeled
+// "concurrent" almost always still have only one type with real numbers
+// (T16 and T2 are rarely both filled in at once); prefer whichever type
+// already has data, and only fall back to the registered claim label when
+// nothing has been entered yet.
+const resolveActiveFeeType = (
+  claimTypeLabel: string | null,
+  t16Retro: number,
+  t2Retro: number,
+  auxRetro: number,
+): "t16" | "t2" | "aux" => {
+  if (t16Retro > 0 && t2Retro <= 0 && auxRetro <= 0) return "t16";
+  if (t2Retro > 0 && t16Retro <= 0 && auxRetro <= 0) return "t2";
+  if (auxRetro > 0 && t16Retro <= 0 && t2Retro <= 0) return "aux";
+  // More than one type has data (rare) — T16 is the primary edit target.
+  if (t16Retro > 0) return "t16";
+  if (t2Retro > 0) return "t2";
+  if (auxRetro > 0) return "aux";
+  // Nothing entered yet — default from the case's registered claim type.
+  if (claimTypeLabel === "T2") return "t2";
+  return "t16";
+};
+
 const getMissingClause = (key: string | null) => {
   switch (key) {
     case "noa": return sql`AND COALESCE(${feePetitions.noa}, false) = false`;
@@ -139,8 +164,12 @@ export const GET = async (req: NextRequest) => {
         firstName: cases.firstName,
         lastName: cases.lastName,
         approvalDate: cases.approvalDate,
+        claimTypeLabel: cases.claimTypeLabel,
         totalFeesExpected: feeRecords.totalFeesExpected,
         totalFeesPaid: feeRecords.totalFeesPaid,
+        t16Retro: feeRecords.t16Retro,
+        t2Retro: feeRecords.t2Retro,
+        auxRetro: feeRecords.auxRetro,
         noa: feePetitions.noa,
         timeDelineation: feePetitions.timeDelineation,
         feePetitionDoc: feePetitions.feePetitionDoc,
@@ -166,6 +195,12 @@ export const GET = async (req: NextRequest) => {
       updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
       feeAmount: r.totalFeesExpected != null ? Number(r.totalFeesExpected) : null,
       feesReceived: r.totalFeesPaid != null ? Number(r.totalFeesPaid) : null,
+      activeFeeType: resolveActiveFeeType(
+        r.claimTypeLabel,
+        Number(r.t16Retro) || 0,
+        Number(r.t2Retro) || 0,
+        Number(r.auxRetro) || 0,
+      ),
       noa: r.noa ?? false,
       timeDelineation: r.timeDelineation ?? false,
       feePetitionDoc: r.feePetitionDoc ?? false,
