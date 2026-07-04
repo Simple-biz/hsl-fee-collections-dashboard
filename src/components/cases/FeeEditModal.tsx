@@ -110,6 +110,26 @@ export default function FeeEditModal({
           changes.push(`${label}: $${ov} → $${nv}`);
         }
       };
+      // Fee Due is DB-trigger-computed from Retro whenever a write doesn't
+      // also explicitly set Fee Due itself — that's what lets this modal's
+      // override stick across unrelated edits. But it means an override
+      // that hasn't changed THIS session (so plain chk() would omit it) must
+      // still be sent explicitly whenever Retro changes, or the trigger will
+      // recompute over it and silently discard the override.
+      const chkDue = (
+        nv: number,
+        ov: number,
+        key: string,
+        label: string,
+        retroChanged: boolean,
+      ) => {
+        if (retroChanged) {
+          feeFields[key] = nv;
+          if (Math.abs(nv - ov) > 0.001) changes.push(`${label}: $${ov} → $${nv}`);
+        } else {
+          chk(nv, ov, key, label);
+        }
+      };
       const chkDt = (
         nv: string,
         ov: string | null,
@@ -122,8 +142,10 @@ export default function FeeEditModal({
         }
       };
 
-      chk(parseFloat(f.t16Retro) || 0, orig.t16Retro, "t16Retro", "T16 Retro");
-      chk(t16Due, orig.t16FeeDue, "t16FeeDue", "T16 Fee Due");
+      const t16RetroVal = parseFloat(f.t16Retro) || 0;
+      const t16RetroChanged = Math.abs(t16RetroVal - orig.t16Retro) > 0.001;
+      chk(t16RetroVal, orig.t16Retro, "t16Retro", "T16 Retro");
+      chkDue(t16Due, orig.t16FeeDue, "t16FeeDue", "T16 Fee Due", t16RetroChanged);
       chk(
         parseFloat(f.t16Rcv) || 0,
         orig.t16FeeReceived,
@@ -133,8 +155,10 @@ export default function FeeEditModal({
       chk(t16Pend, orig.t16Pending, "t16Pending", "T16 Pending");
       chkDt(f.t16Dt, orig.t16FeeReceivedDate, "t16FeeReceivedDate", "T16 Date");
 
-      chk(parseFloat(f.t2Retro) || 0, orig.t2Retro, "t2Retro", "T2 Retro");
-      chk(t2Due, orig.t2FeeDue, "t2FeeDue", "T2 Fee Due");
+      const t2RetroVal = parseFloat(f.t2Retro) || 0;
+      const t2RetroChanged = Math.abs(t2RetroVal - orig.t2Retro) > 0.001;
+      chk(t2RetroVal, orig.t2Retro, "t2Retro", "T2 Retro");
+      chkDue(t2Due, orig.t2FeeDue, "t2FeeDue", "T2 Fee Due", t2RetroChanged);
       chk(
         parseFloat(f.t2Rcv) || 0,
         orig.t2FeeReceived,
@@ -144,8 +168,10 @@ export default function FeeEditModal({
       chk(t2Pend, orig.t2Pending, "t2Pending", "T2 Pending");
       chkDt(f.t2Dt, orig.t2FeeReceivedDate, "t2FeeReceivedDate", "T2 Date");
 
-      chk(parseFloat(f.auxRetro) || 0, orig.auxRetro, "auxRetro", "AUX Retro");
-      chk(auxDue, orig.auxFeeDue, "auxFeeDue", "AUX Fee Due");
+      const auxRetroVal = parseFloat(f.auxRetro) || 0;
+      const auxRetroChanged = Math.abs(auxRetroVal - orig.auxRetro) > 0.001;
+      chk(auxRetroVal, orig.auxRetro, "auxRetro", "AUX Retro");
+      chkDue(auxDue, orig.auxFeeDue, "auxFeeDue", "AUX Fee Due", auxRetroChanged);
       chk(
         parseFloat(f.auxRcv) || 0,
         orig.auxFeeReceived,

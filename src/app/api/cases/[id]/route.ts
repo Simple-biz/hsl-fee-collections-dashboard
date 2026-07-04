@@ -531,23 +531,25 @@ export const PATCH = async (
       }
 
       if (updates.length > 0) {
-        // t16/t2/aux_pending are auto-recomputed as Due − Received (floored
-        // at 0) by the trg_fee_records_compute_totals DB trigger on every
-        // write — it always wins, an explicit Pending in `updates` above is
-        // silently overwritten. RETURNING reads its result back so
-        // optimistic client updates (which only know the field they
-        // explicitly sent) can sync without a refetch.
+        // t16/t2/aux_fee_due auto-track MIN(Retro × 25%, fee cap) via the
+        // trg_fee_records_compute_totals DB trigger whenever Retro changes
+        // and this same write doesn't also explicitly set Fee Due (an
+        // explicit override — e.g. a negotiated fee from FeeEditModal —
+        // sticks instead of being recalculated). Pending is no longer
+        // trigger-computed at all; it's freely editable. RETURNING reads
+        // Fee Due back so optimistic client updates (which only know the
+        // field they explicitly sent) can sync without a refetch.
         const [updated] = (await db.execute(sql`
           UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
           WHERE case_id = ${caseId}
-          RETURNING t16_pending, t2_pending, aux_pending
+          RETURNING t16_fee_due, t2_fee_due, aux_fee_due
         `)) as unknown as [
-          { t16_pending: string; t2_pending: string; aux_pending: string } | undefined,
+          { t16_fee_due: string; t2_fee_due: string; aux_fee_due: string } | undefined,
         ];
         if (updated) {
-          computedFields.t16Pending = Number(updated.t16_pending);
-          computedFields.t2Pending = Number(updated.t2_pending);
-          computedFields.auxPending = Number(updated.aux_pending);
+          computedFields.t16FeeDue = Number(updated.t16_fee_due);
+          computedFields.t2FeeDue = Number(updated.t2_fee_due);
+          computedFields.auxFeeDue = Number(updated.aux_fee_due);
         }
       }
     }

@@ -110,7 +110,9 @@ export default function FeesClosedPage() {
     );
   }
 
-  if (loading) {
+  // Only block on the initial load — see the matching comment in
+  // master-fees/page.tsx for why later refreshes shouldn't blank the table.
+  if (loading && cases.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} aria-hidden="true" />

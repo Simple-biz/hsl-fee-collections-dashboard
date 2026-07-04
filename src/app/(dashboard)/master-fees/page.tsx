@@ -54,7 +54,12 @@ export default function MasterFeesPage() {
     );
   }
 
-  if (casesLoading) {
+  // Only block the whole page on the initial load. A later refresh() (e.g.
+  // after saving a win sheet link, note, or archive action) re-runs the same
+  // fetch and flips casesLoading again — without this guard, every one of
+  // those small edits would blank the entire table back to a spinner instead
+  // of just quietly swapping in fresh data once it arrives.
+  if (casesLoading && cases.length === 0) {
     return (
       <div className={`rounded-xl border ${t.card} flex items-center justify-center py-16`}>
         <RefreshCw aria-hidden="true" className={`h-5 w-5 animate-spin ${t.textMuted}`} />
