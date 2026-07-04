@@ -266,22 +266,6 @@ const patchSingleField = async (
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
-const PIF_COLORS = (pif: string | null, dark: boolean) => {
-  if (pif === "YES")
-    return dark
-      ? "bg-emerald-900/40 text-emerald-400"
-      : "bg-emerald-50 text-emerald-700";
-  if (pif === "PENDING")
-    return dark
-      ? "bg-amber-900/40 text-amber-400"
-      : "bg-amber-50 text-amber-700";
-  if (pif === "NO")
-    return dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-700";
-  return dark
-    ? "bg-neutral-800 text-neutral-500"
-    : "bg-neutral-100 text-neutral-400";
-};
-
 const AGING_COLORS = (cat: string | null, dark: boolean) => {
   if (cat === ">60") return dark ? "text-red-400" : "text-red-600";
   if (cat === "≤60") return dark ? "text-emerald-400" : "text-emerald-600";
@@ -401,7 +385,10 @@ export const FeeRecordsTable = ({
   const [feeOverrides, setFeeOverrides] = useState<
     Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16Pending" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2Pending" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxPending" | "auxFeeReceived" | "auxFeeReceivedDate">>>
   >({});
-  type FeeAmountField = "t16Retro" | "t16FeeDue" | "t16Pending" | "t2Retro" | "t2FeeDue" | "t2Pending" | "auxRetro" | "auxFeeDue" | "auxPending";
+  // Fee Due isn't in this union — it's auto-calculated by the DB trigger
+  // (MIN(Retro × 25%, fee cap)) and only directly overridable via FeeEditModal
+  // on the Case Page, not this table's inline pencil-edit.
+  type FeeAmountField = "t16Retro" | "t16Pending" | "t2Retro" | "t2Pending" | "auxRetro" | "auxPending";
   const [feeAmountEdit, setFeeAmountEdit] = useState<{
     caseId: number;
     field: FeeAmountField;
@@ -740,9 +727,9 @@ export const FeeRecordsTable = ({
     setFeeAmountError(null);
     const { caseId, field } = feeAmountEdit;
     const labelMap: Record<FeeAmountField, string> = {
-      t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due", t16Pending: "T16 Pending",
-      t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",   t2Pending: "T2 Pending",
-      auxRetro: "AUX Retro", auxFeeDue: "AUX Fee Due",  auxPending: "AUX Pending",
+      t16Retro: "T16 Retro", t16Pending: "T16 Pending",
+      t2Retro: "T2 Retro",   t2Pending: "T2 Pending",
+      auxRetro: "AUX Retro", auxPending: "AUX Pending",
     };
     try {
       const res = await fetch(`/api/cases/${caseId}`, {
@@ -759,9 +746,9 @@ export const FeeRecordsTable = ({
         throw new Error((j as { error?: string }).error ?? `Save failed (${res.status})`);
       }
       const j = await res.json().catch(() => ({}));
-      // The server also auto-recalculates the sibling Pending amount when
-      // Fee Due/Received changes — merge it in so the row reflects it
-      // immediately instead of waiting for the next full refetch.
+      // The server also auto-recalculates the sibling Fee Due amount when
+      // Retro changes — merge it in so the row reflects it immediately
+      // instead of waiting for the next full refetch.
       const computed = (j as { computed?: Record<string, number> }).computed ?? {};
       setFeeOverrides((prev) => ({
         ...prev,
@@ -1262,12 +1249,7 @@ export const FeeRecordsTable = ({
                 </th>
 
                 {/* Workflow */}
-                <th
-                  className={`${thBase} ${t.textSub} text-center ${groupBorder}`}
-                >
-                  PIF
-                </th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
+                <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>
                   Approved By
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
@@ -1832,17 +1814,9 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                      title="Auto-calculated: MIN(Retro × 25%, fee cap)"
                     >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
-                        value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: String(c.t16FeeDue) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
+                      {currency(c.t16FeeDue)}
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
@@ -1903,17 +1877,9 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                      title="Auto-calculated: MIN(Retro × 25%, fee cap)"
                     >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
-                        value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: String(c.t2FeeDue) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
+                      {currency(c.t2FeeDue)}
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
@@ -1974,17 +1940,9 @@ export const FeeRecordsTable = ({
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                      title="Auto-calculated: MIN(Retro × 25%, fee cap)"
                     >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
-                        value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: String(c.auxFeeDue) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
+                      {currency(c.auxFeeDue)}
                     </td>
                     <td
                       className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
@@ -2046,17 +2004,8 @@ export const FeeRecordsTable = ({
                     </td>
 
                     {/* Workflow */}
-                    <td className={`${tdBase} text-center ${groupBorder}`}>
-                      {c.pif && (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${PIF_COLORS(c.pif, dark)}`}
-                        >
-                          {c.pif}
-                        </span>
-                      )}
-                    </td>
                     <td
-                      className={`${tdBase} ${t.textSub}`}
+                      className={`${tdBase} ${t.textSub} ${groupBorder}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {mode === "closed" || !canFinalize ? (
