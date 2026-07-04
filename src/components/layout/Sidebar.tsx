@@ -232,10 +232,10 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               </div>
               {open && (
                 <div className="leading-tight">
-                  <div className={`text-[13px] font-bold ${t.text}`}>
+                  <div className={`text-[15px] font-bold ${t.text}`}>
                     Fee Collections
                   </div>
-                  <div className={`text-[10px] ${t.textMuted}`}>
+                  <div className={`text-[12px] ${t.textMuted}`}>
                     Hogan Smith Law
                   </div>
                 </div>
@@ -262,7 +262,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               <Search className="h-3.5 w-3.5" />
               <span>Search cases</span>
               <span
-                className={`ml-auto text-[10px] px-1 py-0.5 rounded border ${t.kbdBg}`}
+                className={`ml-auto text-[12px] px-1 py-0.5 rounded border ${t.kbdBg}`}
               >
                 {"\u2318"}K
               </span>
@@ -294,7 +294,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
             <div key={group.section}>
               {open && (
                 <div
-                  className={`px-2 pt-4 pb-1 text-[10px] font-semibold ${t.textMuted} uppercase tracking-wider`}
+                  className={`px-2 pt-4 pb-1 text-[12px] font-semibold ${t.textMuted} uppercase tracking-wider`}
                 >
                   {group.section}
                 </div>
@@ -306,7 +306,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                     key={item.path}
                     href={item.path}
                     onClick={() => onMobileClose?.()}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${open ? "" : "justify-center"} ${active ? `${t.activeNav} font-semibold` : `${t.textSub} ${t.hover}`}`}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[15px] font-medium transition-colors ${open ? "" : "justify-center"} ${active ? `${t.activeNav} font-semibold` : `${t.textSub} ${t.hover}`}`}
                   >
                     <div className="relative shrink-0">
                       <item.icon
@@ -323,7 +323,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                       <span className="flex items-center gap-2 flex-1">
                         {item.label}
                         {item.path === "/notifications" && notifCount > 0 && (
-                          <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                          <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
                             {notifCount > 99 ? "99+" : notifCount}
                           </span>
                         )}
@@ -351,7 +351,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                   setUserMenuOpen(false);
                   setChangePasswordOpen(true);
                 }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${t.textSub} ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[15px] font-medium text-left transition-colors ${t.textSub} ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}
               >
                 <KeyRound aria-hidden="true" className="h-4 w-4 shrink-0" />
                 Change password
@@ -359,7 +359,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               <div className={`border-t ${t.borderLight}`} />
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-left transition-colors ${dark ? "text-red-400 hover:bg-neutral-800" : "text-red-600 hover:bg-neutral-50"}`}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[15px] font-medium text-left transition-colors ${dark ? "text-red-400 hover:bg-neutral-800" : "text-red-600 hover:bg-neutral-50"}`}
               >
                 <LogOut aria-hidden="true" className="h-4 w-4 shrink-0" />
                 Sign out
@@ -378,11 +378,11 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                 {userInitial}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <div className={`text-[12px] font-semibold ${t.text} truncate`}>
+                <div className={`text-[14px] font-semibold ${t.text} truncate`}>
                   {userName}
                 </div>
                 {userEmail && (
-                  <div className={`text-[10px] ${t.textMuted} truncate`}>
+                  <div className={`text-[12px] ${t.textMuted} truncate`}>
                     {userEmail}
                   </div>
                 )}
@@ -452,7 +452,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               {searchQuery && searchResults.length > 0 && (
                 <div className="px-2 py-2">
                   <p
-                    className={`px-3 py-1.5 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                    className={`px-3 py-1.5 text-[12px] font-semibold uppercase ${t.textMuted}`}
                   >
                     Cases ({searchResults.length})
                   </p>
@@ -466,16 +466,16 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                         <span className={`text-sm font-semibold ${t.text}`}>
                           {c.name}
                         </span>
-                        <span className={`ml-2 text-[10px] ${t.textMuted}`}>
+                        <span className={`ml-2 text-[12px] ${t.textMuted}`}>
                           #{c.id}
                         </span>
                       </div>
                       <span
-                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                        className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
                       >
                         {fmtClaim(c.claim)}
                       </span>
-                      <span className={`text-[10px] ${t.textMuted}`}>
+                      <span className={`text-[12px] ${t.textMuted}`}>
                         {c.assigned}
                       </span>
                     </button>
@@ -497,7 +497,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               {!searchQuery && (
                 <div className="px-2 py-2">
                   <p
-                    className={`px-3 py-1.5 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                    className={`px-3 py-1.5 text-[12px] font-semibold uppercase ${t.textMuted}`}
                   >
                     Quick Navigation
                   </p>
@@ -532,13 +532,13 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
             <div
               className={`border-t ${t.borderLight} px-4 py-2 flex items-center gap-4`}
             >
-              <span className={`text-[10px] ${t.textMuted}`}>
+              <span className={`text-[12px] ${t.textMuted}`}>
                 {"\u2191\u2193"} Navigate
               </span>
-              <span className={`text-[10px] ${t.textMuted}`}>
+              <span className={`text-[12px] ${t.textMuted}`}>
                 {"\u21B5"} Select
               </span>
-              <span className={`text-[10px] ${t.textMuted}`}>esc Close</span>
+              <span className={`text-[12px] ${t.textMuted}`}>esc Close</span>
             </div>
           </div>
         </div>

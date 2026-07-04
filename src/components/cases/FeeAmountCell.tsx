@@ -40,7 +40,7 @@ export function FeeAmountCell({
             type="number" min="0" step="0.01" value={draft} autoFocus
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
-            className={`h-6 px-1.5 rounded border text-[11px] outline-none w-24 text-right ${inputBg}`}
+            className={`h-6 px-1.5 rounded border text-[13px] outline-none w-24 text-right ${inputBg}`}
           />
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin ml-0.5" aria-hidden="true" />
@@ -55,7 +55,7 @@ export function FeeAmountCell({
             </>
           )}
         </div>
-        {error && <p role="alert" className="text-[10px] text-red-500">{error}</p>}
+        {error && <p role="alert" className="text-[12px] text-red-500">{error}</p>}
       </div>
     );
   }

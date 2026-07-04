@@ -172,14 +172,14 @@ export function MyCaseDocumentsDialog({
                     />
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`text-[13px] font-medium ${t.text} truncate`}
+                        className={`text-[15px] font-medium ${t.text} truncate`}
                         title={d.filename || d.name}
                       >
                         {d.filename || d.name}
                       </p>
                       {d.path && (
                         <p
-                          className={`text-[10px] ${t.textMuted} truncate`}
+                          className={`text-[12px] ${t.textMuted} truncate`}
                           title={d.path}
                         >
                           {d.path}
@@ -187,14 +187,14 @@ export function MyCaseDocumentsDialog({
                       )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className={`text-[10px] ${t.textMuted}`}>
+                      <span className={`text-[12px] ${t.textMuted}`}>
                         {fmtDate(d.assigned_date || d.created_at)}
                       </span>
                       <a
                         href={`/api/mycase/documents/${d.id}/file`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-1 text-[11px] font-medium ${dark ? "text-indigo-400" : "text-indigo-600"} hover:underline`}
+                        className={`inline-flex items-center gap-1 text-[13px] font-medium ${dark ? "text-indigo-400" : "text-indigo-600"} hover:underline`}
                       >
                         View
                         <ExternalLink aria-hidden="true" className="h-3 w-3" />
@@ -202,7 +202,7 @@ export function MyCaseDocumentsDialog({
                     </div>
                   </div>
                   {d.description && (
-                    <p className={`mt-1 ml-7 text-[11px] ${t.textSub}`}>
+                    <p className={`mt-1 ml-7 text-[13px] ${t.textSub}`}>
                       {d.description}
                     </p>
                   )}

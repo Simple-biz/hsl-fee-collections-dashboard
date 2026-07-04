@@ -546,10 +546,10 @@ export const ChroniclePull = () => {
   ) => (
     <div className="flex items-center gap-2">
       <Icon className={`h-3.5 w-3.5 ${t.textMuted} shrink-0`} />
-      <span className={`text-[11px] ${t.textMuted} w-28 shrink-0`}>
+      <span className={`text-[13px] ${t.textMuted} w-28 shrink-0`}>
         {label}
       </span>
-      <span className={`text-[12px] ${t.text}`}>{value || "\u2014"}</span>
+      <span className={`text-[14px] ${t.text}`}>{value || "\u2014"}</span>
     </div>
   );
 
@@ -570,7 +570,7 @@ export const ChroniclePull = () => {
               <h3 className={`text-sm font-bold ${t.text}`}>
                 Chronicle Legal Lookup
               </h3>
-              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+              <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                 Enter a Chronicle Client ID to pull case data
               </p>
             </div>
@@ -620,7 +620,7 @@ export const ChroniclePull = () => {
               <h3 className={`text-sm font-bold ${t.text}`}>
                 Search Clients
               </h3>
-              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+              <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                 Find a Chronicle client by name, last-4 SSN, or external ID
                 (fields are combined). Useful for cases where you don&apos;t
                 know the Chronicle ID.
@@ -688,7 +688,7 @@ export const ChroniclePull = () => {
               {searching ? "Searching..." : "Search"}
             </button>
             {searchResults && (
-              <span className={`text-[11px] ${t.textMuted}`}>
+              <span className={`text-[13px] ${t.textMuted}`}>
                 {searchResults.length} result
                 {searchResults.length === 1 ? "" : "s"}
               </span>
@@ -700,13 +700,13 @@ export const ChroniclePull = () => {
               className={`mt-3 rounded-lg border p-2.5 flex items-center gap-2 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
             >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="text-[12px]">{searchError}</span>
+              <span className="text-[14px]">{searchError}</span>
             </div>
           )}
 
           {searchResults && searchResults.length > 0 && (
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-[14px]">
                 <thead>
                   <tr className={`text-left ${t.textMuted}`}>
                     <th className="py-1.5 pr-3 font-medium">Chronicle ID</th>
@@ -749,7 +749,7 @@ export const ChroniclePull = () => {
                       <td className="py-1.5 pr-3">
                         <button
                           onClick={() => handlePull(String(r.clientId))}
-                          className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border ${t.outlineBtn}`}
+                          className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[13px] font-semibold border ${t.outlineBtn}`}
                           title="Pull this client into the lookup above"
                         >
                           <ArrowRight className="h-3 w-3" /> Pull
@@ -763,7 +763,7 @@ export const ChroniclePull = () => {
           )}
 
           {searchResults && searchResults.length === 0 && !searchError && (
-            <p className={`mt-3 text-[12px] ${t.textMuted}`}>
+            <p className={`mt-3 text-[14px] ${t.textMuted}`}>
               No clients matched.
             </p>
           )}
@@ -792,7 +792,7 @@ export const ChroniclePull = () => {
           className={`rounded-xl border p-3 flex items-center gap-2.5 ${dark ? "bg-amber-900/20 border-amber-800 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"}`}
         >
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          <span className="text-[11px]">
+          <span className="text-[13px]">
             Using mock data \u2014 set CHRONICLE_API_URL and CHRONICLE_API_KEY
             in .env.local
           </span>
@@ -862,7 +862,7 @@ export const ChroniclePull = () => {
             <div className="flex items-center gap-2">
               {result.existsInDb ? (
                 <span
-                  className={`text-[10px] font-semibold px-2 py-1 rounded ${dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700"}`}
+                  className={`text-[12px] font-semibold px-2 py-1 rounded ${dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700"}`}
                 >
                   Already in DB #{result.matchedClientId}
                 </span>
@@ -887,7 +887,7 @@ export const ChroniclePull = () => {
           <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-3">
               <p
-                className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}
+                className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}
               >
                 Client Information
               </p>
@@ -911,7 +911,7 @@ export const ChroniclePull = () => {
               {infoRow(MapPin, "Office", result.parsed.officeWithJurisdiction)}
               <div className="pt-2">
                 <p
-                  className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}
+                  className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}
                 >
                   Claim Details
                 </p>
@@ -935,7 +935,7 @@ export const ChroniclePull = () => {
 
             <div className="space-y-3">
               <p
-                className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}
+                className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}
               >
                 Decisions
               </p>
@@ -945,7 +945,7 @@ export const ChroniclePull = () => {
               </div>
               <div className="pt-2">
                 <p
-                  className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}
+                  className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}
                 >
                   Key Dates
                 </p>
@@ -995,7 +995,7 @@ export const ChroniclePull = () => {
               {result.parsed.aljName && (
                 <div className="pt-2">
                   <p
-                    className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}
+                    className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}
                   >
                     Hearing Info
                   </p>
@@ -1021,7 +1021,7 @@ export const ChroniclePull = () => {
                 <span className={`text-xs font-bold ${t.text}`}>
                   PDF Data Extraction
                 </span>
-                <span className={`ml-2 text-[10px] ${t.textMuted}`}>
+                <span className={`ml-2 text-[12px] ${t.textMuted}`}>
                   Fields not available from API
                 </span>
               </div>
@@ -1046,7 +1046,7 @@ export const ChroniclePull = () => {
             )}
             {pdfData && (
               <span
-                className={`text-[10px] font-medium px-2 py-1 rounded ${dark ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-700"}`}
+                className={`text-[12px] font-medium px-2 py-1 rounded ${dark ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-700"}`}
               >
                 ✓ {pdfData.totalPages} pages parsed
               </span>
@@ -1080,21 +1080,21 @@ export const ChroniclePull = () => {
               <div
                 className={`flex items-center justify-between py-2 mb-2 border-b ${t.borderLight}`}
               >
-                <span className={`text-[11px] ${t.textMuted}`}>
+                <span className={`text-[13px] ${t.textMuted}`}>
                   {selectedPdfFields.size} of {availablePdfFieldCount} fields
                   selected for import
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={selectAllPdfFields}
-                    className={`text-[10px] font-medium ${dark ? "text-violet-400 hover:text-violet-300" : "text-violet-600 hover:text-violet-700"}`}
+                    className={`text-[12px] font-medium ${dark ? "text-violet-400 hover:text-violet-300" : "text-violet-600 hover:text-violet-700"}`}
                   >
                     Select All
                   </button>
-                  <span className={`text-[10px] ${t.textMuted}`}>|</span>
+                  <span className={`text-[12px] ${t.textMuted}`}>|</span>
                   <button
                     onClick={deselectAllPdfFields}
-                    className={`text-[10px] font-medium ${dark ? "text-neutral-400 hover:text-neutral-300" : "text-neutral-500 hover:text-neutral-600"}`}
+                    className={`text-[12px] font-medium ${dark ? "text-neutral-400 hover:text-neutral-300" : "text-neutral-500 hover:text-neutral-600"}`}
                   >
                     None
                   </button>
@@ -1119,7 +1119,7 @@ export const ChroniclePull = () => {
                           className={`h-3.5 w-3.5 ${dark ? "text-violet-400" : "text-violet-600"}`}
                         />
                         <span
-                          className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}
+                          className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}
                         >
                           {group.label}
                         </span>
@@ -1149,13 +1149,13 @@ export const ChroniclePull = () => {
                               />
                               <div className="min-w-0 flex-1">
                                 <span
-                                  className={`text-[11px] font-medium ${t.text}`}
+                                  className={`text-[13px] font-medium ${t.text}`}
                                 >
                                   {field.label}
                                 </span>
                                 {displayVal && (
                                   <p
-                                    className={`text-[10px] ${t.textMuted} truncate`}
+                                    className={`text-[12px] ${t.textMuted} truncate`}
                                   >
                                     {displayVal}
                                   </p>
@@ -1175,7 +1175,7 @@ export const ChroniclePull = () => {
                 <div
                   className={`mt-4 pt-3 border-t ${t.borderLight} flex items-center justify-between`}
                 >
-                  <span className={`text-[11px] ${t.textMuted}`}>
+                  <span className={`text-[13px] ${t.textMuted}`}>
                     {selectedPdfFields.size > 0
                       ? `${selectedPdfFields.size} PDF fields will be saved with import`
                       : "No PDF fields selected — only Chronicle API data will be imported"}
@@ -1201,7 +1201,7 @@ export const ChroniclePull = () => {
 
           {/* Not yet parsed hint */}
           {!pdfData && !parsingPdf && !pdfError && (
-            <div className={`px-4 py-3 text-[11px] ${t.textMuted}`}>
+            <div className={`px-4 py-3 text-[13px] ${t.textMuted}`}>
               Click &quot;Parse PDF&quot; to extract diagnoses, fee info, DLI,
               representative details, and more from the Chronicle file.
             </div>
@@ -1243,30 +1243,30 @@ export const ChroniclePull = () => {
                   />
                 )}
                 <div className="flex-1 min-w-0">
-                  <span className={`text-[12px] font-semibold ${t.text}`}>
+                  <span className={`text-[14px] font-semibold ${t.text}`}>
                     {pr.parsed.lastName}, {pr.parsed.firstName}
                   </span>
-                  <span className={`ml-2 text-[10px] ${t.textMuted}`}>
+                  <span className={`ml-2 text-[12px] ${t.textMuted}`}>
                     #{pr.parsed.chronicleClientId}
                   </span>
                 </div>
                 <span
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                  className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
                 >
                   {fmtClaim(pr.parsed.claimType)}
                 </span>
-                <span className={`text-[10px] ${t.textMuted}`}>
+                <span className={`text-[12px] ${t.textMuted}`}>
                   {pr.parsed.caseLevel}
                 </span>
                 {pr.existsInDb ? (
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded ${dark ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-600"}`}
+                    className={`text-[12px] px-1.5 py-0.5 rounded ${dark ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-600"}`}
                   >
                     In DB
                   </span>
                 ) : (
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded ${dark ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}
+                    className={`text-[12px] px-1.5 py-0.5 rounded ${dark ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}
                   >
                     New
                   </span>
@@ -1288,7 +1288,7 @@ export const ChroniclePull = () => {
             Enter a Chronicle Client ID above to pull case data. Favorable
             decisions can be imported directly into the dashboard.
           </p>
-          <p className={`text-[10px] ${t.textMuted} mt-3`}>
+          <p className={`text-[12px] ${t.textMuted} mt-3`}>
             Mock IDs for testing: 112221, 112222, 112223, 112224
           </p>
         </div>

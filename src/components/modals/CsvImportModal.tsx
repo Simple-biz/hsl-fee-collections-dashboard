@@ -209,7 +209,7 @@ export default function CsvImportModal({
 
   const activeStepIndex = STEPS.findIndex((s) => s.id === step);
 
-  const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const lblCls = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const errBg = dark
     ? "bg-red-900/20 border-red-800 text-red-300"
     : "bg-red-50 border-red-200 text-red-700";
@@ -231,7 +231,7 @@ export default function CsvImportModal({
         <div className={`flex items-center justify-between px-5 py-3 border-b ${t.borderLight}`}>
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>{title}</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>{description}</p>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>{description}</p>
           </div>
           <button
             onClick={onClose}
@@ -251,7 +251,7 @@ export default function CsvImportModal({
               return (
                 <div
                   key={s.id}
-                  className={`text-center py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                  className={`text-center py-1.5 rounded-md text-[13px] font-medium transition-colors ${
                     isActive
                       ? dark ? "bg-neutral-100 text-neutral-900" : "bg-neutral-900 text-white"
                       : isDone
@@ -300,12 +300,12 @@ export default function CsvImportModal({
                 <p className={`text-sm font-semibold ${t.text}`}>
                   {fileName ?? "Drag & drop a CSV file, or click to browse"}
                 </p>
-                <p className={`text-[11px] mt-1 ${t.textMuted}`}>Only .csv files. Any column names — you'll map them in the next step.</p>
+                <p className={`text-[13px] mt-1 ${t.textMuted}`}>Only .csv files. Any column names — you'll map them in the next step.</p>
               </div>
 
               {/* Header row selector */}
               <div className={`flex items-center gap-3 px-1`}>
-                <label className={`text-[11px] font-medium ${t.textSub} shrink-0`}>
+                <label className={`text-[13px] font-medium ${t.textSub} shrink-0`}>
                   Column headers are on row:
                 </label>
                 <div className="flex items-center gap-1">
@@ -317,7 +317,7 @@ export default function CsvImportModal({
                         setHeaderRow(n);
                         if (fileText) parseAndAdvance(fileText, n);
                       }}
-                      className={`h-7 w-7 rounded-md border text-[11px] font-semibold transition-colors ${
+                      className={`h-7 w-7 rounded-md border text-[13px] font-semibold transition-colors ${
                         headerRow === n
                           ? dark ? "bg-neutral-100 text-neutral-900 border-neutral-100" : "bg-neutral-900 text-white border-neutral-900"
                           : `${t.outlineBtn}`
@@ -327,7 +327,7 @@ export default function CsvImportModal({
                     </button>
                   ))}
                 </div>
-                <p className={`text-[11px] ${t.textMuted}`}>
+                <p className={`text-[13px] ${t.textMuted}`}>
                   {headerRow > 1 ? `Rows 1–${headerRow - 1} will be skipped as metadata.` : "Row 1 is the header row."}
                 </p>
               </div>
@@ -337,13 +337,13 @@ export default function CsvImportModal({
                   <span className={lblCls}>Dashboard fields available for import</span>
                   <button
                     onClick={downloadTemplate}
-                    className={`text-[11px] font-medium underline ${t.textSub} hover:opacity-80`}
+                    className={`text-[13px] font-medium underline ${t.textSub} hover:opacity-80`}
                   >
                     Download template
                   </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-[13px]">
                     <thead>
                       <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
                         <th className={`${lblCls} text-left px-3 py-2`}>Field</th>
@@ -358,11 +358,11 @@ export default function CsvImportModal({
                           <td className={`${t.textSub} px-3 py-1.5`}>{col.hint ?? "—"}</td>
                           <td className="px-3 py-1.5 text-center">
                             {col.required ? (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
+                              <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
                                 YES
                               </span>
                             ) : (
-                              <span className={`text-[10px] ${t.textMuted}`}>opt</span>
+                              <span className={`text-[12px] ${t.textMuted}`}>opt</span>
                             )}
                           </td>
                         </tr>
@@ -377,7 +377,7 @@ export default function CsvImportModal({
           {/* ── STEP 2: MAP COLUMNS ── */}
           {step === "map" && (
             <>
-              <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-neutral-800/60 border-neutral-700 text-neutral-300" : "bg-neutral-50 border-neutral-200 text-neutral-600"}`}>
+              <div className={`rounded-md border p-3 text-[13px] ${dark ? "bg-neutral-800/60 border-neutral-700 text-neutral-300" : "bg-neutral-50 border-neutral-200 text-neutral-600"}`}>
                 <p>
                   Your file has <span className="font-semibold">{csvHeaders.length} columns</span> and{" "}
                   <span className="font-semibold">{csvRows.length} rows</span>.
@@ -387,7 +387,7 @@ export default function CsvImportModal({
               </div>
 
               {requiredUnmapped.length > 0 && (
-                <div role="alert" className={`rounded-md border p-3 text-[11px] flex items-start gap-2 ${warnBg}`}>
+                <div role="alert" className={`rounded-md border p-3 text-[13px] flex items-start gap-2 ${warnBg}`}>
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                   <span>
                     Required field{requiredUnmapped.length !== 1 ? "s" : ""} not yet mapped:{" "}
@@ -397,7 +397,7 @@ export default function CsvImportModal({
               )}
 
               <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
-                <table className="w-full text-[12px]">
+                <table className="w-full text-[14px]">
                   <thead>
                     <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
                       <th className={`${lblCls} text-left px-3 py-2`}>Dashboard field</th>
@@ -417,7 +417,7 @@ export default function CsvImportModal({
                               <span className="ml-1 text-red-500" aria-label="required">*</span>
                             )}
                           </td>
-                          <td className={`px-3 py-2 ${t.textMuted} text-[11px] hidden sm:table-cell`}>
+                          <td className={`px-3 py-2 ${t.textMuted} text-[13px] hidden sm:table-cell`}>
                             {col.hint ?? "—"}
                           </td>
                           <td className="px-3 py-2">
@@ -426,7 +426,7 @@ export default function CsvImportModal({
                               onChange={(e) =>
                                 setMapping((prev) => ({ ...prev, [col.key]: e.target.value }))
                               }
-                              className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${
+                              className={`w-full h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${
                                 isReqUnmapped
                                   ? dark ? "border-red-700 bg-neutral-900 text-red-300" : "border-red-300 bg-white text-red-700"
                                   : t.inputBg
@@ -446,7 +446,7 @@ export default function CsvImportModal({
               </div>
 
               {/* CSV header preview */}
-              <div className={`text-[11px] ${t.textMuted}`}>
+              <div className={`text-[13px] ${t.textMuted}`}>
                 Columns detected in your file:{" "}
                 {csvHeaders.map((h, i) => (
                   <span key={`${h}-${i}`}>
@@ -479,7 +479,7 @@ export default function CsvImportModal({
               </div>
 
               {errorRows.length > 0 && (
-                <div className={`rounded-md border p-3 text-[11px] ${warnBg}`}>
+                <div className={`rounded-md border p-3 text-[13px] ${warnBg}`}>
                   <div className="flex items-center gap-1.5 font-semibold mb-1">
                     <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                     {errorRows.length} row{errorRows.length !== 1 ? "s" : ""} will be skipped
@@ -497,7 +497,7 @@ export default function CsvImportModal({
 
               <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
                 <div className="overflow-x-auto max-h-72 overflow-y-auto">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-[13px]">
                     <thead className="sticky top-0">
                       <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900" : "bg-neutral-50"}`}>
                         <th className={`${lblCls} text-left px-3 py-2 w-10`}>#</th>
@@ -529,11 +529,11 @@ export default function CsvImportModal({
                             <td className={`px-3 py-1.5 ${t.textMuted} tabular-nums`}>{row.rowNumber}</td>
                             <td className="px-3 py-1.5">
                               {hasError ? (
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-100 text-red-700"}`}>
+                                <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-100 text-red-700"}`}>
                                   ERR
                                 </span>
                               ) : (
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}>
+                                <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}>
                                   OK
                                 </span>
                               )}
@@ -553,7 +553,7 @@ export default function CsvImportModal({
                   </table>
                 </div>
                 {parsedRows.length > 200 && (
-                  <div className={`px-3 py-2 text-[11px] ${t.textMuted} border-t ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
+                  <div className={`px-3 py-2 text-[13px] ${t.textMuted} border-t ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
                     Showing first 200 of {parsedRows.length} rows. All valid rows will be imported.
                   </div>
                 )}
@@ -578,7 +578,7 @@ export default function CsvImportModal({
                 <div className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800"}`}>
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
-                    <p className="text-[13px] font-bold">{importResult.error}</p>
+                    <p className="text-[15px] font-bold">{importResult.error}</p>
                   </div>
                 </div>
               ) : (
@@ -590,7 +590,7 @@ export default function CsvImportModal({
                   }`}>
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
-                      <div className="text-[13px]">
+                      <div className="text-[15px]">
                         <p className="font-bold">
                           {importResult.imported} row{importResult.imported !== 1 ? "s" : ""} imported.
                         </p>
@@ -604,7 +604,7 @@ export default function CsvImportModal({
                   </div>
 
                   {importResult.rowErrors.length > 0 && (
-                    <div className={`mt-3 max-w-md mx-auto rounded-md border p-3 text-[11px] ${warnBg}`}>
+                    <div className={`mt-3 max-w-md mx-auto rounded-md border p-3 text-[13px] ${warnBg}`}>
                       <p className="font-semibold mb-1">Row errors:</p>
                       <ul className="space-y-0.5 max-h-32 overflow-y-auto">
                         {importResult.rowErrors.map((e, i) => (

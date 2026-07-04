@@ -207,7 +207,7 @@ export default function ImportCasesModal({
     return false;
   };
 
-  const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const lblCls = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
   return (
     <div
@@ -255,10 +255,10 @@ export default function ImportCasesModal({
                         : "text-neutral-400"
                 }`}
               >
-                <div className="text-[10px] font-bold uppercase tracking-wider">
+                <div className="text-[12px] font-bold uppercase tracking-wider">
                   {s.title}
                 </div>
-                <div className="text-[12px] font-medium">{s.subtitle}</div>
+                <div className="text-[14px] font-medium">{s.subtitle}</div>
               </button>
             );
           })}
@@ -283,7 +283,7 @@ export default function ImportCasesModal({
                   Upload Spreadsheet
                 </h4>
               </div>
-              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+              <p className={`text-[13px] ${t.textMuted} mb-4`}>
                 Upload your XLSX file and select the sheet tab to compare against
                 the cases database.
               </p>
@@ -327,7 +327,7 @@ export default function ImportCasesModal({
                 <p className={`text-sm font-semibold ${t.text}`}>
                   {file ? file.name : "Drag & drop your file here, or click to browse"}
                 </p>
-                <p className={`text-[11px] mt-1 ${t.textMuted}`}>
+                <p className={`text-[13px] mt-1 ${t.textMuted}`}>
                   {file
                     ? `${(file.size / 1024).toFixed(0)} KB${busy === "preview" ? " · parsing…" : ""}`
                     : "Supports .xlsx, .xls, and .csv files"}
@@ -369,14 +369,14 @@ export default function ImportCasesModal({
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>
                 Map Columns
               </h4>
-              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+              <p className={`text-[13px] ${t.textMuted} mb-4`}>
                 The mapping below was auto-detected from your file&apos;s header row. All
                 columns shown are mapped automatically — no action needed unless you see
                 a missing required field.
               </p>
 
               <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
-                <table className="w-full text-[12px]">
+                <table className="w-full text-[14px]">
                   <thead>
                     <tr
                       className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}
@@ -398,18 +398,18 @@ export default function ImportCasesModal({
                         <td className={`${t.text} px-3 py-2 font-medium`}>
                           {m.sheet}
                         </td>
-                        <td className={`${t.textSub} px-3 py-2 font-mono text-[11px]`}>
+                        <td className={`${t.textSub} px-3 py-2 font-mono text-[13px]`}>
                           {m.db}
                         </td>
                         <td className="px-3 py-2 text-center">
                           {m.required ? (
                             <span
-                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}
+                              className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}
                             >
                               REQUIRED
                             </span>
                           ) : (
-                            <span className={`text-[10px] ${t.textMuted}`}>
+                            <span className={`text-[12px] ${t.textMuted}`}>
                               optional
                             </span>
                           )}
@@ -422,7 +422,7 @@ export default function ImportCasesModal({
 
               {preview && preview.summary.warnings.length > 0 && (
                 <div
-                  className={`mt-4 rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
+                  className={`mt-4 rounded-md border p-3 text-[13px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
                 >
                   <div className="flex items-center gap-1.5 font-semibold mb-1">
                     <AlertTriangle className="h-3.5 w-3.5" />
@@ -447,7 +447,7 @@ export default function ImportCasesModal({
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>
                 Compare & Preview
               </h4>
-              <p className={`text-[11px] ${t.textMuted} mb-3`}>
+              <p className={`text-[13px] ${t.textMuted} mb-3`}>
                 Rows already in the database (matched by MyCase ID) are flagged
                 as duplicates. Use Step 4 to choose which rows to import.
               </p>
@@ -490,12 +490,12 @@ export default function ImportCasesModal({
                   <h4 className={`text-sm font-semibold ${t.text}`}>
                     Select & Update
                   </h4>
-                  <p className={`text-[11px] ${t.textMuted}`}>
+                  <p className={`text-[13px] ${t.textMuted}`}>
                     Choose which rows to import. By default only new rows are
                     selected.
                   </p>
                 </div>
-                <div className={`text-[11px] ${t.textSub}`}>
+                <div className={`text-[13px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>
                     {selected.size.toLocaleString()}
                   </span>{" "}
@@ -567,7 +567,7 @@ export default function ImportCasesModal({
               >
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
-                  <div className="text-[13px]">
+                  <div className="text-[15px]">
                     <p className="font-bold">
                       Imported {result.inserted.toLocaleString()} case
                       {result.inserted === 1 ? "" : "s"}.
@@ -662,11 +662,11 @@ const Stat = ({
   accent?: string;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} p-3`}>
-    <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>
+    <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>
       {label}
     </p>
     <p
-      className={`text-[18px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}
+      className={`text-[20px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}
     >
       {value}
     </p>
@@ -688,7 +688,7 @@ const PreviewTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr
             className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}
@@ -707,7 +707,7 @@ const PreviewTable = ({
             <tr key={r.clientId} className={`border-b ${t.borderLight}`}>
               <td className="px-3 py-1.5">
                 <span
-                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                  className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${
                     r.isDuplicate
                       ? dark
                         ? "bg-amber-900/40 text-amber-400"
@@ -745,13 +745,13 @@ const PreviewTable = ({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className={`text-[11px] underline ${dark ? "text-blue-400" : "text-blue-600"} inline-flex items-center gap-1`}
+                    className={`text-[13px] underline ${dark ? "text-blue-400" : "text-blue-600"} inline-flex items-center gap-1`}
                   >
                     {r.winSheetLinkText ?? "Open"}
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 ) : (
-                  <span className={`text-[11px] ${t.textMuted}`}>
+                  <span className={`text-[13px] ${t.textMuted}`}>
                     {r.winSheetLinkText ?? "—"}
                   </span>
                 )}
@@ -761,11 +761,11 @@ const PreviewTable = ({
               </td>
               <td className="px-3 py-1.5 text-center">
                 {r.hasNotes ? (
-                  <span className={`text-[10px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>
+                  <span className={`text-[12px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>
                     YES
                   </span>
                 ) : (
-                  <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                  <span className={`text-[12px] ${t.textMuted}`}>—</span>
                 )}
               </td>
             </tr>
@@ -775,7 +775,7 @@ const PreviewTable = ({
     </div>
     {truncated && (
       <div
-        className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}
+        className={`text-[13px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}
       >
         Showing first 100 of {total.toLocaleString()} rows. All will be processed
         on import.
@@ -803,7 +803,7 @@ const SelectionTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr
             className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} sticky top-0`}
@@ -839,7 +839,7 @@ const SelectionTable = ({
                 </td>
                 <td className="px-3 py-1.5">
                   <span
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                    className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${
                       r.isDuplicate
                         ? dark
                           ? "bg-amber-900/40 text-amber-400"
@@ -860,7 +860,7 @@ const SelectionTable = ({
                 </td>
                 <td className="px-3 py-1.5">
                   <span
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}
+                    className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}
                   >
                     {r.winSheetStatus.replace(/_/g, " ")}
                   </span>
@@ -873,7 +873,7 @@ const SelectionTable = ({
     </div>
     {truncated && (
       <div
-        className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}
+        className={`text-[13px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}
       >
         Showing first 200 of {total.toLocaleString()} matching rows. All matches
         respect your selection.
@@ -890,7 +890,7 @@ const Th = ({
   alignRight?: boolean;
 }) => (
   <th
-    className={`text-[10px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}
+    className={`text-[12px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}
   >
     {children}
   </th>

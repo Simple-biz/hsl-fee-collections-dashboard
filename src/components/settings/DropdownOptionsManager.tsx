@@ -42,7 +42,7 @@ export function DropdownOptionsManager() {
               aria-selected={isActive}
               type="button"
               onClick={() => setActive(cat.key)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-[13px] font-medium transition-colors ${
                 isActive
                   ? dark
                     ? "bg-neutral-800 text-neutral-100"

@@ -737,16 +737,16 @@ export const FeePetitions = () => {
   const isRefreshing = loading && rows.length > 0;
 
   const sectionCard = `rounded-xl border ${t.card}`;
-  const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
-  const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
+  const thBase = `py-2 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap`;
+  const tdBase = `py-2 px-3 text-[14px] whitespace-nowrap`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
-  const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
+  const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
   const presetActive = dark
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
-  const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
+  const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
   const colSpan = CHECKBOX_COLUMNS.length + 8;
 
   return (
@@ -776,7 +776,7 @@ export const FeePetitions = () => {
           </div>
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Fee Petitions</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>Track and manage fee petition filings</p>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>Track and manage fee petition filings</p>
           </div>
         </div>
       </div>
@@ -790,9 +790,9 @@ export const FeePetitions = () => {
           { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
+            <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
             <p className={`text-xl font-bold mt-1 ${t.text}`}>{s.value}</p>
-            <p className={`text-[10px] ${t.textMuted} mt-0.5`}>{s.sub}</p>
+            <p className={`text-[12px] ${t.textMuted} mt-0.5`}>{s.sub}</p>
           </div>
         ))}
       </div>
@@ -901,7 +901,7 @@ export const FeePetitions = () => {
                     <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                   )}
                 </h3>
-                <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                   {total === 0 ? "0 petitions" : `Showing ${rangeStart}–${rangeEnd} of ${total} petitions`}
                 </p>
               </>
@@ -969,7 +969,7 @@ export const FeePetitions = () => {
 
         {/* Quick filter presets */}
         <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
-          <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
+          <span className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
           <button
             onClick={() => { urlMethodRef.current = "push"; setTouchedFilter((v) => (v === "none" ? "" : "none")); setPage(1); }}
             className={`${presetBase} ${touchedFilter === "none" ? presetActive : t.outlineBtn}`}
@@ -1027,7 +1027,7 @@ export const FeePetitions = () => {
                 </button>
               </span>
             )}
-            <button onClick={clearAllFilters} className={`text-[11px] font-medium underline ${t.textMuted} hover:opacity-70`}>
+            <button onClick={clearAllFilters} className={`text-[13px] font-medium underline ${t.textMuted} hover:opacity-70`}>
               Clear all
             </button>
           </div>
@@ -1176,7 +1176,7 @@ export const FeePetitions = () => {
                           {row.claimant}
                         </Link>
                         {row.updatedAt && (
-                          <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                          <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                             Updated {formatRelativeDate(row.updatedAt)}
                           </p>
                         )}
@@ -1227,7 +1227,7 @@ export const FeePetitions = () => {
                         <div className="flex items-center gap-1.5">
                           <span>{fmtDate(row.approvalDate)}</span>
                           {daysSince(row.approvalDate) != null && (
-                            <span className={`text-[10px] font-semibold px-1 rounded ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-100 text-neutral-500"}`}>
+                            <span className={`text-[12px] font-semibold px-1 rounded ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-100 text-neutral-500"}`}>
                               {daysSince(row.approvalDate)}d
                             </span>
                           )}
@@ -1242,7 +1242,7 @@ export const FeePetitions = () => {
                               style={{ width: `${(completedCount / CHECKBOX_COLUMNS.length) * 100}%` }}
                             />
                           </div>
-                          <span className={`text-[11px] font-semibold ${isComplete ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
+                          <span className={`text-[13px] font-semibold ${isComplete ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
                             {completedCount}/{CHECKBOX_COLUMNS.length}
                           </span>
                         </div>
@@ -1277,7 +1277,7 @@ export const FeePetitions = () => {
 
         {/* Pagination footer */}
         <div className={`px-4 py-3 flex items-center justify-between border-t ${t.borderLight}`}>
-          <p className={`text-[11px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
+          <p className={`text-[13px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
           <div className="flex items-center gap-1">
             <button
               onClick={() => { urlMethodRef.current = "push"; setPage((p) => Math.max(1, p - 1)); }}
@@ -1308,7 +1308,7 @@ export const FeePetitions = () => {
                 onBlur={(e) => { e.target.value = String(page); }}
                 className={`h-8 w-12 px-1 rounded-md border text-xs text-center outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 disabled:opacity-40 ${t.inputBg}`}
               />
-              <span className={`text-[11px] ${t.textMuted}`}>/ {totalPages}</span>
+              <span className={`text-[13px] ${t.textMuted}`}>/ {totalPages}</span>
             </div>
             <button
               onClick={() => { urlMethodRef.current = "push"; setPage((p) => Math.min(totalPages, p + 1)); }}

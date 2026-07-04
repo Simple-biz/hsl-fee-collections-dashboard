@@ -475,11 +475,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     setDaySel(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
   };
 
-  const thBase = `py-2.5 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
-  const tdBase = `py-2.5 px-3 text-[12px] whitespace-nowrap tabular-nums`;
+  const thBase = `py-2.5 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap`;
+  const tdBase = `py-2.5 px-3 text-[14px] whitespace-nowrap tabular-nums`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover  = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
-  const miniInput = `w-12 h-6 px-1 text-center text-[11px] rounded border outline-none tabular-nums ${t.inputBg}`;
+  const miniInput = `w-12 h-6 px-1 text-center text-[13px] rounded border outline-none tabular-nums ${t.inputBg}`;
 
   return (
     <div className="space-y-4">
@@ -510,7 +510,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               { label: "No Fees Over 90 Days",  value: data.noFeesAging.over90,         tone: dark ? "text-red-400"   : "text-red-600"   },
             ].map(({ label, value, tone }) => (
               <div key={label} className="py-3 text-center">
-                <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
+                <div className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} mb-1`}>{label}</div>
                 <div className={`text-xl font-extrabold tabular-nums ${tone}`}>{value}</div>
               </div>
             ))}
@@ -523,7 +523,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         <div className={`rounded-xl border ${t.card} overflow-hidden`}>
           <div className={`px-4 py-2.5 flex items-center justify-between border-b ${t.borderLight}`}>
             <span className={`text-xs font-bold ${t.text}`}>No Fees Cases</span>
-            <span className="text-[11px] font-medium tabular-nums">
+            <span className="text-[13px] font-medium tabular-nums">
               <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} over 60 days</span>
               <span className={t.textMuted}> · </span>
               <span className={dark ? "text-red-400" : "text-red-600"}>{data.noFeesAging.over90} over 90 days</span>
@@ -592,7 +592,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             </div>
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>Agent Tracking</h3>
-              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>{windowLabel}</p>
+              <p className={`text-[13px] ${t.textMuted} mt-0.5`}>{windowLabel}</p>
             </div>
           </div>
 
@@ -724,7 +724,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   aria-label="From date"
                   className={`h-8 px-2 rounded-md border text-xs outline-none ${t.inputBg}`}
                 />
-                <span className={`text-[11px] ${t.textMuted}`}>to</span>
+                <span className={`text-[13px] ${t.textMuted}`}>to</span>
                 <input
                   type="date"
                   value={rangeTo}
@@ -804,7 +804,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <AlertTriangle aria-hidden="true" className="h-3 w-3" />
                 Needs attention
               </button>
-              <span className={`ml-auto text-[11px] ${t.textMuted}`}>
+              <span className={`ml-auto text-[13px] ${t.textMuted}`}>
                 {filteredAgents.length} of {data.agents.length} agents
               </span>
             </div>
@@ -938,7 +938,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               <Phone className={`h-4 w-4 ${dark ? "text-indigo-400" : "text-indigo-500"}`} aria-hidden="true" />
               <div>
                 <h3 className={`text-sm font-bold ${t.text}`}>Daily Call Log</h3>
-                <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                   {windowLabel} — Enter SSA &amp; client call counts per agent
                 </p>
               </div>
@@ -979,7 +979,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   {entryDays.map((day) => (
                     <th key={day.date} className={`${thBase} ${t.textSub} text-center`}>
                       <div>{day.dayName}</div>
-                      <div className={`text-[9px] font-normal ${t.textMuted}`}>{day.label}</div>
+                      <div className={`text-[11px] font-normal ${t.textMuted}`}>{day.label}</div>
                     </th>
                   ))}
                   {entryDays.length > 1 && <th className={`${thBase} ${t.textSub} text-center`}>Total</th>}
@@ -995,16 +995,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       <tr className={rowBorder}>
                         <td className={`${tdBase} ${t.text} font-semibold align-middle`} rowSpan={5}>
                           <div className="flex items-center gap-2">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-200 text-neutral-600"}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-200 text-neutral-600"}`}>
                               {agent.agent[0]}
                             </div>
                             {agent.agent}
                             {!editable && (
-                              <span className={`text-[9px] font-normal ${t.textMuted}`}>(read-only)</span>
+                              <span className={`text-[11px] font-normal ${t.textMuted}`}>(read-only)</span>
                             )}
                           </div>
                         </td>
-                        <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-blue-400" : "text-blue-600"}`}>SSA</td>
+                        <td className={`px-2 py-1.5 text-[12px] font-medium whitespace-nowrap ${dark ? "text-blue-400" : "text-blue-600"}`}>SSA</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
@@ -1015,14 +1015,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           </td>
                         ))}
                         {entryDays.length > 1 && (
-                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ssa > 0 ? (dark ? "text-blue-400" : "text-blue-600") : t.textMuted}`}>
+                          <td className={`px-2 py-1 text-center text-[13px] font-semibold tabular-nums ${totals.ssa > 0 ? (dark ? "text-blue-400" : "text-blue-600") : t.textMuted}`}>
                             {totals.ssa || "—"}
                           </td>
                         )}
                       </tr>
                       {/* Client IB */}
                       <tr className={rowBorder}>
-                        <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-emerald-400" : "text-emerald-600"}`}>Client IB</td>
+                        <td className={`px-2 py-1.5 text-[12px] font-medium whitespace-nowrap ${dark ? "text-emerald-400" : "text-emerald-600"}`}>Client IB</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
@@ -1033,14 +1033,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           </td>
                         ))}
                         {entryDays.length > 1 && (
-                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ib > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
+                          <td className={`px-2 py-1 text-center text-[13px] font-semibold tabular-nums ${totals.ib > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
                             {totals.ib || "—"}
                           </td>
                         )}
                       </tr>
                       {/* Client OB */}
                       <tr className={rowBorder}>
-                        <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-amber-400" : "text-amber-600"}`}>Client OB</td>
+                        <td className={`px-2 py-1.5 text-[12px] font-medium whitespace-nowrap ${dark ? "text-amber-400" : "text-amber-600"}`}>Client OB</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
@@ -1051,14 +1051,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           </td>
                         ))}
                         {entryDays.length > 1 && (
-                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ob > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}>
+                          <td className={`px-2 py-1 text-center text-[13px] font-semibold tabular-nums ${totals.ob > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}>
                             {totals.ob || "—"}
                           </td>
                         )}
                       </tr>
                       {/* Win Sheets */}
                       <tr className={rowBorder}>
-                        <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-violet-400" : "text-violet-600"}`}>Win Sheets</td>
+                        <td className={`px-2 py-1.5 text-[12px] font-medium whitespace-nowrap ${dark ? "text-violet-400" : "text-violet-600"}`}>Win Sheets</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
@@ -1069,14 +1069,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           </td>
                         ))}
                         {entryDays.length > 1 && (
-                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.ws > 0 ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
+                          <td className={`px-2 py-1 text-center text-[13px] font-semibold tabular-nums ${totals.ws > 0 ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
                             {totals.ws || "—"}
                           </td>
                         )}
                       </tr>
                       {/* Fax Sent */}
                       <tr className={`border-b ${rowBorder}`}>
-                        <td className={`px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${dark ? "text-rose-400" : "text-rose-600"}`}>Fax Sent</td>
+                        <td className={`px-2 py-1.5 text-[12px] font-medium whitespace-nowrap ${dark ? "text-rose-400" : "text-rose-600"}`}>Fax Sent</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
                             <input type="number" min="0" placeholder="0" className={miniInput}
@@ -1087,7 +1087,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           </td>
                         ))}
                         {entryDays.length > 1 && (
-                          <td className={`px-2 py-1 text-center text-[11px] font-semibold tabular-nums ${totals.fax > 0 ? (dark ? "text-rose-400" : "text-rose-600") : t.textMuted}`}>
+                          <td className={`px-2 py-1 text-center text-[13px] font-semibold tabular-nums ${totals.fax > 0 ? (dark ? "text-rose-400" : "text-rose-600") : t.textMuted}`}>
                             {totals.fax || "—"}
                           </td>
                         )}
@@ -1099,20 +1099,20 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               <tfoot>
                 <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
                   <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
-                  <td className={`px-2 py-1.5 text-[10px] font-bold ${t.textSub}`}>All</td>
+                  <td className={`px-2 py-1.5 text-[12px] font-bold ${t.textSub}`}>All</td>
                   {entryDays.map((day) => {
                     const dayTotal = data.agents.reduce((sum, a) => {
                       const c = getCell(a.agent, day.date);
                       return sum + (parseInt(c.ssaCalls) || 0) + (parseInt(c.clientCallsIb) || 0) + (parseInt(c.clientCallsOb) || 0);
                     }, 0);
                     return (
-                      <td key={day.date} className={`px-2 py-1.5 text-center text-[11px] font-bold tabular-nums ${dayTotal > 0 ? t.text : t.textMuted}`}>
+                      <td key={day.date} className={`px-2 py-1.5 text-center text-[13px] font-bold tabular-nums ${dayTotal > 0 ? t.text : t.textMuted}`}>
                         {dayTotal || "—"}
                       </td>
                     );
                   })}
                   {entryDays.length > 1 && (
-                    <td className={`px-2 py-1.5 text-center text-[11px] font-bold tabular-nums ${t.text}`}>
+                    <td className={`px-2 py-1.5 text-center text-[13px] font-bold tabular-nums ${t.text}`}>
                       {data.agents.reduce((sum, a) => sum + agentCellTotals(a.agent).total, 0) || "—"}
                     </td>
                   )}

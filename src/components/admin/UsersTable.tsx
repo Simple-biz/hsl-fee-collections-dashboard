@@ -156,8 +156,8 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
   };
 
   const sectionCard = `rounded-xl border ${t.card}`;
-  const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${t.textSub}`;
-  const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
+  const thBase = `py-2 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap ${t.textSub}`;
+  const tdBase = `py-2 px-3 text-[14px] whitespace-nowrap`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
 
   return (
@@ -168,7 +168,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
       >
         <div>
           <h3 className={`text-sm font-bold ${t.text}`}>Users</h3>
-          <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+          <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
             {users.length === 1 ? "1 account" : `${users.length} accounts`}
           </p>
         </div>
@@ -243,7 +243,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                     <td className={tdBase}>
                       <div className="flex items-center gap-2.5">
                         <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${t.avatarBg}`}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold ${t.avatarBg}`}
                         >
                           {initial}
                         </div>
@@ -252,7 +252,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                             {user.name || user.email}
                             {isSelf && (
                               <span
-                                className={`ml-2 text-[10px] font-normal ${t.textMuted}`}
+                                className={`ml-2 text-[12px] font-normal ${t.textMuted}`}
                               >
                                 (you)
                               </span>
@@ -261,7 +261,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                           {user.name && (
                             <a
                               href={`mailto:${user.email}`}
-                              className={`text-[10px] ${t.textMuted} truncate hover:underline`}
+                              className={`text-[12px] ${t.textMuted} truncate hover:underline`}
                             >
                               {user.email}
                             </a>
@@ -299,7 +299,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                             variant="outline"
                             onClick={() => setEditTarget(user)}
                             disabled={rowBusy}
-                            className="h-7 text-[11px]"
+                            className="h-7 text-[13px]"
                           >
                             <Pencil className="h-3 w-3" aria-hidden="true" />
                             Edit
@@ -310,7 +310,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                           variant="outline"
                           onClick={() => setResetTarget(user)}
                           disabled={rowBusy}
-                          className="h-7 text-[11px]"
+                          className="h-7 text-[13px]"
                         >
                           <KeyRound className="h-3 w-3" aria-hidden="true" />
                           Reset password
@@ -320,7 +320,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                           variant="outline"
                           onClick={() => setAccessTarget(user)}
                           disabled={rowBusy}
-                          className="h-7 text-[11px]"
+                          className="h-7 text-[13px]"
                         >
                           <ShieldCheck className="h-3 w-3" aria-hidden="true" />
                           Access

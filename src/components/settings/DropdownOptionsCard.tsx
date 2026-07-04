@@ -234,7 +234,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         <h4 className={`text-xs font-bold ${t.text} flex items-center gap-2`}>
           <ListChecks className="h-3.5 w-3.5" /> {label} Options
         </h4>
-        <span className={`text-[11px] ${t.textMuted}`}>
+        <span className={`text-[13px] ${t.textMuted}`}>
           {loading
             ? "Loading…"
             : options.length === 1
@@ -245,7 +245,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
 
       <div className="p-4 space-y-3">
         {description && (
-          <p className={`text-[11px] ${t.textMuted}`}>{description}</p>
+          <p className={`text-[13px] ${t.textMuted}`}>{description}</p>
         )}
 
         {error && (
@@ -296,7 +296,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
           </div>
         ) : options.length === 0 ? (
           <div
-            className={`py-8 text-center text-[11px] ${t.textMuted} border rounded-md ${t.borderLight}`}
+            className={`py-8 text-center text-[13px] ${t.textMuted} border rounded-md ${t.borderLight}`}
           >
             No options yet. Add the first one above to populate the dropdown.
           </div>
@@ -367,7 +367,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                           onClick={() => handleMove(opt.id, "up")}
                           disabled={rowBusy || busyId !== null || options.indexOf(opt) === 0}
                           aria-label={`Move ${opt.name} up`}
-                          className={`h-4 w-5 flex items-center justify-center rounded text-[10px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
+                          className={`h-4 w-5 flex items-center justify-center rounded text-[12px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
                         >
                           <ChevronUp aria-hidden="true" className="h-3 w-3" />
                         </button>
@@ -376,7 +376,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                           onClick={() => handleMove(opt.id, "down")}
                           disabled={rowBusy || busyId !== null || options.indexOf(opt) === options.length - 1}
                           aria-label={`Move ${opt.name} down`}
-                          className={`h-4 w-5 flex items-center justify-center rounded text-[10px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
+                          className={`h-4 w-5 flex items-center justify-center rounded text-[12px] disabled:opacity-30 ${t.hover} ${t.textSub}`}
                         >
                           <ChevronDown aria-hidden="true" className="h-3 w-3" />
                         </button>
@@ -395,7 +395,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
                           disabled={rowBusy}
                           aria-label={`${opt.isActive ? "Deactivate" : "Activate"} ${opt.name}`}
                         />
-                        <span className={`text-[10px] ${t.textMuted} w-12`}>
+                        <span className={`text-[12px] ${t.textMuted} w-12`}>
                           {opt.isActive ? "Active" : "Inactive"}
                         </span>
                       </div>

@@ -53,7 +53,7 @@ export function AdminPage({
           </div>
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Admin</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
               Manage user accounts and review activity
             </p>
           </div>

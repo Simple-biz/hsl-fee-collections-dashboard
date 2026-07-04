@@ -186,9 +186,9 @@ const FeeSection = memo(
     onSaved,
   }: FeeSectionProps) => {
     const t = themeClasses(dark);
-    const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
-    const valCls = `text-[13px] font-semibold ${t.text} mt-0.5`;
-    const inpCls = `mt-1 h-7 px-2 rounded border text-[12px] outline-none w-full ${t.inputBg}`;
+    const lbl = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+    const valCls = `text-[15px] font-semibold ${t.text} mt-0.5`;
+    const inpCls = `mt-1 h-7 px-2 rounded border text-[14px] outline-none w-full ${t.inputBg}`;
     const sectionCard = `rounded-xl border ${t.card} p-4 md:p-5`;
 
     const [inlineEdit, setInlineEdit] = useState(false);
@@ -276,7 +276,7 @@ const FeeSection = memo(
           {!inlineEdit ? (
             <button
               onClick={startEdit}
-              className={`text-[10px] font-medium ${t.textMuted} flex items-center gap-1`}
+              className={`text-[12px] font-medium ${t.textMuted} flex items-center gap-1`}
             >
               <Pencil className="h-2.5 w-2.5" /> Edit
             </button>
@@ -284,14 +284,14 @@ const FeeSection = memo(
             <div className="flex gap-1.5">
               <button
                 onClick={cancelInlineEdit}
-                className={`text-[10px] font-medium ${t.textMuted} flex items-center gap-0.5`}
+                className={`text-[12px] font-medium ${t.textMuted} flex items-center gap-0.5`}
               >
                 <X className="h-2.5 w-2.5" /> Cancel
               </button>
               <button
                 onClick={saveInline}
                 disabled={localSaving}
-                className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5 disabled:opacity-50"
+                className="text-[12px] font-semibold text-emerald-500 flex items-center gap-0.5 disabled:opacity-50"
               >
                 {localSaving ? (
                   <RefreshCw className="h-2.5 w-2.5 animate-spin" />
@@ -319,7 +319,7 @@ const FeeSection = memo(
               <div>
                 <p className={lbl}>
                   Fee Due{" "}
-                  <span className="text-[8px] normal-case font-normal">
+                  <span className="text-[10px] normal-case font-normal">
                     (auto)
                   </span>
                 </p>
@@ -373,7 +373,7 @@ const FeeSection = memo(
               <div>
                 <p className={lbl}>Fee Received</p>
                 <p
-                  className={`text-[13px] font-semibold mt-0.5 ${received > 0 ? "text-emerald-500" : t.textMuted}`}
+                  className={`text-[15px] font-semibold mt-0.5 ${received > 0 ? "text-emerald-500" : t.textMuted}`}
                 >
                   {currency(received)}
                 </p>
@@ -381,7 +381,7 @@ const FeeSection = memo(
               <div>
                 <p className={lbl}>Pending</p>
                 <p
-                  className={`text-[13px] font-semibold mt-0.5 ${pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
+                  className={`text-[15px] font-semibold mt-0.5 ${pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
                 >
                   {currency(pending)}
                 </p>
@@ -693,9 +693,9 @@ const CaseDetailPage = () => {
   // ---- Style helpers ----
 
   const sectionCard = `rounded-xl border ${t.card} p-4 md:p-5`;
-  const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
-  const val = `text-[13px] font-semibold ${t.text} mt-0.5`;
-  const inp = `mt-1 h-7 px-2 rounded border text-[12px] w-full outline-none ${t.inputBg}`;
+  const lbl = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const val = `text-[15px] font-semibold ${t.text} mt-0.5`;
+  const inp = `mt-1 h-7 px-2 rounded border text-[14px] w-full outline-none ${t.inputBg}`;
 
   // ---- Render ----
 
@@ -751,7 +751,7 @@ const CaseDetailPage = () => {
               </div>
               <div>
                 <h3 className={`text-sm font-bold ${t.text}`}>Delete Case</h3>
-                <p className={`text-[11px] ${t.textMuted}`}>
+                <p className={`text-[13px] ${t.textMuted}`}>
                   This action cannot be undone
                 </p>
               </div>
@@ -801,17 +801,17 @@ const CaseDetailPage = () => {
                 {caseData.name}
               </h1>
               <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
               >
                 {fmtClaim(caseData.claim)}
               </span>
               <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
+                className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
               >
                 {caseData.level}
               </span>
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(caseData.status as WinSheetStatus, dark)}`}
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold ${getStatusColor(caseData.status as WinSheetStatus, dark)}`}
               >
                 {STATUS_LABELS_DETAIL[caseData.status] || caseData.status}
               </span>
@@ -1180,7 +1180,7 @@ const CaseDetailPage = () => {
                   className={`text-xs font-bold ${t.text} mb-3 flex items-center gap-2`}
                 >
                   <DollarSign className="h-3.5 w-3.5" /> Financial Summary
-                  <span className={`text-[9px] font-normal ${t.textMuted}`}>
+                  <span className={`text-[11px] font-normal ${t.textMuted}`}>
                     (computed)
                   </span>
                 </h4>
@@ -1196,7 +1196,7 @@ const CaseDetailPage = () => {
                   <div>
                     <p className={lbl}>Paid</p>
                     <p
-                      className={`text-[13px] font-semibold mt-0.5 ${caseData.paid > 0 ? "text-emerald-500" : t.textMuted}`}
+                      className={`text-[15px] font-semibold mt-0.5 ${caseData.paid > 0 ? "text-emerald-500" : t.textMuted}`}
                     >
                       {fmtFull(caseData.paid)}
                     </p>
@@ -1204,7 +1204,7 @@ const CaseDetailPage = () => {
                   <div>
                     <p className={lbl}>Outstanding</p>
                     <p
-                      className={`text-[13px] font-semibold mt-0.5 ${caseData.outstanding > 0 ? (dark ? "text-red-400" : "text-red-600") : "text-emerald-500"}`}
+                      className={`text-[15px] font-semibold mt-0.5 ${caseData.outstanding > 0 ? (dark ? "text-red-400" : "text-red-600") : "text-emerald-500"}`}
                     >
                       {fmtFull(caseData.outstanding)}
                     </p>
@@ -1221,7 +1221,7 @@ const CaseDetailPage = () => {
                           }}
                         />
                       </div>
-                      <p className={`text-[10px] ${t.textMuted} mt-1`}>
+                      <p className={`text-[12px] ${t.textMuted} mt-1`}>
                         {Math.round((caseData.paid / caseData.expected) * 100)}%
                         collected
                       </p>
@@ -1230,7 +1230,7 @@ const CaseDetailPage = () => {
                   <div className="flex items-center gap-2 pt-1">
                     <p className={lbl}>PIF</p>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold ${
                         caseData.pif === "YES"
                           ? dark
                             ? "bg-emerald-900/40 text-emerald-400"
@@ -1254,7 +1254,7 @@ const CaseDetailPage = () => {
                     <div className="flex items-center gap-2">
                       <p className={lbl}>Aging</p>
                       <span
-                        className={`text-[12px] font-semibold ${caseData.approvalCategory === ">60" ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-emerald-400" : "text-emerald-600"}`}
+                        className={`text-[14px] font-semibold ${caseData.approvalCategory === ">60" ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-emerald-400" : "text-emerald-600"}`}
                       >
                         <Clock className="h-3 w-3 inline mr-1" />
                         {caseData.daysAfterApproval}d (
@@ -1280,7 +1280,7 @@ const CaseDetailPage = () => {
                   className={`text-xs font-bold ${t.text} mb-3 flex items-center gap-2`}
                 >
                   <Shield className="h-3.5 w-3.5" /> PDF-Extracted Data
-                  <span className={`text-[9px] font-normal ${t.textMuted}`}>
+                  <span className={`text-[11px] font-normal ${t.textMuted}`}>
                     (from Chronicle file)
                   </span>
                 </h4>
@@ -1370,7 +1370,7 @@ const CaseDetailPage = () => {
                   <div className="mt-3">
                     <p className={lbl}>Allegations</p>
                     <p
-                      className={`text-[12px] ${t.textSub} mt-1 leading-relaxed`}
+                      className={`text-[14px] ${t.textSub} mt-1 leading-relaxed`}
                     >
                       {caseData.allegations}
                     </p>
@@ -1385,7 +1385,7 @@ const CaseDetailPage = () => {
                         {caseData.representatives.map((rep, i) => (
                           <span
                             key={i}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium ${dark ? "bg-neutral-800/60 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-medium ${dark ? "bg-neutral-800/60 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
                           >
                             <User className="h-3 w-3" /> {rep.name}
                             {rep.repId ? ` (${rep.repId})` : ""}
@@ -1408,7 +1408,7 @@ const CaseDetailPage = () => {
                           return (
                             <span
                               key={i}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium ${
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-medium ${
                                 denied
                                   ? dark
                                     ? "bg-red-900/30 text-red-400"
@@ -1486,7 +1486,7 @@ const CaseDetailPage = () => {
                 className={`text-xs font-bold ${t.text} mb-4 flex items-center gap-2`}
               >
                 <MessageSquare className="h-3.5 w-3.5" /> Activity Log
-                <span className={`ml-1 text-[10px] font-normal ${t.textMuted}`}>
+                <span className={`ml-1 text-[12px] font-normal ${t.textMuted}`}>
                   ({caseData.activities?.length ?? 0}{" "}
                   {caseData.activities?.length === 1 ? "entry" : "entries"})
                 </span>
@@ -1494,7 +1494,7 @@ const CaseDetailPage = () => {
               <div
                 className={`mb-4 rounded-lg border p-3 ${dark ? "bg-neutral-800/40 border-neutral-700" : "bg-neutral-50 border-neutral-200"}`}
               >
-                <p className={`text-[10px] ${t.textMuted} mb-2`}>
+                <p className={`text-[12px] ${t.textMuted} mb-2`}>
                   Posting as{" "}
                   <span className={`font-semibold ${t.textSub}`}>
                     {currentUser}
@@ -1506,7 +1506,7 @@ const CaseDetailPage = () => {
                     onChange={(e) => setNewNote(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handlePostNote()}
                     placeholder="Add a note or status update..."
-                    className={`flex-1 h-8 px-3 rounded-md border text-[12px] outline-none ${t.inputBg}`}
+                    className={`flex-1 h-8 px-3 rounded-md border text-[14px] outline-none ${t.inputBg}`}
                   />
                   <button
                     onClick={handlePostNote}
@@ -1544,11 +1544,11 @@ const CaseDetailPage = () => {
                         <div className="flex-1 min-w-0 pb-1">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`text-[11px] font-semibold ${t.text}`}
+                              className={`text-[13px] font-semibold ${t.text}`}
                             >
                               {a.createdBy}
                             </span>
-                            <span className={`text-[10px] ${t.textMuted}`}>
+                            <span className={`text-[12px] ${t.textMuted}`}>
                               {new Date(a.createdAt).toLocaleDateString(
                                 "en-US",
                                 {
@@ -1562,7 +1562,7 @@ const CaseDetailPage = () => {
                             </span>
                           </div>
                           <p
-                            className={`text-[12px] ${t.textSub} mt-0.5 leading-relaxed break-words`}
+                            className={`text-[14px] ${t.textSub} mt-0.5 leading-relaxed break-words`}
                           >
                             {a.message}
                           </p>

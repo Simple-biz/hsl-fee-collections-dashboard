@@ -34,7 +34,7 @@ export function TestAccountsHint() {
 
       {open && (
         <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-          <table className="cursor-text text-[11px] select-text">
+          <table className="cursor-text text-[13px] select-text">
             <tbody>
               {TEST_ACCOUNTS.map((a) => (
                 <tr key={a.email}>

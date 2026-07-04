@@ -80,13 +80,13 @@ export function ArchivePageClient() {
           </div>
           <div className="flex-1">
             <h3 className={`text-sm font-bold ${t.text}`}>Archive</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
               Cases removed from reconciliation — not found in the Master List or Fees Closed sheet
             </p>
           </div>
           {rows.length > 0 && (
             <span
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-100 text-neutral-600"}`}
+              className={`text-[13px] font-semibold px-2 py-0.5 rounded-full ${dark ? "bg-neutral-700 text-neutral-300" : "bg-neutral-100 text-neutral-600"}`}
             >
               {rows.length}
             </span>
