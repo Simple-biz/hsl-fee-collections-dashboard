@@ -224,7 +224,7 @@ const FeeSection = memo(
         const newRetro = parseFloat(fields.lr) || 0;
         const newReceived = parseFloat(fields.lrcv) || 0;
         const newDue = computeFeeDue(newRetro, feeCap);
-        const newPending = parseFloat(fields.lpd) || 0;
+        const newPending = Math.max(0, parseFloat(fields.lpd) || 0);
 
         if (newRetro !== retro) {
           feeFields[`${prefix}Retro`] = newRetro;
@@ -343,6 +343,7 @@ const FeeSection = memo(
                 <p className={lbl}>Pending</p>
                 <input
                   type="number"
+                  min="0"
                   step="0.01"
                   value={fields.lpd}
                   onChange={(e) => setField("lpd", e.target.value)}

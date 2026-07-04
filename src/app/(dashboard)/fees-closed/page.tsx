@@ -19,6 +19,11 @@ export default function FeesClosedPage() {
 
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // True once the closed-cases list has completed loading at least once —
+  // lets the initial-spinner check below tell "still loading for the first
+  // time" apart from "loading again after a refresh", even when there are
+  // genuinely zero closed cases to show.
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
   const [closedFrom, setClosedFrom] = useState("");
@@ -44,7 +49,10 @@ export default function FeesClosedPage() {
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError((e as Error).message);
     } finally {
-      if (!controller.signal.aborted) setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setHasLoadedOnce(true);
+      }
     }
   }, []);
 
@@ -112,7 +120,9 @@ export default function FeesClosedPage() {
 
   // Only block on the initial load — see the matching comment in
   // master-fees/page.tsx for why later refreshes shouldn't blank the table.
-  if (loading && cases.length === 0) {
+  // Gating on hasLoadedOnce (not cases.length === 0) also keeps a genuinely
+  // empty result from re-showing the full spinner on every refresh.
+  if (loading && !hasLoadedOnce) {
     return (
       <div className="flex items-center justify-center py-20">
         <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} aria-hidden="true" />
