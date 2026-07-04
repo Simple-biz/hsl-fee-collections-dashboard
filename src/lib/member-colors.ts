@@ -22,10 +22,17 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
+// Manual overrides for specific people who asked for a particular color
+// instead of whatever the hash landed them on.
+const OVERRIDES: Record<string, number> = {
+  Aurora: PALETTE.findIndex((p) => p.light.includes("bg-pink")),
+};
+
 // Deterministic per-name color — the same person always lands on the same
 // tint across renders and pages, since it's derived from the name itself
 // rather than list position.
 export function memberRowTint(name: string, dark: boolean): string {
-  const entry = PALETTE[hashString(name) % PALETTE.length];
+  const idx = OVERRIDES[name] ?? hashString(name) % PALETTE.length;
+  const entry = PALETTE[idx];
   return dark ? entry.dark : entry.light;
 }
