@@ -25,6 +25,10 @@ interface DashboardData {
   dropdownOptions: DropdownOptionsByCategory;
   loading: boolean; // summary + team (fast — powers KPI cards + collections chart)
   casesLoading: boolean; // the heavier /api/cases list (powers the fee records table)
+  // True once the cases list has completed loading at least once — lets
+  // consumers distinguish "still loading for the first time" from "loading
+  // again after a refresh", even when the result is a genuinely empty list.
+  casesLoadedOnce: boolean;
   error: string | null;
   refresh: () => void;
 }
@@ -53,6 +57,7 @@ export const useDashboard = (): DashboardData => {
     useState<DropdownOptionsByCategory>({});
   const [loading, setLoading] = useState(true);
   const [casesLoading, setCasesLoading] = useState(true);
+  const [casesLoadedOnce, setCasesLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -144,7 +149,10 @@ export const useDashboard = (): DashboardData => {
         })
         .finally(() => {
           // same Strict Mode guard as summaryTask above
-          if (!controller.signal.aborted && !cancelledRef.current) setCasesLoading(false);
+          if (!controller.signal.aborted && !cancelledRef.current) {
+            setCasesLoading(false);
+            setCasesLoadedOnce(true);
+          }
         }),
     ]);
   }, []);
@@ -167,6 +175,7 @@ export const useDashboard = (): DashboardData => {
     dropdownOptions,
     loading,
     casesLoading,
+    casesLoadedOnce,
     error,
     refresh: fetchAll,
   };

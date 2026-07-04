@@ -150,8 +150,6 @@ const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const toStr = (v: number) => (v > 0 ? String(v) : "");
 const computeFeeDue = (retro: number, cap: number) =>
   Math.min(retro * 0.25, cap);
-const computePending = (due: number, received: number) =>
-  Math.max(due - received, 0);
 
 // ============================================================================
 // FeeSection — extracted as stable component (fixes focus loss)
@@ -196,15 +194,11 @@ const FeeSection = memo(
     const [inlineEdit, setInlineEdit] = useState(false);
     const [localSaving, setLocalSaving] = useState(false);
     // Use a single state object to minimize re-renders
-    const [fields, setFields] = useState({ lr: "", lrcv: "", ldt: "" });
+    const [fields, setFields] = useState({ lr: "", lrcv: "", ldt: "", lpd: "" });
 
     const computedDue = computeFeeDue(parseFloat(fields.lr) || 0, feeCap);
-    const computedPending = computePending(
-      computedDue,
-      parseFloat(fields.lrcv) || 0,
-    );
 
-    const setField = (key: "lr" | "lrcv" | "ldt", val: string) => {
+    const setField = (key: "lr" | "lrcv" | "ldt" | "lpd", val: string) => {
       setFields((prev) => ({ ...prev, [key]: val }));
     };
 
@@ -213,6 +207,7 @@ const FeeSection = memo(
         lr: toStr(retro),
         lrcv: toStr(received),
         ldt: dateReceived || "",
+        lpd: toStr(pending),
       });
       setInlineEdit(true);
     };
@@ -229,7 +224,7 @@ const FeeSection = memo(
         const newRetro = parseFloat(fields.lr) || 0;
         const newReceived = parseFloat(fields.lrcv) || 0;
         const newDue = computeFeeDue(newRetro, feeCap);
-        const newPending = computePending(newDue, newReceived);
+        const newPending = Math.max(0, parseFloat(fields.lpd) || 0);
 
         if (newRetro !== retro) {
           feeFields[`${prefix}Retro`] = newRetro;
@@ -245,7 +240,7 @@ const FeeSection = memo(
         }
         if (newPending !== pending) {
           feeFields[`${prefix}Pending`] = newPending;
-          changes.push(`${title} Pending: $${pending} → $${newPending} (auto)`);
+          changes.push(`${title} Pending: $${pending} → $${newPending}`);
         }
         if (fields.ldt !== (dateReceived || "")) {
           feeFields[`${prefix}FeeReceivedDate`] = fields.ldt || null;
@@ -345,17 +340,15 @@ const FeeSection = memo(
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Pending{" "}
-                  <span className="text-[8px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p
-                  className={`${valCls} ${computedPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                >
-                  {fmtFull(computedPending)}
-                </p>
+                <p className={lbl}>Pending</p>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={fields.lpd}
+                  onChange={(e) => setField("lpd", e.target.value)}
+                  className={inpCls}
+                />
               </div>
               <div>
                 <p className={lbl}>Date Received</p>

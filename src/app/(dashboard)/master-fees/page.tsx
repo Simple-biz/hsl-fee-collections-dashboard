@@ -23,6 +23,7 @@ export default function MasterFeesPage() {
     approvedByOptions,
     dropdownOptions,
     casesLoading,
+    casesLoadedOnce,
     error,
     refresh,
   } = useDashboard();
@@ -54,7 +55,14 @@ export default function MasterFeesPage() {
     );
   }
 
-  if (casesLoading) {
+  // Only block the whole page on the initial load. A later refresh() (e.g.
+  // after saving a win sheet link, note, or archive action) re-runs the same
+  // fetch and flips casesLoading again — without this guard, every one of
+  // those small edits would blank the entire table back to a spinner instead
+  // of just quietly swapping in fresh data once it arrives. Gating on
+  // casesLoadedOnce (not cases.length === 0) also keeps a genuinely empty
+  // filtered result from re-showing the full spinner on every refresh.
+  if (casesLoading && !casesLoadedOnce) {
     return (
       <div className={`rounded-xl border ${t.card} flex items-center justify-center py-16`}>
         <RefreshCw aria-hidden="true" className={`h-5 w-5 animate-spin ${t.textMuted}`} />
