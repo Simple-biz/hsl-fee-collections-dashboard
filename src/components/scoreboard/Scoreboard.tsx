@@ -189,7 +189,7 @@ export const Scoreboard = () => {
       <div className={`px-5 py-4 border-b ${t.borderLight} flex items-center justify-between gap-4`}>
         <div>
           <h2 className={`text-sm font-bold ${t.text}`}>Total Number of Closed Cases</h2>
-          <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+          <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
             {weekOffset === 0
               ? "Current week + 4 previous weeks"
               : `5 weeks ending ${weekRangeLabel(getMonday(weekOffset)).split("–")[0].trim()}`}
@@ -199,7 +199,7 @@ export const Scoreboard = () => {
           {canImport && (
             <button
               onClick={() => setCsvImportOpen(true)}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
               aria-label="Import daily metrics from CSV"
             >
               <Upload aria-hidden="true" className="h-3.5 w-3.5" />
@@ -208,7 +208,7 @@ export const Scoreboard = () => {
           )}
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
             aria-label="Previous 5 weeks"
           >
             <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" />
@@ -217,7 +217,7 @@ export const Scoreboard = () => {
           {weekOffset < 0 && (
             <button
               onClick={() => setWeekOffset(0)}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${dark ? "border-amber-700 text-amber-400 hover:bg-amber-900/20" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
+              className={`px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-amber-700 text-amber-400 hover:bg-amber-900/20" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
             >
               This week
             </button>
@@ -225,7 +225,7 @@ export const Scoreboard = () => {
           <button
             onClick={() => setWeekOffset(weekOffset + 1)}
             disabled={weekOffset >= 0}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${weekOffset >= 0 ? (dark ? "border-neutral-800 text-neutral-600 cursor-not-allowed" : "border-neutral-100 text-neutral-300 cursor-not-allowed") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${weekOffset >= 0 ? (dark ? "border-neutral-800 text-neutral-600 cursor-not-allowed" : "border-neutral-100 text-neutral-300 cursor-not-allowed") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
             aria-label="Next 5 weeks"
             aria-disabled={weekOffset >= 0}
           >
@@ -284,14 +284,14 @@ export const Scoreboard = () => {
                       <thead>
                         <tr className={`border-b ${t.borderLight}`}>
                           <th
-                            className={`py-2 px-4 text-left text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} w-40`}
+                            className={`py-2 px-4 text-left text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} w-40`}
                           >
                             Agent
                           </th>
                           {weeks.map((w, i) => (
                             <th
                               key={i}
-                              className={`py-2 px-3 text-center text-[10px] font-semibold uppercase tracking-wider ${i === 0 ? t.text : t.textMuted}`}
+                              className={`py-2 px-3 text-center text-[12px] font-semibold uppercase tracking-wider ${i === 0 ? t.text : t.textMuted}`}
                             >
                               {w.label}
                             </th>
@@ -304,19 +304,19 @@ export const Scoreboard = () => {
                             key={row.agent}
                             className={`border-b ${t.borderLight} ${rowIdx % 2 !== 0 ? (dark ? "bg-neutral-800/20" : "bg-neutral-50/50") : ""}`}
                           >
-                            <td className={`py-2.5 px-4 text-[12px] font-medium ${t.text}`}>
+                            <td className={`py-2.5 px-4 text-[14px] font-medium ${t.text}`}>
                               {row.agent}
                             </td>
                             {row.weekValues.map((val, i) => (
                               <td key={i} className="py-2.5 px-3 text-center">
                                 {i === 0 ? (
                                   <span
-                                    className={`inline-block min-w-8 rounded px-2 py-0.5 text-[12px] font-semibold ${thisWeekCellColor(val, currentWeekMax)}`}
+                                    className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold ${thisWeekCellColor(val, currentWeekMax)}`}
                                   >
                                     {val}
                                   </span>
                                 ) : (
-                                  <span className={`text-[12px] ${t.textSub}`}>{val}</span>
+                                  <span className={`text-[14px] ${t.textSub}`}>{val}</span>
                                 )}
                               </td>
                             ))}

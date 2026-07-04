@@ -317,7 +317,7 @@ export const TeamManagement = () => {
               />
             </div>
             <div>
-              <p className={`text-[11px] ${t.textMuted}`}>{card.label}</p>
+              <p className={`text-[13px] ${t.textMuted}`}>{card.label}</p>
               <p className={`text-xl font-bold ${t.text}`}>{card.value}</p>
             </div>
           </div>
@@ -345,7 +345,7 @@ export const TeamManagement = () => {
           )}
         </div>
         <label
-          className={`inline-flex items-center gap-1.5 text-[11px] ${t.textMuted} cursor-pointer select-none`}
+          className={`inline-flex items-center gap-1.5 text-[13px] ${t.textMuted} cursor-pointer select-none`}
         >
           <input
             type="checkbox"
@@ -364,47 +364,47 @@ export const TeamManagement = () => {
             <thead>
               <tr className={dark ? "bg-neutral-800/50" : "bg-neutral-50"}>
                 <th
-                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Name
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Role
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-left font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Team
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-center font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-center font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Status
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Cases
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Active
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[13px]`}
                 >
                   PIF
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Collected
                 </th>
                 <th
-                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[11px]`}
+                  className={`px-4 py-2.5 text-right font-semibold ${t.textMuted} text-[13px]`}
                 >
                   Actions
                 </th>
@@ -434,7 +434,7 @@ export const TeamManagement = () => {
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2.5">
                         <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${t.avatarBg}`}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold ${t.avatarBg}`}
                         >
                           {m.name.charAt(0).toUpperCase()}
                         </div>
@@ -453,12 +453,12 @@ export const TeamManagement = () => {
                     <td className="px-4 py-2.5">
                       {m.team ? (
                         <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${teamBadgeClasses(m.team, dark)}`}
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-semibold ${teamBadgeClasses(m.team, dark)}`}
                         >
                           {m.team}
                         </span>
                       ) : (
-                        <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                        <span className={`text-[12px] ${t.textMuted}`}>—</span>
                       )}
                     </td>
 
@@ -466,7 +466,7 @@ export const TeamManagement = () => {
                     <td className="px-4 py-2.5 text-center">
                       {m.isActive ? (
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium ${
                             dark
                               ? "bg-emerald-900/30 text-emerald-400"
                               : "bg-emerald-50 text-emerald-700"
@@ -477,7 +477,7 @@ export const TeamManagement = () => {
                         </span>
                       ) : (
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium ${
                             dark
                               ? "bg-neutral-800 text-neutral-500"
                               : "bg-neutral-100 text-neutral-500"
@@ -567,7 +567,7 @@ export const TeamManagement = () => {
               {/* Name */}
               <div>
                 <label
-                  className={`block text-[11px] font-semibold ${t.textMuted} mb-1`}
+                  className={`block text-[13px] font-semibold ${t.textMuted} mb-1`}
                 >
                   Name
                 </label>
@@ -585,7 +585,7 @@ export const TeamManagement = () => {
               {/* Role */}
               <div>
                 <label
-                  className={`block text-[11px] font-semibold ${t.textMuted} mb-1`}
+                  className={`block text-[13px] font-semibold ${t.textMuted} mb-1`}
                 >
                   Role
                 </label>
@@ -611,7 +611,7 @@ export const TeamManagement = () => {
               {/* Team */}
               <div>
                 <label
-                  className={`block text-[11px] font-semibold ${t.textMuted} mb-1`}
+                  className={`block text-[13px] font-semibold ${t.textMuted} mb-1`}
                 >
                   Team
                 </label>

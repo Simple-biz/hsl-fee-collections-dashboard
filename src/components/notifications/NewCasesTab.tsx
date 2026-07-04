@@ -42,7 +42,7 @@ const isToday = (iso: string): boolean =>
 const fmtTime = (iso: string): string =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-const thBase = "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide";
+const thBase = "px-3 py-2 text-[13px] font-semibold uppercase tracking-wide";
 const tdBase = "px-3 py-2 text-xs";
 
 export function NewCasesTab({ dark, t }: NewCasesTabProps) {
@@ -113,7 +113,7 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
           </div>
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>New Cases</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
               {weekTotal} added — {formatWeekLabel(monday)}
             </p>
           </div>
@@ -126,7 +126,7 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
-          <span className={`text-[11px] font-medium ${t.textSub} whitespace-nowrap px-2`}>
+          <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-2`}>
             {formatWeekLabel(monday)}
           </span>
           <button
@@ -187,7 +187,7 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
                   <td className={`${tdBase} ${t.text} font-medium`}>
                     {fmtDate(d.date)}
                     {isToday(d.date) && (
-                      <span className={`ml-1.5 text-[10px] font-semibold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
+                      <span className={`ml-1.5 text-[12px] font-semibold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
                         Today
                       </span>
                     )}

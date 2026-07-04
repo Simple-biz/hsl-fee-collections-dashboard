@@ -27,7 +27,7 @@ const fmtDate = (iso: string): string =>
     day: "numeric",
   });
 
-const thBase = "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide";
+const thBase = "px-3 py-2 text-[13px] font-semibold uppercase tracking-wide";
 const tdBase = "px-3 py-2 text-xs";
 
 export function AuditLogTab({ dark, t }: AuditLogTabProps) {
@@ -90,7 +90,7 @@ export function AuditLogTab({ dark, t }: AuditLogTabProps) {
           </div>
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Audit Log</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
               Daily agent activity — {formatWeekLabel(monday)}
             </p>
           </div>
@@ -103,7 +103,7 @@ export function AuditLogTab({ dark, t }: AuditLogTabProps) {
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
-          <span className={`text-[11px] font-medium ${t.textSub} whitespace-nowrap px-2`}>
+          <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-2`}>
             {formatWeekLabel(monday)}
           </span>
           <button

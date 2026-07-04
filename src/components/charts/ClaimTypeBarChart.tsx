@@ -38,7 +38,7 @@ export const ClaimTypeBarChart = ({ cases }: ClaimTypeBarChartProps) => {
 
   if (bars.length === 0) {
     return (
-      <div className="flex items-center justify-center h-36 text-[11px] text-neutral-400 dark:text-neutral-500">
+      <div className="flex items-center justify-center h-36 text-[13px] text-neutral-400 dark:text-neutral-500">
         No claim-type data yet
       </div>
     );
@@ -50,7 +50,7 @@ export const ClaimTypeBarChart = ({ cases }: ClaimTypeBarChartProps) => {
     <div className="flex items-end gap-6 justify-center h-36 px-4 overflow-x-auto">
       {bars.map((b) => (
         <div key={b.label} className="flex flex-col items-center gap-1 shrink-0">
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+          <span className="text-[12px] text-neutral-400 dark:text-neutral-500 font-medium">
             {fmt(b.expected)}
           </span>
           <div className="flex items-end gap-1">
@@ -70,7 +70,7 @@ export const ClaimTypeBarChart = ({ cases }: ClaimTypeBarChartProps) => {
               }}
             />
           </div>
-          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
+          <span className="text-[13px] text-neutral-500 dark:text-neutral-400 font-medium">
             {b.label}
           </span>
         </div>

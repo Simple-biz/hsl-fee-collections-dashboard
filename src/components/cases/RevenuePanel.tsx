@@ -38,7 +38,7 @@ export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
       <div className={`text-2xl font-extrabold ${t.text} mt-1`}>
         {fmtFull(stats.paid)}
       </div>
-      <div className={`text-[11px] font-medium mt-0.5 ${rateTone}`}>
+      <div className={`text-[13px] font-medium mt-0.5 ${rateTone}`}>
         {hasExpected
           ? `${rate.toFixed(1)}% collection rate`
           : "No fees expected yet"}
@@ -48,11 +48,11 @@ export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
         <ClaimTypeBarChart cases={cases} />
       </div>
       <div className="mt-3 flex items-center gap-4 justify-center">
-        <span className={`flex items-center gap-1.5 text-[10px] ${t.textSub}`}>
+        <span className={`flex items-center gap-1.5 text-[12px] ${t.textSub}`}>
           <span className="w-2.5 h-2.5 rounded-sm bg-indigo-400 opacity-30" />{" "}
           Expected
         </span>
-        <span className={`flex items-center gap-1.5 text-[10px] ${t.textSub}`}>
+        <span className={`flex items-center gap-1.5 text-[12px] ${t.textSub}`}>
           <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Collected
         </span>
       </div>

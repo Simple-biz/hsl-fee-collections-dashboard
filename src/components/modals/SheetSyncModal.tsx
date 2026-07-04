@@ -503,7 +503,7 @@ export default function SheetSyncModal({
     return false;
   };
 
-  const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const lblCls = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
   return (
     <div
@@ -558,8 +558,8 @@ export default function SheetSyncModal({
                         : "text-neutral-400"
                 }`}
               >
-                <div className="text-[10px] font-bold uppercase tracking-wider">{s.title}</div>
-                <div className="text-[12px] font-medium">{s.subtitle}</div>
+                <div className="text-[12px] font-bold uppercase tracking-wider">{s.title}</div>
+                <div className="text-[14px] font-medium">{s.subtitle}</div>
               </button>
             );
           })}
@@ -589,7 +589,7 @@ export default function SheetSyncModal({
                 <CloudDownload className={`h-4 w-4 ${t.textSub}`} aria-hidden="true" />
                 <h4 className={`text-sm font-semibold ${t.text}`}>Fetch from Google Sheets</h4>
               </div>
-              <p className={`text-[11px] ${t.textMuted} mb-6`}>
+              <p className={`text-[13px] ${t.textMuted} mb-6`}>
                 Pulls the latest rows from the MASTER LIST and Fees Closed tabs via the sync
                 webhook and compares them against the cases database.
               </p>
@@ -598,7 +598,7 @@ export default function SheetSyncModal({
                 <div className={`rounded-lg border-2 border-dashed p-12 text-center ${dark ? "border-neutral-700" : "border-neutral-300"}`}>
                   <FileSpreadsheet className={`h-10 w-10 mx-auto mb-3 ${t.textMuted}`} aria-hidden="true" />
                   <p className={`text-sm font-semibold ${t.text} mb-1`}>Ready to sync</p>
-                  <p className={`text-[11px] ${t.textMuted} mb-5`}>
+                  <p className={`text-[13px] ${t.textMuted} mb-5`}>
                     Click the button below to pull the latest data from Google Sheets
                   </p>
                   <button
@@ -621,7 +621,7 @@ export default function SheetSyncModal({
               {preview && !fetching && (
                 <div className="space-y-4">
                   {preview.usingMock && (
-                    <div className={`rounded-md border p-3 flex items-center gap-2 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                    <div className={`rounded-md border p-3 flex items-center gap-2 text-[13px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       Using mock data — set{" "}
                       <code className="font-mono">SHEETS_SYNC_WEBHOOK_URL</code> in .env.local to
@@ -680,7 +680,7 @@ export default function SheetSyncModal({
                     />
                   </div>
                   {preview.summary.warnings.length > 0 && (
-                    <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                    <div className={`rounded-md border p-3 text-[13px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
                       <div className="flex items-center gap-1.5 font-semibold mb-1">
                         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                         {preview.summary.warnings.length} warning
@@ -697,7 +697,7 @@ export default function SheetSyncModal({
                     </div>
                   )}
                   {needsLinkRows.length > 0 && (
-                    <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800"}`}>
+                    <div className={`rounded-md border p-3 text-[13px] ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800"}`}>
                       <div className="flex items-center gap-1.5 font-semibold mb-1">
                         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                         {needsLinkRows.length} row{needsLinkRows.length === 1 ? "" : "s"} {needsLinkRows.length === 1 ? "has" : "have"} no MyCase link — skipped
@@ -715,7 +715,7 @@ export default function SheetSyncModal({
                               onChange={(e) =>
                                 setLinkOverrides((prev) => ({ ...prev, [r.row]: e.target.value }))
                               }
-                              className={`w-full h-6 px-2 rounded border text-[10px] outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-600" : "bg-white border-neutral-300 text-neutral-800 placeholder:text-neutral-400"}`}
+                              className={`w-full h-6 px-2 rounded border text-[12px] outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-600" : "bg-white border-neutral-300 text-neutral-800 placeholder:text-neutral-400"}`}
                             />
                           </li>
                         ))}
@@ -728,7 +728,7 @@ export default function SheetSyncModal({
                   {fcPreviewError && (
                     <div
                       role="alert"
-                      className={`rounded-md border p-3 text-[11px] flex items-start gap-2 ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
+                      className={`rounded-md border p-3 text-[13px] flex items-start gap-2 ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
                     >
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                       <span>
@@ -753,12 +753,12 @@ export default function SheetSyncModal({
           {step === 2 && (
             <div>
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Map Columns</h4>
-              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+              <p className={`text-[13px] ${t.textMuted} mb-4`}>
                 The mapping below defines how Google Sheet columns write to the database. No action
                 needed — all columns are mapped automatically.
               </p>
               <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
-                <table className="w-full text-[12px]">
+                <table className="w-full text-[14px]">
                   <thead>
                     <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
                       <th className={`${lblCls} text-left px-3 py-2`}>Sheet column</th>
@@ -770,14 +770,14 @@ export default function SheetSyncModal({
                     {COLUMN_MAP.map((m) => (
                       <tr key={m.sheet} className={`border-b ${t.borderLight}`}>
                         <td className={`${t.text} px-3 py-2 font-medium`}>{m.sheet}</td>
-                        <td className={`${t.textSub} px-3 py-2 font-mono text-[11px]`}>{m.db}</td>
+                        <td className={`${t.textSub} px-3 py-2 font-mono text-[13px]`}>{m.db}</td>
                         <td className="px-3 py-2 text-center">
                           {m.required ? (
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
+                            <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
                               REQUIRED
                             </span>
                           ) : (
-                            <span className={`text-[10px] ${t.textMuted}`}>optional</span>
+                            <span className={`text-[12px] ${t.textMuted}`}>optional</span>
                           )}
                         </td>
                       </tr>
@@ -792,7 +792,7 @@ export default function SheetSyncModal({
           {step === 3 && preview && (
             <div>
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Compare & Preview</h4>
-              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+              <p className={`text-[13px] ${t.textMuted} mb-4`}>
                 Four categories based on where each record exists.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-5">
@@ -891,7 +891,7 @@ export default function SheetSyncModal({
                         </button>
                         <button
                           onClick={() => setSelectedMissing(new Set())}
-                          className={`text-[11px] ${dark ? "text-neutral-400 hover:text-neutral-200" : "text-neutral-500 hover:text-neutral-700"}`}
+                          className={`text-[13px] ${dark ? "text-neutral-400 hover:text-neutral-200" : "text-neutral-500 hover:text-neutral-700"}`}
                         >
                           Clear
                         </button>
@@ -940,7 +940,7 @@ export default function SheetSyncModal({
                         </button>
                         <button
                           onClick={() => setSelectedMissingClosed(new Set())}
-                          className={`text-[11px] ${dark ? "text-neutral-400 hover:text-neutral-200" : "text-neutral-500 hover:text-neutral-700"}`}
+                          className={`text-[13px] ${dark ? "text-neutral-400 hover:text-neutral-200" : "text-neutral-500 hover:text-neutral-700"}`}
                         >
                           Clear
                         </button>
@@ -981,12 +981,12 @@ export default function SheetSyncModal({
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h4 className={`text-sm font-semibold ${t.text}`}>Select & Sync</h4>
-                  <p className={`text-[11px] ${t.textMuted}`}>
+                  <p className={`text-[13px] ${t.textMuted}`}>
                     Choose which rows to sync. MASTER LIST rows are inserted or updated; Fees Closed
                     rows are marked closed and moved to the Fees Closed page.
                   </p>
                 </div>
-                <div className={`text-[11px] ${t.textSub}`}>
+                <div className={`text-[13px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>{(selected.size + selectedFcNames.size).toLocaleString()}</span>
                   {" "}/ {(step4Rows.filter((r) => r.syncable).length + fcNewRows.length).toLocaleString()} syncable selected
                 </div>
@@ -1039,7 +1039,7 @@ export default function SheetSyncModal({
               </div>
 
               {syntheticRows.length > 0 && (
-                <div className={`rounded-md border p-3 mb-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                <div className={`rounded-md border p-3 mb-3 text-[13px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                     <div className="flex-1">
@@ -1087,24 +1087,24 @@ export default function SheetSyncModal({
                 <div className="mt-5">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE.fees_closed_new(dark)}`}>
+                      <span className={`text-[12px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE.fees_closed_new(dark)}`}>
                         FEES CLOSED NEW
                       </span>
-                      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>{fcNewRows.length.toLocaleString()}</span>
-                      <span className={`text-[11px] ${t.textMuted}`}>
+                      <span className={`text-[13px] font-semibold tabular-nums ${t.text}`}>{fcNewRows.length.toLocaleString()}</span>
+                      <span className={`text-[13px] ${t.textMuted}`}>
                         Not yet in database — will be created with isClosed=true
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setSelectedFcNames(new Set(fcNewRows.map((r) => r.caseName)))}
-                        className={`h-7 px-2.5 rounded border text-[11px] font-medium ${t.outlineBtn} transition-colors`}
+                        className={`h-7 px-2.5 rounded border text-[13px] font-medium ${t.outlineBtn} transition-colors`}
                       >
                         Select all
                       </button>
                       <button
                         onClick={() => setSelectedFcNames(new Set())}
-                        className={`h-7 px-2.5 rounded border text-[11px] font-medium ${t.outlineBtn} transition-colors`}
+                        className={`h-7 px-2.5 rounded border text-[13px] font-medium ${t.outlineBtn} transition-colors`}
                       >
                         Deselect all
                       </button>
@@ -1129,7 +1129,7 @@ export default function SheetSyncModal({
 
           {/* STEP 4 inline results */}
           {step === 4 && result && (
-            <div role="alert" className={`mt-4 rounded-lg border p-3 flex items-start gap-2.5 text-[12px] ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+            <div role="alert" className={`mt-4 rounded-lg border p-3 flex items-start gap-2.5 text-[14px] ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>
                 <span className="font-semibold">Master list synced.</span>{" "}
@@ -1138,7 +1138,7 @@ export default function SheetSyncModal({
             </div>
           )}
           {step === 4 && fcResult && (
-            <div role="alert" className={`mt-3 rounded-lg border p-3 flex items-start gap-2.5 text-[12px] ${dark ? "bg-teal-900/20 border-teal-800 text-teal-300" : "bg-teal-50 border-teal-200 text-teal-800"}`}>
+            <div role="alert" className={`mt-3 rounded-lg border p-3 flex items-start gap-2.5 text-[14px] ${dark ? "bg-teal-900/20 border-teal-800 text-teal-300" : "bg-teal-50 border-teal-200 text-teal-800"}`}>
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>
                 <span className="font-semibold">Fees Closed synced.</span>{" "}
@@ -1215,8 +1215,8 @@ const Stat = ({
   accent?: string;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} p-3`}>
-    <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{label}</p>
-    <p className={`text-[18px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}>{value}</p>
+    <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{label}</p>
+    <p className={`text-[20px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}>{value}</p>
   </div>
 );
 
@@ -1239,16 +1239,16 @@ const CategorySection = ({
 }) => (
   <div>
     <div className="flex items-center gap-2 mb-2">
-      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE[status](dark)}`}>
+      <span className={`text-[12px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE[status](dark)}`}>
         {STATUS_LABEL[status]}
       </span>
-      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>
+      <span className={`text-[13px] font-semibold tabular-nums ${t.text}`}>
         {count.toLocaleString()}
       </span>
-      <span className={`text-[11px] ${t.textMuted}`}>{description}</span>
+      <span className={`text-[13px] ${t.textMuted}`}>{description}</span>
     </div>
     {count === 0 ? (
-      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[11px] ${t.textMuted}`}>
+      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[13px] ${t.textMuted}`}>
         None
       </div>
     ) : (
@@ -1277,7 +1277,7 @@ const SheetRowsTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             <Th>Case</Th>
@@ -1308,7 +1308,7 @@ const SheetRowsTable = ({
               </td>
               {showChangedFields && (
                 <td className="px-3 py-1.5 max-w-64">
-                  <div className={`text-[10px] font-mono space-y-0.5 ${dark ? "text-blue-300" : "text-blue-700"}`}>
+                  <div className={`text-[12px] font-mono space-y-0.5 ${dark ? "text-blue-300" : "text-blue-700"}`}>
                     {r.changedFields.slice(0, 3).map((f) => (
                       <div key={f.field} className="leading-tight">
                         <span className="font-semibold">{f.field}</span>
@@ -1334,13 +1334,13 @@ const SheetRowsTable = ({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className={`text-[11px] underline ${dark ? "text-blue-400" : "text-blue-600"} inline-flex items-center gap-1`}
+                    className={`text-[13px] underline ${dark ? "text-blue-400" : "text-blue-600"} inline-flex items-center gap-1`}
                   >
                     {r.winSheetLinkText ?? "Open"}
                     <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 ) : (
-                  <span className={`text-[11px] ${t.textMuted}`}>{r.winSheetLinkText ?? "—"}</span>
+                  <span className={`text-[13px] ${t.textMuted}`}>{r.winSheetLinkText ?? "—"}</span>
                 )}
               </td>
               <td className={`${t.text} px-3 py-1.5 text-right tabular-nums font-medium`}>
@@ -1348,9 +1348,9 @@ const SheetRowsTable = ({
               </td>
               <td className="px-3 py-1.5 text-center">
                 {r.hasNotes ? (
-                  <span className={`text-[10px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>YES</span>
+                  <span className={`text-[12px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>YES</span>
                 ) : (
-                  <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                  <span className={`text-[12px] ${t.textMuted}`}>—</span>
                 )}
               </td>
             </tr>
@@ -1359,7 +1359,7 @@ const SheetRowsTable = ({
       </table>
     </div>
     {truncated && (
-      <div className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
+      <div className={`text-[13px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
         Showing first 100 of {total.toLocaleString()} rows.
       </div>
     )}
@@ -1381,7 +1381,7 @@ const DbOnlyTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             {onToggle && <Th>{""}</Th>}
@@ -1410,7 +1410,7 @@ const DbOnlyTable = ({
               )}
               <td className={`${t.text} px-3 py-1.5 font-medium`}>{r.caseName}</td>
               <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
-              <td className={`${t.textMuted} px-3 py-1.5 text-[11px] max-w-80 truncate`} title={r.caseLink}>
+              <td className={`${t.textMuted} px-3 py-1.5 text-[13px] max-w-80 truncate`} title={r.caseLink}>
                 {r.caseLink || "—"}
               </td>
             </tr>
@@ -1442,7 +1442,7 @@ const SelectionTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} sticky top-0`}>
             <Th>{""}</Th>
@@ -1488,7 +1488,7 @@ const SelectionTable = ({
                   </span>
                 </td>
                 <td className="px-3 py-1.5">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>
+                  <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>
                     {STATUS_LABEL[r.status]}
                   </span>
                 </td>
@@ -1496,11 +1496,11 @@ const SelectionTable = ({
                 <td className={`${t.textSub} px-3 py-1.5`}>{"assignedTo" in r ? (r.assignedTo ?? "—") : "—"}</td>
                 <td className="px-3 py-1.5">
                   {"winSheetStatus" in r ? (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
+                    <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
                       {r.winSheetStatus.replace(/_/g, " ")}
                     </span>
                   ) : (
-                    <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                    <span className={`text-[12px] ${t.textMuted}`}>—</span>
                   )}
                 </td>
               </tr>
@@ -1510,7 +1510,7 @@ const SelectionTable = ({
       </table>
     </div>
     {truncated && (
-      <div className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
+      <div className={`text-[13px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
         Showing first 200 of {total.toLocaleString()} matching rows.
       </div>
     )}
@@ -1532,7 +1532,7 @@ const FcNewTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             {selectedNames && <Th>{""}</Th>}
@@ -1585,7 +1585,7 @@ const Th = ({
   children: React.ReactNode;
   alignRight?: boolean;
 }) => (
-  <th className={`text-[10px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}>
+  <th className={`text-[12px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}>
     {children}
   </th>
 );

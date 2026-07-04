@@ -107,7 +107,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
                 {s.value}
               </div>
               {s.sub && (
-                <div className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                <div className={`text-[13px] ${t.textMuted} mt-0.5`}>
                   {s.sub}
                 </div>
               )}
@@ -116,11 +116,11 @@ export const StatCards = ({ stats }: StatCardsProps) => {
           <div
             className={`mt-3 pt-2 border-t ${t.borderLight} flex items-center justify-between`}
           >
-            <span className={`text-[11px] ${t.textSub} font-medium`}>
+            <span className={`text-[13px] ${t.textSub} font-medium`}>
               Details
             </span>
             <span
-              className={`text-[11px] font-semibold flex items-center gap-0.5 ${toneClass(
+              className={`text-[13px] font-semibold flex items-center gap-0.5 ${toneClass(
                 s.detailTone,
               )}`}
             >

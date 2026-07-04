@@ -76,7 +76,7 @@ export function CaseActivityFeed({
         <h3 className={`text-sm font-semibold mt-3 ${t.text}`}>
           No case activity yet
         </h3>
-        <p className={`text-[11px] ${t.textMuted} mt-1 max-w-md mx-auto`}>
+        <p className={`text-[13px] ${t.textMuted} mt-1 max-w-md mx-auto`}>
           Edits to cases (fees, status, notes, assignments) will appear here.
         </p>
       </div>
@@ -117,17 +117,17 @@ export function CaseActivityFeed({
               <div className="flex items-center gap-2">
                 <Link
                   href={`/cases/${e.caseId}`}
-                  className={`inline-flex items-center gap-1 text-[11px] font-semibold hover:underline ${dark ? "text-blue-400" : "text-blue-600"}`}
+                  className={`inline-flex items-center gap-1 text-[13px] font-semibold hover:underline ${dark ? "text-blue-400" : "text-blue-600"}`}
                 >
                   {e.caseName}
                   <ExternalLink className="h-2.5 w-2.5" aria-hidden="true" />
                 </Link>
               </div>
               <div className="select-text">
-                <p className={`text-[12px] ${t.text} mt-0.5 break-words`}>
+                <p className={`text-[14px] ${t.text} mt-0.5 break-words`}>
                   {e.message}
                 </p>
-                <p className={`text-[10px] ${t.textMuted} mt-0.5`}>
+                <p className={`text-[12px] ${t.textMuted} mt-0.5`}>
                   {e.createdBy ?? "System"} · {fmtDateTime(e.createdAt)}
                 </p>
               </div>

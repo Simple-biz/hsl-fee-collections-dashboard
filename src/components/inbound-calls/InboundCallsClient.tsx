@@ -357,7 +357,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   const card = `rounded-xl border ${t.card}`;
   const inputCls = `w-full text-xs bg-transparent border-0 outline-none focus:ring-1 focus:ring-blue-500 rounded px-1.5 py-1 ${t.text} placeholder:${t.textMuted}`;
-  const thCls = `px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} whitespace-nowrap`;
+  const thCls = `px-3 py-2.5 text-left text-[13px] font-semibold uppercase tracking-wider ${t.textMuted} whitespace-nowrap`;
   const tdCls = `px-2 py-1.5 align-top`;
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -387,7 +387,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           </div>
           <div>
             <h2 className={`text-sm font-bold ${t.text}`}>Inbound Call History</h2>
-            <p className={`text-[11px] ${t.textMuted}`}>POC schedule and call log by week</p>
+            <p className={`text-[13px] ${t.textMuted}`}>POC schedule and call log by week</p>
           </div>
         </div>
 
@@ -399,7 +399,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           >
             {weekLabel(selectedWeek)}
             {isCurrentWeek(selectedWeek) && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${dark ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-600"}`}>
+              <span className={`text-[12px] px-1.5 py-0.5 rounded-full ${dark ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-600"}`}>
                 This week
               </span>
             )}
@@ -418,7 +418,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                   }`}
                 >
                   <span>{weekLabel(w)}</span>
-                  {isCurrentWeek(w) && <span className={`text-[10px] ${dark ? "text-blue-400" : "text-blue-500"}`}>Now</span>}
+                  {isCurrentWeek(w) && <span className={`text-[12px] ${dark ? "text-blue-400" : "text-blue-500"}`}>Now</span>}
                 </button>
               ))}
             </div>
@@ -433,7 +433,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           {isAdmin && !pocEditMode && (
             <button
               onClick={() => { setPocDraft({ ...pocAssignments }); setPocEditMode(true); }}
-              className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-300 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"}`}
+              className={`text-[13px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-300 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"}`}
             >
               Edit schedule
             </button>
@@ -442,14 +442,14 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPocEditMode(false)}
-                className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-400 hover:border-neutral-400" : "border-neutral-200 text-neutral-500 hover:border-neutral-400"}`}
+                className={`text-[13px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-400 hover:border-neutral-400" : "border-neutral-200 text-neutral-500 hover:border-neutral-400"}`}
               >
                 Cancel
               </button>
               <button
                 onClick={savePoc}
                 disabled={pocSaving}
-                className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                className="text-[13px] px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
               >
                 {pocSaving && <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />}
                 <Save aria-hidden="true" className="h-3 w-3" />
@@ -476,7 +476,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                 key={num}
                 className={`rounded-lg border p-3 min-h-[90px] ${dark ? "border-neutral-700 bg-neutral-800/40" : "border-neutral-200 bg-neutral-50/60"}`}
               >
-                <p className={`text-[11px] font-semibold mb-2 ${t.textMuted}`}>{label}</p>
+                <p className={`text-[13px] font-semibold mb-2 ${t.textMuted}`}>{label}</p>
                 {pocEditMode && isAdmin ? (
                   <div className="space-y-1.5">
                     {teamMembers.map((name) => {
@@ -496,7 +496,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                             }}
                             className="h-3 w-3 rounded accent-blue-500"
                           />
-                          <span className={`text-[11px] ${t.text} truncate`}>{name}</span>
+                          <span className={`text-[13px] ${t.text} truncate`}>{name}</span>
                         </label>
                       );
                     })}
@@ -506,14 +506,14 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                     {assigned.map((name) => (
                       <span
                         key={name}
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${dark ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"}`}
+                        className={`text-[12px] px-2 py-0.5 rounded-full font-medium ${dark ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"}`}
                       >
                         {name}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <span className={`text-[11px] italic ${t.textMuted}`}>No POC assigned</span>
+                  <span className={`text-[13px] italic ${t.textMuted}`}>No POC assigned</span>
                 )}
               </div>
             );
@@ -527,13 +527,13 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           <span className={`text-xs font-semibold ${t.text}`}>
             Call Log
             {records.length > 0 && (
-              <span className={`ml-2 text-[11px] font-normal ${t.textMuted}`}>{records.length} record{records.length !== 1 ? "s" : ""}</span>
+              <span className={`ml-2 text-[13px] font-normal ${t.textMuted}`}>{records.length} record{records.length !== 1 ? "s" : ""}</span>
             )}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCsvImportOpen(true)}
-              className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-300 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"}`}
+              className={`flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-300 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"}`}
               aria-label="Import call records from CSV"
             >
               <Upload aria-hidden="true" className="h-3 w-3" />
@@ -542,7 +542,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
             <button
               onClick={addRow}
               disabled={addingRow}
-              className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {addingRow
                 ? <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />
@@ -672,13 +672,13 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => confirmDelete(row.id)}
-                            className="text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+                            className="text-[12px] px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
                           >
                             Delete
                           </button>
                           <button
                             onClick={() => setPendingDelete(null)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${dark ? "border-neutral-600 text-neutral-400 hover:border-neutral-400" : "border-neutral-200 text-neutral-500 hover:border-neutral-400"}`}
+                            className={`text-[12px] px-1.5 py-0.5 rounded border transition-colors ${dark ? "border-neutral-600 text-neutral-400 hover:border-neutral-400" : "border-neutral-200 text-neutral-500 hover:border-neutral-400"}`}
                           >
                             Cancel
                           </button>

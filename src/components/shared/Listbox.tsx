@@ -212,7 +212,7 @@ export function Listbox({
           else openAt(initialIndex());
         }}
         onKeyDown={onTriggerKeyDown}
-        className={`h-7 px-2 rounded-md border text-[11px] outline-none flex items-center justify-between gap-1.5 cursor-pointer ${selected?.tint ?? t.inputBg} ${className}`}
+        className={`h-7 px-2 rounded-md border text-[13px] outline-none flex items-center justify-between gap-1.5 cursor-pointer ${selected?.tint ?? t.inputBg} ${className}`}
       >
         <span className="flex items-center gap-1.5 truncate">
           {selected?.icon && (
@@ -240,7 +240,7 @@ export function Listbox({
               className={`rounded-lg border shadow-lg p-1 max-h-64 overflow-auto ${t.card}`}
             >
               {options.length === 0 ? (
-                <div className={`px-2 py-1.5 text-[11px] ${t.textMuted}`}>
+                <div className={`px-2 py-1.5 text-[13px] ${t.textMuted}`}>
                   No options configured — add them in Settings
                 </div>
               ) : (
@@ -269,7 +269,7 @@ export function Listbox({
                         onChange(o.value);
                         setOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium text-left ${rowTone}`}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] font-medium text-left ${rowTone}`}
                     >
                       {o.icon && (
                         <span

@@ -194,7 +194,7 @@ export default function AddCaseModal({
     }
   };
 
-  const lblCls = `block text-[10px] font-semibold uppercase tracking-wider mb-1 ${t.textMuted}`;
+  const lblCls = `block text-[12px] font-semibold uppercase tracking-wider mb-1 ${t.textMuted}`;
   const inputCls = `h-9 w-full px-3 rounded-md border text-sm outline-none ${t.inputBg}`;
 
   return (
@@ -228,7 +228,7 @@ export default function AddCaseModal({
             >
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
-                <div className="text-[13px]">
+                <div className="text-[15px]">
                   <p className="font-bold">
                     Case created for {form.firstName} {form.lastName}.
                   </p>
@@ -301,18 +301,18 @@ export default function AddCaseModal({
                   )}
                 </div>
                 {form.chronicleUrl.trim() !== "" && !form.chronicleId && (
-                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                  <p className="mt-2 text-[13px] text-amber-600 dark:text-amber-400">
                     Couldn’t read a Chronicle client id from that — paste the
                     full client URL or just the numeric id.
                   </p>
                 )}
                 {caseLinkMissingAlj && (
-                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                  <p className="mt-2 text-[13px] text-amber-600 dark:text-amber-400">
                     No “v.” separator found — ALJ wasn’t captured. Add it as
                     “… v. ALJ NAME” or fill the ALJ fields below.
                   </p>
                 )}
-                <p className={`mt-2 text-[11px] ${t.textMuted}`}>
+                <p className={`mt-2 text-[13px] ${t.textMuted}`}>
                   Fills Client ID, name, approval date, and ALJ below — all
                   editable.
                 </p>
@@ -330,13 +330,13 @@ export default function AddCaseModal({
                     className={`${inputCls} ${clientIdStatus === "duplicate" ? "border-red-500 dark:border-red-600" : ""}`}
                   />
                   {clientIdStatus === "checking" && (
-                    <p className={`mt-1 text-[11px] flex items-center gap-1 ${t.textMuted}`}>
+                    <p className={`mt-1 text-[13px] flex items-center gap-1 ${t.textMuted}`}>
                       <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                       Checking…
                     </p>
                   )}
                   {clientIdStatus === "duplicate" && (
-                    <p className="mt-1 text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
+                    <p className="mt-1 text-[13px] text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
                       <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
                       Already exists: {duplicateName}
                     </p>
@@ -454,7 +454,7 @@ export default function AddCaseModal({
                   />
                 </div>
               </div>
-              <p className={`mt-4 text-[11px] ${t.textMuted}`}>
+              <p className={`mt-4 text-[13px] ${t.textMuted}`}>
                 Fees and amounts start at zero — edit them from the case row
                 after creating it.
               </p>

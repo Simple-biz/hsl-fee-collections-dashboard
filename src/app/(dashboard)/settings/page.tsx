@@ -325,7 +325,7 @@ export default function SettingsPage() {
             />
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>Settings</h3>
-              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+              <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                 Configure fee caps, integrations, targets, and preferences
               </p>
             </div>
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                   setActiveTab(tab);
                   setSaveMsg(null);
                 }}
-                className={`h-8 px-3 rounded-md text-[11px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                className={`h-8 px-3 rounded-md text-[13px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors ${
                   active
                     ? dark
                       ? "bg-neutral-800 text-neutral-100"
@@ -488,7 +488,7 @@ export default function SettingsPage() {
                   >
                     <Calendar className="h-3.5 w-3.5" /> SSA Fee Cap History
                   </h4>
-                  <span className={`text-[10px] ${t.textMuted}`}>
+                  <span className={`text-[12px] ${t.textMuted}`}>
                     {feeCaps.length} entries
                   </span>
                 </div>
@@ -497,13 +497,13 @@ export default function SettingsPage() {
                 <div
                   className={`p-4 border-b ${t.borderLight} ${dark ? "bg-neutral-800/30" : "bg-neutral-50/50"}`}
                 >
-                  <p className={`text-[11px] font-semibold ${t.textSub} mb-2`}>
+                  <p className={`text-[13px] font-semibold ${t.textSub} mb-2`}>
                     Add Fee Cap
                   </p>
                   <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2">
                     <div className="flex-1 min-w-0">
                       <label
-                        className={`text-[10px] ${t.textMuted} block mb-0.5`}
+                        className={`text-[12px] ${t.textMuted} block mb-0.5`}
                       >
                         Effective Date
                       </label>
@@ -516,7 +516,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <label
-                        className={`text-[10px] ${t.textMuted} block mb-0.5`}
+                        className={`text-[12px] ${t.textMuted} block mb-0.5`}
                       >
                         Cap Amount ($)
                       </label>
@@ -531,7 +531,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex-2 min-w-0">
                       <label
-                        className={`text-[10px] ${t.textMuted} block mb-0.5`}
+                        className={`text-[12px] ${t.textMuted} block mb-0.5`}
                       >
                         Notes (optional)
                       </label>
@@ -587,7 +587,7 @@ export default function SettingsPage() {
                             })}
                           </div>
                           {fc.notes && (
-                            <span className={`text-[11px] ${t.textMuted}`}>
+                            <span className={`text-[13px] ${t.textMuted}`}>
                               {fc.notes}
                             </span>
                           )}
@@ -625,7 +625,7 @@ export default function SettingsPage() {
                   >
                     <Shield className="h-3.5 w-3.5" /> Service Connections
                   </h4>
-                  <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                  <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                     API keys and URLs are managed via environment variables in
                     Vercel
                   </p>
@@ -655,11 +655,11 @@ export default function SettingsPage() {
                   return (
                     <div key={conn.service} className="p-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <h5 className={`text-[13px] font-semibold ${t.text}`}>
+                        <h5 className={`text-[15px] font-semibold ${t.text}`}>
                           {conn.label}
                         </h5>
                         <span
-                          className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${colorClass}`}
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${colorClass}`}
                         >
                           <StatusIcon className="h-2.5 w-2.5" />
                           {conn.status === "connected"
@@ -671,14 +671,14 @@ export default function SettingsPage() {
                                 : "Untested"}
                         </span>
                       </div>
-                      <p className={`text-[11px] ${t.textSub}`}>
+                      <p className={`text-[13px] ${t.textSub}`}>
                         {conn.message}
                       </p>
 
                       <div className={`mt-2 flex flex-wrap items-center gap-3`}>
                         <div className="flex items-center gap-1.5">
                           <Key className={`h-3 w-3 ${t.textMuted}`} />
-                          <span className={`text-[10px] ${t.textMuted}`}>
+                          <span className={`text-[12px] ${t.textMuted}`}>
                             <code
                               className={`px-1 py-0.5 rounded ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}
                             >
@@ -687,13 +687,13 @@ export default function SettingsPage() {
                           </span>
                           {conn.keyConfigured ? (
                             <span
-                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${dark ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-700"}`}
+                              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${dark ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-700"}`}
                             >
                               SET
                             </span>
                           ) : (
                             <span
-                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${dark ? "bg-neutral-800 text-neutral-500" : "bg-neutral-100 text-neutral-400"}`}
+                              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${dark ? "bg-neutral-800 text-neutral-500" : "bg-neutral-100 text-neutral-400"}`}
                             >
                               NOT SET
                             </span>
@@ -702,7 +702,7 @@ export default function SettingsPage() {
                         {conn.baseUrl && (
                           <div className="flex items-center gap-1.5">
                             <Link2 className={`h-3 w-3 ${t.textMuted}`} />
-                            <span className={`text-[10px] ${t.textMuted}`}>
+                            <span className={`text-[12px] ${t.textMuted}`}>
                               {conn.baseUrl}
                             </span>
                           </div>
@@ -715,7 +715,7 @@ export default function SettingsPage() {
 
               {/* Help note */}
               <div className={`p-4 border-t ${t.borderLight}`}>
-                <p className={`text-[11px] ${t.textMuted}`}>
+                <p className={`text-[13px] ${t.textMuted}`}>
                   To update API keys or URLs, go to{" "}
                   <span className={`font-semibold ${t.text}`}>
                     Vercel Dashboard → Project Settings → Environment Variables
@@ -736,7 +736,7 @@ export default function SettingsPage() {
                 >
                   <Target className="h-3.5 w-3.5" /> Daily Call Targets
                 </h4>
-                <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                   Agents below these thresholds trigger &qout;Missed Calls&qout;
                   notifications.
                 </p>
@@ -759,7 +759,7 @@ export default function SettingsPage() {
                       onChange={(e) => editValue(s.key, e.target.value)}
                       className={`${inputClass} sm:w-32`}
                     />
-                    <span className={`text-[11px] ${t.textMuted}`}>
+                    <span className={`text-[13px] ${t.textMuted}`}>
                       calls/day
                     </span>
                   </div>
@@ -796,7 +796,7 @@ export default function SettingsPage() {
                       onChange={(e) => editValue(s.key, e.target.value)}
                       className={`${inputClass} sm:w-32`}
                     />
-                    <span className={`text-[11px] ${t.textMuted}`}>
+                    <span className={`text-[13px] ${t.textMuted}`}>
                       seconds
                     </span>
                   </div>

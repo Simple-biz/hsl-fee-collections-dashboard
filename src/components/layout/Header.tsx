@@ -134,7 +134,7 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
             >
               <div className="p-2">
                 <p
-                  className={`px-2 py-1 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                  className={`px-2 py-1 text-[12px] font-semibold uppercase ${t.textMuted}`}
                 >
                   Quick Select
                 </p>
@@ -152,27 +152,27 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
               </div>
               <div className={`border-t ${t.borderLight} p-2`}>
                 <p
-                  className={`px-2 py-1 text-[10px] font-semibold uppercase ${t.textMuted}`}
+                  className={`px-2 py-1 text-[12px] font-semibold uppercase ${t.textMuted}`}
                 >
                   Custom Range
                 </p>
                 <div className="flex gap-2 px-2">
                   <div className="flex-1">
-                    <label className={`text-[10px] ${t.textMuted}`}>From</label>
+                    <label className={`text-[12px] ${t.textMuted}`}>From</label>
                     <input
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className={`w-full h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
+                      className={`w-full h-7 px-2 rounded border text-[13px] outline-none ${t.inputBg}`}
                     />
                   </div>
                   <div className="flex-1">
-                    <label className={`text-[10px] ${t.textMuted}`}>To</label>
+                    <label className={`text-[12px] ${t.textMuted}`}>To</label>
                     <input
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className={`w-full h-7 px-2 rounded border text-[11px] outline-none ${t.inputBg}`}
+                      className={`w-full h-7 px-2 rounded border text-[13px] outline-none ${t.inputBg}`}
                     />
                   </div>
                 </div>
@@ -180,14 +180,14 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
                   <button
                     onClick={applyCustom}
                     disabled={!fromDate || !toDate}
-                    className={`flex-1 h-7 rounded text-[11px] font-semibold ${t.ctaBtn} disabled:opacity-40`}
+                    className={`flex-1 h-7 rounded text-[13px] font-semibold ${t.ctaBtn} disabled:opacity-40`}
                   >
                     Apply
                   </button>
                   {dateRange && (
                     <button
                       onClick={clearRange}
-                      className={`h-7 px-3 rounded text-[11px] border ${t.outlineBtn}`}
+                      className={`h-7 px-3 rounded text-[13px] border ${t.outlineBtn}`}
                     >
                       Clear
                     </button>

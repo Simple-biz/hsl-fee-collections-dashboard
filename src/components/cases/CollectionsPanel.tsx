@@ -22,18 +22,18 @@ export const CollectionsPanel = ({ data }: CollectionsPanelProps) => {
           <h3 className={`text-sm font-bold ${t.text}`}>
             Collections Activity — Monthly
           </h3>
-          <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+          <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
             Showing fee activity for the last 6 months
           </p>
         </div>
         <div className="flex items-center gap-4">
           <span
-            className={`flex items-center gap-1.5 text-[11px] ${t.textSub}`}
+            className={`flex items-center gap-1.5 text-[13px] ${t.textSub}`}
           >
             <span className="w-2 h-2 rounded-full bg-indigo-500" /> Expected
           </span>
           <span
-            className={`flex items-center gap-1.5 text-[11px] ${t.textSub}`}
+            className={`flex items-center gap-1.5 text-[13px] ${t.textSub}`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500" /> Collected
           </span>

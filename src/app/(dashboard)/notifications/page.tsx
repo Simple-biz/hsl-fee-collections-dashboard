@@ -263,7 +263,7 @@ export default function NotificationsPage() {
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />
             {label}
             {key === "notifications" && unreadCount > 0 && (
-              <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -291,14 +291,14 @@ export default function NotificationsPage() {
                 className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-500"}`}
               />
               {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
             </div>
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>Notifications</h3>
-              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+              <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                 {all.length} total · {unread.length} unread
               </p>
             </div>
@@ -337,7 +337,7 @@ export default function NotificationsPage() {
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`h-7 px-3 rounded-md text-[11px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                className={`h-7 px-3 rounded-md text-[13px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors ${
                   active
                     ? dark
                       ? "bg-neutral-800 text-neutral-100"
@@ -350,7 +350,7 @@ export default function NotificationsPage() {
                 {label}
                 {count > 0 && (
                   <span
-                    className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                    className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
                       active
                         ? dark
                           ? "bg-neutral-700 text-neutral-300"
@@ -452,7 +452,7 @@ export default function NotificationsPage() {
                         />
                       )}
                       <h4
-                        className={`text-[13px] font-semibold truncate ${t.text}`}
+                        className={`text-[15px] font-semibold truncate ${t.text}`}
                       >
                         {n.title}
                       </h4>
@@ -460,7 +460,7 @@ export default function NotificationsPage() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       {isLive && (
                         <span
-                          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
                             dark
                               ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/50"
                               : "bg-indigo-50 text-indigo-600 border border-indigo-200"
@@ -470,26 +470,26 @@ export default function NotificationsPage() {
                         </span>
                       )}
                       <span
-                        className={`text-[10px] ${t.textMuted} whitespace-nowrap`}
+                        className={`text-[12px] ${t.textMuted} whitespace-nowrap`}
                       >
                         {timeAgo(n.createdAt)}
                       </span>
                     </div>
                   </div>
                   <p
-                    className={`text-[12px] ${t.textSub} mt-0.5 leading-relaxed`}
+                    className={`text-[14px] ${t.textSub} mt-0.5 leading-relaxed`}
                   >
                     {n.message}
                   </p>
                   <div className="flex items-center gap-3 mt-2">
                     <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${colorClass}`}
+                      className={`text-[12px] font-medium px-2 py-0.5 rounded-full border ${colorClass}`}
                     >
                       {meta.label}
                     </span>
                     {n.agentName && (
                       <span
-                        className={`text-[10px] font-medium ${t.textMuted}`}
+                        className={`text-[12px] font-medium ${t.textMuted}`}
                       >
                         {n.agentName}
                       </span>
@@ -497,7 +497,7 @@ export default function NotificationsPage() {
                     {n.caseId && (
                       <Link
                         href={`/cases/${n.caseId}`}
-                        className={`text-[10px] font-medium flex items-center gap-0.5 ${dark ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
+                        className={`text-[12px] font-medium flex items-center gap-0.5 ${dark ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
                       >
                         View case <ChevronRight className="h-3 w-3" />
                       </Link>
@@ -505,7 +505,7 @@ export default function NotificationsPage() {
                     {!n.isRead && !isLive && (
                       <button
                         onClick={() => markRead(n.id)}
-                        className={`text-[10px] font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                        className={`text-[12px] font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
                           dark
                             ? "text-neutral-400 hover:text-neutral-200"
                             : "text-neutral-500 hover:text-neutral-700"
