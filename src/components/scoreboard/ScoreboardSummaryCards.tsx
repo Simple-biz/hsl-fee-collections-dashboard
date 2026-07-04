@@ -114,7 +114,7 @@ export function ScoreboardSummaryCards({
                     : t.card
                 }`}
               >
-                <p className={`text-[10px] font-medium uppercase ${item.toggled ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
+                <p className={`text-[12px] font-medium uppercase ${item.toggled ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
                   {item.label}
                 </p>
                 <p className={`text-lg font-bold mt-1 ${item.toggled ? (dark ? "text-violet-300" : "text-violet-700") : t.text}`}>
@@ -127,7 +127,7 @@ export function ScoreboardSummaryCards({
                 className={`rounded-lg border p-3 border-l-[3px] ${t.card}`}
                 style={item.accent ? { borderLeftColor: item.accent } : undefined}
               >
-                <p className={`flex items-center gap-1.5 text-[10px] font-medium ${t.textMuted} uppercase`}>
+                <p className={`flex items-center gap-1.5 text-[12px] font-medium ${t.textMuted} uppercase`}>
                   {item.accent && (
                     <span
                       aria-hidden="true"
@@ -147,7 +147,7 @@ export function ScoreboardSummaryCards({
       {/* Team breakdown */}
       {teams.length > 0 && (
         <div>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} mb-3`}>
+          <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} mb-3`}>
             By Team — {label}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -160,7 +160,7 @@ export function ScoreboardSummaryCards({
                     <span className={`text-xs font-bold ${accentText}`}>
                       {teamLabel(team.team)}
                     </span>
-                    <span className={`text-[10px] ${t.textMuted}`}>
+                    <span className={`text-[12px] ${t.textMuted}`}>
                       {team.agentCount} agent{team.agentCount !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -174,7 +174,7 @@ export function ScoreboardSummaryCards({
                       { label: "Open Cases", value: team.openCases },
                     ].map((stat) => (
                       <div key={stat.label}>
-                        <p className={`text-[9px] font-medium uppercase tracking-wide ${t.textMuted}`}>
+                        <p className={`text-[11px] font-medium uppercase tracking-wide ${t.textMuted}`}>
                           {stat.label}
                         </p>
                         <p className={`text-sm font-bold ${t.text} mt-0.5`}>

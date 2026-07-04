@@ -331,7 +331,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
 
   const syncableCount = effectiveRows.length;
 
-  const lblCls = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const lblCls = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
@@ -375,8 +375,8 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                       : dark ? "text-neutral-500" : "text-neutral-400"
                 }`}
               >
-                <div className="text-[10px] font-bold uppercase tracking-wider">{s.title}</div>
-                <div className="text-[12px] font-medium">{s.subtitle}</div>
+                <div className="text-[12px] font-bold uppercase tracking-wider">{s.title}</div>
+                <div className="text-[14px] font-medium">{s.subtitle}</div>
               </button>
             );
           })}
@@ -403,7 +403,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 <CloudDownload className={`h-4 w-4 ${t.textSub}`} aria-hidden="true" />
                 <h4 className={`text-sm font-semibold ${t.text}`}>Fetch from MyCase</h4>
               </div>
-              <p className={`text-[11px] ${t.textMuted} mb-6`}>
+              <p className={`text-[13px] ${t.textMuted} mb-6`}>
                 Queries the MyCase mirror database for all cases with an approval date and compares
                 them against the fee collections database.
               </p>
@@ -412,7 +412,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                 <div className={`rounded-lg border-2 border-dashed p-12 text-center ${dark ? "border-neutral-700" : "border-neutral-300"}`}>
                   <Database className={`h-10 w-10 mx-auto mb-3 ${t.textMuted}`} aria-hidden="true" />
                   <p className={`text-sm font-semibold ${t.text} mb-1`}>Ready to sync</p>
-                  <p className={`text-[11px] ${t.textMuted} mb-5`}>
+                  <p className={`text-[13px] ${t.textMuted} mb-5`}>
                     Click the button below to pull the latest data from the MyCase mirror database
                   </p>
                   <button
@@ -463,7 +463,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                     />
                   </div>
                   {preview.summary.warnings.length > 0 && (
-                    <div className={`rounded-md border p-3 text-[11px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                    <div className={`rounded-md border p-3 text-[13px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
                       <div className="flex items-center gap-1.5 font-semibold mb-1">
                         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                         {preview.summary.warnings.length} warning{preview.summary.warnings.length === 1 ? "" : "s"}
@@ -494,12 +494,12 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
           {step === 2 && (
             <div>
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Field Map</h4>
-              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+              <p className={`text-[13px] ${t.textMuted} mb-4`}>
                 How MyCase custom fields map to the fee collections database. All mappings are
                 automatic — no action needed.
               </p>
               <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
-                <table className="w-full text-[12px]">
+                <table className="w-full text-[14px]">
                   <thead>
                     <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
                       <th className={`${lblCls} text-left px-3 py-2`}>MyCase field</th>
@@ -510,15 +510,15 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
                   <tbody>
                     {FIELD_MAP.map((m) => (
                       <tr key={m.source} className={`border-b ${t.borderLight}`}>
-                        <td className={`${t.text} px-3 py-2 font-medium font-mono text-[11px]`}>{m.source}</td>
-                        <td className={`${t.textSub} px-3 py-2 font-mono text-[11px]`}>{m.db}</td>
+                        <td className={`${t.text} px-3 py-2 font-medium font-mono text-[13px]`}>{m.source}</td>
+                        <td className={`${t.textSub} px-3 py-2 font-mono text-[13px]`}>{m.db}</td>
                         <td className="px-3 py-2 text-center">
                           {m.required ? (
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
+                            <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-600"}`}>
                               REQUIRED
                             </span>
                           ) : (
-                            <span className={`text-[10px] ${t.textMuted}`}>optional</span>
+                            <span className={`text-[12px] ${t.textMuted}`}>optional</span>
                           )}
                         </td>
                       </tr>
@@ -533,7 +533,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
           {step === 3 && preview && (
             <div>
               <h4 className={`text-sm font-semibold ${t.text} mb-1`}>Compare & Preview</h4>
-              <p className={`text-[11px] ${t.textMuted} mb-4`}>
+              <p className={`text-[13px] ${t.textMuted} mb-4`}>
                 Categories based on how each record compares between MyCase and the fee collections database.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
@@ -569,11 +569,11 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h4 className={`text-sm font-semibold ${t.text}`}>Select & Sync</h4>
-                  <p className={`text-[11px] ${t.textMuted}`}>
+                  <p className={`text-[13px] ${t.textMuted}`}>
                     Choose which rows to import. New cases are inserted; existing cases are updated.
                   </p>
                 </div>
-                <div className={`text-[11px] ${t.textSub}`}>
+                <div className={`text-[13px] ${t.textSub}`}>
                   <span className={`font-bold ${t.text}`}>{selected.size.toLocaleString()}</span>
                   {" "}/ {syncableCount.toLocaleString()} syncable selected
                 </div>
@@ -649,7 +649,7 @@ export default function MyCaseSyncModal({ dark, onClose, onSynced }: MyCaseSyncM
               <div className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
-                  <div className="text-[13px]">
+                  <div className="text-[15px]">
                     <p className="font-bold">Sync complete.</p>
                     <p className="opacity-90 mt-1">
                       <span className="font-semibold">{result.inserted.toLocaleString()}</span> new
@@ -736,8 +736,8 @@ const Stat = ({
   accent?: string;
 }) => (
   <div className={`rounded-lg border ${t.borderLight} p-3`}>
-    <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{label}</p>
-    <p className={`text-[18px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}>{value}</p>
+    <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{label}</p>
+    <p className={`text-[20px] font-bold mt-0.5 tabular-nums ${accent ?? t.text}`}>{value}</p>
   </div>
 );
 
@@ -758,14 +758,14 @@ const CategorySection = ({
 }) => (
   <div>
     <div className="flex items-center gap-2 mb-2">
-      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE[status](dark)}`}>
+      <span className={`text-[12px] font-semibold px-2 py-0.5 rounded ${STATUS_BADGE[status](dark)}`}>
         {STATUS_LABEL[status]}
       </span>
-      <span className={`text-[11px] font-semibold tabular-nums ${t.text}`}>{count.toLocaleString()}</span>
-      <span className={`text-[11px] ${t.textMuted}`}>{description}</span>
+      <span className={`text-[13px] font-semibold tabular-nums ${t.text}`}>{count.toLocaleString()}</span>
+      <span className={`text-[13px] ${t.textMuted}`}>{description}</span>
     </div>
     {count === 0 ? (
-      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[11px] ${t.textMuted}`}>None</div>
+      <div className={`rounded-lg border ${t.borderLight} px-3 py-4 text-center text-[13px] ${t.textMuted}`}>None</div>
     ) : (
       children
     )}
@@ -789,7 +789,7 @@ const SourceRowsTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             <Th>Case</Th>
@@ -820,7 +820,7 @@ const SourceRowsTable = ({
               </td>
               {showChangedFields && (
                 <td className="px-3 py-1.5 max-w-64">
-                  <div className={`text-[10px] font-mono space-y-0.5 ${dark ? "text-blue-300" : "text-blue-700"}`}>
+                  <div className={`text-[12px] font-mono space-y-0.5 ${dark ? "text-blue-300" : "text-blue-700"}`}>
                     {r.changedFields.slice(0, 3).map((f) => (
                       <div key={f.field} className="leading-tight">
                         <span className="font-semibold">{f.field}</span>
@@ -840,7 +840,7 @@ const SourceRowsTable = ({
               <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
               <td className={`${t.textSub} px-3 py-1.5`}>{r.assignedTo ?? "—"}</td>
               <td className="px-3 py-1.5">
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
+                <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
                   {r.winSheetStatus.replace(/_/g, " ")}
                 </span>
               </td>
@@ -849,9 +849,9 @@ const SourceRowsTable = ({
               </td>
               <td className="px-3 py-1.5 text-center">
                 {r.hasNotes ? (
-                  <span className={`text-[10px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>YES</span>
+                  <span className={`text-[12px] font-semibold ${dark ? "text-blue-400" : "text-blue-600"}`}>YES</span>
                 ) : (
-                  <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                  <span className={`text-[12px] ${t.textMuted}`}>—</span>
                 )}
               </td>
             </tr>
@@ -860,7 +860,7 @@ const SourceRowsTable = ({
       </table>
     </div>
     {truncated && (
-      <div className={`text-[11px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
+      <div className={`text-[13px] px-3 py-2 ${t.textMuted} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} border-t ${t.borderLight}`}>
         Showing first 100 of {total.toLocaleString()} rows.
       </div>
     )}
@@ -878,7 +878,7 @@ const MissingRowsTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"}`}>
             <Th>Case</Th>
@@ -891,7 +891,7 @@ const MissingRowsTable = ({
             <tr key={r.clientId} className={`border-b ${t.borderLight}`}>
               <td className={`${t.text} px-3 py-1.5 font-medium`}>{r.caseName}</td>
               <td className={`${t.textSub} px-3 py-1.5 tabular-nums`}>{fmtDate(r.approvalDate)}</td>
-              <td className={`${t.textMuted} px-3 py-1.5 text-[11px] max-w-80 truncate`} title={r.caseLink}>
+              <td className={`${t.textMuted} px-3 py-1.5 text-[13px] max-w-80 truncate`} title={r.caseLink}>
                 {r.caseLink || "—"}
               </td>
             </tr>
@@ -921,7 +921,7 @@ const SelectionTable = ({
 }) => (
   <div className={`rounded-lg border ${t.borderLight} overflow-hidden`}>
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[14px]">
         <thead>
           <tr className={`border-b ${t.borderLight} ${dark ? "bg-neutral-900/40" : "bg-neutral-50"} sticky top-0`}>
             <Th>{""}</Th>
@@ -959,7 +959,7 @@ const SelectionTable = ({
                   {r.caseName}
                 </td>
                 <td className="px-3 py-1.5">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>
+                  <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${STATUS_BADGE[r.status](dark)}`}>
                     {STATUS_LABEL[r.status]}
                   </span>
                 </td>
@@ -969,11 +969,11 @@ const SelectionTable = ({
                 </td>
                 <td className="px-3 py-1.5">
                   {"winSheetStatus" in r ? (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
+                    <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded ${STATUS_PILL[r.winSheetStatus] ?? STATUS_PILL.not_started}`}>
                       {r.winSheetStatus.replace(/_/g, " ")}
                     </span>
                   ) : (
-                    <span className={`text-[10px] ${t.textMuted}`}>—</span>
+                    <span className={`text-[12px] ${t.textMuted}`}>—</span>
                   )}
                 </td>
                 <td className="px-3 py-1.5 text-right">
@@ -981,7 +981,7 @@ const SelectionTable = ({
                     <button
                       onClick={(e) => { e.stopPropagation(); onTag(r.clientId); }}
                       title="Mark as viewed — hide from future new cases"
-                      className={`h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-violet-400 hover:bg-violet-900/40" : "text-violet-600 hover:bg-violet-100"}`}
+                      className={`h-6 px-2 rounded text-[12px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-violet-400 hover:bg-violet-900/40" : "text-violet-600 hover:bg-violet-100"}`}
                     >
                       <Eye className="h-3 w-3" aria-hidden="true" />
                       Mark Viewed
@@ -991,7 +991,7 @@ const SelectionTable = ({
                     <button
                       onClick={(e) => { e.stopPropagation(); onUntag(r.clientId); }}
                       title="Unmark — restore to new"
-                      className={`h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-neutral-400 hover:bg-neutral-700" : "text-neutral-500 hover:bg-neutral-200"}`}
+                      className={`h-6 px-2 rounded text-[12px] font-medium flex items-center gap-1 ml-auto transition-colors ${dark ? "text-neutral-400 hover:bg-neutral-700" : "text-neutral-500 hover:bg-neutral-200"}`}
                     >
                       <EyeOff className="h-3 w-3" aria-hidden="true" />
                       Unmark
@@ -1008,7 +1008,7 @@ const SelectionTable = ({
 );
 
 const Th = ({ children, alignRight }: { children: React.ReactNode; alignRight?: boolean }) => (
-  <th className={`text-[10px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}>
+  <th className={`text-[12px] font-semibold uppercase tracking-wider px-3 py-2 ${alignRight ? "text-right" : "text-left"}`}>
     {children}
   </th>
 );

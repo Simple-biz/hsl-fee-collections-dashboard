@@ -88,7 +88,7 @@ export default function MasterFeesPage() {
           c.approvedBy?.toLowerCase().includes(approverFilter),
         );
 
-  const presetBase = `px-3 py-1 rounded-full text-[11px] font-medium border transition-colors`;
+  const presetBase = `px-3 py-1 rounded-full text-[13px] font-medium border transition-colors`;
   const presetActive = dark
     ? "bg-amber-700 border-amber-600 text-white"
     : "bg-amber-100 border-amber-400 text-amber-800";
@@ -99,7 +99,7 @@ export default function MasterFeesPage() {
   return (
     <div className="space-y-3">
       <div className={`rounded-xl border ${t.card} px-4 py-2.5 flex items-center gap-2 flex-wrap`}>
-        <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>
+        <span className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>
           Aging:
         </span>
         {AGING_OPTIONS.map(({ value, label }) => (
@@ -113,7 +113,7 @@ export default function MasterFeesPage() {
           </button>
         ))}
         {agingFilter !== "all" && (
-          <span className={`ml-auto text-[11px] ${t.textMuted}`}>
+          <span className={`ml-auto text-[13px] ${t.textMuted}`}>
             {displayCases.length} case{displayCases.length !== 1 ? "s" : ""}
           </span>
         )}

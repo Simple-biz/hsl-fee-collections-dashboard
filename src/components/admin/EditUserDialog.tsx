@@ -97,7 +97,7 @@ export function EditUserDialog({
               </SelectContent>
             </Select>
             {isSelf && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 You can&apos;t change your own role or active status.
               </p>
             )}

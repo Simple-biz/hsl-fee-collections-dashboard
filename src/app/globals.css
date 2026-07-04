@@ -4,6 +4,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Bumped one tier up from Tailwind's defaults (xs 0.75rem->0.875rem,
+     sm 0.875rem->1rem) so dense UI text stays readable for older users —
+     text-base and above are left alone since headings weren't the complaint. */
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.5rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-outfit);

@@ -48,7 +48,7 @@ export function NoteField({
         maxLength={maxLength}
         rows={expanded ? 5 : 1}
         aria-label={ariaLabel}
-        className={`pl-2 pr-7 py-1 rounded-md border text-[11px] outline-none resize-none transition-[height] focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${
+        className={`pl-2 pr-7 py-1 rounded-md border text-[13px] outline-none resize-none transition-[height] focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${
           expanded ? "w-full min-w-80" : "w-full h-7 overflow-hidden whitespace-nowrap"
         } ${t.inputBg}`}
       />

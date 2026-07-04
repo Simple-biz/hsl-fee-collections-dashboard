@@ -772,16 +772,16 @@ export const OverpaidCases = () => {
   const isRefreshing = loading && rows.length > 0;
 
   const sectionCard = `rounded-xl border ${t.card}`;
-  const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
-  const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
+  const thBase = `py-2 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap`;
+  const tdBase = `py-2 px-3 text-[14px] whitespace-nowrap`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
-  const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
+  const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
   const presetActive = dark
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
-  const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors`;
+  const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
 
   return (
     <div className="space-y-4">
@@ -823,7 +823,7 @@ export const OverpaidCases = () => {
           </div>
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Overpaid Cases</h3>
-            <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
               Cases where fees received exceed expected amount
             </p>
           </div>
@@ -833,17 +833,17 @@ export const OverpaidCases = () => {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className={`${sectionCard} p-4`}>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Pending Cases</p>
+          <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Pending Cases</p>
           <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : String(total)}</p>
-          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>awaiting cleared checks</p>
+          <p className={`text-[12px] ${t.textMuted} mt-0.5`}>awaiting cleared checks</p>
         </div>
         <div className={`${sectionCard} p-4`}>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
+          <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
           <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{isInitialLoad ? "—" : fmtFull(stats.totalOverpaid)}</p>
-          <p className={`text-[10px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
+          <p className={`text-[12px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
         </div>
         <div className={`${sectionCard} p-4`}>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
+          <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
           <p className={`text-xl font-bold mt-1 ${t.text}`}>{isInitialLoad ? "—" : `${stats.ltrCount} / ${total}`}</p>
           {!isInitialLoad && total > 0 && (
             <div className={`mt-2 h-1.5 rounded-full ${dark ? "bg-neutral-700" : "bg-neutral-200"}`}>
@@ -853,7 +853,7 @@ export const OverpaidCases = () => {
               />
             </div>
           )}
-          <p className={`text-[10px] ${t.textMuted} mt-1`}>
+          <p className={`text-[12px] ${t.textMuted} mt-1`}>
             {!isInitialLoad && total > 0 ? `${Math.round((stats.ltrCount / total) * 100)}% on file` : "letters on file"}
           </p>
         </div>
@@ -956,7 +956,7 @@ export const OverpaidCases = () => {
                     <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                   )}
                 </h3>
-                <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                   {total === 0 ? "0 cases" : `Showing ${rangeStart}–${rangeEnd} of ${total} cases`}
                 </p>
               </>
@@ -1043,7 +1043,7 @@ export const OverpaidCases = () => {
 
         {/* Quick filter presets + amount range */}
         <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${t.borderLight}`}>
-          <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
+          <span className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted} shrink-0`}>Quick:</span>
           <button
             onClick={() => {
               urlMethodRef.current = "push";
@@ -1069,7 +1069,7 @@ export const OverpaidCases = () => {
             No LTR Sent
           </button>
           <div className="ml-auto flex items-center gap-1.5 shrink-0">
-            <span className={`text-[11px] ${t.textMuted}`}>$</span>
+            <span className={`text-[13px] ${t.textMuted}`}>$</span>
             <input
               type="number"
               min={0}
@@ -1077,9 +1077,9 @@ export const OverpaidCases = () => {
               onChange={(e) => setMinAmount(e.target.value)}
               placeholder="Min"
               aria-label="Minimum overpaid amount"
-              className={`h-7 w-20 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+              className={`h-7 w-20 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
             />
-            <span className={`text-[11px] ${t.textMuted}`}>–</span>
+            <span className={`text-[13px] ${t.textMuted}`}>–</span>
             <input
               type="number"
               min={0}
@@ -1087,7 +1087,7 @@ export const OverpaidCases = () => {
               onChange={(e) => setMaxAmount(e.target.value)}
               placeholder="Max"
               aria-label="Maximum overpaid amount"
-              className={`h-7 w-20 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+              className={`h-7 w-20 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
             />
           </div>
         </div>
@@ -1135,7 +1135,7 @@ export const OverpaidCases = () => {
                 </button>
               </span>
             )}
-            <button onClick={clearAllFilters} className={`text-[11px] font-medium underline ${t.textMuted} hover:opacity-70`}>
+            <button onClick={clearAllFilters} className={`text-[13px] font-medium underline ${t.textMuted} hover:opacity-70`}>
               Clear all
             </button>
           </div>
@@ -1143,14 +1143,14 @@ export const OverpaidCases = () => {
 
         {/* Legend */}
         <div className={`px-4 py-1.5 flex items-center gap-4 flex-wrap border-b ${t.borderLight}`}>
-          <span className={`text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Key</span>
+          <span className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Key</span>
           <span className="flex items-center gap-1.5">
             <span className={`inline-block w-4 h-4 rounded-sm border-l-2 border-l-amber-500 ${dark ? "bg-neutral-800" : "bg-neutral-100"}`} />
-            <span className={`text-[11px] ${t.textMuted}`}>Overpaid amount ≥ $3,000</span>
+            <span className={`text-[13px] ${t.textMuted}`}>Overpaid amount ≥ $3,000</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className={`w-1.5 h-1.5 rounded-full ${dark ? "bg-amber-400" : "bg-amber-500"}`} />
-            <span className={`text-[11px] ${t.textMuted}`}>No workflow data entered</span>
+            <span className={`text-[13px] ${t.textMuted}`}>No workflow data entered</span>
           </span>
         </div>
 
@@ -1296,7 +1296,7 @@ export const OverpaidCases = () => {
                               {row.claimant}
                             </Link>
                             {row.updatedAt && (
-                              <p className={`text-[10px] ${t.textMuted} mt-0.5 font-normal`}>
+                              <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                                 Updated {formatRelativeDate(row.updatedAt)}
                               </p>
                             )}
@@ -1313,7 +1313,7 @@ export const OverpaidCases = () => {
                             onBlur={() => persistRegion(row)}
                             placeholder="—"
                             maxLength={100}
-                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {regionState[row.id] === "saving" && (
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
@@ -1335,7 +1335,7 @@ export const OverpaidCases = () => {
                             onBlur={() => persistOverpaidAmount(row)}
                             placeholder="—"
                             aria-label="Overpaid amount"
-                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {overpaidAmountState[row.id] === "saving" && (
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
@@ -1356,7 +1356,7 @@ export const OverpaidCases = () => {
                             maxLength={50}
                             disabled={!canEditFeesConf}
                             title={!canEditFeesConf ? "You don't have permission to update Fees Confirmation." : undefined}
-                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg} disabled:opacity-50 disabled:cursor-not-allowed`}
+                            className={`w-full h-7 pl-2 pr-7 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                           {confirmationState[row.id] === "saving" && (
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
@@ -1374,7 +1374,7 @@ export const OverpaidCases = () => {
                             onChange={(e) => setOpLtrDateLocal(row.id, e.target.value)}
                             onBlur={() => persistOpLtrDate(row)}
                             aria-label="O/P letter sent date"
-                            className={`w-36 h-7 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                            className={`w-36 h-7 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {opLtrDateState[row.id] === "saving" && (
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
@@ -1392,7 +1392,7 @@ export const OverpaidCases = () => {
                             onChange={(e) => setLtrDateLocal(row.id, e.target.value)}
                             onBlur={() => persistLtrDate(row)}
                             aria-label="O/P letter received date"
-                            className={`w-36 h-7 px-2 rounded-md border text-[11px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                            className={`w-36 h-7 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                           />
                           {ltrState[row.id] === "saving" && (
                             <Loader2 aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin ${t.textMuted}`} />
@@ -1443,7 +1443,7 @@ export const OverpaidCases = () => {
 
         {/* Pagination footer */}
         <div className={`px-4 py-3 flex items-center justify-between border-t ${t.borderLight}`}>
-          <p className={`text-[11px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
+          <p className={`text-[13px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
           <div className="flex items-center gap-1">
             <button
               onClick={() => { urlMethodRef.current = "push"; setPage((p) => Math.max(1, p - 1)); }}
@@ -1474,7 +1474,7 @@ export const OverpaidCases = () => {
                 onBlur={(e) => { e.target.value = String(page); }}
                 className={`h-8 w-12 px-1 rounded-md border text-xs text-center outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 disabled:opacity-40 ${t.inputBg}`}
               />
-              <span className={`text-[11px] ${t.textMuted}`}>/ {totalPages}</span>
+              <span className={`text-[13px] ${t.textMuted}`}>/ {totalPages}</span>
             </div>
             <button
               onClick={() => { urlMethodRef.current = "push"; setPage((p) => Math.min(totalPages, p + 1)); }}

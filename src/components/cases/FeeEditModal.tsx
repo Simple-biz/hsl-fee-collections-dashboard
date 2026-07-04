@@ -205,8 +205,8 @@ export default function FeeEditModal({
   };
 
   // Styles
-  const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
-  const inpCls = `mt-1 h-7 px-2 rounded border text-[12px] outline-none w-full ${t.inputBg}`;
+  const lbl = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const inpCls = `mt-1 h-7 px-2 rounded border text-[14px] outline-none w-full ${t.inputBg}`;
   const amber = dark ? "text-amber-400" : "text-amber-600";
 
   // Fee Due/Pending default to the formula but stay editable — typing into
@@ -222,12 +222,12 @@ export default function FeeEditModal({
       <p className={lbl}>
         {label}{" "}
         {overrideVal == null ? (
-          <span className="text-[8px] normal-case font-normal">(auto)</span>
+          <span className="text-[10px] normal-case font-normal">(auto)</span>
         ) : (
           <button
             type="button"
             onClick={resetOverride(overrideKey)}
-            className={`text-[8px] normal-case font-normal underline ${amber}`}
+            className={`text-[10px] normal-case font-normal underline ${amber}`}
           >
             reset to auto
           </button>
@@ -256,7 +256,7 @@ export default function FeeEditModal({
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Edit Fee Amounts</h3>
-            <p className={`text-[10px] ${t.textMuted} mt-0.5`}>
+            <p className={`text-[12px] ${t.textMuted} mt-0.5`}>
               Fee Due = MIN(Retro × 25%, {fmtFull(feeCap)}) · Pending = Fee Due
               − Received — both editable; edits stick until reset to auto
             </p>

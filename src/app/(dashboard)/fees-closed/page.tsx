@@ -148,7 +148,7 @@ export default function FeesClosedPage() {
             </div>
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>Fees Closed</h3>
-              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+              <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                 Cases acknowledged and marked closed from the dashboard
               </p>
             </div>
@@ -159,7 +159,7 @@ export default function FeesClosedPage() {
                 key={f}
                 onClick={() => setLevelFilter(f)}
                 aria-pressed={levelFilter === f}
-                className={`px-3 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
                   levelFilter === f
                     ? dark
                       ? "bg-emerald-700 border-emerald-600 text-white"
@@ -172,26 +172,26 @@ export default function FeesClosedPage() {
                 {f === "all" ? "All" : "Fee Petitions"}
               </button>
             ))}
-            <span className={`text-[11px] ${t.textMuted} ml-1`}>Closed:</span>
+            <span className={`text-[13px] ${t.textMuted} ml-1`}>Closed:</span>
             <input
               type="date"
               value={closedFrom}
               onChange={(e) => setClosedFrom(e.target.value)}
               aria-label="Closed from date"
-              className={`rounded-md border px-2 py-1 text-[11px] ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200" : "bg-white border-neutral-200 text-neutral-900"}`}
+              className={`rounded-md border px-2 py-1 text-[13px] ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200" : "bg-white border-neutral-200 text-neutral-900"}`}
             />
-            <span className={`text-[11px] ${t.textMuted}`}>–</span>
+            <span className={`text-[13px] ${t.textMuted}`}>–</span>
             <input
               type="date"
               value={closedTo}
               onChange={(e) => setClosedTo(e.target.value)}
               aria-label="Closed to date"
-              className={`rounded-md border px-2 py-1 text-[11px] ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200" : "bg-white border-neutral-200 text-neutral-900"}`}
+              className={`rounded-md border px-2 py-1 text-[13px] ${dark ? "bg-neutral-800 border-neutral-700 text-neutral-200" : "bg-white border-neutral-200 text-neutral-900"}`}
             />
             {(closedFrom || closedTo) && (
               <button
                 onClick={() => { setClosedFrom(""); setClosedTo(""); }}
-                className={`text-[11px] ${t.textMuted} hover:text-red-500 transition-colors`}
+                className={`text-[13px] ${t.textMuted} hover:text-red-500 transition-colors`}
                 aria-label="Clear date filter"
               >
                 Clear

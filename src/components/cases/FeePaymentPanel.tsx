@@ -151,26 +151,26 @@ export function FeePaymentPanel({
       className={`fixed rounded-xl border shadow-xl ${t.card} p-4 space-y-3`}
     >
       <div className="flex items-center justify-between">
-        <span className={`text-[11px] font-semibold uppercase tracking-wide ${t.textMuted}`}>
+        <span className={`text-[13px] font-semibold uppercase tracking-wide ${t.textMuted}`}>
           {feeType.toUpperCase()} Payment History
         </span>
-        <span className={`text-[11px] font-medium ${t.textSub}`}>
+        <span className={`text-[13px] font-medium ${t.textSub}`}>
           Total: {currentTotal > 0 ? fmtFull(currentTotal) : "—"}
         </span>
       </div>
 
       {/* Payment list */}
       {!payments && !loadError && (
-        <div className={`flex items-center gap-2 text-[12px] ${t.textMuted}`}>
+        <div className={`flex items-center gap-2 text-[14px] ${t.textMuted}`}>
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           Loading…
         </div>
       )}
       {loadError && (
-        <p className="text-[12px] text-red-500" role="alert">{loadError}</p>
+        <p className="text-[14px] text-red-500" role="alert">{loadError}</p>
       )}
       {payments && payments.length === 0 && (
-        <p className={`text-[12px] ${t.textMuted}`}>No payment records yet.</p>
+        <p className={`text-[14px] ${t.textMuted}`}>No payment records yet.</p>
       )}
       {payments && payments.length > 0 && (
         <div className="space-y-1 max-h-52 overflow-y-auto">
@@ -180,10 +180,10 @@ export function FeePaymentPanel({
               className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 ${dark ? "bg-neutral-800/60" : "bg-neutral-50"}`}
             >
               <div className="min-w-0">
-                <div className={`text-[12px] font-semibold tabular-nums ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                <div className={`text-[14px] font-semibold tabular-nums ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
                   {fmtFull(p.amount)}
                 </div>
-                <div className={`text-[11px] ${t.textMuted}`}>
+                <div className={`text-[13px] ${t.textMuted}`}>
                   {fmtDate(p.receivedDate)}
                   {p.note && <span className="ml-1 italic">· {p.note}</span>}
                 </div>
@@ -208,7 +208,7 @@ export function FeePaymentPanel({
       {/* Add payment form */}
       {canEdit && (
         <div className={`border-t pt-3 ${t.borderLight}`}>
-          <p className={`text-[11px] font-semibold uppercase tracking-wide ${t.textMuted} mb-2`}>
+          <p className={`text-[13px] font-semibold uppercase tracking-wide ${t.textMuted} mb-2`}>
             Add payment
           </p>
           <div className="space-y-2">
@@ -217,7 +217,7 @@ export function FeePaymentPanel({
                 type="date"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
-                className={`rounded-md border px-2 py-1.5 text-[12px] w-full ${t.inputBg}`}
+                className={`rounded-md border px-2 py-1.5 text-[14px] w-full ${t.inputBg}`}
                 aria-label="Payment date"
               />
               <input
@@ -227,7 +227,7 @@ export function FeePaymentPanel({
                 value={newAmount}
                 onChange={(e) => setNewAmount(e.target.value)}
                 placeholder="Amount"
-                className={`rounded-md border px-2 py-1.5 text-[12px] w-full ${t.inputBg}`}
+                className={`rounded-md border px-2 py-1.5 text-[14px] w-full ${t.inputBg}`}
                 aria-label="Payment amount"
               />
             </div>
@@ -237,16 +237,16 @@ export function FeePaymentPanel({
               onChange={(e) => setNewNote(e.target.value)}
               placeholder="Note (optional)"
               maxLength={200}
-              className={`rounded-md border px-2 py-1.5 text-[12px] w-full ${t.inputBg}`}
+              className={`rounded-md border px-2 py-1.5 text-[14px] w-full ${t.inputBg}`}
               aria-label="Payment note"
             />
             {addError && (
-              <p className="text-[11px] text-red-500" role="alert">{addError}</p>
+              <p className="text-[13px] text-red-500" role="alert">{addError}</p>
             )}
             <button
               onClick={handleAdd}
               disabled={adding}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors w-full justify-center ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-50`}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[14px] font-medium transition-colors w-full justify-center ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-50`}
             >
               {adding
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -264,7 +264,7 @@ export function FeePaymentPanel({
       <button
         ref={triggerRef}
         onClick={handleOpen}
-        className={`flex items-center gap-1 text-[12px] rounded px-1 py-0.5 transition-colors ${t.hover} ${t.textSub}`}
+        className={`flex items-center gap-1 text-[14px] rounded px-1 py-0.5 transition-colors ${t.hover} ${t.textSub}`}
         aria-label={`${feeType.toUpperCase()} payment history`}
         aria-expanded={open}
       >

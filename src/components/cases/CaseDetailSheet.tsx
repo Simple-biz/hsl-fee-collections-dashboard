@@ -131,7 +131,7 @@ function ClientDetailsSection({
 
   return (
     <div className={sectionCls}>
-      <h4 className={`text-[10px] font-bold uppercase tracking-widest ${textMuted} mb-3 flex items-center gap-1.5`}>
+      <h4 className={`text-[12px] font-bold uppercase tracking-widest ${textMuted} mb-3 flex items-center gap-1.5`}>
         <User aria-hidden="true" className="h-3 w-3" /> Client Details
       </h4>
       <div className="space-y-3">
@@ -465,9 +465,9 @@ export default function CaseDetailSheet({
     setSaveError(null);
   }, []);
 
-  const lbl = `text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`;
-  const val = `text-[13px] font-semibold ${t.text} mt-0.5`;
-  const inp = `mt-1 h-7 px-2 rounded border text-[12px] w-full outline-none ${t.inputBg}`;
+  const lbl = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
+  const val = `text-[15px] font-semibold ${t.text} mt-0.5`;
+  const inp = `mt-1 h-7 px-2 rounded border text-[14px] w-full outline-none ${t.inputBg}`;
   const sectionCls = `p-4 border-b ${t.borderLight}`;
 
   const chronicleLink = data
@@ -517,7 +517,7 @@ export default function CaseDetailSheet({
                     onClick={handleSave}
                     disabled={isSaving}
                     aria-label="Save changes"
-                    className={`h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-semibold ${dark ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} disabled:opacity-50`}
+                    className={`h-7 px-2 rounded-md flex items-center gap-1 text-[13px] font-semibold ${dark ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"} disabled:opacity-50`}
                   >
                     <Check aria-hidden="true" className="h-3 w-3" />
                     {isSaving ? "Saving…" : "Save"}
@@ -542,11 +542,11 @@ export default function CaseDetailSheet({
               )}
             </div>
           </div>
-          <SheetDescription className={`text-[11px] ${t.textMuted}`}>
+          <SheetDescription className={`text-[13px] ${t.textMuted}`}>
             {isEditing ? "Edit local DB fields — changes write to the app database." : "Details needed for processing the win sheet for this case."}
           </SheetDescription>
           {saveError && (
-            <p role="alert" className="text-[11px] text-red-500 mt-1">{saveError}</p>
+            <p role="alert" className="text-[13px] text-red-500 mt-1">{saveError}</p>
           )}
         </SheetHeader>
 
@@ -579,14 +579,14 @@ export default function CaseDetailSheet({
                     {data.name}
                   </h3>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}>
+                    <span className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}>
                       {fmtClaim(data.claim)}
                     </span>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}>
+                    <span className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}>
                       {data.level}
                     </span>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(data.status as WinSheetStatus, dark)}`}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold ${getStatusColor(data.status as WinSheetStatus, dark)}`}
                     >
                       {STATUS_LABELS_DETAIL[data.status] || data.status}
                     </span>
@@ -634,14 +634,14 @@ export default function CaseDetailSheet({
                     href={data.externalId || `https://rgdr.mycase.com/court_cases/${data.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-bold uppercase transition-colors ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
                   >
                     MyCase <ExternalLink aria-hidden="true" className="h-3 w-3" />
                   </a>
                   <button
                     type="button"
                     onClick={() => setDocsOpen(true)}
-                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-bold uppercase transition-colors ${dark ? "bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
                   >
                     Documents <FileText aria-hidden="true" className="h-3 w-3" />
                   </button>
@@ -650,7 +650,7 @@ export default function CaseDetailSheet({
                       href={chronicleLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${dark ? "bg-sky-900/30 text-sky-400 hover:bg-sky-900/50" : "bg-sky-50 text-sky-600 hover:bg-sky-100"}`}
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-bold uppercase transition-colors ${dark ? "bg-sky-900/30 text-sky-400 hover:bg-sky-900/50" : "bg-sky-50 text-sky-600 hover:bg-sky-100"}`}
                     >
                       Chronicle <ExternalLink aria-hidden="true" className="h-3 w-3" />
                     </a>
@@ -661,7 +661,7 @@ export default function CaseDetailSheet({
 
             {/* Core Identification */}
             <div className={sectionCls}>
-              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+              <h4 className={`text-[12px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
                 <Shield aria-hidden="true" className="h-3 w-3" /> Identity & Verification
               </h4>
               <div className="grid grid-cols-2 gap-4">
@@ -719,7 +719,7 @@ export default function CaseDetailSheet({
 
             {/* Decisions */}
             <div className={sectionCls}>
-              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+              <h4 className={`text-[12px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
                 <FileText aria-hidden="true" className="h-3 w-3" /> Decisions
               </h4>
               <div className="space-y-3">
@@ -819,7 +819,7 @@ export default function CaseDetailSheet({
                       href={data.winSheetLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-500 hover:underline"
+                      className="inline-flex items-center gap-1 text-[14px] font-medium text-blue-500 hover:underline"
                     >
                       <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       {data.winSheetLinkText || "Open"}
@@ -831,7 +831,7 @@ export default function CaseDetailSheet({
 
             {/* Financial Totals */}
             <div className={sectionCls}>
-              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+              <h4 className={`text-[12px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
                 <DollarSign aria-hidden="true" className="h-3 w-3" /> Financial Summary
               </h4>
               <div className="grid grid-cols-2 gap-4">
@@ -843,7 +843,7 @@ export default function CaseDetailSheet({
                   <p className={lbl}>PIF Status</p>
                   <div className="mt-1">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-bold ${
                         data.pif === "YES"
                           ? dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-700"
                           : data.pif === "PENDING"
@@ -871,7 +871,7 @@ export default function CaseDetailSheet({
 
             {/* Detailed Fee Breakdown */}
             <div className={sectionCls}>
-              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3`}>
+              <h4 className={`text-[12px] font-bold uppercase tracking-widest ${t.textMuted} mb-3`}>
                 Fee Breakdown
               </h4>
               <div className="space-y-4">
@@ -883,7 +883,7 @@ export default function CaseDetailSheet({
                   ] as const
                 ).map((b) => (
                   <div key={b.key} className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
-                    <p className={`text-[11px] font-bold uppercase ${b.titleColor} mb-2`}>{b.label}</p>
+                    <p className={`text-[13px] font-bold uppercase ${b.titleColor} mb-2`}>{b.label}</p>
                     {isEditing ? (
                       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                         <div>
@@ -961,18 +961,18 @@ export default function CaseDetailSheet({
 
             {/* Live from MyCase */}
             <div className={sectionCls}>
-              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
+              <h4 className={`text-[12px] font-bold uppercase tracking-widest ${t.textMuted} mb-3 flex items-center gap-1.5`}>
                 <Database aria-hidden="true" className="h-3 w-3" /> Live from MyCase
               </h4>
               {myCaseLoading ? (
                 <div className="flex items-center gap-2 py-2">
                   <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 animate-spin ${t.textMuted}`} />
-                  <span className={`text-[11px] ${t.textMuted}`}>Fetching from MyCase…</span>
+                  <span className={`text-[13px] ${t.textMuted}`}>Fetching from MyCase…</span>
                 </div>
               ) : myCaseError ? (
                 <div
                   role="alert"
-                  className={`flex items-start gap-2 rounded-md p-2 text-[11px] ${dark ? "bg-amber-900/20 text-amber-400" : "bg-amber-50 text-amber-700"}`}
+                  className={`flex items-start gap-2 rounded-md p-2 text-[13px] ${dark ? "bg-amber-900/20 text-amber-400" : "bg-amber-50 text-amber-700"}`}
                 >
                   <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span className="flex-1">{myCaseError}</span>
@@ -989,7 +989,7 @@ export default function CaseDetailSheet({
                     </div>
                     <div>
                       <p className={lbl}>Case Stage</p>
-                      <p className={`${val} text-[11px] leading-tight`}>{myCaseData.caseStage ?? "—"}</p>
+                      <p className={`${val} text-[13px] leading-tight`}>{myCaseData.caseStage ?? "—"}</p>
                     </div>
                     <div>
                       <p className={lbl}>Assigned To</p>
@@ -1006,7 +1006,7 @@ export default function CaseDetailSheet({
                           href={data.winSheetLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-500 hover:underline"
+                          className="inline-flex items-center gap-1 text-[14px] font-medium text-blue-500 hover:underline"
                         >
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
                           {data.winSheetLinkText || "Open"}
@@ -1031,7 +1031,7 @@ export default function CaseDetailSheet({
                     { key: "t2", label: "T2 (SSDI)", color: "text-blue-500", retro: myCaseData.t2Retro, due: myCaseData.t2FeeDue, received: myCaseData.t2FeeReceived, pending: myCaseData.t2Pending, receivedDate: myCaseData.t2FeeReceivedDate },
                   ].map((b) => (
                     <div key={b.key} className={`p-3 rounded-lg border ${t.borderLight} bg-neutral-50/30 dark:bg-neutral-900/20`}>
-                      <p className={`text-[11px] font-bold uppercase ${b.color} mb-2`}>{b.label}</p>
+                      <p className={`text-[13px] font-bold uppercase ${b.color} mb-2`}>{b.label}</p>
                       <div className="grid grid-cols-2 gap-2">
                         {[
                           { label: "Retro", val: b.retro },
@@ -1067,13 +1067,13 @@ export default function CaseDetailSheet({
                   {myCaseData.feesConfirmation && (
                     <div>
                       <p className={lbl}>Fees Confirmation</p>
-                      <p className={`${val} text-[11px] leading-snug`}>{myCaseData.feesConfirmation}</p>
+                      <p className={`${val} text-[13px] leading-snug`}>{myCaseData.feesConfirmation}</p>
                     </div>
                   )}
                   {myCaseData.notes && (
                     <div>
                       <p className={lbl}>Collection Notes</p>
-                      <p className={`${val} text-[11px] leading-snug whitespace-pre-wrap`}>{myCaseData.notes}</p>
+                      <p className={`${val} text-[13px] leading-snug whitespace-pre-wrap`}>{myCaseData.notes}</p>
                     </div>
                   )}
                 </div>

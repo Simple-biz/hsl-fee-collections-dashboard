@@ -102,7 +102,7 @@ export function AdminActivityLog({ entries }: { entries: AdminActivityEntry[] })
         <h3 className={`text-sm font-semibold mt-3 ${t.text}`}>
           No admin activity yet
         </h3>
-        <p className={`text-[11px] ${t.textMuted} mt-1 max-w-md mx-auto`}>
+        <p className={`text-[13px] ${t.textMuted} mt-1 max-w-md mx-auto`}>
           User creates, role changes, password resets, and access edits will
           appear here as they happen.
         </p>
@@ -147,15 +147,15 @@ export function AdminActivityLog({ entries }: { entries: AdminActivityEntry[] })
                 className={`flex items-start gap-3 px-4 py-2.5 ${dark ? "hover:bg-neutral-800/30" : "hover:bg-neutral-50"}`}
               >
                 <span
-                  className={`mt-0.5 shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${toneClasses(meta.tone, dark)}`}
+                  className={`mt-0.5 shrink-0 text-[12px] font-semibold px-1.5 py-0.5 rounded ${toneClasses(meta.tone, dark)}`}
                 >
                   {meta.label}
                 </span>
                 <div className="flex-1 min-w-0 select-text">
-                  <p className={`text-[12px] ${t.text} break-words`}>
+                  <p className={`text-[14px] ${t.text} break-words`}>
                     {e.summary}
                   </p>
-                  <p className={`text-[10px] ${t.textMuted} mt-0.5`}>
+                  <p className={`text-[12px] ${t.textMuted} mt-0.5`}>
                     {e.actorEmail ?? "Unknown"} · {fmtDateTime(e.createdAt)}
                   </p>
                 </div>

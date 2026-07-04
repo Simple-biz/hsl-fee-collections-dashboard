@@ -147,14 +147,14 @@ export function AccessOverridesDialog({
                 size="sm"
                 variant="outline"
                 onClick={applyDefaults}
-                className="h-7 text-[11px]"
+                className="h-7 text-[13px]"
               >
                 <RotateCcw className="h-3 w-3" aria-hidden="true" /> Apply Role
                 Defaults
               </Button>
             </div>
             <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Pages
               </p>
               <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -181,7 +181,7 @@ export function AccessOverridesDialog({
             </div>
 
             <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Case actions
               </p>
               <div className="grid grid-cols-1 gap-x-6 gap-y-2">
@@ -206,7 +206,7 @@ export function AccessOverridesDialog({
                           />
                         )}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[13px] text-muted-foreground">
                         {c.description}
                       </span>
                     </span>
@@ -224,7 +224,7 @@ export function AccessOverridesDialog({
         )}
 
         <DialogFooter className="items-center">
-          <span className="mr-auto text-[11px] text-muted-foreground">
+          <span className="mr-auto text-[13px] text-muted-foreground">
             {dirty ? "Unsaved changes" : "No unsaved changes"}
           </span>
           <Button variant="outline" onClick={onClose} disabled={saving}>

@@ -131,7 +131,7 @@ export default function NotesModal({
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>{isLeader ? "Leader Notes" : "Case Log"}</h3>
             <p
-              className={`text-[11px] ${t.textMuted} mt-0.5 truncate max-w-md`}
+              className={`text-[13px] ${t.textMuted} mt-0.5 truncate max-w-md`}
             >
               {caseName}
             </p>
@@ -146,7 +146,7 @@ export default function NotesModal({
 
         {/* Add New Note */}
         <div className="mb-6">
-          <label className={`block text-[11px] font-semibold ${t.text} mb-1.5`}>
+          <label className={`block text-[13px] font-semibold ${t.text} mb-1.5`}>
             Add New Note
           </label>
           <textarea
@@ -154,7 +154,7 @@ export default function NotesModal({
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Enter your note…"
             rows={3}
-            className={`w-full px-3 py-2 rounded-md border text-[13px] outline-none resize-y ${t.inputBg}`}
+            className={`w-full px-3 py-2 rounded-md border text-[15px] outline-none resize-y ${t.inputBg}`}
           />
           <div className="mt-2 flex items-center gap-3">
             <button
@@ -167,7 +167,7 @@ export default function NotesModal({
             </button>
             {actionError && (
               <span
-                className={`text-[11px] ${dark ? "text-red-400" : "text-red-600"}`}
+                className={`text-[13px] ${dark ? "text-red-400" : "text-red-600"}`}
               >
                 {actionError}
               </span>
@@ -176,7 +176,7 @@ export default function NotesModal({
         </div>
 
         {/* History */}
-        <h4 className={`text-[11px] font-semibold ${t.text} mb-2`}>
+        <h4 className={`text-[13px] font-semibold ${t.text} mb-2`}>
           {isLeader ? "Notes History" : "Log History"} ({count})
         </h4>
 
@@ -211,11 +211,11 @@ export default function NotesModal({
             {notes.map((n) => (
               <div
                 key={n.id}
-                className={`relative rounded-lg border ${t.borderLight} p-3 text-[12px] leading-relaxed`}
+                className={`relative rounded-lg border ${t.borderLight} p-3 text-[14px] leading-relaxed`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div
-                    className={`flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider ${t.textMuted}`}
+                    className={`flex items-center gap-2 mb-1.5 text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}
                   >
                     <span>{n.createdBy ?? "—"}</span>
                     <span>·</span>
@@ -224,13 +224,13 @@ export default function NotesModal({
                   {canDelete &&
                     (confirmingId === n.id ? (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`text-[10px] ${t.textMuted}`}>
+                        <span className={`text-[12px] ${t.textMuted}`}>
                           Delete?
                         </span>
                         <button
                           onClick={() => deleteNote(n.id)}
                           disabled={deletingId === n.id}
-                          className={`h-6 px-2 rounded text-[10px] font-semibold flex items-center gap-1 disabled:opacity-50 ${dark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-600 text-white hover:bg-red-700"}`}
+                          className={`h-6 px-2 rounded text-[12px] font-semibold flex items-center gap-1 disabled:opacity-50 ${dark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-600 text-white hover:bg-red-700"}`}
                         >
                           {deletingId === n.id && (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -240,7 +240,7 @@ export default function NotesModal({
                         <button
                           onClick={() => setConfirmingId(null)}
                           disabled={deletingId === n.id}
-                          className={`h-6 px-2 rounded border text-[10px] font-medium ${t.outlineBtn} disabled:opacity-50`}
+                          className={`h-6 px-2 rounded border text-[12px] font-medium ${t.outlineBtn} disabled:opacity-50`}
                         >
                           Cancel
                         </button>

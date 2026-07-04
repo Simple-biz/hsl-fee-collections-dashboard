@@ -21,7 +21,7 @@ export function RecentActivityFeed({ activities, dark, t }: RecentActivityFeedPr
     <div className={`rounded-xl border ${t.card} p-4`}>
       <h4 className={`text-xs font-bold ${t.text} flex items-center gap-2 mb-3`}>
         <Clock aria-hidden="true" className="h-3.5 w-3.5" /> Recent Activity
-        <span className={`text-[10px] font-normal ${t.textMuted}`}>
+        <span className={`text-[12px] font-normal ${t.textMuted}`}>
           ({activities.length})
         </span>
       </h4>
@@ -37,19 +37,19 @@ export function RecentActivityFeed({ activities, dark, t }: RecentActivityFeedPr
               className={`rounded-md p-2 ${dark ? "bg-neutral-800/40" : "bg-neutral-50"}`}
             >
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-semibold ${t.text}`}>
+                <span className={`text-[12px] font-semibold ${t.text}`}>
                   {a.createdBy}
                 </span>
                 {a.caseName && (
-                  <span className={`text-[10px] ${t.textMuted}`}>
+                  <span className={`text-[12px] ${t.textMuted}`}>
                     on {a.caseName}
                   </span>
                 )}
               </div>
-              <p className={`text-[11px] ${t.textSub} mt-0.5 leading-snug line-clamp-2`}>
+              <p className={`text-[13px] ${t.textSub} mt-0.5 leading-snug line-clamp-2`}>
                 {a.message}
               </p>
-              <p className={`text-[9px] ${t.textMuted} mt-0.5`}>
+              <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
                 {new Date(a.createdAt).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",

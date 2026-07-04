@@ -69,7 +69,7 @@ function ClaimTypeBadge({ value, dark }: { value: string | null | undefined; dar
   if (!value) return <span className="text-neutral-400">—</span>;
   const colors = CLAIM_TYPE_COLORS[value] ?? CLAIM_TYPE_FALLBACK;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
       {value}
     </span>
   );
@@ -79,7 +79,7 @@ function FeesConfBadge({ value, dark }: { value: string | null | undefined; dark
   if (!value) return <span className="text-neutral-400">—</span>;
   const colors = FEES_CONF_COLORS[value] ?? FEES_CONF_FALLBACK;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
       {value}
     </span>
   );
@@ -102,7 +102,7 @@ function WinSheetStatusBadge({ value, dark }: { value: string | null | undefined
   if (!value) return <span className="text-neutral-400">—</span>;
   const colors = WIN_SHEET_STATUS_COLORS[value] ?? WIN_SHEET_STATUS_FALLBACK;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
       {value}
     </span>
   );
@@ -131,7 +131,7 @@ function CaseStatusBadge({ value, dark }: { value: string | null | undefined; da
   if (!value) return <span className="text-neutral-400">—</span>;
   const colors = CASE_STATUS_COLORS[value] ?? CASE_STATUS_FALLBACK;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
       {value}
     </span>
   );
@@ -756,8 +756,8 @@ export const FeeRecordsTable = ({
   // (row 1) overrides to the very top with `top-0!`.
   // `h-8` forces each header row to exactly 32px so row 2's `top-8` sits
   // flush against row 1's bottom — no gap for body rows to peek through.
-  const thBase = `h-8 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap sticky top-8 z-20 ${stickyBg}`;
-  const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
+  const thBase = `h-8 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap sticky top-8 z-20 ${stickyBg}`;
+  const tdBase = `py-2 px-3 text-[14px] whitespace-nowrap`;
   const groupBorder = dark
     ? "border-l border-neutral-700/50"
     : "border-l border-neutral-200";
@@ -835,7 +835,7 @@ export const FeeRecordsTable = ({
       >
         <div>
           <h3 className={`text-sm font-bold ${t.text}`}>Master Fee Records</h3>
-          <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+          <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
             {filtered.length} of {cases.length} cases
           </p>
         </div>
@@ -964,13 +964,13 @@ export const FeeRecordsTable = ({
       {selectedIds.size > 0 && isAdmin && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex justify-center">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
-            <span className="text-[11px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
+            <span className="text-[13px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
             </span>
             <button
               onClick={handleBatchArchive}
               disabled={archiveConfirmOpen}
-              className="h-7 px-3 rounded-full text-[11px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
+              className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
             >
               <Archive aria-hidden="true" className="h-3 w-3" />
               Archive
@@ -1271,7 +1271,7 @@ export const FeeRecordsTable = ({
                             {c.name}
                           </span>
                         )}
-                        <div className="flex items-center gap-2 text-[11px] leading-none min-w-0">
+                        <div className="flex items-center gap-2 text-[13px] leading-none min-w-0">
                           {(() => {
                             // Mirror the Claim column's optimistic value so the
                             // sub-line updates the instant the dropdown changes.
@@ -1355,7 +1355,7 @@ export const FeeRecordsTable = ({
                             );
                             setFeesConfEditId(null);
                           }}
-                          className={`w-full h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          className={`w-full h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             feesConfirmationOptions.length === 0
                               ? "No options configured — add them in Settings"
@@ -1481,7 +1481,7 @@ export const FeeRecordsTable = ({
                             );
                             setClaimEditId(null);
                           }}
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             claimTypeOptions.length === 0
                               ? "No options configured — add them in Settings"
@@ -1544,7 +1544,7 @@ export const FeeRecordsTable = ({
                             );
                             setWinSheetStatusEditId(null);
                           }}
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             winSheetStatusOptions.length === 0
                               ? "No options configured — add them in Settings"
@@ -1605,7 +1605,7 @@ export const FeeRecordsTable = ({
                               if (e.key === "Enter") handleWinSheetSave(c);
                               if (e.key === "Escape") setWinSheetEditing(null);
                             }}
-                            className={`h-6 px-2 rounded border text-[11px] outline-none w-full ${t.inputBg}`}
+                            className={`h-6 px-2 rounded border text-[13px] outline-none w-full ${t.inputBg}`}
                           />
                           <input
                             type="text"
@@ -1618,10 +1618,10 @@ export const FeeRecordsTable = ({
                               if (e.key === "Enter") handleWinSheetSave(c);
                               if (e.key === "Escape") setWinSheetEditing(null);
                             }}
-                            className={`h-6 px-2 rounded border text-[11px] outline-none w-full ${t.inputBg}`}
+                            className={`h-6 px-2 rounded border text-[13px] outline-none w-full ${t.inputBg}`}
                           />
                           {winSheetError && (
-                            <p role="alert" className={`text-[10px] text-red-500`}>
+                            <p role="alert" className={`text-[12px] text-red-500`}>
                               {winSheetError}
                             </p>
                           )}
@@ -1633,7 +1633,7 @@ export const FeeRecordsTable = ({
                                 <button
                                   type="button"
                                   onClick={() => handleWinSheetSave(c)}
-                                  className="inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[10px] font-semibold bg-blue-500 text-white hover:bg-blue-600"
+                                  className="inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[12px] font-semibold bg-blue-500 text-white hover:bg-blue-600"
                                 >
                                   <Check className="h-3 w-3" aria-hidden="true" />
                                   Save
@@ -1641,7 +1641,7 @@ export const FeeRecordsTable = ({
                                 <button
                                   type="button"
                                   onClick={() => { setWinSheetEditing(null); setWinSheetError(null); }}
-                                  className={`inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[10px] font-semibold border ${t.outlineBtn}`}
+                                  className={`inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[12px] font-semibold border ${t.outlineBtn}`}
                                 >
                                   <X className="h-3 w-3" aria-hidden="true" />
                                   Cancel
@@ -1660,7 +1660,7 @@ export const FeeRecordsTable = ({
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-500 hover:underline"
+                                  className="inline-flex items-center gap-1 text-[13px] font-medium text-blue-500 hover:underline"
                                 >
                                   <ExternalLink className="h-3 w-3" aria-hidden="true" />
                                   {c.winSheetLinkText || "Open"}
@@ -1669,7 +1669,7 @@ export const FeeRecordsTable = ({
                               <HoverCardContent
                                 align="start"
                                 collisionPadding={12}
-                                className="w-72 p-3 space-y-2 text-[11px]"
+                                className="w-72 p-3 space-y-2 text-[13px]"
                               >
                                 <p>
                                   <span className="font-semibold">Display text: </span>
@@ -1682,7 +1682,7 @@ export const FeeRecordsTable = ({
                               </HoverCardContent>
                             </HoverCard>
                           ) : (
-                            <span className={`text-[11px] ${t.textMuted}`}>—</span>
+                            <span className={`text-[13px] ${t.textMuted}`}>—</span>
                           )}
                           <button
                             type="button"
@@ -1717,7 +1717,7 @@ export const FeeRecordsTable = ({
                             e.stopPropagation();
                             setLeaderNotesFor({ id: c.id, name: c.name });
                           }}
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
                             c.leaderNotesCount > 0
                               ? dark
                                 ? "bg-violet-900/40 text-violet-400 hover:bg-violet-900/60"
@@ -2006,7 +2006,7 @@ export const FeeRecordsTable = ({
                             );
                             setCaseStatusEditId(null);
                           }}
-                          className={`h-7 px-2 rounded-md border text-[11px] outline-none cursor-pointer ${t.inputBg}`}
+                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
                           title={
                             caseStatusOptions.length === 0
                               ? "No options configured — add them in Settings"
@@ -2057,7 +2057,7 @@ export const FeeRecordsTable = ({
                           <HoverCardContent
                             align="start"
                             collisionPadding={12}
-                            className="w-auto max-w-[min(28rem,90vw)] p-3 text-[12px] leading-relaxed whitespace-pre-wrap wrap-break-word"
+                            className="w-auto max-w-[min(28rem,90vw)] p-3 text-[14px] leading-relaxed whitespace-pre-wrap wrap-break-word"
                           >
                             {c.update}
                           </HoverCardContent>
@@ -2072,7 +2072,7 @@ export const FeeRecordsTable = ({
                           e.stopPropagation();
                           setNotesFor({ id: c.id, name: c.name });
                         }}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
                           c.notesCount > 0
                             ? dark
                               ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
@@ -2100,7 +2100,7 @@ export const FeeRecordsTable = ({
                         {c.daysAfterApproval !== null ? (
                           <span>
                             {c.daysAfterApproval}d{" "}
-                            <span className="text-[9px] opacity-70">
+                            <span className="text-[11px] opacity-70">
                               {c.approvalCategory}
                             </span>
                           </span>
@@ -2129,12 +2129,12 @@ export const FeeRecordsTable = ({
         <div
           className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t ${t.borderLight}`}
         >
-          <p className={`text-[11px] ${t.textMuted}`}>
+          <p className={`text-[13px] ${t.textMuted}`}>
             Showing {pageStart + 1}–{pageEnd} of {filtered.length}
           </p>
           <div className="flex items-center gap-2">
             <label
-              className={`text-[11px] font-medium ${t.textSub} flex items-center gap-1.5`}
+              className={`text-[13px] font-medium ${t.textSub} flex items-center gap-1.5`}
             >
               Rows per page
               <select
@@ -2165,7 +2165,7 @@ export const FeeRecordsTable = ({
                   Prev
                 </button>
                 <span
-                  className={`text-[11px] ${t.textSub} px-1 whitespace-nowrap`}
+                  className={`text-[13px] ${t.textSub} px-1 whitespace-nowrap`}
                 >
                   Page {currentPage + 1} of {pageCount}
                 </span>

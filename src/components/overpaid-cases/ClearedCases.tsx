@@ -347,8 +347,8 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
   const isInitialLoad = loading && rows.length === 0;
   const isRefreshing = loading && rows.length > 0;
 
-  const thBase = `py-2 px-3 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap`;
-  const tdBase = `py-2 px-3 text-[12px] whitespace-nowrap`;
+  const thBase = `py-2 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap`;
+  const tdBase = `py-2 px-3 text-[14px] whitespace-nowrap`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
@@ -375,7 +375,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
           <span className={`text-sm font-bold ${t.text}`}>Cleared Cases</span>
           {total != null && total > 0 && (
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[13px] font-semibold ${
                 dark ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
               }`}
             >
@@ -453,13 +453,13 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                       <Loader2 aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                     )}
                   </p>
-                  <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                  <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                     {safeTotal === 0
                       ? "0 cases"
                       : `Showing ${rangeStart}–${rangeEnd} of ${safeTotal} cases`}
                   </p>
                   {safeTotal > 0 && (
-                    <p className={`text-[11px] ${t.textMuted} mt-0.5`}>
+                    <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                       Total Overpaid {fmt(totalOverpaid)}
                     </p>
                   )}
@@ -729,7 +729,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
           {/* Pagination */}
           {safeTotal > pageSize && (
             <div className={`px-4 py-3 flex items-center justify-between border-t ${t.borderLight}`}>
-              <p className={`text-[11px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
+              <p className={`text-[13px] ${t.textMuted}`}>Page {page} of {totalPages}</p>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -738,7 +738,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                 >
                   <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" /> Prev
                 </button>
-                <span className={`text-[11px] px-2 ${t.textMuted}`}>{page} / {totalPages}</span>
+                <span className={`text-[13px] px-2 ${t.textMuted}`}>{page} / {totalPages}</span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages || loading}

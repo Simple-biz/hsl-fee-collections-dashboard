@@ -189,7 +189,7 @@ export function ActivityFilterBar({
             className={`${ctl} cursor-pointer`}
             aria-label="From date"
           />
-          <span className={`text-[11px] ${t.textMuted}`}>to</span>
+          <span className={`text-[13px] ${t.textMuted}`}>to</span>
           <input
             type="date"
             value={state.to}
