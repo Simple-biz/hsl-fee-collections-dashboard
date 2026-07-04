@@ -23,16 +23,17 @@ function hashString(s: string): number {
 }
 
 // Manual overrides for specific people who asked for a particular color
-// instead of whatever the hash landed them on.
-const OVERRIDES: Record<string, number> = {
-  Aurora: PALETTE.findIndex((p) => p.light.includes("bg-pink")),
+// instead of whatever the hash landed them on. Values are hardcoded rather
+// than looked up from PALETTE so an override can't silently break if the
+// palette is ever reordered or trimmed.
+const OVERRIDES: Record<string, { light: string; dark: string }> = {
+  Aurora: { light: "bg-pink-50 text-pink-800 border-pink-200 hover:bg-pink-100", dark: "bg-pink-900/20 text-pink-300 border-pink-800/60 hover:bg-pink-900/30" },
 };
 
 // Deterministic per-name color — the same person always lands on the same
 // tint across renders and pages, since it's derived from the name itself
 // rather than list position.
 export function memberRowTint(name: string, dark: boolean): string {
-  const idx = OVERRIDES[name] ?? hashString(name) % PALETTE.length;
-  const entry = PALETTE[idx];
+  const entry = OVERRIDES[name] ?? PALETTE[hashString(name) % PALETTE.length];
   return dark ? entry.dark : entry.light;
 }
