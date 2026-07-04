@@ -1093,7 +1093,7 @@ export const FeeRecordsTable = ({
                   className={`${thBase} ${t.textSub} text-left ${stickyGroup3}`}
                 />
                 <th
-                  colSpan={6}
+                  colSpan={canSeeLeaderNotes ? 7 : 6}
                   aria-hidden="true"
                   className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
                 />
@@ -1123,7 +1123,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={isClosedMode ? 5 : 6}
+                  colSpan={isClosedMode ? 4 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
