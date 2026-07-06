@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, RefreshCw, FileText, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { X, RefreshCw, FileText, Loader2, Pencil } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDateTime } from "@/lib/formatters";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -11,6 +12,7 @@ interface NoteEntry {
   message: string;
   createdBy: string | null;
   createdAt: string;
+  editedAt?: string | null;
 }
 
 interface NotesModalProps {
@@ -39,9 +41,19 @@ export default function NotesModal({
 }: NotesModalProps) {
   const t = themeClasses(dark);
   const { can } = useCapabilities();
+  const { data: session } = useSession();
   const isLeader = variant === "leader-notes";
   const apiPath = `/api/cases/${caseId}/${isLeader ? "leader-notes" : "notes"}`;
-  const canDelete = can(isLeader ? "leaderNotes.access" : "case.delete");
+  // Leader notes keep their existing all-or-nothing gate. The general Case
+  // Log instead lets a note's own author manage it, with case.delete as an
+  // admin override — see canModifyNote below.
+  const canDeleteLeader = can("leaderNotes.access");
+  const canAdminOverride = can("case.delete");
+  const currentUserName = session?.user?.name?.trim() || null;
+  const canModifyNote = (n: NoteEntry) =>
+    isLeader
+      ? canDeleteLeader
+      : canAdminOverride || (!!currentUserName && n.createdBy === currentUserName);
 
   const [notes, setNotes] = useState<NoteEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +62,9 @@ export default function NotesModal({
   const [adding, setAdding] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,6 +127,43 @@ export default function NotesModal({
       setActionError((e as Error).message);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const startEdit = (n: NoteEntry) => {
+    setEditingId(n.id);
+    setEditDraft(n.message);
+    setActionError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft("");
+  };
+
+  const saveEdit = async (id: string) => {
+    const message = editDraft.trim();
+    if (!message || savingEditId) return;
+    setSavingEditId(id);
+    setActionError(null);
+    try {
+      const res = await fetch(`${apiPath}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setNotes((prev) =>
+        (prev ?? []).map((n) => (n.id === id ? (json.data as NoteEntry) : n)),
+      );
+      setEditingId(null);
+      setEditDraft("");
+      onChanged?.();
+    } catch (e) {
+      setActionError((e as Error).message);
+    } finally {
+      setSavingEditId(null);
     }
   };
 
@@ -220,8 +272,17 @@ export default function NotesModal({
                     <span>{n.createdBy ?? "—"}</span>
                     <span>·</span>
                     <span>{fmtDateTime(n.createdAt)}</span>
+                    {n.editedAt && (
+                      <>
+                        <span>·</span>
+                        <span className="normal-case tracking-normal font-normal">
+                          edited {fmtDateTime(n.editedAt)}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  {canDelete &&
+                  {canModifyNote(n) &&
+                    editingId !== n.id &&
                     (confirmingId === n.id ? (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`text-[12px] ${t.textMuted}`}>
@@ -246,19 +307,61 @@ export default function NotesModal({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setConfirmingId(n.id)}
-                        aria-label="Delete note"
-                        title="Delete note"
-                        className={`-mt-1 -mr-1 h-6 w-6 shrink-0 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!isLeader && (
+                          <button
+                            onClick={() => startEdit(n)}
+                            aria-label="Edit note"
+                            title="Edit note"
+                            className={`-mt-1 h-6 w-6 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setConfirmingId(n.id)}
+                          aria-label="Delete note"
+                          title="Delete note"
+                          className={`-mt-1 -mr-1 h-6 w-6 shrink-0 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ))}
                 </div>
-                <p className={`${t.text} whitespace-pre-wrap wrap-break-word`}>
-                  {n.message}
-                </p>
+                {editingId === n.id ? (
+                  <div>
+                    <textarea
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      rows={3}
+                      className={`w-full px-3 py-2 rounded-md border text-[15px] outline-none resize-y ${t.inputBg}`}
+                    />
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        onClick={() => saveEdit(n.id)}
+                        disabled={!editDraft.trim() || savingEditId === n.id}
+                        className={`h-7 px-3 rounded-md text-[12px] font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
+                      >
+                        {savingEditId === n.id && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={savingEditId === n.id}
+                        className={`h-7 px-3 rounded-md border text-[12px] font-medium ${t.outlineBtn} disabled:opacity-50`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className={`${t.text} whitespace-pre-wrap wrap-break-word`}>
+                    {n.message}
+                  </p>
+                )}
               </div>
             ))}
           </div>

@@ -1,0 +1,1 @@
+ALTER TABLE "activity_log" ADD COLUMN "edited_at" timestamp with time zone;
