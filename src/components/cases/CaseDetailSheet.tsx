@@ -9,7 +9,6 @@ import {
   FileText,
   DollarSign,
   CalendarDays,
-  CheckCircle2,
   Shield,
   ChevronRight,
   ExternalLink,
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { themeClasses } from "@/lib/theme-classes";
 import { MyCaseDocumentsDialog } from "@/components/cases/MyCaseDocumentsDialog";
+import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import {
   fmtFull,
   fmtDate,
@@ -851,18 +851,7 @@ export default function CaseDetailSheet({
                 <div>
                   <p className={lbl}>PIF Status</p>
                   <div className="mt-1">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-bold ${
-                        data.pif === "YES"
-                          ? dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-700"
-                          : data.pif === "PENDING"
-                          ? dark ? "bg-amber-900/40 text-amber-400" : "bg-amber-50 text-amber-700"
-                          : dark ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-700"
-                      }`}
-                    >
-                      {data.pif === "YES" && <CheckCircle2 aria-hidden="true" className="h-3 w-3 mr-1" />}
-                      {data.pif || "NO"}
-                    </span>
+                    <FeesConfBadge value={data.feesConfirmation} dark={dark} />
                   </div>
                 </div>
                 <div>

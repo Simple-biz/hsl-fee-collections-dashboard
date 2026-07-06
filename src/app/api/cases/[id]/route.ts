@@ -110,7 +110,6 @@ export const GET = async (
         totalRetroDue: feeRecords.totalRetroDue,
         totalFeesExpected: feeRecords.totalFeesExpected,
         totalFeesPaid: feeRecords.totalFeesPaid,
-        pifReadyToClose: feeRecords.pifReadyToClose,
         approvedBy: feeRecords.approvedBy,
         feesConfirmation: feeRecords.feesConfirmation,
         feesClosedTrigger: feeRecords.feesClosedTrigger,
@@ -255,13 +254,6 @@ export const GET = async (
       outstanding: expected - paid,
 
       // Workflow
-      pif: row.pifReadyToClose
-        ? "YES"
-        : paid > 0
-          ? "PENDING"
-          : expected > 0
-            ? "NO"
-            : null,
       approvedBy: row.approvedBy,
       feesConfirmation: row.feesConfirmation ?? null,
       feesClosedTrigger: row.feesClosedTrigger ?? null,

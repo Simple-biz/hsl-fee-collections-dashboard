@@ -229,7 +229,7 @@ export interface CaseDetailData {
   winSheetLinkText: string | null;
 
   // Workflow
-  pif: PifStatus;
+  feesConfirmation: string | null;
   approvedBy: string | null;
   feesClosedTrigger: string | null;
   feeMethod: string | null;
