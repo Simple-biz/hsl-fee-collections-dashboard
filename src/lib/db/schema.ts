@@ -366,6 +366,7 @@ export const activityLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
   },
   (table) => [
     index("idx_activity_log_case_id").on(table.caseId),
