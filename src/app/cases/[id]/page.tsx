@@ -40,6 +40,7 @@ import {
 import type { WinSheetStatus, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import FeeEditModal from "@/components/cases/FeeEditModal";
+import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { useSession } from "next-auth/react";
 
@@ -132,7 +133,7 @@ interface CaseDetail {
   expected: number;
   paid: number;
   outstanding: number;
-  pif: string | null;
+  feesConfirmation: string | null;
   approvedBy: string | null;
   feeMethod: string | null;
   applicableFeeCap: number;
@@ -644,7 +645,7 @@ const CaseDetailPage = () => {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          feeFields: { pifReadyToClose: true, winSheetStatus: "paid_in_full" },
+          feeFields: { feesConfirmation: "Yes", winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
         }),
       });
@@ -863,7 +864,7 @@ const CaseDetailPage = () => {
                 )}
 
                 {!editing &&
-                  caseData.pif !== "YES" &&
+                  caseData.feesConfirmation !== "Yes" &&
                   caseData.paid > 0 &&
                   caseData.paid >= caseData.expected && (
                     <button
@@ -1220,26 +1221,7 @@ const CaseDetailPage = () => {
                   )}
                   <div className="flex items-center gap-2 pt-1">
                     <p className={lbl}>PIF</p>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold ${
-                        caseData.pif === "YES"
-                          ? dark
-                            ? "bg-emerald-900/40 text-emerald-400"
-                            : "bg-emerald-50 text-emerald-700"
-                          : caseData.pif === "PENDING"
-                            ? dark
-                              ? "bg-amber-900/40 text-amber-400"
-                              : "bg-amber-50 text-amber-700"
-                            : dark
-                              ? "bg-red-900/40 text-red-400"
-                              : "bg-red-50 text-red-700"
-                      }`}
-                    >
-                      {caseData.pif === "YES" && (
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                      )}
-                      {caseData.pif || "NO"}
-                    </span>
+                    <FeesConfBadge value={caseData.feesConfirmation} dark={dark} />
                   </div>
                   {caseData.daysAfterApproval !== null && (
                     <div className="flex items-center gap-2">
