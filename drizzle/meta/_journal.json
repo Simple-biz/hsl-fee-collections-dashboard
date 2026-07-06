@@ -253,6 +253,13 @@
       "when": 1783361580196,
       "tag": "0035_normalize_concurrent_claim_type_to_conc",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1783365041404,
+      "tag": "0036_activity_log_edited_at",
+      "breakpoints": true
     }
   ]
 }

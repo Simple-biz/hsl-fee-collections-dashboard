@@ -24,6 +24,7 @@ export const GET = async (
         message: activityLog.message,
         createdBy: activityLog.createdBy,
         createdAt: activityLog.createdAt,
+        editedAt: activityLog.editedAt,
       })
       .from(activityLog)
       .where(eq(activityLog.caseId, caseId))
