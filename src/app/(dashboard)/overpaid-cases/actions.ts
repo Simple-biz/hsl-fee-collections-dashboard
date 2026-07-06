@@ -131,7 +131,7 @@ export async function updateFeesConfirmation(input: {
     // action was the last unguarded path to the same field.
     const guard = await requireCapability("feesConfirmation.edit");
     if (!guard.ok) {
-      return { ok: false, error: "You don't have permission to update Fees Confirmation." };
+      return { ok: false, error: "You don't have permission to update PIF." };
     }
 
     if (!Number.isFinite(input.caseId)) {

@@ -54,7 +54,7 @@ export function FeesClosedConfirmDialog({
         : { isClosed: false, feesConfirmation: null, feesClosedTrigger: null };
       const logMessage = isClose
         ? "Fees Closed checked — moved to Fees Closed."
-        : "Reopened from Fees Closed — moved back to the active dashboard. Fees Confirmation and Fees Closed cleared.";
+        : "Reopened from Fees Closed — moved back to the active dashboard. PIF and Fees Closed cleared.";
       const res = await fetch(`/api/cases/${caseId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -96,7 +96,7 @@ export function FeesClosedConfirmDialog({
             ) : (
               <>
                 <span className="font-semibold">{caseName}</span> will move back
-                to the active dashboard. Fees Confirmation and Fees Closed will
+                to the active dashboard. PIF and Fees Closed will
                 be cleared.
               </>
             )}

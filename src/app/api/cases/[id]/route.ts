@@ -399,7 +399,7 @@ export const PATCH = async (
       const feesConfGuard = await requireCapability("feesConfirmation.edit");
       if (!feesConfGuard.ok) {
         return NextResponse.json(
-          { error: "You don't have permission to update Fees Confirmation." },
+          { error: "You don't have permission to update PIF." },
           { status: guardStatus(feesConfGuard.error) },
         );
       }
@@ -523,7 +523,7 @@ export const PATCH = async (
         updates.push("marked_overpaid = true");
         logMessage = logMessage
           ? `${logMessage} — also flagged as overpaid`
-          : "Flagged as overpaid (Fees Confirmation set to \"Overpaid\")";
+          : "Flagged as overpaid (PIF set to \"Overpaid\")";
       }
 
       if (updates.length > 0) {

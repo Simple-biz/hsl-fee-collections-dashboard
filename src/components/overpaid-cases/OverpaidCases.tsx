@@ -724,7 +724,7 @@ export const OverpaidCases = () => {
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Fees Confirmation", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
+      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "PIF", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
@@ -1217,7 +1217,7 @@ export const OverpaidCases = () => {
                     Overpaid Amount {sortIcon("overpaidAmount")}
                   </button>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Fees Confirmation</th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>PIF</th>
                 <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Notice Sent</th>
                 <th
                   aria-sort={ariaSortFor("opLtrDate")}
@@ -1355,7 +1355,7 @@ export const OverpaidCases = () => {
                             placeholder="—"
                             maxLength={50}
                             disabled={!canEditFeesConf}
-                            title={!canEditFeesConf ? "You don't have permission to update Fees Confirmation." : undefined}
+                            title={!canEditFeesConf ? "You don't have permission to update PIF." : undefined}
                             className={`w-full h-7 pl-2 pr-7 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                           {confirmationState[row.id] === "saving" && (
