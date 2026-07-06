@@ -1345,7 +1345,7 @@ export const FeeRecordsTable = ({
                               "fee",
                               "feesConfirmation",
                               "feesConfirmation",
-                              "Fees Confirmation",
+                              "PIF",
                               e.target.value,
                             );
                             setFeesConfEditId(null);

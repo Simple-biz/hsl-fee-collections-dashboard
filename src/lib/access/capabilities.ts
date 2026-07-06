@@ -54,8 +54,8 @@ export const CAPABILITIES = [
   },
   {
     key: "feesConfirmation.edit",
-    label: "Edit Fees Confirmation",
-    description: "Change the Fees Confirmation dropdown on a case. Doesn't include Fees Closed, which stays admin-only.",
+    label: "Edit PIF",
+    description: "Change the PIF dropdown on a case. Doesn't include Fees Closed, which stays admin-only.",
   },
 ] as const;
 
