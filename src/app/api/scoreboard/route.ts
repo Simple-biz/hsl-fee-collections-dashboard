@@ -364,7 +364,7 @@ export const GET = async (req: NextRequest) => {
       name: `${r.last_name ?? ""}, ${r.first_name ?? ""}`,
       externalId: r.external_id,
       assigned: r.assigned || "—",
-      claim: r.claim_type_label === "T2_T16" ? "CONC" : r.claim_type_label || "—",
+      claim: r.claim_type_label === "T2_T16" || r.claim_type_label === "CONCURRENT" ? "CONC" : r.claim_type_label || "—",
       approvalDate: r.approval_date,
       daysSinceApproval: Number(r.days_since_approval) || 0,
     }));

@@ -206,7 +206,7 @@ export const GET = async (req: NextRequest) => {
         chronicleId: r.udChronicleId ?? null,
         assigned: r.assignedTo || "—",
         level: r.levelWon || "—",
-        claim: r.claimTypeLabel === "T2_T16" ? "CONC" : r.claimTypeLabel || "—",
+        claim: r.claimTypeLabel === "T2_T16" || r.claimTypeLabel === "CONCURRENT" ? "CONC" : r.claimTypeLabel || "—",
         date: r.approvalDate || null,
         status: r.winSheetStatus || "not_started",
 

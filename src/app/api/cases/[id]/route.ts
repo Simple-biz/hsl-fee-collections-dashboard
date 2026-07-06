@@ -197,7 +197,9 @@ export const GET = async (
       firstName: row.firstName,
       lastName: row.lastName,
       claim:
-        row.claimTypeLabel === "T2_T16" ? "CONC" : row.claimTypeLabel || "—",
+        row.claimTypeLabel === "T2_T16" || row.claimTypeLabel === "CONCURRENT"
+          ? "CONC"
+          : row.claimTypeLabel || "—",
       level: row.levelWon || "—",
       t2Decision: row.t2Decision,
       t16Decision: row.t16Decision,
