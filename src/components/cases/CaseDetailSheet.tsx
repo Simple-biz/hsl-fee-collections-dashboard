@@ -242,14 +242,17 @@ export default function CaseDetailSheet({
     chronicleId: "",
     externalId: "",
     t16Retro: "",
+    t16FeeDue: "",
     t16Pending: "",
     t16FeeReceived: "",
     t16FeeReceivedDate: "",
     t2Retro: "",
+    t2FeeDue: "",
     t2Pending: "",
     t2FeeReceived: "",
     t2FeeReceivedDate: "",
     auxRetro: "",
+    auxFeeDue: "",
     auxPending: "",
     auxFeeReceived: "",
     auxFeeReceivedDate: "",
@@ -347,14 +350,17 @@ export default function CaseDetailSheet({
         chronicleId: data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "",
         externalId: data.externalId ?? "",
         t16Retro: data.t16Retro > 0 ? String(data.t16Retro) : "",
+        t16FeeDue: data.t16FeeDue > 0 ? String(data.t16FeeDue) : "",
         t16Pending: data.t16Pending > 0 ? String(data.t16Pending) : "",
         t16FeeReceived: data.t16FeeReceived > 0 ? String(data.t16FeeReceived) : "",
         t16FeeReceivedDate: data.t16FeeReceivedDate ?? "",
         t2Retro: data.t2Retro > 0 ? String(data.t2Retro) : "",
+        t2FeeDue: data.t2FeeDue > 0 ? String(data.t2FeeDue) : "",
         t2Pending: data.t2Pending > 0 ? String(data.t2Pending) : "",
         t2FeeReceived: data.t2FeeReceived > 0 ? String(data.t2FeeReceived) : "",
         t2FeeReceivedDate: data.t2FeeReceivedDate ?? "",
         auxRetro: data.auxRetro > 0 ? String(data.auxRetro) : "",
+        auxFeeDue: data.auxFeeDue > 0 ? String(data.auxFeeDue) : "",
         auxPending: data.auxPending > 0 ? String(data.auxPending) : "",
         auxFeeReceived: data.auxFeeReceived > 0 ? String(data.auxFeeReceived) : "",
         auxFeeReceivedDate: data.auxFeeReceivedDate ?? "",
@@ -402,12 +408,15 @@ export default function CaseDetailSheet({
     const feeFields: Record<string, number | string | null> = {};
     const feeNumFields = [
       ["t16Retro", data.t16Retro],
+      ["t16FeeDue", data.t16FeeDue],
       ["t16Pending", data.t16Pending],
       ["t16FeeReceived", data.t16FeeReceived],
       ["t2Retro", data.t2Retro],
+      ["t2FeeDue", data.t2FeeDue],
       ["t2Pending", data.t2Pending],
       ["t2FeeReceived", data.t2FeeReceived],
       ["auxRetro", data.auxRetro],
+      ["auxFeeDue", data.auxFeeDue],
       ["auxPending", data.auxPending],
       ["auxFeeReceived", data.auxFeeReceived],
     ] as const;
@@ -886,15 +895,10 @@ export default function CaseDetailSheet({
                     <p className={`text-[13px] font-bold uppercase ${b.titleColor} mb-2`}>{b.label}</p>
                     {isEditing ? (
                       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                        <div>
-                          <p className={lbl}>Fee Due</p>
-                          <p className="text-xs font-semibold mt-1" title="Auto-calculated: MIN(Retro × 25%, fee cap)">
-                            {currency(b.due)}
-                          </p>
-                        </div>
                         {(
                           [
                             { label: "Retro",     field: `${b.key}Retro`            as keyof typeof editValues, disabled: false },
+                            { label: "Fee Due",   field: `${b.key}FeeDue`           as keyof typeof editValues, disabled: false },
                             { label: "Pending",   field: `${b.key}Pending`          as keyof typeof editValues, disabled: false },
                             { label: "Received",  field: `${b.key}FeeReceived`      as keyof typeof editValues, disabled: !canEditFeeReceived },
                           ] as const
@@ -934,9 +938,7 @@ export default function CaseDetailSheet({
                         </div>
                         <div>
                           <p className={lbl}>Fee Due</p>
-                          <p className="text-xs font-semibold" title="Auto-calculated: MIN(Retro × 25%, fee cap)">
-                            {currency(b.due)}
-                          </p>
+                          <p className="text-xs font-semibold">{currency(b.due)}</p>
                         </div>
                         <div>
                           <p className={lbl}>Received</p>

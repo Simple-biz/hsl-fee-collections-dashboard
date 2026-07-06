@@ -185,19 +185,19 @@ export const GET = async (req: NextRequest) => {
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
-         AND (fr.fees_confirmation IS NULL OR fr.fees_confirmation = '')
+         AND (fr.fees_confirmation IS NULL OR fr.fees_confirmation IN ('', 'No'))
         )::int AS open_no_fees,
 
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
-         AND fr.fees_confirmation IN ('Partial Payment', 'Pending (full/partial)')
+         AND fr.fees_confirmation = 'Pending'
         )::int AS open_partial,
 
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
-         AND fr.fees_confirmation = 'Paid In Full'
+         AND fr.fees_confirmation = 'Yes'
         )::int AS open_pif
 
       FROM team_members tm
