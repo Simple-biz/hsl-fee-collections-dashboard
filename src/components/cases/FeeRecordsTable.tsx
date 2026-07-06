@@ -22,6 +22,7 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { FeePaymentPanel } from "@/components/cases/FeePaymentPanel";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
+import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import {
   fmtFull,
   fmtDate,
@@ -49,15 +50,6 @@ import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
 
-const FEES_CONF_COLORS: Record<string, { badge: string; badgeDark: string }> = {
-  "Yes":         { badge: "bg-emerald-50 text-emerald-700 border-emerald-300",  badgeDark: "bg-emerald-900/40 text-emerald-300 border-emerald-700" },
-  "No":          { badge: "bg-red-50 text-red-700 border-red-300",              badgeDark: "bg-red-900/40 text-red-300 border-red-700"             },
-  "Pending":     { badge: "bg-blue-50 text-blue-700 border-blue-300",           badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"          },
-  "No Fees Due": { badge: "bg-neutral-100 text-black border-neutral-400",        badgeDark: "bg-neutral-800 text-white border-neutral-600"          },
-  "Overpaid":    { badge: "bg-amber-50 text-amber-700 border-amber-300",        badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"       },
-};
-const FEES_CONF_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
-
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
   "T2":   { badge: "bg-violet-50 text-violet-700 border-violet-300", badgeDark: "bg-violet-900/40 text-violet-300 border-violet-700" },
@@ -68,16 +60,6 @@ const CLAIM_TYPE_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neu
 function ClaimTypeBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
   if (!value) return <span className="text-neutral-400">—</span>;
   const colors = CLAIM_TYPE_COLORS[value] ?? CLAIM_TYPE_FALLBACK;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
-      {value}
-    </span>
-  );
-}
-
-function FeesConfBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
-  if (!value) return <span className="text-neutral-400">—</span>;
-  const colors = FEES_CONF_COLORS[value] ?? FEES_CONF_FALLBACK;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
       {value}
@@ -382,15 +364,15 @@ export const FeeRecordsTable = ({
     return Array.from(set).sort();
   }, [cases]);
 
-  // Unique fees-confirmation values present in the data for the filter dropdown.
-  // Derived from cases rather than feesConfirmationOptions so inactive values
-  // that are already set on records remain filterable.
+  // All PIF statuses for the filter dropdown — the full admin-configured
+  // catalog (so every status is filterable even if no currently-loaded case
+  // has it yet), unioned with whatever's actually present on records so an
+  // inactive-but-still-set value remains filterable too.
   const feesConfValues = useMemo(() => {
-    const set = new Set(
-      cases.map((c) => c.feesConfirmation).filter((v): v is string => v != null),
-    );
+    const set = new Set((dropdownOptions.fees_confirmation ?? []).map((o) => o.name));
+    for (const c of cases) if (c.feesConfirmation != null) set.add(c.feesConfirmation);
     return Array.from(set).sort();
-  }, [cases]);
+  }, [cases, dropdownOptions.fees_confirmation]);
 
   // Unique Remarks values present in the data for the quick-filter dropdown.
   // Remarks predates the case_status dropdown catalog, so this includes
