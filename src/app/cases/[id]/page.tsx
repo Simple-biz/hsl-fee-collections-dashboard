@@ -148,8 +148,6 @@ interface CaseDetail {
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
 const toStr = (v: number) => (v > 0 ? String(v) : "");
-const computeFeeDue = (retro: number, cap: number) =>
-  Math.min(retro * 0.25, cap);
 
 // ============================================================================
 // FeeSection — extracted as stable component (fixes focus loss)
@@ -164,7 +162,6 @@ interface FeeSectionProps {
   received: number;
   pending: number;
   dateReceived: string | null;
-  feeCap: number;
   caseId: string;
   dark: boolean;
   onSaved: () => Promise<void>;
@@ -180,7 +177,6 @@ const FeeSection = memo(
     received,
     pending,
     dateReceived,
-    feeCap,
     caseId,
     dark,
     onSaved,
@@ -194,17 +190,16 @@ const FeeSection = memo(
     const [inlineEdit, setInlineEdit] = useState(false);
     const [localSaving, setLocalSaving] = useState(false);
     // Use a single state object to minimize re-renders
-    const [fields, setFields] = useState({ lr: "", lrcv: "", ldt: "", lpd: "" });
+    const [fields, setFields] = useState({ lr: "", ld: "", lrcv: "", ldt: "", lpd: "" });
 
-    const computedDue = computeFeeDue(parseFloat(fields.lr) || 0, feeCap);
-
-    const setField = (key: "lr" | "lrcv" | "ldt" | "lpd", val: string) => {
+    const setField = (key: "lr" | "ld" | "lrcv" | "ldt" | "lpd", val: string) => {
       setFields((prev) => ({ ...prev, [key]: val }));
     };
 
     const startEdit = () => {
       setFields({
         lr: toStr(retro),
+        ld: toStr(due),
         lrcv: toStr(received),
         ldt: dateReceived || "",
         lpd: toStr(pending),
@@ -222,8 +217,8 @@ const FeeSection = memo(
         const changes: string[] = [];
 
         const newRetro = parseFloat(fields.lr) || 0;
+        const newDue = parseFloat(fields.ld) || 0;
         const newReceived = parseFloat(fields.lrcv) || 0;
-        const newDue = computeFeeDue(newRetro, feeCap);
         const newPending = Math.max(0, parseFloat(fields.lpd) || 0);
 
         if (newRetro !== retro) {
@@ -232,7 +227,7 @@ const FeeSection = memo(
         }
         if (newDue !== due) {
           feeFields[`${prefix}FeeDue`] = newDue;
-          changes.push(`${title} Fee Due: $${due} → $${newDue} (auto)`);
+          changes.push(`${title} Fee Due: $${due} → $${newDue}`);
         }
         if (newReceived !== received) {
           feeFields[`${prefix}FeeReceived`] = newReceived;
@@ -317,17 +312,14 @@ const FeeSection = memo(
                 />
               </div>
               <div>
-                <p className={lbl}>
-                  Fee Due{" "}
-                  <span className="text-[10px] normal-case font-normal">
-                    (auto)
-                  </span>
-                </p>
-                <p
-                  className={`${valCls} ${dark ? "text-amber-400" : "text-amber-600"}`}
-                >
-                  {fmtFull(computedDue)}
-                </p>
+                <p className={lbl}>Fee Due</p>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={fields.ld}
+                  onChange={(e) => setField("ld", e.target.value)}
+                  className={inpCls}
+                />
               </div>
               <div>
                 <p className={lbl}>Fee Received</p>
@@ -709,7 +701,6 @@ const CaseDetailPage = () => {
       {feeModalOpen && caseData && (
         <FeeEditModal
           dark={dark}
-          feeCap={caseData.applicableFeeCap}
           caseId={id}
           t16Retro={caseData.t16Retro}
           t16FeeDue={caseData.t16FeeDue}
@@ -1446,7 +1437,6 @@ const CaseDetailPage = () => {
                 received={caseData.t16FeeReceived}
                 pending={caseData.t16Pending}
                 dateReceived={caseData.t16FeeReceivedDate}
-                feeCap={caseData.applicableFeeCap}
                 caseId={id}
                 onSaved={fetchCase}
               />
@@ -1460,7 +1450,6 @@ const CaseDetailPage = () => {
                 received={caseData.t2FeeReceived}
                 pending={caseData.t2Pending}
                 dateReceived={caseData.t2FeeReceivedDate}
-                feeCap={caseData.applicableFeeCap}
                 caseId={id}
                 onSaved={fetchCase}
               />
@@ -1474,7 +1463,6 @@ const CaseDetailPage = () => {
                 received={caseData.auxFeeReceived}
                 pending={caseData.auxPending}
                 dateReceived={caseData.auxFeeReceivedDate}
-                feeCap={caseData.applicableFeeCap}
                 caseId={id}
                 onSaved={fetchCase}
               />
