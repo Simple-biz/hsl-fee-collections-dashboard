@@ -364,15 +364,15 @@ export const FeeRecordsTable = ({
     return Array.from(set).sort();
   }, [cases]);
 
-  // Unique fees-confirmation values present in the data for the filter dropdown.
-  // Derived from cases rather than feesConfirmationOptions so inactive values
-  // that are already set on records remain filterable.
+  // All PIF statuses for the filter dropdown — the full admin-configured
+  // catalog (so every status is filterable even if no currently-loaded case
+  // has it yet), unioned with whatever's actually present on records so an
+  // inactive-but-still-set value remains filterable too.
   const feesConfValues = useMemo(() => {
-    const set = new Set(
-      cases.map((c) => c.feesConfirmation).filter((v): v is string => v != null),
-    );
+    const set = new Set((dropdownOptions.fees_confirmation ?? []).map((o) => o.name));
+    for (const c of cases) if (c.feesConfirmation != null) set.add(c.feesConfirmation);
     return Array.from(set).sort();
-  }, [cases]);
+  }, [cases, dropdownOptions.fees_confirmation]);
 
   // Unique Remarks values present in the data for the quick-filter dropdown.
   // Remarks predates the case_status dropdown catalog, so this includes
