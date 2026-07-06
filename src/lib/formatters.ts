@@ -64,16 +64,20 @@ export const fmtDateLong = (iso: string | null | undefined): string => {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
-// Claim type display: T2_T16 → CONC, T2/T16 → CONC.
-// Worksheet-style values (CONC, DWB, DAC, AUX) pass through unchanged so
-// rows saved directly via the dashboard dropdowns render verbatim.
+// Claim type display: T2_T16 → CONC, T2/T16 → CONC, CONCURRENT → CONC.
+// CONCURRENT was a dropdown-option spelling briefly live in Settings that
+// wrote straight into claim_type_label — same "the dropdown drifted" class
+// of bug as the fees_confirmation rename, kept here defensively in case it
+// recurs. Worksheet-style values (CONC, DWB, DAC, AUX) pass through
+// unchanged so rows saved directly via the dashboard dropdowns render
+// verbatim.
 export const fmtClaim = (claim: string): string => {
-  if (claim === "T2_T16" || claim === "T2/T16") return "CONC";
+  if (claim === "T2_T16" || claim === "T2/T16" || claim === "CONCURRENT") return "CONC";
   return claim;
 };
 
 // Long-form claim labels for the case-name sub-line:
-//   T2 → Title II, T16 → Title XVI, T2_T16/CONC → Concurrent.
+//   T2 → Title II, T16 → Title XVI, T2_T16/CONC/CONCURRENT → Concurrent.
 // Anything else (DWB, DAC, AUX, "—", …) passes through unchanged.
 export const fmtClaimLong = (claim: string): string => {
   switch (claim) {
@@ -84,6 +88,7 @@ export const fmtClaimLong = (claim: string): string => {
     case "T2_T16":
     case "T2/T16":
     case "CONC":
+    case "CONCURRENT":
       return "Concurrent";
     default:
       return claim;
