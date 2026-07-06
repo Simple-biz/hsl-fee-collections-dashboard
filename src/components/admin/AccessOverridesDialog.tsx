@@ -140,7 +140,7 @@ export function AccessOverridesDialog({
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
             <div className="flex justify-end">
               <Button
                 type="button"
