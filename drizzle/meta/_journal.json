@@ -239,6 +239,13 @@
       "when": 1783357639164,
       "tag": "0033_fix_pif_auto_write_skip_condition",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783360283111,
+      "tag": "0034_fix_pif_blank_sections_and_stale_pending",
+      "breakpoints": true
     }
   ]
 }
