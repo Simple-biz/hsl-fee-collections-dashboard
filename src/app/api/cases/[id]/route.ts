@@ -356,10 +356,6 @@ export const PATCH = async (
     // Mutable — the Overpaid auto-flag below appends to whatever the client
     // sent so the activity log names the side effect, not just the edit.
     let logMessage = clientLogMessage;
-    // Populated by the Pending auto-calc below and returned to the client so
-    // optimistic UI updates (which only know the field they explicitly sent)
-    // can pick up the server-computed sibling value without a refetch.
-    const computedFields: Record<string, number> = {};
 
     // Authorize: any update needs case.update. Finalizing fields (close/reopen,
     // mark overpaid, approvedBy) additionally need case.finalize, and editing
@@ -531,26 +527,12 @@ export const PATCH = async (
       }
 
       if (updates.length > 0) {
-        // t16/t2/aux_fee_due auto-track MIN(Retro × 25%, fee cap) via the
-        // trg_fee_records_compute_totals DB trigger whenever Retro changes
-        // and this same write doesn't also explicitly set Fee Due (an
-        // explicit override — e.g. a negotiated fee from FeeEditModal —
-        // sticks instead of being recalculated). Pending is no longer
-        // trigger-computed at all; it's freely editable. RETURNING reads
-        // Fee Due back so optimistic client updates (which only know the
-        // field they explicitly sent) can sync without a refetch.
-        const [updated] = (await db.execute(sql`
+        // Retro, Fee Due, Pending, and Fee Received are all plain editable
+        // columns — nothing here derives Fee Due from Retro anymore.
+        await db.execute(sql`
           UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
           WHERE case_id = ${caseId}
-          RETURNING t16_fee_due, t2_fee_due, aux_fee_due
-        `)) as unknown as [
-          { t16_fee_due: string; t2_fee_due: string; aux_fee_due: string } | undefined,
-        ];
-        if (updated) {
-          computedFields.t16FeeDue = Number(updated.t16_fee_due);
-          computedFields.t2FeeDue = Number(updated.t2_fee_due);
-          computedFields.auxFeeDue = Number(updated.aux_fee_due);
-        }
+        `);
       }
     }
 
@@ -596,7 +578,7 @@ export const PATCH = async (
       });
     }
 
-    return NextResponse.json({ status: "ok", updated: caseId, computed: computedFields });
+    return NextResponse.json({ status: "ok", updated: caseId });
   } catch (error) {
     console.error("PATCH /api/cases/[id] error:", error);
     return NextResponse.json(
