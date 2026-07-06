@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
 import {
   Search,
   ArrowUp,
@@ -15,6 +14,7 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
@@ -24,6 +24,7 @@ import { NoteField } from "@/components/shared/NoteField";
 interface CompletedRow {
   id: number;
   claimant: string;
+  externalId: string | null;
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
@@ -446,12 +447,19 @@ export const CompletedPetitions = ({ dark }: Props) => {
                           className={`${tdBase} ${t.text} font-semibold w-40 min-w-40 max-w-40 sticky left-0 z-10 ${stickyBg} ${stickyHover}`}
                           title={row.claimant}
                         >
-                          <Link
-                            href={`/cases/${row.id}`}
-                            className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                          >
-                            {row.claimant}
-                          </Link>
+                          {row.externalId ? (
+                            <a
+                              href={row.externalId}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                            >
+                              <span className="truncate">{row.claimant}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+                            </a>
+                          ) : (
+                            <span className="truncate block">{row.claimant}</span>
+                          )}
                           {row.updatedAt && (
                             <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                               Completed {formatRelativeDate(row.updatedAt)}

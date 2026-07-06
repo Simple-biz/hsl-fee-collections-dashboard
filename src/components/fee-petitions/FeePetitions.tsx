@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
   Search,
@@ -19,6 +18,7 @@ import {
   Upload,
   X,
   Undo2,
+  ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
@@ -34,6 +34,7 @@ import { useCapabilities } from "@/hooks/useCapabilities";
 interface FeePetitionRow {
   id: number;
   claimant: string;
+  externalId: string | null;
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
@@ -1169,12 +1170,19 @@ export const FeePetitions = () => {
                         className={`${tdBase} ${t.text} font-semibold w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
-                        <Link
-                          href={`/cases/${row.id}`}
-                          className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                        >
-                          {row.claimant}
-                        </Link>
+                        {row.externalId ? (
+                          <a
+                            href={row.externalId}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                          >
+                            <span className="truncate">{row.claimant}</span>
+                            <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+                          </a>
+                        ) : (
+                          <span className="truncate block">{row.claimant}</span>
+                        )}
                         {row.updatedAt && (
                           <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                             Updated {formatRelativeDate(row.updatedAt)}

@@ -163,6 +163,7 @@ export const GET = async (req: NextRequest) => {
         clientId: cases.clientId,
         firstName: cases.firstName,
         lastName: cases.lastName,
+        externalId: cases.externalId,
         approvalDate: cases.approvalDate,
         claimTypeLabel: cases.claimTypeLabel,
         totalFeesExpected: feeRecords.totalFeesExpected,
@@ -191,6 +192,7 @@ export const GET = async (req: NextRequest) => {
     const data = rows.map((r) => ({
       id: r.clientId,
       claimant: `${r.lastName}, ${r.firstName}`,
+      externalId: r.externalId ?? null,
       approvalDate: r.approvalDate ?? null,
       updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
       feeAmount: r.totalFeesExpected != null ? Number(r.totalFeesExpected) : null,
