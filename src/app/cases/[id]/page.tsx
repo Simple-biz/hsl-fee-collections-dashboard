@@ -148,11 +148,16 @@ interface CaseDetail {
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
+// Fee Due distinguishes "never touched" (null, "—") from an explicit
+// $0.00 — every other field on this card still collapses both to "—" via
+// currency() above.
+const currencyFeeDue = (v: number | null) => (v == null ? "—" : fmtFull(v));
 // Pending can go negative (overpaid) now that it's auto-calculated as Fee
 // Due minus Received — unlike currency() above, that's real signal worth
 // showing rather than collapsing to "—".
 const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const toStr = (v: number) => (v > 0 ? String(v) : "");
+const toStrFeeDue = (v: number | null) => ((v ?? 0) > 0 ? String(v) : "");
 
 // ============================================================================
 // FeeSection — extracted as stable component (fixes focus loss)
@@ -163,7 +168,7 @@ interface FeeSectionProps {
   color: string;
   prefix: "t16" | "t2" | "aux";
   retro: number;
-  due: number;
+  due: number | null;
   received: number;
   pending: number;
   dateReceived: string | null;
@@ -205,7 +210,7 @@ const FeeSection = memo(
     const startEdit = () => {
       setFields({
         lr: toStr(retro),
-        ld: toStr(due),
+        ld: toStrFeeDue(due),
         lrcv: toStr(received),
         ldt: dateReceived || "",
       });
@@ -222,7 +227,10 @@ const FeeSection = memo(
         const changes: string[] = [];
 
         const newRetro = parseFloat(fields.lr) || 0;
-        const newDue = parseFloat(fields.ld) || 0;
+        // An empty box means "didn't touch it" — treat as unchanged rather
+        // than coercing to 0, which would wrongly turn an untouched (null)
+        // Fee Due into an explicit $0.00 on every save.
+        const newDue = fields.ld.trim() === "" ? due : parseFloat(fields.ld) || 0;
         const newReceived = parseFloat(fields.lrcv) || 0;
 
         if (newRetro !== retro) {
@@ -231,7 +239,7 @@ const FeeSection = memo(
         }
         if (newDue !== due) {
           feeFields[`${prefix}FeeDue`] = newDue;
-          changes.push(`${title} Fee Due: $${due} → $${newDue}`);
+          changes.push(`${title} Fee Due: ${due == null ? "—" : `$${due}`} → $${newDue}`);
         }
         if (newReceived !== received) {
           feeFields[`${prefix}FeeReceived`] = newReceived;
@@ -358,7 +366,7 @@ const FeeSection = memo(
               </div>
               <div>
                 <p className={lbl}>Fee Due</p>
-                <p className={valCls}>{currency(due)}</p>
+                <p className={valCls}>{currencyFeeDue(due)}</p>
               </div>
               <div>
                 <p className={lbl}>Fee Received</p>

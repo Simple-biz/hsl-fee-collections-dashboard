@@ -1742,8 +1742,8 @@ export const FeeRecordsTable = ({
                       <FeeAmountCell
                         active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
                         value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: String(c.t16FeeDue) }); setFeeAmountError(null); }}
+                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: c.t16FeeDue != null ? String(c.t16FeeDue) : "" }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
                         onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
@@ -1805,8 +1805,8 @@ export const FeeRecordsTable = ({
                       <FeeAmountCell
                         active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
                         value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: String(c.t2FeeDue) }); setFeeAmountError(null); }}
+                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: c.t2FeeDue != null ? String(c.t2FeeDue) : "" }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
                         onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
@@ -1868,8 +1868,8 @@ export const FeeRecordsTable = ({
                       <FeeAmountCell
                         active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
                         value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: String(c.auxFeeDue) }); setFeeAmountError(null); }}
+                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: c.auxFeeDue != null ? String(c.auxFeeDue) : "" }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
                         onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}

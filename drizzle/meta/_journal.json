@@ -302,6 +302,13 @@
       "when": 1783431674685,
       "tag": "0042_overpaid_vs_pending_needs_due_set",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1783434201891,
+      "tag": "0043_fix_null_totals_and_due_display",
+      "breakpoints": true
     }
   ]
 }

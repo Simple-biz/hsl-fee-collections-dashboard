@@ -5,20 +5,24 @@ import { RefreshCw, Save, X } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 
 const toStr = (v: number) => (v > 0 ? String(v) : "");
+// Fee Due can be null (never touched) as well as a real 0 — collapse both
+// to an empty box (matches toStr's "0 shows blank" convention for the
+// other fields) but keep the type honest.
+const toStrFeeDue = (v: number | null) => ((v ?? 0) > 0 ? String(v) : "");
 
 interface FeeEditModalProps {
   dark: boolean;
   caseId: string;
   t16Retro: number;
-  t16FeeDue: number;
+  t16FeeDue: number | null;
   t16FeeReceived: number;
   t16FeeReceivedDate: string | null;
   t2Retro: number;
-  t2FeeDue: number;
+  t2FeeDue: number | null;
   t2FeeReceived: number;
   t2FeeReceivedDate: string | null;
   auxRetro: number;
-  auxFeeDue: number;
+  auxFeeDue: number | null;
   auxFeeReceived: number;
   auxFeeReceivedDate: string | null;
   onClose: () => void;
@@ -37,15 +41,15 @@ export default function FeeEditModal({
   // Single flat state object — one setState call per keystroke, no nested components
   const [f, setF] = useState({
     t16Retro: toStr(orig.t16Retro),
-    t16Due: toStr(orig.t16FeeDue),
+    t16Due: toStrFeeDue(orig.t16FeeDue),
     t16Rcv: toStr(orig.t16FeeReceived),
     t16Dt: orig.t16FeeReceivedDate || "",
     t2Retro: toStr(orig.t2Retro),
-    t2Due: toStr(orig.t2FeeDue),
+    t2Due: toStrFeeDue(orig.t2FeeDue),
     t2Rcv: toStr(orig.t2FeeReceived),
     t2Dt: orig.t2FeeReceivedDate || "",
     auxRetro: toStr(orig.auxRetro),
-    auxDue: toStr(orig.auxFeeDue),
+    auxDue: toStrFeeDue(orig.auxFeeDue),
     auxRcv: toStr(orig.auxFeeReceived),
     auxDt: orig.auxFeeReceivedDate || "",
   });
@@ -67,6 +71,19 @@ export default function FeeEditModal({
           changes.push(`${label}: $${ov} → $${nv}`);
         }
       };
+      // Fee Due needs the raw box string, not the pre-parsed number — an
+      // empty box means "didn't touch it" (keep whatever it was, null or
+      // not), while an explicit "0" is a real, distinct value that a plain
+      // numeric diff can't tell apart from null (JS coerces null to 0 in
+      // arithmetic, which would silently swallow an intentional $0.00 edit).
+      const chkFeeDue = (rawStr: string, ov: number | null, key: string, label: string) => {
+        const touched = rawStr.trim() !== "";
+        const nv = touched ? parseFloat(rawStr) || 0 : ov;
+        if (nv !== ov) {
+          feeFields[key] = nv;
+          changes.push(`${label}: ${ov == null ? "—" : `$${ov}`} → $${nv}`);
+        }
+      };
       const chkDt = (
         nv: string,
         ov: string | null,
@@ -80,17 +97,17 @@ export default function FeeEditModal({
       };
 
       chk(parseFloat(f.t16Retro) || 0, orig.t16Retro, "t16Retro", "T16 Retro");
-      chk(parseFloat(f.t16Due) || 0, orig.t16FeeDue, "t16FeeDue", "T16 Fee Due");
+      chkFeeDue(f.t16Due, orig.t16FeeDue, "t16FeeDue", "T16 Fee Due");
       chk(parseFloat(f.t16Rcv) || 0, orig.t16FeeReceived, "t16FeeReceived", "T16 Received");
       chkDt(f.t16Dt, orig.t16FeeReceivedDate, "t16FeeReceivedDate", "T16 Date");
 
       chk(parseFloat(f.t2Retro) || 0, orig.t2Retro, "t2Retro", "T2 Retro");
-      chk(parseFloat(f.t2Due) || 0, orig.t2FeeDue, "t2FeeDue", "T2 Fee Due");
+      chkFeeDue(f.t2Due, orig.t2FeeDue, "t2FeeDue", "T2 Fee Due");
       chk(parseFloat(f.t2Rcv) || 0, orig.t2FeeReceived, "t2FeeReceived", "T2 Received");
       chkDt(f.t2Dt, orig.t2FeeReceivedDate, "t2FeeReceivedDate", "T2 Date");
 
       chk(parseFloat(f.auxRetro) || 0, orig.auxRetro, "auxRetro", "AUX Retro");
-      chk(parseFloat(f.auxDue) || 0, orig.auxFeeDue, "auxFeeDue", "AUX Fee Due");
+      chkFeeDue(f.auxDue, orig.auxFeeDue, "auxFeeDue", "AUX Fee Due");
       chk(parseFloat(f.auxRcv) || 0, orig.auxFeeReceived, "auxFeeReceived", "AUX Received");
       chkDt(f.auxDt, orig.auxFeeReceivedDate, "auxFeeReceivedDate", "AUX Date");
 

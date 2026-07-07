@@ -230,21 +230,21 @@ export const GET = async (
 
       // T16
       t16Retro: Number(row.t16Retro) || 0,
-      t16FeeDue: Number(row.t16FeeDue) || 0,
+      t16FeeDue: row.t16FeeDue != null ? Number(row.t16FeeDue) : null,
       t16FeeReceived: Number(row.t16FeeReceived) || 0,
       t16Pending: Number(row.t16Pending) || 0,
       t16FeeReceivedDate: row.t16FeeReceivedDate,
 
       // T2
       t2Retro: Number(row.t2Retro) || 0,
-      t2FeeDue: Number(row.t2FeeDue) || 0,
+      t2FeeDue: row.t2FeeDue != null ? Number(row.t2FeeDue) : null,
       t2FeeReceived: Number(row.t2FeeReceived) || 0,
       t2Pending: Number(row.t2Pending) || 0,
       t2FeeReceivedDate: row.t2FeeReceivedDate,
 
       // AUX
       auxRetro: Number(row.auxRetro) || 0,
-      auxFeeDue: Number(row.auxFeeDue) || 0,
+      auxFeeDue: row.auxFeeDue != null ? Number(row.auxFeeDue) : null,
       auxFeeReceived: Number(row.auxFeeReceived) || 0,
       auxPending: Number(row.auxPending) || 0,
       auxFeeReceivedDate: row.auxFeeReceivedDate,
