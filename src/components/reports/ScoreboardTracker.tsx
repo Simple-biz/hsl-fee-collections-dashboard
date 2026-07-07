@@ -506,7 +506,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           <div className={`grid grid-cols-3 divide-x divide-dashed ${dark ? "divide-neutral-700" : "divide-neutral-200"}`}>
             {[
               { label: "No Fees",              value: data.openCasesFeesStatus.noFees, tone: dark ? "text-amber-400" : "text-amber-600" },
-              { label: "No Fees Over 60 Days",  value: data.noFeesAging.over60,         tone: dark ? "text-orange-400" : "text-orange-600" },
+              { label: "No Fees 60–90 Days",    value: data.noFeesAging.over60,         tone: dark ? "text-orange-400" : "text-orange-600" },
               { label: "No Fees Over 90 Days",  value: data.noFeesAging.over90,         tone: dark ? "text-red-400"   : "text-red-600"   },
             ].map(({ label, value, tone }) => (
               <div key={label} className="py-3 text-center">
@@ -524,7 +524,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           <div className={`px-4 py-2.5 flex items-center justify-between border-b ${t.borderLight}`}>
             <span className={`text-xs font-bold ${t.text}`}>No Fees Cases</span>
             <span className="text-[13px] font-medium tabular-nums">
-              <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} over 60 days</span>
+              <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} 60–90 days</span>
               <span className={t.textMuted}> · </span>
               <span className={dark ? "text-red-400" : "text-red-600"}>{data.noFeesAging.over90} over 90 days</span>
             </span>
