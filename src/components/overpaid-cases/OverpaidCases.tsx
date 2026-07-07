@@ -385,9 +385,10 @@ export const OverpaidCases = () => {
     }
   };
 
-  // Unmarks marked_overpaid and deletes the overpaid_cases metadata row —
-  // does not touch fees_confirmation/is_closed, so Master Fees and Fees
-  // Closed are unaffected. No undo: the metadata is genuinely gone.
+  // Stamps overpaid_dismissed_at and deletes the overpaid_cases metadata
+  // row — does not touch fees_confirmation/is_closed/marked_overpaid, so
+  // Master Fees and Fees Closed are unaffected. No undo: the metadata is
+  // genuinely gone.
   const handleBulkRemove = async () => {
     if (selectedIds.size === 0 || bulkRemoving) return;
     setBulkRemoving(true);

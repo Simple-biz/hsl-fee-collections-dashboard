@@ -514,8 +514,8 @@ export const PATCH = async (
         updates.push("marked_overpaid = true");
         // Clears a stale dismissal from an earlier, unrelated overpayment on
         // this case — otherwise this new one would be silently hidden from
-        // Overpaid Cases by that old dismissal (see bulk-overpaid route.ts
-        // and bulkRemoveFromOverpaid for the same pattern).
+        // Overpaid Cases by that old dismissal (same pattern as
+        // bulkRemoveFromOverpaid's own dismissal handling).
         updates.push("overpaid_dismissed_at = NULL");
         logMessage = logMessage
           ? `${logMessage} — also flagged as overpaid`
