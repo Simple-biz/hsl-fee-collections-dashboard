@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate } from "@/lib/formatters";
+import { fmt, fmtDate, namesMatch } from "@/lib/formatters";
 import { teamBadgeClasses } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import {
@@ -224,7 +224,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const userName = session?.user?.name;
   const { can } = useCapabilities();
   const canEditAgent = (agentName: string) =>
-    can("dailyMetrics.editOthers") || (!!userName && agentName === userName);
+    can("dailyMetrics.editOthers") || namesMatch(agentName, userName);
 
   const currentYear = nowForInit.getFullYear();
   const yearOptions = useMemo(
