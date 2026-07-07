@@ -17,6 +17,7 @@ import {
   Plus,
   X,
   Archive,
+  RefreshCw,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -315,6 +316,21 @@ export const FeeRecordsTable = ({
   const [feeOverrides, setFeeOverrides] = useState<
     Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxFeeReceived" | "auxFeeReceivedDate">>>
   >({});
+  // Per-row "refresh" — re-fetches one case from the server and patches just
+  // that row, so a fee edit's server-side side effects (Pending recompute,
+  // PIF auto-classification) show up without reloading/re-searching the
+  // whole table. Takes priority over feeOverrides/pending once populated,
+  // since it reflects confirmed server state rather than an optimistic guess.
+  const [rowOverrides, setRowOverrides] = useState<Record<number, Partial<CaseRow>>>({});
+  // A per-row refresh snapshot must not outlive the next full-list refetch
+  // (CSV import, Sheets/MyCase sync) — otherwise it would keep shadowing
+  // newer data for that case indefinitely, since it's spread last in the
+  // row merge below. `cases` gets a new array reference on every refetch.
+  useEffect(() => {
+    setRowOverrides({});
+  }, [cases]);
+  const [rowRefreshing, setRowRefreshing] = useState<Set<number>>(new Set());
+  const rowRefreshAbortRef = useRef<Map<number, AbortController>>(new Map());
   type FeeAmountField =
     | "t16Retro" | "t16FeeDue"
     | "t2Retro" | "t2FeeDue"
@@ -332,10 +348,13 @@ export const FeeRecordsTable = ({
   useEffect(() => {
     const abortMap = patchAbortRef.current;
     const feeAmountRef = feeAmountAbortRef;
+    const rowRefreshMap = rowRefreshAbortRef.current;
     return () => {
       for (const ctrl of abortMap.values()) ctrl.abort();
       abortMap.clear();
       feeAmountRef.current?.abort();
+      for (const ctrl of rowRefreshMap.values()) ctrl.abort();
+      rowRefreshMap.clear();
     };
   }, []);
 
@@ -699,6 +718,105 @@ export const FeeRecordsTable = ({
     }
   };
 
+  // Re-fetches one case and patches just its row — lets staff see a fee
+  // edit's server-computed side effects (Pending, PIF auto-classification)
+  // without reloading the whole table or losing their place in it.
+  const handleRowRefresh = async (c: CaseRow) => {
+    rowRefreshAbortRef.current.get(c.id)?.abort();
+    const controller = new AbortController();
+    rowRefreshAbortRef.current.set(c.id, controller);
+    setRowRefreshing((prev) => new Set(prev).add(c.id));
+    try {
+      const res = await fetch(`/api/cases/${c.id}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to refresh case (${res.status})`);
+      const json = await res.json();
+      const d = json.data;
+      const expected = Number(d.expected) || 0;
+      const paid = Number(d.paid) || 0;
+      // Mirrors the same PIF derivation used by GET /api/cases (the list
+      // endpoint) — the detail endpoint returns expected/paid but not pif.
+      let pif: CaseRow["pif"] = null;
+      if (expected > 0) {
+        if (paid >= expected) pif = "YES";
+        else if (paid > 0) pif = "PENDING";
+        else pif = "NO";
+      }
+      const patch: Partial<CaseRow> = {
+        externalId: d.externalId ?? null,
+        chronicleId: d.userDetails?.chronicleId ?? null,
+        assigned: d.assigned || "—",
+        level: d.level || "—",
+        claim: d.claim || "—",
+        date: d.approvalDate ?? null,
+        status: d.status || "not_started",
+        t16Retro: Number(d.t16Retro) || 0,
+        t16FeeDue: d.t16FeeDue != null ? Number(d.t16FeeDue) : null,
+        t16FeeReceived: Number(d.t16FeeReceived) || 0,
+        t16Pending: Number(d.t16Pending) || 0,
+        t16FeeReceivedDate: d.t16FeeReceivedDate ?? null,
+        t2Retro: Number(d.t2Retro) || 0,
+        t2FeeDue: d.t2FeeDue != null ? Number(d.t2FeeDue) : null,
+        t2FeeReceived: Number(d.t2FeeReceived) || 0,
+        t2Pending: Number(d.t2Pending) || 0,
+        t2FeeReceivedDate: d.t2FeeReceivedDate ?? null,
+        auxRetro: Number(d.auxRetro) || 0,
+        auxFeeDue: d.auxFeeDue != null ? Number(d.auxFeeDue) : null,
+        auxFeeReceived: Number(d.auxFeeReceived) || 0,
+        auxPending: Number(d.auxPending) || 0,
+        auxFeeReceivedDate: d.auxFeeReceivedDate ?? null,
+        totalRetroDue: Number(d.totalRetroDue) || 0,
+        expected,
+        paid,
+        pif,
+        approvedBy: d.approvedBy ?? null,
+        feesConfirmation: d.feesConfirmation ?? null,
+        feesClosedTrigger: d.feesClosedTrigger ?? null,
+        caseStatus: d.caseStatus ?? null,
+        isClosed: d.isClosed ?? false,
+        markedOverpaid: d.markedOverpaid ?? false,
+        closedAt: d.closedAt ?? null,
+        update: d.activities?.[0]?.message || "—",
+        sync: d.syncStatus || "not_synced",
+        daysAfterApproval: d.daysAfterApproval ?? null,
+        approvalCategory: d.approvalCategory ?? null,
+        feesStatus: d.feesStatus ?? null,
+        weekAssignedToAgent: d.weekAssignedToAgent ?? null,
+        monthAssignedToAgent: d.monthAssignedToAgent ?? null,
+        office: d.office || "—",
+        notesCount: Array.isArray(d.activities) ? d.activities.length : c.notesCount,
+        winSheetLink: d.winSheetLink ?? null,
+        winSheetLinkText: d.winSheetLinkText ?? null,
+      };
+      setRowOverrides((prev) => ({ ...prev, [c.id]: patch }));
+      // Fresh server truth just arrived — drop any stale optimistic values
+      // for this case so they can't keep shadowing it.
+      setFeeOverrides((prev) => {
+        if (!(c.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[c.id];
+        return next;
+      });
+      setPending((prev) => {
+        if (!(c.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[c.id];
+        return next;
+      });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      console.error("Failed to refresh row:", err);
+    } finally {
+      if (rowRefreshAbortRef.current.get(c.id) === controller) {
+        rowRefreshAbortRef.current.delete(c.id);
+      }
+      setRowRefreshing((prev) => {
+        const next = new Set(prev);
+        next.delete(c.id);
+        return next;
+      });
+    }
+  };
+
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
 
@@ -1059,7 +1177,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={isClosedMode ? 4 : 5}
+                  colSpan={isClosedMode ? 5 : 6}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -1195,6 +1313,7 @@ export const FeeRecordsTable = ({
                   Recent Update
                 </th>
                 <th className={`${thBase} ${t.textSub} text-center`}>Logs</th>
+                <th className={`${thBase} ${t.textSub} text-center`}>Refresh</th>
                 {/* Closed On moved to the front (frozen) in "closed" mode —
                     this trailing slot is Active-mode-only now. */}
                 {!isClosedMode && (
@@ -1212,7 +1331,7 @@ export const FeeRecordsTable = ({
             </thead>
             <tbody>
               {paged.map((rawC) => {
-                const c = { ...rawC, ...feeOverrides[rawC.id] };
+                const c = { ...rawC, ...feeOverrides[rawC.id], ...rowOverrides[rawC.id] };
                 const isOverpaid = c.markedOverpaid;
                 return (
                   <tr
@@ -2084,6 +2203,21 @@ export const FeeRecordsTable = ({
                       >
                         <MessageSquare className="h-3 w-3" aria-hidden="true" />
                         {c.notesCount}
+                      </button>
+                    </td>
+                    <td className={`${tdBase} text-center`} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => handleRowRefresh(c)}
+                        disabled={rowRefreshing.has(c.id)}
+                        aria-label={`Refresh ${c.name}`}
+                        title="Refresh this case's fee data from the server"
+                        className={`inline-flex items-center justify-center h-6 w-6 rounded ${t.hover} ${t.textSub} disabled:opacity-50`}
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${rowRefreshing.has(c.id) ? "animate-spin" : ""}`}
+                          aria-hidden="true"
+                        />
                       </button>
                     </td>
                     {/* Closed On moved to the front (frozen) in "closed" mode —
