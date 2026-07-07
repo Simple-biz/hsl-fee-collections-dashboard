@@ -322,6 +322,13 @@ export const FeeRecordsTable = ({
   // whole table. Takes priority over feeOverrides/pending once populated,
   // since it reflects confirmed server state rather than an optimistic guess.
   const [rowOverrides, setRowOverrides] = useState<Record<number, Partial<CaseRow>>>({});
+  // A per-row refresh snapshot must not outlive the next full-list refetch
+  // (CSV import, Sheets/MyCase sync) — otherwise it would keep shadowing
+  // newer data for that case indefinitely, since it's spread last in the
+  // row merge below. `cases` gets a new array reference on every refetch.
+  useEffect(() => {
+    setRowOverrides({});
+  }, [cases]);
   const [rowRefreshing, setRowRefreshing] = useState<Set<number>>(new Set());
   const rowRefreshAbortRef = useRef<Map<number, AbortController>>(new Map());
   type FeeAmountField =
