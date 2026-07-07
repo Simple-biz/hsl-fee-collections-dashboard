@@ -512,6 +512,11 @@ export const PATCH = async (
         !("markedOverpaid" in feeFields)
       ) {
         updates.push("marked_overpaid = true");
+        // Clears a stale dismissal from an earlier, unrelated overpayment on
+        // this case — otherwise this new one would be silently hidden from
+        // Overpaid Cases by that old dismissal (same pattern as
+        // bulkRemoveFromOverpaid's own dismissal handling).
+        updates.push("overpaid_dismissed_at = NULL");
         logMessage = logMessage
           ? `${logMessage} — also flagged as overpaid`
           : "Flagged as overpaid (PIF set to \"Overpaid\")";
