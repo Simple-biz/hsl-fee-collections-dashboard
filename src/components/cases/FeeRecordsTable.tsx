@@ -310,13 +310,15 @@ export const FeeRecordsTable = ({
     "active_sheet" | "fees_closed_sheet"
   >("active_sheet");
   // Optimistic overrides for fee payment totals after panel add/delete.
+  // Pending is deliberately absent — it's fully derived (Fee Due minus
+  // Received) by the compute_fee_totals trigger, never set optimistically.
   const [feeOverrides, setFeeOverrides] = useState<
-    Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16Pending" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2Pending" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxPending" | "auxFeeReceived" | "auxFeeReceivedDate">>>
+    Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxFeeReceived" | "auxFeeReceivedDate">>>
   >({});
   type FeeAmountField =
-    | "t16Retro" | "t16FeeDue" | "t16Pending"
-    | "t2Retro" | "t2FeeDue" | "t2Pending"
-    | "auxRetro" | "auxFeeDue" | "auxPending";
+    | "t16Retro" | "t16FeeDue"
+    | "t2Retro" | "t2FeeDue"
+    | "auxRetro" | "auxFeeDue";
   const [feeAmountEdit, setFeeAmountEdit] = useState<{
     caseId: number;
     field: FeeAmountField;
@@ -655,9 +657,9 @@ export const FeeRecordsTable = ({
     setFeeAmountError(null);
     const { caseId, field } = feeAmountEdit;
     const labelMap: Record<FeeAmountField, string> = {
-      t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due", t16Pending: "T16 Pending",
-      t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",   t2Pending: "T2 Pending",
-      auxRetro: "AUX Retro", auxFeeDue: "AUX Fee Due", auxPending: "AUX Pending",
+      t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due",
+      t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",
+      auxRetro: "AUX Retro", auxFeeDue: "AUX Fee Due",
     };
     try {
       const res = await fetch(`/api/cases/${caseId}`, {

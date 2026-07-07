@@ -458,17 +458,14 @@ export const PATCH = async (
         t16Retro: "t16_retro",
         t16FeeDue: "t16_fee_due",
         t16FeeReceived: "t16_fee_received",
-        t16Pending: "t16_pending",
         t16FeeReceivedDate: "t16_fee_received_date",
         t2Retro: "t2_retro",
         t2FeeDue: "t2_fee_due",
         t2FeeReceived: "t2_fee_received",
-        t2Pending: "t2_pending",
         t2FeeReceivedDate: "t2_fee_received_date",
         auxRetro: "aux_retro",
         auxFeeDue: "aux_fee_due",
         auxFeeReceived: "aux_fee_received",
-        auxPending: "aux_pending",
         auxFeeReceivedDate: "aux_fee_received_date",
         totalRetroDue: "total_retro_due",
         totalFeesExpected: "total_fees_expected",
@@ -521,8 +518,13 @@ export const PATCH = async (
       }
 
       if (updates.length > 0) {
-        // Retro, Fee Due, Pending, and Fee Received are all plain editable
-        // columns — nothing here derives Fee Due from Retro anymore.
+        // Retro, Fee Due, and Fee Received are plain editable columns —
+        // nothing here derives Fee Due from Retro. Pending is deliberately
+        // absent from FEE_FIELD_MAP above: it's fully derived (Fee Due minus
+        // Received) by the compute_fee_totals trigger on every write to an
+        // open record, so accepting it here would be a no-op for open cases
+        // and a real footgun for closed ones (the trigger skips closed
+        // records entirely, so a stray write here would actually persist).
         await db.execute(sql`
           UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
           WHERE case_id = ${caseId}
