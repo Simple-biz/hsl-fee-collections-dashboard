@@ -23,17 +23,23 @@ export const GET = async (req: NextRequest) => {
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
 
-    // Calculate Monday of the target week (used as the default window)
-    const now = new Date();
+    // Calculate Monday of the target week (used as the default window).
+    // Local getters, not toISOString() — this route only hits this branch
+    // when no `week` param is supplied, and every current caller always
+    // supplies one, but toISOString() would still be wrong by a day for a
+    // server running outside UTC.
     let monday: string;
     if (weekParam) {
       monday = weekParam;
     } else {
-      const d = new Date(now);
+      const d = new Date();
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       d.setDate(diff);
-      monday = d.toISOString().split("T")[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      monday = `${y}-${m}-${dd}`;
     }
 
     // Resolve the call-aggregation window: explicit range when both from/to
