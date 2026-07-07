@@ -9,6 +9,7 @@ import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { getMonday } from "@/lib/formatters";
 
 // ---------- types ----------
 
@@ -26,13 +27,6 @@ interface WeekSlot {
 }
 
 // ---------- helpers ----------
-
-const getMonday = (offsetWeeks: number): string => {
-  const d = new Date();
-  const day = d.getDay();
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1) + offsetWeeks * 7);
-  return d.toISOString().split("T")[0];
-};
 
 const weekRangeLabel = (monday: string): string => {
   const start = new Date(monday + "T12:00:00");

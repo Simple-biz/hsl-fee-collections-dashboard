@@ -34,11 +34,21 @@ export const fmtDate = (d: string | null | undefined): string => {
 
 // Monday (YYYY-MM-DD) of the current week, shifted by `offset` weeks.
 // Shared by the week-nav tabs on Notifications and Reports.
+//
+// Builds the string from local Y/M/D getters rather than toISOString()
+// (which converts to UTC) — for anyone east of UTC (e.g. Philippines,
+// UTC+8), toISOString() rolls back to the previous calendar day for any
+// local time before 8am, making this return Sunday's date on a Monday
+// morning. Local getters always reflect the calendar date setDate() above
+// actually produced, regardless of timezone.
 export const getMonday = (offset = 0): string => {
   const d = new Date();
   const day = d.getDay();
   d.setDate(d.getDate() - day + (day === 0 ? -6 : 1) + offset * 7);
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 };
 
 // "Jun 29 – Jul 3, 2026"-style label for the week starting at `monday`.

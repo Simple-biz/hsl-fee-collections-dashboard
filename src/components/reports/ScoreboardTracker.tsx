@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate, namesMatch } from "@/lib/formatters";
+import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel } from "@/lib/formatters";
 import { teamBadgeClasses } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import {
@@ -133,19 +133,14 @@ const MONTH_NAMES = [
 
 // ---------- helpers ----------
 
-const getMonday = (offset = 0): string => {
-  const d = new Date();
-  const day = d.getDay();
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1) + offset * 7);
-  return d.toISOString().split("T")[0];
-};
-
-const formatWeekLabel = (monday: string): string => {
-  const start = new Date(monday + "T00:00:00");
-  const end = new Date(monday + "T00:00:00");
-  end.setDate(end.getDate() + 4);
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  return `${start.toLocaleDateString("en-US", opts)} – ${end.toLocaleDateString("en-US", { ...opts, year: "numeric" })}`;
+// Local getters, never toISOString() — that converts to UTC and rolls the
+// date back a day for anyone east of UTC (e.g. Philippines, UTC+8) on any
+// local date built via setDate()/local-midnight parsing.
+const toLocalIso = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 };
 
 const getWeekDays = (monday: string) => {
@@ -153,7 +148,7 @@ const getWeekDays = (monday: string) => {
     const d = new Date(monday + "T00:00:00");
     d.setDate(d.getDate() + i);
     return {
-      date: d.toISOString().split("T")[0],
+      date: toLocalIso(d),
       label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       dayName,
     };
