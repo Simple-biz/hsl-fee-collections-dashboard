@@ -47,10 +47,17 @@ export function FeeAmountCell({
     return (
       <div className="flex flex-col items-end gap-1 min-w-[110px]">
         <div className="flex items-center gap-0.5">
+          {/* Fee Due uses type="text" — a native number input sanitizes a
+              bare "-" straight to "" before onChange ever sees it, which
+              would silently break the clear-to-null gesture below. */}
           <input
-            type="number" min="0" step="0.01" value={draft} autoFocus
+            {...(allowExplicitZero
+              ? { type: "text" as const, inputMode: "decimal" as const }
+              : { type: "number" as const, min: "0", step: "0.01" })}
+            value={draft} autoFocus
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+            title={allowExplicitZero ? 'Type "-" to clear back to blank' : undefined}
             className={`h-6 px-1.5 rounded border text-[13px] outline-none w-24 text-right ${inputBg}`}
           />
           {saving ? (
