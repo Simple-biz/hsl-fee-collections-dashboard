@@ -16,18 +16,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Upload,
-  Plus,
   X,
   Undo2,
+  Trash2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull } from "@/lib/formatters";
-import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkImportOverpaidCases } from "@/app/(dashboard)/overpaid-cases/actions";
-import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
-import AddCaseModal from "@/components/modals/AddCaseModal";
-import { parseBool, parseDate, parseDecimalString } from "@/lib/import/csv-parser";
-import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
+import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkRemoveFromOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
 import { NoteField } from "@/components/shared/NoteField";
 import { ClearedCases } from "@/components/overpaid-cases/ClearedCases";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -87,32 +82,6 @@ const patchCase = async (
   if (!result.ok) throw new Error(result.error);
 };
 
-// ---------- csv import config ----------
-const OC_CSV_COLUMNS: ColumnDef[] = [
-  { key: "client_id", label: "Client ID / Name", required: true, hint: "Integer client ID or \"First Last\" / \"Last, First\"" },
-  { key: "op_ltr_date", label: "OP Ltr Date", hint: "YYYY-MM-DD or MM/DD/YYYY" },
-  { key: "op_ltr_received", label: "OP Ltr Received", hint: "YYYY-MM-DD or MM/DD/YYYY" },
-  { key: "overpaid_amount", label: "Overpaid Amount", hint: "Decimal, e.g. 1234.56" },
-  { key: "checks_cleared", label: "Checks Cleared", hint: "true/false/yes/no/1/0" },
-  { key: "region", label: "Region", hint: "Optional text" },
-  { key: "update_note", label: "Update Note", hint: "Optional text, max 5000 chars" },
-];
-
-const OC_TEMPLATE_CSV =
-  "client_id,op_ltr_date,op_ltr_received,overpaid_amount,checks_cleared,region,update_note\n" +
-  "123456,2024-01-15,2024-01-20,1500.00,false,Region A,Example note\n";
-
-const validateOcRow = (raw: Record<string, string>): string[] => {
-  const errors: string[] = [];
-  if (!raw["client_id"]?.trim()) errors.push("client_id is required");
-  if (raw["op_ltr_date"]?.trim() && !parseDate(raw["op_ltr_date"])) errors.push("Invalid op_ltr_date");
-  if (raw["op_ltr_received"]?.trim() && !parseDate(raw["op_ltr_received"])) errors.push("Invalid op_ltr_received");
-  if (raw["overpaid_amount"]?.trim() && !parseDecimalString(raw["overpaid_amount"])) errors.push("Invalid overpaid_amount");
-  if (raw["checks_cleared"]?.trim() && parseBool(raw["checks_cleared"]) === null) errors.push("Invalid checks_cleared value");
-  if (raw["update_note"] && raw["update_note"].length > 5000) errors.push("update_note too long");
-  return errors;
-};
-
 // ---------- component ----------
 export const OverpaidCases = () => {
   const { resolvedTheme } = useTheme();
@@ -121,7 +90,6 @@ export const OverpaidCases = () => {
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
   const { can } = useCapabilities();
-  const canFinalize = can("case.finalize");
   const canEditFeesConf = can("feesConfirmation.edit");
 
   const router = useRouter();
@@ -172,6 +140,8 @@ export const OverpaidCases = () => {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkClearing, setBulkClearing] = useState(false);
   const [bulkConfirming, setBulkConfirming] = useState(false);
+  const [bulkRemoving, setBulkRemoving] = useState(false);
+  const [removeConfirming, setRemoveConfirming] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{ caseIds: number[]; expiresAt: number } | null>(null);
   const [undoing, setUndoing] = useState(false);
   // Bumped whenever a case is marked/un-marked cleared from this table, so
@@ -371,6 +341,7 @@ export const OverpaidCases = () => {
   const clearSelection = () => {
     setSelectedIds(new Set());
     setBulkConfirming(false);
+    setRemoveConfirming(false);
   };
 
   const toggleSelectAll = () => {
@@ -411,6 +382,27 @@ export const OverpaidCases = () => {
       setError((err as Error).message);
     } finally {
       setBulkClearing(false);
+    }
+  };
+
+  // Unmarks marked_overpaid and deletes the overpaid_cases metadata row —
+  // does not touch fees_confirmation/is_closed, so Master Fees and Fees
+  // Closed are unaffected. No undo: the metadata is genuinely gone.
+  const handleBulkRemove = async () => {
+    if (selectedIds.size === 0 || bulkRemoving) return;
+    setBulkRemoving(true);
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await bulkRemoveFromOverpaid({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
+      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+      setTotal((tot) => Math.max(0, tot - ids.length));
+      setSelectedIds(new Set());
+      setRemoveConfirming(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBulkRemoving(false);
     }
   };
 
@@ -667,40 +659,6 @@ export const OverpaidCases = () => {
   };
 
   const [exporting, setExporting] = useState(false);
-  const [csvImportOpen, setCsvImportOpen] = useState(false);
-  const [addCaseOpen, setAddCaseOpen] = useState(false);
-  const [dropdownOptions, setDropdownOptions] = useState<DropdownOptionsByCategory>({});
-
-  // Lazy-loaded the first time the Add Case modal opens — this page doesn't
-  // otherwise need the full dropdown-options set, so there's no reason to
-  // fetch it on every page load.
-  const openAddCase = async () => {
-    if (Object.keys(dropdownOptions).length === 0) {
-      try {
-        setDropdownOptions(await fetchDropdownOptions());
-      } catch {
-        /* non-critical — modal falls back to empty dropdowns */
-      }
-    }
-    setAddCaseOpen(true);
-  };
-
-  // A manually-added case has no fee_records row marked overpaid yet (it
-  // isn't part of a Sheets/MyCase sync, just created bare via AddCaseModal),
-  // so flip that flag right after creation — this is what actually makes it
-  // show up in this page's own list.
-  const markNewCaseOverpaid = async (clientId: number) => {
-    const res = await fetch("/api/cases/bulk-overpaid", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ caseIds: [clientId], markedOverpaid: true }),
-    });
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      throw new Error(json.error || `Failed to mark case overpaid (${res.status})`);
-    }
-    await fetchCases();
-  };
 
   const downloadCsv = async () => {
     setExporting(true);
@@ -785,28 +743,6 @@ export const OverpaidCases = () => {
 
   return (
     <div className="space-y-4">
-      {csvImportOpen && (
-        <CsvImportModal
-          dark={dark}
-          title="Import Overpaid Cases"
-          description="Upload a CSV to bulk-upsert overpaid case tracking data."
-          columns={OC_CSV_COLUMNS}
-          templateFilename="overpaid-cases-template.csv"
-          templateCsv={OC_TEMPLATE_CSV}
-          validateRow={validateOcRow}
-          onImport={bulkImportOverpaidCases}
-          onClose={() => setCsvImportOpen(false)}
-          onSuccess={() => { fetchCases(); setClearedRefreshToken((v) => v + 1); }}
-        />
-      )}
-      {addCaseOpen && (
-        <AddCaseModal
-          dark={dark}
-          dropdownOptions={dropdownOptions}
-          onClose={() => setAddCaseOpen(false)}
-          onCreated={markNewCaseOverpaid}
-        />
-      )}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveMessage}
       </div>
@@ -925,6 +861,28 @@ export const OverpaidCases = () => {
                       Cancel
                     </button>
                   </>
+                ) : removeConfirming ? (
+                  <>
+                    <span className={`text-sm ${t.textMuted}`}>
+                      Remove {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} from Overpaid Cases? This won&apos;t affect Master Fees or Fees Closed, but can&apos;t be undone.
+                    </span>
+                    <button
+                      onClick={handleBulkRemove}
+                      disabled={bulkRemoving}
+                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-red-700 hover:bg-red-600 text-white" : "bg-red-600 hover:bg-red-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
+                    >
+                      {bulkRemoving
+                        ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                        : <Trash2 aria-hidden="true" className="h-3 w-3" />}
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setRemoveConfirming(false)}
+                      className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
+                    >
+                      Cancel
+                    </button>
+                  </>
                 ) : (
                   <>
                     <span className={`text-sm font-bold ${t.text}`}>
@@ -937,6 +895,15 @@ export const OverpaidCases = () => {
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
                       Mark Cleared
+                    </button>
+                    <button
+                      onClick={() => setRemoveConfirming(true)}
+                      aria-label="Remove selected cases from Overpaid Cases"
+                      title="Remove from Overpaid Cases — doesn't affect Master Fees or Fees Closed"
+                      className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-red-800 text-red-400 hover:bg-red-900/30" : "border-red-200 text-red-600 hover:bg-red-50"} transition-colors`}
+                    >
+                      <Trash2 aria-hidden="true" className="h-3 w-3" />
+                      Remove
                     </button>
                     <button
                       onClick={clearSelection}
@@ -1017,27 +984,6 @@ export const OverpaidCases = () => {
                 {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
               </span>
             </button>
-            {canFinalize && (
-              <button
-                onClick={() => setCsvImportOpen(true)}
-                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
-                aria-label="Import from CSV"
-              >
-                <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Import</span>
-              </button>
-            )}
-            {canFinalize && (
-              <button
-                onClick={openAddCase}
-                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
-                aria-label="Manually add an overpaid case"
-                title="For cases handled here that never came through Master Fees"
-              >
-                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Add Case</span>
-              </button>
-            )}
           </div>
         </div>
 
