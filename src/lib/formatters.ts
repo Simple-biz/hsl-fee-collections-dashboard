@@ -1,5 +1,18 @@
 import type { WinSheetStatus, SyncStatus } from "@/types";
 
+// Trim/case-insensitive comparison for matching a session's display name
+// against an admin-managed roster name (team_members.name, agent_name on
+// daily_metrics, etc). These are two independently-edited free-text fields
+// that are supposed to mirror each other exactly — a stray space or
+// capitalization difference between them silently locks someone out of
+// editing their own row, so tolerate that class of drift rather than
+// requiring byte-for-byte equality.
+export const namesMatch = (
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean =>
+  !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
 export const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",

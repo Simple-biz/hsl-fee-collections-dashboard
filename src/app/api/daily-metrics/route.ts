@@ -5,14 +5,16 @@ import { db } from "@/lib/db";
 import { dailyMetrics } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { sessionHasCapability } from "@/lib/auth-helpers";
+import { namesMatch } from "@/lib/formatters";
 
 // Members can only log their own calls — agent_name is matched against the
 // session's display name (team_members.name mirrors users.name for real
-// accounts). dailyMetrics.editOthers (lead/admin by default, grantable
+// accounts), tolerant of case/whitespace drift between the two independently
+// -edited fields. dailyMetrics.editOthers (lead/admin by default, grantable
 // per-user via the access overrides modal) can log for anyone.
 const canWriteAgent = (session: Session, agent: string): boolean =>
   sessionHasCapability(session, "dailyMetrics.editOthers") ||
-  agent === session.user?.name;
+  namesMatch(agent, session.user?.name);
 
 // GET /api/daily-metrics?agent=Drake&date=2026-02-20
 // GET /api/daily-metrics?week=2026-02-17  (returns all agents for the week)
