@@ -153,6 +153,31 @@ export async function bulkRemoveFromOverpaid(input: {
   }
 }
 
+// Marks a single case overpaid directly — for old cases that never came
+// through Master Fees and shouldn't be added there just to flag them here.
+// The normal path (setting PIF to "Overpaid" on Master Fees) already sets
+// marked_overpaid atomically; this covers the escape hatch for cases with
+// no fee history to track at all, right after AddCaseModal creates the bare
+// case record.
+export async function markCaseOverpaid(input: {
+  caseId: number;
+}): Promise<Result> {
+  try {
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) return { ok: false, error: "You don't have permission to mark cases overpaid." };
+    if (!Number.isFinite(input.caseId)) return { ok: false, error: "Invalid case ID" };
+
+    await db
+      .update(feeRecords)
+      .set({ markedOverpaid: true, overpaidDismissedAt: null, updatedAt: new Date() })
+      .where(eq(feeRecords.caseId, input.caseId));
+    return { ok: true };
+  } catch (error) {
+    console.error("markCaseOverpaid error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
 export async function updateFeesConfirmation(input: {
   caseId: number;
   feesConfirmation: string;

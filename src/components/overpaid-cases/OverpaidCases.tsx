@@ -16,13 +16,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Plus,
   X,
   Undo2,
   Trash2,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull } from "@/lib/formatters";
-import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkRemoveFromOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
+import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkRemoveFromOverpaid, markCaseOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
+import AddCaseModal from "@/components/modals/AddCaseModal";
+import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 import { NoteField } from "@/components/shared/NoteField";
 import { ClearedCases } from "@/components/overpaid-cases/ClearedCases";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -90,6 +93,7 @@ export const OverpaidCases = () => {
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
   const { can } = useCapabilities();
+  const canFinalize = can("case.finalize");
   const canEditFeesConf = can("feesConfirmation.edit");
 
   const router = useRouter();
@@ -660,6 +664,33 @@ export const OverpaidCases = () => {
   };
 
   const [exporting, setExporting] = useState(false);
+  const [addCaseOpen, setAddCaseOpen] = useState(false);
+  const [dropdownOptions, setDropdownOptions] = useState<DropdownOptionsByCategory>({});
+
+  // Lazy-loaded the first time the Add Case modal opens — this page doesn't
+  // otherwise need the full dropdown-options set, so there's no reason to
+  // fetch it on every page load.
+  const openAddCase = async () => {
+    if (Object.keys(dropdownOptions).length === 0) {
+      try {
+        setDropdownOptions(await fetchDropdownOptions());
+      } catch {
+        /* non-critical — modal falls back to empty dropdowns */
+      }
+    }
+    setAddCaseOpen(true);
+  };
+
+  // A manually-added case has no fee_records row marked overpaid yet (it
+  // isn't part of a Sheets/MyCase sync, just created bare via AddCaseModal),
+  // so flip that flag right after creation — this is what actually makes it
+  // show up in this page's own list. For old cases that never came through
+  // Master Fees and don't belong there.
+  const markNewCaseOverpaid = async (clientId: number) => {
+    const result = await markCaseOverpaid({ caseId: clientId });
+    if (!result.ok) throw new Error(result.error);
+    await fetchCases();
+  };
 
   const downloadCsv = async () => {
     setExporting(true);
@@ -744,6 +775,14 @@ export const OverpaidCases = () => {
 
   return (
     <div className="space-y-4">
+      {addCaseOpen && (
+        <AddCaseModal
+          dark={dark}
+          dropdownOptions={dropdownOptions}
+          onClose={() => setAddCaseOpen(false)}
+          onCreated={markNewCaseOverpaid}
+        />
+      )}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveMessage}
       </div>
@@ -985,6 +1024,17 @@ export const OverpaidCases = () => {
                 {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export"}
               </span>
             </button>
+            {canFinalize && (
+              <button
+                onClick={openAddCase}
+                className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
+                aria-label="Manually add an overpaid case"
+                title="For old cases that never came through Master Fees"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Case</span>
+              </button>
+            )}
           </div>
         </div>
 
