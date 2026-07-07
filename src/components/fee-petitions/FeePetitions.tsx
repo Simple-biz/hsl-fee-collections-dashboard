@@ -70,6 +70,7 @@ type SortDir = "asc" | "desc";
 type TouchedFilter = "" | "none";
 type MissingFilter = "" | CheckboxKey;
 type AgingFilter = "" | "unpaid_60" | "unpaid_90";
+type Assignee = { name: string; count: number };
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -94,6 +95,7 @@ const DEFAULTS = {
   touched: "" as TouchedFilter,
   missing: "" as MissingFilter,
   aging: "" as AgingFilter,
+  assignedTo: "",
   sort: "approvalDate" as SortKey,
   dir: "desc" as SortDir,
   page: 1,
@@ -182,6 +184,7 @@ export const FeePetitions = () => {
     touched: (urlParams.get("touched") === "none" ? "none" : "") as TouchedFilter,
     missing: (CHECKBOX_KEYS.includes(urlParams.get("missing") as CheckboxKey) ? urlParams.get("missing") : "") as MissingFilter,
     aging: (["unpaid_60", "unpaid_90"].includes(urlParams.get("aging") ?? "") ? urlParams.get("aging") : "") as AgingFilter,
+    assignedTo: urlParams.get("assignedTo") ?? DEFAULTS.assignedTo,
     sort: (SORT_KEYS.includes(urlParams.get("sort") as SortKey)
       ? (urlParams.get("sort") as SortKey)
       : DEFAULTS.sort) as SortKey,
@@ -208,6 +211,8 @@ export const FeePetitions = () => {
   const [touchedFilter, setTouchedFilter] = useState<TouchedFilter>(initialState.touched);
   const [missingFilter, setMissingFilter] = useState<MissingFilter>(initialState.missing);
   const [agingFilter, setAgingFilter] = useState<AgingFilter>(initialState.aging);
+  const [assignedToFilter, setAssignedToFilter] = useState(initialState.assignedTo);
+  const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
@@ -232,6 +237,7 @@ export const FeePetitions = () => {
     if (touchedFilter) params.set("touched", touchedFilter);
     if (missingFilter) params.set("missing", missingFilter);
     if (agingFilter) params.set("aging", agingFilter);
+    if (assignedToFilter) params.set("assignedTo", assignedToFilter);
     if (sortKey !== DEFAULTS.sort) params.set("sort", sortKey);
     if (sortDir !== DEFAULTS.dir) params.set("dir", sortDir);
     if (page !== DEFAULTS.page) params.set("page", String(page));
@@ -246,7 +252,7 @@ export const FeePetitions = () => {
       { scroll: false },
     );
     urlMethodRef.current = "replace";
-  }, [appliedSearch, touchedFilter, missingFilter, agingFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
+  }, [appliedSearch, touchedFilter, missingFilter, agingFilter, assignedToFilter, sortKey, sortDir, page, pageSize, pathname, router, urlParams]);
 
   // Sync URL → state (back/forward)
   useEffect(() => {
@@ -256,6 +262,7 @@ export const FeePetitions = () => {
     const urlMissing = (CHECKBOX_KEYS.includes(urlMissingRaw as CheckboxKey) ? urlMissingRaw : "") as MissingFilter;
     const urlAgingRaw = urlParams.get("aging") ?? "";
     const urlAging = (["unpaid_60", "unpaid_90"].includes(urlAgingRaw) ? urlAgingRaw : "") as AgingFilter;
+    const urlAssignedTo = urlParams.get("assignedTo") ?? DEFAULTS.assignedTo;
     const urlSortRaw = urlParams.get("sort") as SortKey | null;
     const urlSort = SORT_KEYS.includes(urlSortRaw as SortKey)
       ? (urlSortRaw as SortKey)
@@ -269,6 +276,7 @@ export const FeePetitions = () => {
     if (urlTouched !== touchedFilter) setTouchedFilter(urlTouched);
     if (urlMissing !== missingFilter) setMissingFilter(urlMissing);
     if (urlAging !== agingFilter) setAgingFilter(urlAging);
+    if (urlAssignedTo !== assignedToFilter) setAssignedToFilter(urlAssignedTo);
     if (urlSort !== sortKey) setSortKey(urlSort);
     if (urlDir !== sortDir) setSortDir(urlDir);
     if (urlPage !== page) setPage(urlPage);
@@ -394,6 +402,7 @@ export const FeePetitions = () => {
       if (touchedFilter) params.set("touched", touchedFilter);
       if (missingFilter) params.set("missing", missingFilter);
       if (agingFilter) params.set("aging", agingFilter);
+      if (assignedToFilter) params.set("assignedTo", assignedToFilter);
       params.set("sort", sortKey);
       params.set("dir", sortDir);
       const res = await fetch(`/api/fee-petitions?${params.toString()}`, {
@@ -406,6 +415,7 @@ export const FeePetitions = () => {
       setSelectedIds(new Set());
       setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
+      if (Array.isArray(json.assignees)) setAssignees(json.assignees);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -413,7 +423,7 @@ export const FeePetitions = () => {
     } finally {
       if (fetchAbortRef.current === controller) setLoading(false);
     }
-  }, [page, pageSize, appliedSearch, touchedFilter, missingFilter, agingFilter, sortKey, sortDir]);
+  }, [page, pageSize, appliedSearch, touchedFilter, missingFilter, agingFilter, assignedToFilter, sortKey, sortDir]);
 
   useEffect(() => {
     fetchPetitions();
@@ -497,7 +507,8 @@ export const FeePetitions = () => {
     appliedSearch !== DEFAULTS.search ||
     touchedFilter !== DEFAULTS.touched ||
     missingFilter !== DEFAULTS.missing ||
-    agingFilter !== DEFAULTS.aging;
+    agingFilter !== DEFAULTS.aging ||
+    assignedToFilter !== DEFAULTS.assignedTo;
 
   const clearAllFilters = () => {
     urlMethodRef.current = "push";
@@ -506,6 +517,7 @@ export const FeePetitions = () => {
     setTouchedFilter(DEFAULTS.touched);
     setMissingFilter(DEFAULTS.missing);
     setAgingFilter(DEFAULTS.aging);
+    setAssignedToFilter(DEFAULTS.assignedTo);
     setPage(1);
   };
 
@@ -711,6 +723,7 @@ export const FeePetitions = () => {
         if (touchedFilter) params.set("touched", touchedFilter);
         if (missingFilter) params.set("missing", missingFilter);
         if (agingFilter) params.set("aging", agingFilter);
+        if (assignedToFilter) params.set("assignedTo", assignedToFilter);
         params.set("sort", sortKey);
         params.set("dir", sortDir);
         const res = await fetch(`/api/fee-petitions?${params.toString()}`);
@@ -970,6 +983,17 @@ export const FeePetitions = () => {
               ))}
             </select>
             <select
+              value={assignedToFilter}
+              onChange={(e) => { urlMethodRef.current = "push"; setAssignedToFilter(e.target.value); setPage(1); }}
+              aria-label="Filter by assigned to"
+              className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+            >
+              <option value="">All Assigned</option>
+              {assignees.map((a) => (
+                <option key={a.name} value={a.name}>{a.name} ({a.count})</option>
+              ))}
+            </select>
+            <select
               value={pageSize}
               onChange={(e) => { urlMethodRef.current = "push"; setPageSize(parseInt(e.target.value)); setPage(1); }}
               aria-label="Rows per page"
@@ -1059,6 +1083,14 @@ export const FeePetitions = () => {
               <span className={chipBase}>
                 {agingFilter === "unpaid_60" ? "Unpaid >60d" : "Unpaid >90d"}
                 <button aria-label="Clear aging filter" onClick={() => { urlMethodRef.current = "push"; setAgingFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {assignedToFilter && (
+              <span className={chipBase}>
+                Assigned: {assignedToFilter}
+                <button aria-label="Clear assigned to filter" onClick={() => { urlMethodRef.current = "push"; setAssignedToFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
