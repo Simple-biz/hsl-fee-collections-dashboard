@@ -23,17 +23,23 @@ export const GET = async (req: NextRequest) => {
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
 
-    // Calculate Monday of the target week (used as the default window)
-    const now = new Date();
+    // Calculate Monday of the target week (used as the default window).
+    // Local getters, not toISOString() — this route only hits this branch
+    // when no `week` param is supplied, and every current caller always
+    // supplies one, but toISOString() would still be wrong by a day for a
+    // server running outside UTC.
     let monday: string;
     if (weekParam) {
       monday = weekParam;
     } else {
-      const d = new Date(now);
+      const d = new Date();
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       d.setDate(diff);
-      monday = d.toISOString().split("T")[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      monday = `${y}-${m}-${dd}`;
     }
 
     // Resolve the call-aggregation window: explicit range when both from/to
@@ -313,15 +319,16 @@ export const GET = async (req: NextRequest) => {
       }),
     );
 
-    // "No fees" = has a real fee due but hasn't fully received it yet
-    // (outstanding balance > 0) — not a PIF/fees_confirmation check, since
-    // that flags whether staff have *reviewed* the case, not whether money
-    // is actually still owed. Bucketed the same way here and in the No Fees
-    // Cases aging query below so this card and that table can never disagree.
+    // "No fees" = has a real fee due and has received nothing at all yet —
+    // not a partial balance (some received, still owing) and not a
+    // PIF/fees_confirmation check, since that flags whether staff have
+    // *reviewed* the case, not whether any money has come in. Bucketed the
+    // same way here and in the No Fees Cases aging query below so this card
+    // and that table can never disagree.
     const [feesStatus] = await db.execute(sql`
       SELECT COUNT(*) FILTER (
         WHERE COALESCE(total_fees_expected, 0) > 0
-          AND COALESCE(total_fees_expected, 0) > COALESCE(total_fees_paid, 0)
+          AND COALESCE(total_fees_paid, 0) = 0
       )::int AS no_fees_count
       FROM fee_records
       WHERE is_closed = false
@@ -331,12 +338,12 @@ export const GET = async (req: NextRequest) => {
       noFees: Number(feesStatus?.no_fees_count) || 0,
     };
 
-    // No Fees Cases — open cases with a real fee due that hasn't been fully
-    // received (same predicate as openCasesFeesStatus.noFees above), aged
-    // over 60 days by approval_date. Returns the actual case rows (not just
-    // a count) so the Reports page can list them for reporting; over60/over90
-    // counts are derived from this same list below so the card and the table
-    // can never disagree.
+    // No Fees Cases — open cases with a real fee due and nothing received at
+    // all (same predicate as openCasesFeesStatus.noFees above), aged over 60
+    // days by approval_date. Returns the actual case rows (not just a count)
+    // so the Reports page can list them for reporting; over60/over90 counts
+    // are derived from this same list below so the card and the table can
+    // never disagree.
     const noFeesCaseRows = await db.execute(sql`
       SELECT
         c.client_id AS id,
@@ -351,7 +358,7 @@ export const GET = async (req: NextRequest) => {
       JOIN cases c ON c.client_id = fr.case_id
       WHERE fr.is_closed = FALSE
         AND COALESCE(fr.total_fees_expected, 0) > 0
-        AND COALESCE(fr.total_fees_expected, 0) > COALESCE(fr.total_fees_paid, 0)
+        AND COALESCE(fr.total_fees_paid, 0) = 0
         AND c.approval_date IS NOT NULL
         AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
       ORDER BY c.approval_date ASC
@@ -376,8 +383,11 @@ export const GET = async (req: NextRequest) => {
       daysSinceApproval: Number(r.days_since_approval) || 0,
     }));
 
+    // Mutually exclusive buckets — a case over 90 days counts only in the
+    // 90-day bucket, not in both, so the two numbers can be added together
+    // without double-counting.
     const noFeesAging = {
-      over60: noFeesCases.length,
+      over60: noFeesCases.filter((c) => c.daysSinceApproval > 60 && c.daysSinceApproval <= 90).length,
       over90: noFeesCases.filter((c) => c.daysSinceApproval > 90).length,
     };
 
