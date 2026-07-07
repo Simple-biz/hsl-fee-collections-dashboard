@@ -212,7 +212,10 @@ export const feeRecords = pgTable(
 
     // T16
     t16Retro: decimal("t16_retro", { precision: 12, scale: 2 }).default("0"),
-    t16FeeDue: decimal("t16_fee_due", { precision: 12, scale: 2 }).default("0"),
+    // No default — NULL means "never touched" (distinct from an explicit
+    // $0.00), which the PIF automation trigger relies on to tell "no fee
+    // applies here" apart from "not entered yet" on multi-section claims.
+    t16FeeDue: decimal("t16_fee_due", { precision: 12, scale: 2 }),
     t16FeeReceived: decimal("t16_fee_received", {
       precision: 12,
       scale: 2,
@@ -224,7 +227,7 @@ export const feeRecords = pgTable(
 
     // T2
     t2Retro: decimal("t2_retro", { precision: 12, scale: 2 }).default("0"),
-    t2FeeDue: decimal("t2_fee_due", { precision: 12, scale: 2 }).default("0"),
+    t2FeeDue: decimal("t2_fee_due", { precision: 12, scale: 2 }),
     t2FeeReceived: decimal("t2_fee_received", {
       precision: 12,
       scale: 2,
@@ -234,7 +237,7 @@ export const feeRecords = pgTable(
 
     // AUX
     auxRetro: decimal("aux_retro", { precision: 12, scale: 2 }).default("0"),
-    auxFeeDue: decimal("aux_fee_due", { precision: 12, scale: 2 }).default("0"),
+    auxFeeDue: decimal("aux_fee_due", { precision: 12, scale: 2 }),
     auxFeeReceived: decimal("aux_fee_received", {
       precision: 12,
       scale: 2,

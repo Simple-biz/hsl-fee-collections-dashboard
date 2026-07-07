@@ -148,6 +148,10 @@ interface CaseDetail {
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
+// Pending can go negative (overpaid) now that it's auto-calculated as Fee
+// Due minus Received — unlike currency() above, that's real signal worth
+// showing rather than collapsing to "—".
+const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const toStr = (v: number) => (v > 0 ? String(v) : "");
 
 // ============================================================================
@@ -190,10 +194,11 @@ const FeeSection = memo(
 
     const [inlineEdit, setInlineEdit] = useState(false);
     const [localSaving, setLocalSaving] = useState(false);
-    // Use a single state object to minimize re-renders
-    const [fields, setFields] = useState({ lr: "", ld: "", lrcv: "", ldt: "", lpd: "" });
+    // Use a single state object to minimize re-renders. Pending isn't part
+    // of this — it's auto-calculated (Fee Due − Received) server-side.
+    const [fields, setFields] = useState({ lr: "", ld: "", lrcv: "", ldt: "" });
 
-    const setField = (key: "lr" | "ld" | "lrcv" | "ldt" | "lpd", val: string) => {
+    const setField = (key: "lr" | "ld" | "lrcv" | "ldt", val: string) => {
       setFields((prev) => ({ ...prev, [key]: val }));
     };
 
@@ -203,7 +208,6 @@ const FeeSection = memo(
         ld: toStr(due),
         lrcv: toStr(received),
         ldt: dateReceived || "",
-        lpd: toStr(pending),
       });
       setInlineEdit(true);
     };
@@ -220,7 +224,6 @@ const FeeSection = memo(
         const newRetro = parseFloat(fields.lr) || 0;
         const newDue = parseFloat(fields.ld) || 0;
         const newReceived = parseFloat(fields.lrcv) || 0;
-        const newPending = Math.max(0, parseFloat(fields.lpd) || 0);
 
         if (newRetro !== retro) {
           feeFields[`${prefix}Retro`] = newRetro;
@@ -233,10 +236,6 @@ const FeeSection = memo(
         if (newReceived !== received) {
           feeFields[`${prefix}FeeReceived`] = newReceived;
           changes.push(`${title} Received: $${received} → $${newReceived}`);
-        }
-        if (newPending !== pending) {
-          feeFields[`${prefix}Pending`] = newPending;
-          changes.push(`${title} Pending: $${pending} → $${newPending}`);
         }
         if (fields.ldt !== (dateReceived || "")) {
           feeFields[`${prefix}FeeReceivedDate`] = fields.ldt || null;
@@ -334,14 +333,12 @@ const FeeSection = memo(
               </div>
               <div>
                 <p className={lbl}>Pending</p>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={fields.lpd}
-                  onChange={(e) => setField("lpd", e.target.value)}
-                  className={inpCls}
-                />
+                <p
+                  className={`text-[15px] font-semibold mt-0.5 ${pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                  title="Auto-calculated: Fee Due − Received"
+                >
+                  {pendingDisplay(pending)}
+                </p>
               </div>
               <div>
                 <p className={lbl}>Date Received</p>
@@ -374,9 +371,10 @@ const FeeSection = memo(
               <div>
                 <p className={lbl}>Pending</p>
                 <p
-                  className={`text-[15px] font-semibold mt-0.5 ${pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
+                  className={`text-[15px] font-semibold mt-0.5 ${pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                  title="Auto-calculated: Fee Due − Received"
                 >
-                  {currency(pending)}
+                  {pendingDisplay(pending)}
                 </p>
               </div>
               <div>
@@ -706,17 +704,14 @@ const CaseDetailPage = () => {
           t16Retro={caseData.t16Retro}
           t16FeeDue={caseData.t16FeeDue}
           t16FeeReceived={caseData.t16FeeReceived}
-          t16Pending={caseData.t16Pending}
           t16FeeReceivedDate={caseData.t16FeeReceivedDate}
           t2Retro={caseData.t2Retro}
           t2FeeDue={caseData.t2FeeDue}
           t2FeeReceived={caseData.t2FeeReceived}
-          t2Pending={caseData.t2Pending}
           t2FeeReceivedDate={caseData.t2FeeReceivedDate}
           auxRetro={caseData.auxRetro}
           auxFeeDue={caseData.auxFeeDue}
           auxFeeReceived={caseData.auxFeeReceived}
-          auxPending={caseData.auxPending}
           auxFeeReceivedDate={caseData.auxFeeReceivedDate}
           onClose={() => setFeeModalOpen(false)}
           onSaved={fetchCase}

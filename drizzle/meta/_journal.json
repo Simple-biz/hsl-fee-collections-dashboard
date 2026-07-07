@@ -267,6 +267,41 @@
       "when": 1783367408434,
       "tag": "0037_fee_petitions_assigned_to",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1783369254905,
+      "tag": "0038_pif_only_auto_after_received",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1783371870043,
+      "tag": "0039_pending_auto_calculated",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1783430627797,
+      "tag": "0040_pending_only_when_open",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1783431389219,
+      "tag": "0041_pending_when_received_no_due",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1783431674685,
+      "tag": "0042_overpaid_vs_pending_needs_due_set",
+      "breakpoints": true
     }
   ]
 }

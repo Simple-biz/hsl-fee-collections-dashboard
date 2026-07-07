@@ -12,17 +12,14 @@ interface FeeEditModalProps {
   t16Retro: number;
   t16FeeDue: number;
   t16FeeReceived: number;
-  t16Pending: number;
   t16FeeReceivedDate: string | null;
   t2Retro: number;
   t2FeeDue: number;
   t2FeeReceived: number;
-  t2Pending: number;
   t2FeeReceivedDate: string | null;
   auxRetro: number;
   auxFeeDue: number;
   auxFeeReceived: number;
-  auxPending: number;
   auxFeeReceivedDate: string | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
@@ -42,17 +39,14 @@ export default function FeeEditModal({
     t16Retro: toStr(orig.t16Retro),
     t16Due: toStr(orig.t16FeeDue),
     t16Rcv: toStr(orig.t16FeeReceived),
-    t16Pending: toStr(orig.t16Pending),
     t16Dt: orig.t16FeeReceivedDate || "",
     t2Retro: toStr(orig.t2Retro),
     t2Due: toStr(orig.t2FeeDue),
     t2Rcv: toStr(orig.t2FeeReceived),
-    t2Pending: toStr(orig.t2Pending),
     t2Dt: orig.t2FeeReceivedDate || "",
     auxRetro: toStr(orig.auxRetro),
     auxDue: toStr(orig.auxFeeDue),
     auxRcv: toStr(orig.auxFeeReceived),
-    auxPending: toStr(orig.auxPending),
     auxDt: orig.auxFeeReceivedDate || "",
   });
   const [saving, setSaving] = useState(false);
@@ -88,19 +82,16 @@ export default function FeeEditModal({
       chk(parseFloat(f.t16Retro) || 0, orig.t16Retro, "t16Retro", "T16 Retro");
       chk(parseFloat(f.t16Due) || 0, orig.t16FeeDue, "t16FeeDue", "T16 Fee Due");
       chk(parseFloat(f.t16Rcv) || 0, orig.t16FeeReceived, "t16FeeReceived", "T16 Received");
-      chk(parseFloat(f.t16Pending) || 0, orig.t16Pending, "t16Pending", "T16 Pending");
       chkDt(f.t16Dt, orig.t16FeeReceivedDate, "t16FeeReceivedDate", "T16 Date");
 
       chk(parseFloat(f.t2Retro) || 0, orig.t2Retro, "t2Retro", "T2 Retro");
       chk(parseFloat(f.t2Due) || 0, orig.t2FeeDue, "t2FeeDue", "T2 Fee Due");
       chk(parseFloat(f.t2Rcv) || 0, orig.t2FeeReceived, "t2FeeReceived", "T2 Received");
-      chk(parseFloat(f.t2Pending) || 0, orig.t2Pending, "t2Pending", "T2 Pending");
       chkDt(f.t2Dt, orig.t2FeeReceivedDate, "t2FeeReceivedDate", "T2 Date");
 
       chk(parseFloat(f.auxRetro) || 0, orig.auxRetro, "auxRetro", "AUX Retro");
       chk(parseFloat(f.auxDue) || 0, orig.auxFeeDue, "auxFeeDue", "AUX Fee Due");
       chk(parseFloat(f.auxRcv) || 0, orig.auxFeeReceived, "auxFeeReceived", "AUX Received");
-      chk(parseFloat(f.auxPending) || 0, orig.auxPending, "auxPending", "AUX Pending");
       chkDt(f.auxDt, orig.auxFeeReceivedDate, "auxFeeReceivedDate", "AUX Date");
 
       if (changes.length === 0) {
@@ -157,7 +148,7 @@ export default function FeeEditModal({
           <div>
             <h3 className={`text-sm font-bold ${t.text}`}>Edit Fee Amounts</h3>
             <p className={`text-[12px] ${t.textMuted} mt-0.5`}>
-              Retro, Fee Due, Fee Received, and Pending are all independently editable.
+              Retro, Fee Due, and Fee Received are independently editable. Pending is auto-calculated (Fee Due − Received).
             </p>
           </div>
           <button
@@ -180,7 +171,6 @@ export default function FeeEditModal({
               {field("Retro Amount", f.t16Retro, set("t16Retro"))}
               {field("Fee Due", f.t16Due, set("t16Due"))}
               {field("Fee Received", f.t16Rcv, set("t16Rcv"))}
-              {field("Pending", f.t16Pending, set("t16Pending"))}
               {field("Date Received", f.t16Dt, set("t16Dt"), "date")}
             </div>
           </div>
@@ -196,7 +186,6 @@ export default function FeeEditModal({
               {field("Retro Amount", f.t2Retro, set("t2Retro"))}
               {field("Fee Due", f.t2Due, set("t2Due"))}
               {field("Fee Received", f.t2Rcv, set("t2Rcv"))}
-              {field("Pending", f.t2Pending, set("t2Pending"))}
               {field("Date Received", f.t2Dt, set("t2Dt"), "date")}
             </div>
           </div>
@@ -212,7 +201,6 @@ export default function FeeEditModal({
               {field("Retro Amount", f.auxRetro, set("auxRetro"))}
               {field("Fee Due", f.auxDue, set("auxDue"))}
               {field("Fee Received", f.auxRcv, set("auxRcv"))}
-              {field("Pending", f.auxPending, set("auxPending"))}
               {field("Date Received", f.auxDt, set("auxDt"), "date")}
             </div>
           </div>
