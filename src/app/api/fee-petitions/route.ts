@@ -44,7 +44,7 @@ const getMissingClause = (key: string | null) => {
   }
 };
 
-// GET /api/fee-petitions?page=&limit=&search=&sort=&dir=&status=&touched=&missing=&aging=
+// GET /api/fee-petitions?page=&limit=&search=&sort=&dir=&status=&touched=&missing=&aging=&assignedTo=
 // Lists cases at FEE_PETITION level with checklist state and aggregate stats
 export const GET = async (req: NextRequest) => {
   try {
@@ -54,6 +54,7 @@ export const GET = async (req: NextRequest) => {
     const touched = searchParams.get("touched"); // "none" = no fee_petitions row yet
     const missing = searchParams.get("missing"); // checkbox key to filter by
     const aging = searchParams.get("aging"); // "unpaid_60" | "unpaid_90"
+    const assignedTo = searchParams.get("assignedTo"); // fee petition specialist name
     const sortParam = searchParams.get("sort");
     const sort: SortKey = SORT_KEYS.includes(sortParam as SortKey)
       ? (sortParam as SortKey)
@@ -113,6 +114,7 @@ export const GET = async (req: NextRequest) => {
         : aging === "unpaid_90"
           ? sql`AND COALESCE(${feeRecords.totalFeesPaid}, 0) = 0 AND ${cases.approvalDate} IS NOT NULL AND (CURRENT_DATE - ${cases.approvalDate}::date) > 90`
           : sql``;
+    const assignedToClause = assignedTo ? sql`AND ${feePetitions.assignedTo} = ${assignedTo}` : sql``;
 
     // Accept both the legacy enum value and the worksheet-direct label
     // saved via the dashboard dropdown (column C in the master sheet uses
@@ -124,7 +126,34 @@ export const GET = async (req: NextRequest) => {
       ${touchedClause}
       ${missingClause}
       ${agingClause}
+      ${assignedToClause}
     `;
+
+    // Base clause excludes the assignedTo filter itself, so the dropdown's
+    // per-specialist counts reflect every other active filter while still
+    // offering every specialist as an option (not just the selected one).
+    const assignedToBaseClause = sql`${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
+      AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)
+      ${searchClause}
+      ${statusClause}
+      ${touchedClause}
+      ${missingClause}
+      ${agingClause}
+    `;
+    const assignedToRows = await db
+      .select({
+        assignedTo: feePetitions.assignedTo,
+        caseCount: sql<number>`COUNT(*)::int`,
+      })
+      .from(cases)
+      .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
+      .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
+      .where(assignedToBaseClause)
+      .groupBy(feePetitions.assignedTo)
+      .orderBy(feePetitions.assignedTo);
+    const assignees = assignedToRows
+      .filter((r): r is { assignedTo: string; caseCount: number } => r.assignedTo != null)
+      .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
 
     // Single aggregate for stats + count. Fee totals sum across the FULL
     // filtered set (not just the current page), so they stay accurate
@@ -225,6 +254,7 @@ export const GET = async (req: NextRequest) => {
       neverTouchedCount,
       totalFeeRequested,
       totalFeesReceived,
+      assignees,
     });
   } catch (error) {
     console.error("GET /api/fee-petitions error:", error);
