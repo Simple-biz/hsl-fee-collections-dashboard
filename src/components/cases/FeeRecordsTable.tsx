@@ -187,6 +187,11 @@ const patchSingleField = async (
 };
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
+// Pending can go negative (overpaid) now that it's auto-calculated as Fee
+// Due minus Rec'd — unlike currency() above, a negative value here is real
+// signal (the PIF "Overpaid" badge is the primary flag, but the exact
+// overage is still worth showing here rather than collapsing to "—").
+const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
 const AGING_COLORS = (cat: string | null, dark: boolean) => {
@@ -305,13 +310,15 @@ export const FeeRecordsTable = ({
     "active_sheet" | "fees_closed_sheet"
   >("active_sheet");
   // Optimistic overrides for fee payment totals after panel add/delete.
+  // Pending is deliberately absent — it's fully derived (Fee Due minus
+  // Received) by the compute_fee_totals trigger, never set optimistically.
   const [feeOverrides, setFeeOverrides] = useState<
-    Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16Pending" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2Pending" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxPending" | "auxFeeReceived" | "auxFeeReceivedDate">>>
+    Record<number, Partial<Pick<CaseRow, "t16Retro" | "t16FeeDue" | "t16FeeReceived" | "t16FeeReceivedDate" | "t2Retro" | "t2FeeDue" | "t2FeeReceived" | "t2FeeReceivedDate" | "auxRetro" | "auxFeeDue" | "auxFeeReceived" | "auxFeeReceivedDate">>>
   >({});
   type FeeAmountField =
-    | "t16Retro" | "t16FeeDue" | "t16Pending"
-    | "t2Retro" | "t2FeeDue" | "t2Pending"
-    | "auxRetro" | "auxFeeDue" | "auxPending";
+    | "t16Retro" | "t16FeeDue"
+    | "t2Retro" | "t2FeeDue"
+    | "auxRetro" | "auxFeeDue";
   const [feeAmountEdit, setFeeAmountEdit] = useState<{
     caseId: number;
     field: FeeAmountField;
@@ -650,9 +657,9 @@ export const FeeRecordsTable = ({
     setFeeAmountError(null);
     const { caseId, field } = feeAmountEdit;
     const labelMap: Record<FeeAmountField, string> = {
-      t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due", t16Pending: "T16 Pending",
-      t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",   t2Pending: "T2 Pending",
-      auxRetro: "AUX Retro", auxFeeDue: "AUX Fee Due", auxPending: "AUX Pending",
+      t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due",
+      t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",
+      auxRetro: "AUX Retro", auxFeeDue: "AUX Fee Due",
     };
     try {
       const res = await fetch(`/api/cases/${caseId}`, {
@@ -1737,8 +1744,8 @@ export const FeeRecordsTable = ({
                       <FeeAmountCell
                         active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
                         value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: String(c.t16FeeDue) }); setFeeAmountError(null); }}
+                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: c.t16FeeDue != null ? String(c.t16FeeDue) : "" }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
                         onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
@@ -1750,18 +1757,10 @@ export const FeeRecordsTable = ({
                       {currency(c.t16FeeReceived)}
                     </td>
                     <td
-                      className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                      className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t16Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                      title="Auto-calculated: Fee Due − Rec'd"
                     >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Pending"}
-                        value={c.t16Pending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T16 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Pending", draft: String(c.t16Pending) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
+                      {pendingDisplay(c.t16Pending)}
                     </td>
                     <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
                       <FeePaymentPanel
@@ -1808,8 +1807,8 @@ export const FeeRecordsTable = ({
                       <FeeAmountCell
                         active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
                         value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: String(c.t2FeeDue) }); setFeeAmountError(null); }}
+                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: c.t2FeeDue != null ? String(c.t2FeeDue) : "" }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
                         onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
@@ -1821,18 +1820,10 @@ export const FeeRecordsTable = ({
                       {currency(c.t2FeeReceived)}
                     </td>
                     <td
-                      className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                      className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t2Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                      title="Auto-calculated: Fee Due − Rec'd"
                     >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Pending"}
-                        value={c.t2Pending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T2 pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Pending", draft: String(c.t2Pending) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
+                      {pendingDisplay(c.t2Pending)}
                     </td>
                     <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
                       <FeePaymentPanel
@@ -1879,8 +1870,8 @@ export const FeeRecordsTable = ({
                       <FeeAmountCell
                         active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
                         value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: String(c.auxFeeDue) }); setFeeAmountError(null); }}
+                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: c.auxFeeDue != null ? String(c.auxFeeDue) : "" }); setFeeAmountError(null); }}
                         onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                         onSave={handleFeeAmountSave}
                         onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
@@ -1892,18 +1883,10 @@ export const FeeRecordsTable = ({
                       {currency(c.auxFeeReceived)}
                     </td>
                     <td
-                      className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : t.textMuted}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                      className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.auxPending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                      title="Auto-calculated: Fee Due − Rec'd"
                     >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxPending"}
-                        value={c.auxPending} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="AUX pending" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxPending", draft: String(c.auxPending) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
+                      {pendingDisplay(c.auxPending)}
                     </td>
                     <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
                       <FeePaymentPanel
