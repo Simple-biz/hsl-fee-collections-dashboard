@@ -7,6 +7,7 @@
 export const DROPDOWN_CATEGORIES = [
   { key: "approved_by", label: "Approved By", description: "Reviewer who signed off on the fee record." },
   { key: "assigned_to", label: "Assigned To", description: "Team member handling the case." },
+  { key: "fee_petition_assigned_to", label: "Fee Petition Assigned To", description: "Fee petition specialist handling the case's petition filing." },
   { key: "case_level", label: "Case Level", description: "Stage of the case (initial, recon, hearing, etc.)." },
   { key: "claim_type", label: "Claim Type", description: "Benefit type for the claim (T2, T16, CONC, etc.)." },
   { key: "win_sheet_status", label: "Win Sheet Status", description: "Win-sheet progress states." },

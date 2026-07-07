@@ -29,6 +29,7 @@ interface CompletedRow {
   updatedAt: string | null;
   feeAmount: number | null;
   feesReceived: number | null;
+  assignedTo: string | null;
   noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
@@ -233,8 +234,8 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
-  // checkbox + claimant + fee + approved + completed + 7 checkbox cols + note
-  const colSpan = CHECKBOX_COLUMNS.length + 6;
+  // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + note
+  const colSpan = CHECKBOX_COLUMNS.length + 7;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -400,6 +401,9 @@ export const CompletedPetitions = ({ dark }: Props) => {
                       Completed {sortIcon("updatedAt")}
                     </button>
                   </th>
+                  <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>
+                    Assigned To
+                  </th>
                   {CHECKBOX_COLUMNS.map((col) => (
                     <th
                       key={col.key}
@@ -476,6 +480,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>
+                        <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo || "—"}</td>
                         {CHECKBOX_COLUMNS.map((col) => (
                           <td key={col.key} className={`${tdBase} text-center`}>
                             <Check
