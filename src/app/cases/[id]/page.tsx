@@ -323,9 +323,11 @@ const FeeSection = memo(
               </div>
               <div>
                 <p className={lbl}>Fee Due</p>
+                {/* type="text" — a native number input sanitizes a bare "-"
+                    to "" before onChange sees it, breaking clear-to-null. */}
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={fields.ld}
                   onChange={(e) => setField("ld", e.target.value)}
                   title='Type "-" to clear back to blank'

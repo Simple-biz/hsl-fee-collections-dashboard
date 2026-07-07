@@ -141,11 +141,15 @@ export default function FeeEditModal({
   const lbl = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const inpCls = `mt-1 h-7 px-2 rounded border text-[14px] outline-none w-full ${t.inputBg}`;
 
-  const field = (label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type: "number" | "date" = "number", title?: string) => (
+  // "decimal" renders type="text" inputMode="decimal" — a native number
+  // input sanitizes a bare "-" to "" before onChange sees it, breaking the
+  // Fee Due clear-to-null gesture below.
+  const field = (label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type: "number" | "date" | "decimal" = "number", title?: string) => (
     <div>
       <p className={lbl}>{label}</p>
       <input
-        type={type}
+        type={type === "decimal" ? "text" : type}
+        inputMode={type === "decimal" ? "decimal" : undefined}
         step={type === "number" ? "0.01" : undefined}
         value={value}
         onChange={onChange}
@@ -191,7 +195,7 @@ export default function FeeEditModal({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {field("Retro Amount", f.t16Retro, set("t16Retro"))}
-              {field("Fee Due", f.t16Due, set("t16Due"), "number", FEE_DUE_HINT)}
+              {field("Fee Due", f.t16Due, set("t16Due"), "decimal", FEE_DUE_HINT)}
               {field("Fee Received", f.t16Rcv, set("t16Rcv"))}
               {field("Date Received", f.t16Dt, set("t16Dt"), "date")}
             </div>
@@ -206,7 +210,7 @@ export default function FeeEditModal({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {field("Retro Amount", f.t2Retro, set("t2Retro"))}
-              {field("Fee Due", f.t2Due, set("t2Due"), "number", FEE_DUE_HINT)}
+              {field("Fee Due", f.t2Due, set("t2Due"), "decimal", FEE_DUE_HINT)}
               {field("Fee Received", f.t2Rcv, set("t2Rcv"))}
               {field("Date Received", f.t2Dt, set("t2Dt"), "date")}
             </div>
@@ -221,7 +225,7 @@ export default function FeeEditModal({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {field("Retro Amount", f.auxRetro, set("auxRetro"))}
-              {field("Fee Due", f.auxDue, set("auxDue"), "number", FEE_DUE_HINT)}
+              {field("Fee Due", f.auxDue, set("auxDue"), "decimal", FEE_DUE_HINT)}
               {field("Fee Received", f.auxRcv, set("auxRcv"))}
               {field("Date Received", f.auxDt, set("auxDt"), "date")}
             </div>
