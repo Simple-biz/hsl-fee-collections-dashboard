@@ -51,6 +51,7 @@ export function FeeAmountCell({
             type="number" min="0" step="0.01" value={draft} autoFocus
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+            title={allowExplicitZero ? 'Type "-" to clear back to blank' : undefined}
             className={`h-6 px-1.5 rounded border text-[13px] outline-none w-24 text-right ${inputBg}`}
           />
           {saving ? (

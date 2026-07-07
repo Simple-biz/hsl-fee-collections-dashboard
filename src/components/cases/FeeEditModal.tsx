@@ -77,11 +77,14 @@ export default function FeeEditModal({
       // numeric diff can't tell apart from null (JS coerces null to 0 in
       // arithmetic, which would silently swallow an intentional $0.00 edit).
       const chkFeeDue = (rawStr: string, ov: number | null, key: string, label: string) => {
-        const touched = rawStr.trim() !== "";
-        const nv = touched ? parseFloat(rawStr) || 0 : ov;
+        const trimmed = rawStr.trim();
+        // A literal "-" is the deliberate gesture to clear an already-set
+        // Fee Due back to null — distinct from leaving the box empty, which
+        // means "didn't touch it."
+        const nv = trimmed === "" ? ov : trimmed === "-" ? null : parseFloat(rawStr) || 0;
         if (nv !== ov) {
           feeFields[key] = nv;
-          changes.push(`${label}: ${ov == null ? "—" : `$${ov}`} → $${nv}`);
+          changes.push(`${label}: ${ov == null ? "—" : `$${ov}`} → ${nv == null ? "—" : `$${nv}`}`);
         }
       };
       const chkDt = (
@@ -138,7 +141,7 @@ export default function FeeEditModal({
   const lbl = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
   const inpCls = `mt-1 h-7 px-2 rounded border text-[14px] outline-none w-full ${t.inputBg}`;
 
-  const field = (label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type: "number" | "date" = "number") => (
+  const field = (label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type: "number" | "date" = "number", title?: string) => (
     <div>
       <p className={lbl}>{label}</p>
       <input
@@ -146,10 +149,12 @@ export default function FeeEditModal({
         step={type === "number" ? "0.01" : undefined}
         value={value}
         onChange={onChange}
+        title={title}
         className={inpCls}
       />
     </div>
   );
+  const FEE_DUE_HINT = 'Type "-" to clear back to blank';
 
   return (
     <div
@@ -186,7 +191,7 @@ export default function FeeEditModal({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {field("Retro Amount", f.t16Retro, set("t16Retro"))}
-              {field("Fee Due", f.t16Due, set("t16Due"))}
+              {field("Fee Due", f.t16Due, set("t16Due"), "number", FEE_DUE_HINT)}
               {field("Fee Received", f.t16Rcv, set("t16Rcv"))}
               {field("Date Received", f.t16Dt, set("t16Dt"), "date")}
             </div>
@@ -201,7 +206,7 @@ export default function FeeEditModal({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {field("Retro Amount", f.t2Retro, set("t2Retro"))}
-              {field("Fee Due", f.t2Due, set("t2Due"))}
+              {field("Fee Due", f.t2Due, set("t2Due"), "number", FEE_DUE_HINT)}
               {field("Fee Received", f.t2Rcv, set("t2Rcv"))}
               {field("Date Received", f.t2Dt, set("t2Dt"), "date")}
             </div>
@@ -216,7 +221,7 @@ export default function FeeEditModal({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {field("Retro Amount", f.auxRetro, set("auxRetro"))}
-              {field("Fee Due", f.auxDue, set("auxDue"))}
+              {field("Fee Due", f.auxDue, set("auxDue"), "number", FEE_DUE_HINT)}
               {field("Fee Received", f.auxRcv, set("auxRcv"))}
               {field("Date Received", f.auxDt, set("auxDt"), "date")}
             </div>

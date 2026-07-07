@@ -229,8 +229,10 @@ const FeeSection = memo(
         const newRetro = parseFloat(fields.lr) || 0;
         // An empty box means "didn't touch it" — treat as unchanged rather
         // than coercing to 0, which would wrongly turn an untouched (null)
-        // Fee Due into an explicit $0.00 on every save.
-        const newDue = fields.ld.trim() === "" ? due : parseFloat(fields.ld) || 0;
+        // Fee Due into an explicit $0.00 on every save. A literal "-" is the
+        // deliberate gesture to clear an already-set Fee Due back to null.
+        const dueTrimmed = fields.ld.trim();
+        const newDue = dueTrimmed === "" ? due : dueTrimmed === "-" ? null : parseFloat(fields.ld) || 0;
         const newReceived = parseFloat(fields.lrcv) || 0;
 
         if (newRetro !== retro) {
@@ -239,7 +241,7 @@ const FeeSection = memo(
         }
         if (newDue !== due) {
           feeFields[`${prefix}FeeDue`] = newDue;
-          changes.push(`${title} Fee Due: ${due == null ? "—" : `$${due}`} → $${newDue}`);
+          changes.push(`${title} Fee Due: ${due == null ? "—" : `$${due}`} → ${newDue == null ? "—" : `$${newDue}`}`);
         }
         if (newReceived !== received) {
           feeFields[`${prefix}FeeReceived`] = newReceived;
@@ -326,6 +328,7 @@ const FeeSection = memo(
                   step="0.01"
                   value={fields.ld}
                   onChange={(e) => setField("ld", e.target.value)}
+                  title='Type "-" to clear back to blank'
                   className={inpCls}
                 />
               </div>

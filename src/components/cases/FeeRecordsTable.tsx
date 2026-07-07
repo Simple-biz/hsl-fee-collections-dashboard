@@ -645,17 +645,26 @@ export const FeeRecordsTable = ({
 
   const handleFeeAmountSave = async () => {
     if (!feeAmountEdit || feeAmountSaving) return;
-    const amount = parseFloat(feeAmountEdit.draft);
-    if (isNaN(amount) || amount < 0) {
-      setFeeAmountError("Enter a valid amount (0 or more).");
+    const { caseId, field } = feeAmountEdit;
+    // Fee Due is the only field where null is a meaningful, distinct value
+    // ("never touched", renders "—") from an explicit $0.00 — Retro fields
+    // still default to 0 at the DB level, so a bare "-" there is just invalid
+    // input, not a clear-to-null gesture.
+    const isFeeDue = field.endsWith("FeeDue");
+    const clearing = isFeeDue && feeAmountEdit.draft.trim() === "-";
+    const parsed = parseFloat(feeAmountEdit.draft);
+    if (!clearing && (isNaN(parsed) || parsed < 0)) {
+      setFeeAmountError(
+        isFeeDue ? "Enter a valid amount (0 or more), or \"-\" to clear." : "Enter a valid amount (0 or more).",
+      );
       return;
     }
+    const amount: number | null = clearing ? null : parsed;
     feeAmountAbortRef.current?.abort();
     const controller = new AbortController();
     feeAmountAbortRef.current = controller;
     setFeeAmountSaving(true);
     setFeeAmountError(null);
-    const { caseId, field } = feeAmountEdit;
     const labelMap: Record<FeeAmountField, string> = {
       t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due",
       t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",
@@ -667,7 +676,9 @@ export const FeeRecordsTable = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           feeFields: { [field]: amount },
-          logMessage: `${labelMap[field]} updated to ${fmtFull(amount)}`,
+          logMessage: clearing
+            ? `${labelMap[field]} cleared`
+            : `${labelMap[field]} updated to ${fmtFull(parsed)}`,
         }),
         signal: controller.signal,
       });
