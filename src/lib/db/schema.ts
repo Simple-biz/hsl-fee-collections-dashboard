@@ -322,6 +322,12 @@ export const feePetitions = pgTable(
       .references(() => cases.clientId, { onDelete: "cascade" })
       .unique(),
 
+    // Fee petition specialist — distinct from the case's T2/T16/Concurrent
+    // agent (fee_records.assigned_to); set once the case reaches Fee
+    // Petition stage. Admin-managed via dropdown_options (category
+    // fee_petition_assigned_to).
+    assignedTo: varchar("assigned_to", { length: 100 }),
+
     // Filing checklist
     noa: boolean("noa").notNull().default(false),
     timeDelineation: boolean("time_delineation").notNull().default(false),
