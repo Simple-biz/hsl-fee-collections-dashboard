@@ -59,6 +59,10 @@ interface CaseDetailSheetProps {
 }
 
 const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
+// Fee Due specifically distinguishes "never touched" (null, "—") from an
+// explicit $0.00 — every other field on this card still collapses both to
+// "—" via currency() above.
+const currencyFeeDue = (v: number | null) => (v == null ? "—" : fmtFull(v));
 const dateStr = (d: string | null | undefined) => (d ? fmtDate(d) : "—");
 
 // Render <option>s from an admin-managed list, preserving the row's current
@@ -243,17 +247,14 @@ export default function CaseDetailSheet({
     externalId: "",
     t16Retro: "",
     t16FeeDue: "",
-    t16Pending: "",
     t16FeeReceived: "",
     t16FeeReceivedDate: "",
     t2Retro: "",
     t2FeeDue: "",
-    t2Pending: "",
     t2FeeReceived: "",
     t2FeeReceivedDate: "",
     auxRetro: "",
     auxFeeDue: "",
-    auxPending: "",
     auxFeeReceived: "",
     auxFeeReceivedDate: "",
   });
@@ -350,18 +351,15 @@ export default function CaseDetailSheet({
         chronicleId: data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "",
         externalId: data.externalId ?? "",
         t16Retro: data.t16Retro > 0 ? String(data.t16Retro) : "",
-        t16FeeDue: data.t16FeeDue > 0 ? String(data.t16FeeDue) : "",
-        t16Pending: data.t16Pending > 0 ? String(data.t16Pending) : "",
+        t16FeeDue: (data.t16FeeDue ?? 0) > 0 ? String(data.t16FeeDue) : "",
         t16FeeReceived: data.t16FeeReceived > 0 ? String(data.t16FeeReceived) : "",
         t16FeeReceivedDate: data.t16FeeReceivedDate ?? "",
         t2Retro: data.t2Retro > 0 ? String(data.t2Retro) : "",
-        t2FeeDue: data.t2FeeDue > 0 ? String(data.t2FeeDue) : "",
-        t2Pending: data.t2Pending > 0 ? String(data.t2Pending) : "",
+        t2FeeDue: (data.t2FeeDue ?? 0) > 0 ? String(data.t2FeeDue) : "",
         t2FeeReceived: data.t2FeeReceived > 0 ? String(data.t2FeeReceived) : "",
         t2FeeReceivedDate: data.t2FeeReceivedDate ?? "",
         auxRetro: data.auxRetro > 0 ? String(data.auxRetro) : "",
-        auxFeeDue: data.auxFeeDue > 0 ? String(data.auxFeeDue) : "",
-        auxPending: data.auxPending > 0 ? String(data.auxPending) : "",
+        auxFeeDue: (data.auxFeeDue ?? 0) > 0 ? String(data.auxFeeDue) : "",
         auxFeeReceived: data.auxFeeReceived > 0 ? String(data.auxFeeReceived) : "",
         auxFeeReceivedDate: data.auxFeeReceivedDate ?? "",
       });
@@ -409,19 +407,20 @@ export default function CaseDetailSheet({
     const feeNumFields = [
       ["t16Retro", data.t16Retro],
       ["t16FeeDue", data.t16FeeDue],
-      ["t16Pending", data.t16Pending],
       ["t16FeeReceived", data.t16FeeReceived],
       ["t2Retro", data.t2Retro],
       ["t2FeeDue", data.t2FeeDue],
-      ["t2Pending", data.t2Pending],
       ["t2FeeReceived", data.t2FeeReceived],
       ["auxRetro", data.auxRetro],
       ["auxFeeDue", data.auxFeeDue],
-      ["auxPending", data.auxPending],
       ["auxFeeReceived", data.auxFeeReceived],
     ] as const;
     for (const [key, orig] of feeNumFields) {
       const edited = editValues[key];
+      // An empty box on a Fee Due field that was already null means "didn't
+      // touch it" — skip rather than coercing to 0, which would wrongly
+      // turn an untouched Fee Due into an explicit $0.00 on every save.
+      if (edited === "" && orig == null) continue;
       const editedNum = edited === "" ? 0 : Number(edited);
       if (!Number.isFinite(editedNum)) continue;
       if (editedNum !== orig) feeFields[key] = editedNum;
@@ -888,7 +887,6 @@ export default function CaseDetailSheet({
                           [
                             { label: "Retro",     field: `${b.key}Retro`            as keyof typeof editValues, disabled: false },
                             { label: "Fee Due",   field: `${b.key}FeeDue`           as keyof typeof editValues, disabled: false },
-                            { label: "Pending",   field: `${b.key}Pending`          as keyof typeof editValues, disabled: false },
                             { label: "Received",  field: `${b.key}FeeReceived`      as keyof typeof editValues, disabled: !canEditFeeReceived },
                           ] as const
                         ).map(({ label, field, disabled }) => (
@@ -907,6 +905,12 @@ export default function CaseDetailSheet({
                             />
                           </div>
                         ))}
+                        <div>
+                          <p className={lbl}>Pending</p>
+                          <p className="text-xs font-semibold mt-1" title="Auto-calculated: Fee Due − Received">
+                            {currency(b.pending)}
+                          </p>
+                        </div>
                         <div>
                           <p className={lbl}>Rec&apos;d Date</p>
                           <input
@@ -927,7 +931,7 @@ export default function CaseDetailSheet({
                         </div>
                         <div>
                           <p className={lbl}>Fee Due</p>
-                          <p className="text-xs font-semibold">{currency(b.due)}</p>
+                          <p className="text-xs font-semibold">{currencyFeeDue(b.due)}</p>
                         </div>
                         <div>
                           <p className={lbl}>Received</p>

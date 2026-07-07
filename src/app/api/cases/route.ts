@@ -212,21 +212,21 @@ export const GET = async (req: NextRequest) => {
 
         // T16
         t16Retro: Number(r.t16Retro) || 0,
-        t16FeeDue: Number(r.t16FeeDue) || 0,
+        t16FeeDue: r.t16FeeDue != null ? Number(r.t16FeeDue) : null,
         t16FeeReceived: Number(r.t16FeeReceived) || 0,
         t16Pending: Number(r.t16Pending) || 0,
         t16FeeReceivedDate: r.t16FeeReceivedDate ?? null,
 
         // T2
         t2Retro: Number(r.t2Retro) || 0,
-        t2FeeDue: Number(r.t2FeeDue) || 0,
+        t2FeeDue: r.t2FeeDue != null ? Number(r.t2FeeDue) : null,
         t2FeeReceived: Number(r.t2FeeReceived) || 0,
         t2Pending: Number(r.t2Pending) || 0,
         t2FeeReceivedDate: r.t2FeeReceivedDate ?? null,
 
         // AUX
         auxRetro: Number(r.auxRetro) || 0,
-        auxFeeDue: Number(r.auxFeeDue) || 0,
+        auxFeeDue: r.auxFeeDue != null ? Number(r.auxFeeDue) : null,
         auxFeeReceived: Number(r.auxFeeReceived) || 0,
         auxPending: Number(r.auxPending) || 0,
         auxFeeReceivedDate: r.auxFeeReceivedDate ?? null,

@@ -3,11 +3,19 @@
 import { Check, Loader2, Pencil, X } from "lucide-react";
 import { fmtFull } from "@/lib/formatters";
 
-const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
+// allowExplicitZero distinguishes "never touched" (null, renders "—") from
+// an explicitly-entered $0.00 (renders "$0.00") — currently only Fee Due
+// tracks that distinction at the database level. Every other field using
+// this cell (Retro, Fees Requested/Received) still collapses null and 0 to
+// the same "—", matching their existing behavior.
+const currency = (v: number | null, allowExplicitZero?: boolean) =>
+  allowExplicitZero
+    ? v == null ? "—" : fmtFull(v)
+    : (v ?? 0) > 0 ? fmtFull(v as number) : "—";
 
 export interface FeeAmountCellProps {
   active: boolean;
-  value: number;
+  value: number | null;
   draft: string;
   saving: boolean;
   error: string | null;
@@ -24,6 +32,8 @@ export interface FeeAmountCellProps {
   // an unnamed `group`/`group-hover`. Pass e.g. "opacity-0 group-hover/row:opacity-100"
   // when the ancestor row uses a named group (Tailwind's group/<name> syntax).
   pencilRevealClass?: string;
+  // See currency() above — set for Fee Due cells only.
+  allowExplicitZero?: boolean;
 }
 
 export function FeeAmountCell({
@@ -31,6 +41,7 @@ export function FeeAmountCell({
   saveLabel, inputBg, hoverCls, textMuted,
   onEdit, onDraftChange, onSave, onCancel,
   pencilRevealClass = "opacity-0 group-hover:opacity-100",
+  allowExplicitZero,
 }: FeeAmountCellProps) {
   if (active) {
     return (
@@ -61,7 +72,7 @@ export function FeeAmountCell({
   }
   return (
     <div className="flex items-center justify-end gap-1">
-      <span>{currency(value)}</span>
+      <span>{currency(value, allowExplicitZero)}</span>
       {canEdit && (
         <button type="button" onClick={onEdit} className={`${pencilRevealClass} transition-colors p-0.5 rounded ${hoverCls}`} aria-label={`Edit ${saveLabel}`}>
           <Pencil className={`h-3 w-3 ${textMuted}`} aria-hidden="true" />

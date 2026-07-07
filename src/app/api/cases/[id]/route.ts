@@ -230,21 +230,21 @@ export const GET = async (
 
       // T16
       t16Retro: Number(row.t16Retro) || 0,
-      t16FeeDue: Number(row.t16FeeDue) || 0,
+      t16FeeDue: row.t16FeeDue != null ? Number(row.t16FeeDue) : null,
       t16FeeReceived: Number(row.t16FeeReceived) || 0,
       t16Pending: Number(row.t16Pending) || 0,
       t16FeeReceivedDate: row.t16FeeReceivedDate,
 
       // T2
       t2Retro: Number(row.t2Retro) || 0,
-      t2FeeDue: Number(row.t2FeeDue) || 0,
+      t2FeeDue: row.t2FeeDue != null ? Number(row.t2FeeDue) : null,
       t2FeeReceived: Number(row.t2FeeReceived) || 0,
       t2Pending: Number(row.t2Pending) || 0,
       t2FeeReceivedDate: row.t2FeeReceivedDate,
 
       // AUX
       auxRetro: Number(row.auxRetro) || 0,
-      auxFeeDue: Number(row.auxFeeDue) || 0,
+      auxFeeDue: row.auxFeeDue != null ? Number(row.auxFeeDue) : null,
       auxFeeReceived: Number(row.auxFeeReceived) || 0,
       auxPending: Number(row.auxPending) || 0,
       auxFeeReceivedDate: row.auxFeeReceivedDate,
@@ -458,17 +458,14 @@ export const PATCH = async (
         t16Retro: "t16_retro",
         t16FeeDue: "t16_fee_due",
         t16FeeReceived: "t16_fee_received",
-        t16Pending: "t16_pending",
         t16FeeReceivedDate: "t16_fee_received_date",
         t2Retro: "t2_retro",
         t2FeeDue: "t2_fee_due",
         t2FeeReceived: "t2_fee_received",
-        t2Pending: "t2_pending",
         t2FeeReceivedDate: "t2_fee_received_date",
         auxRetro: "aux_retro",
         auxFeeDue: "aux_fee_due",
         auxFeeReceived: "aux_fee_received",
-        auxPending: "aux_pending",
         auxFeeReceivedDate: "aux_fee_received_date",
         totalRetroDue: "total_retro_due",
         totalFeesExpected: "total_fees_expected",
@@ -521,8 +518,13 @@ export const PATCH = async (
       }
 
       if (updates.length > 0) {
-        // Retro, Fee Due, Pending, and Fee Received are all plain editable
-        // columns — nothing here derives Fee Due from Retro anymore.
+        // Retro, Fee Due, and Fee Received are plain editable columns —
+        // nothing here derives Fee Due from Retro. Pending is deliberately
+        // absent from FEE_FIELD_MAP above: it's fully derived (Fee Due minus
+        // Received) by the compute_fee_totals trigger on every write to an
+        // open record, so accepting it here would be a no-op for open cases
+        // and a real footgun for closed ones (the trigger skips closed
+        // records entirely, so a stray write here would actually persist).
         await db.execute(sql`
           UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
           WHERE case_id = ${caseId}

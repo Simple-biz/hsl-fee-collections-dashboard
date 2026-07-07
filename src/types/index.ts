@@ -40,21 +40,22 @@ export interface CaseRow {
 
   // T16 section
   t16Retro: number;
-  t16FeeDue: number;
+  // null = never touched; distinct from an explicit $0.00 (see FeeAmountCell's allowExplicitZero)
+  t16FeeDue: number | null;
   t16FeeReceived: number;
   t16Pending: number;
   t16FeeReceivedDate: string | null;
 
   // T2 section
   t2Retro: number;
-  t2FeeDue: number;
+  t2FeeDue: number | null;
   t2FeeReceived: number;
   t2Pending: number;
   t2FeeReceivedDate: string | null;
 
   // AUX section
   auxRetro: number;
-  auxFeeDue: number;
+  auxFeeDue: number | null;
   auxFeeReceived: number;
   auxPending: number;
   auxFeeReceivedDate: string | null;
@@ -204,17 +205,18 @@ export interface CaseDetailData {
 
   // Financials
   t16Retro: number;
-  t16FeeDue: number;
+  // null = never touched; distinct from an explicit $0.00 (see FeeAmountCell's allowExplicitZero)
+  t16FeeDue: number | null;
   t16FeeReceived: number;
   t16Pending: number;
   t16FeeReceivedDate: string | null;
   t2Retro: number;
-  t2FeeDue: number;
+  t2FeeDue: number | null;
   t2FeeReceived: number;
   t2Pending: number;
   t2FeeReceivedDate: string | null;
   auxRetro: number;
-  auxFeeDue: number;
+  auxFeeDue: number | null;
   auxFeeReceived: number;
   auxPending: number;
   auxFeeReceivedDate: string | null;

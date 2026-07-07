@@ -29,6 +29,9 @@ import { parseBool } from "@/lib/import/csv-parser";
 import { NoteField } from "@/components/shared/NoteField";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { Listbox } from "@/components/shared/Listbox";
+import { buildListboxOptions } from "@/lib/listbox-options";
+import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
 
 // ---------- types ----------
 interface FeePetitionRow {
@@ -43,6 +46,7 @@ interface FeePetitionRow {
   // resolved server-side to whichever type actually has data (falling back
   // to the case's registered claim type when nothing's entered yet).
   activeFeeType: "t16" | "t2" | "aux";
+  assignedTo: string | null;
   noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
@@ -152,6 +156,21 @@ export const FeePetitions = () => {
   useEffect(() => setMounted(true), []);
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    (async () => {
+      const grouped = await fetchDropdownOptions(controller.signal);
+      if (!cancelled) setDropdownOptions(grouped);
+    })().catch((e) => {
+      if ((e as Error).name !== "AbortError") console.error("fetchDropdownOptions error:", e);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
   const { can } = useCapabilities();
   const canEditFees = can("case.update");
 
@@ -176,6 +195,7 @@ export const FeePetitions = () => {
   const [rows, setRows] = useState<FeePetitionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dropdownOptions, setDropdownOptions] = useState<DropdownOptionsByCategory>({});
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -637,6 +657,21 @@ export const FeePetitions = () => {
     }
   };
 
+  const updateAssignedTo = async (id: number, value: string) => {
+    const prevRow = rows.find((r) => r.id === id);
+    if (!prevRow) return;
+    const next = value || null;
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, assignedTo: next } : r)));
+    try {
+      await patchPetition(id, { assignedTo: next });
+      setLiveMessage("Assigned To updated");
+    } catch (err) {
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, assignedTo: prevRow.assignedTo } : r)));
+      setLiveMessage("Save failed");
+      setError((err as Error).message);
+    }
+  };
+
   const setUpdateNoteLocal = (id: number, value: string) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updateNote: value } : r)));
   };
@@ -748,7 +783,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 8;
+  const colSpan = CHECKBOX_COLUMNS.length + 9;
 
   return (
     <div className="space-y-4">
@@ -1103,6 +1138,9 @@ export const FeePetitions = () => {
                     Progress {sortIcon("progress")}
                   </button>
                 </th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>
+                  Assigned To
+                </th>
                 {CHECKBOX_COLUMNS.map((col) => (
                   <th key={col.key} className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
                     {col.label}
@@ -1254,6 +1292,25 @@ export const FeePetitions = () => {
                             {completedCount}/{CHECKBOX_COLUMNS.length}
                           </span>
                         </div>
+                      </td>
+                      <td className={`${tdBase}`} onClick={(e) => e.stopPropagation()}>
+                        <Listbox
+                          value={row.assignedTo ?? ""}
+                          onChange={(v) => updateAssignedTo(row.id, v)}
+                          dark={dark}
+                          t={t}
+                          aria-label="Assigned To"
+                          className="w-full"
+                          title={
+                            (dropdownOptions.fee_petition_assigned_to ?? []).length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                          options={buildListboxOptions(
+                            dropdownOptions.fee_petition_assigned_to ?? [],
+                            row.assignedTo ?? "",
+                          )}
+                        />
                       </td>
                       {CHECKBOX_COLUMNS.map((col) => (
                         <td key={col.key} className={`${tdBase} text-center`}>

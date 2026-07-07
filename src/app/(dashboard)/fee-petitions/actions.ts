@@ -8,6 +8,7 @@ import { resolveCaseId } from "@/lib/import/resolve-case";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
 
 const FIELD_KEYS = [
+  "assignedTo",
   "noa",
   "timeDelineation",
   "feePetitionDoc",

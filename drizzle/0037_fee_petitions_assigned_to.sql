@@ -1,0 +1,1 @@
+ALTER TABLE "fee_petitions" ADD COLUMN "assigned_to" varchar(100);
