@@ -300,7 +300,7 @@ export default function CsvImportModal({
                 <p className={`text-sm font-semibold ${t.text}`}>
                   {fileName ?? "Drag & drop a CSV file, or click to browse"}
                 </p>
-                <p className={`text-[13px] mt-1 ${t.textMuted}`}>Only .csv files. Any column names — you'll map them in the next step.</p>
+                <p className={`text-[13px] mt-1 ${t.textMuted}`}>Only .csv files. Any column names — you&apos;ll map them in the next step.</p>
               </div>
 
               {/* Header row selector */}

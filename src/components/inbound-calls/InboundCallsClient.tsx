@@ -221,12 +221,13 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     setPendingDelete(null);
     fetchPoc(selectedWeek);
     fetchRecords(selectedWeek);
+    const patchAborts = patchAbortRef.current;
     return () => {
       fetchCancelledRef.current = true;
       pocControllerRef.current?.abort();
       recordsControllerRef.current?.abort();
-      for (const ctrl of patchAbortRef.current.values()) ctrl.abort();
-      patchAbortRef.current.clear();
+      for (const ctrl of patchAborts.values()) ctrl.abort();
+      patchAborts.clear();
       addRowAbortRef.current?.abort();
       deleteAbortRef.current?.abort();
     };
