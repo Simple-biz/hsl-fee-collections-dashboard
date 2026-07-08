@@ -18,6 +18,8 @@ import {
   X,
   Archive,
   RefreshCw,
+  Minimize2,
+  Maximize2,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -281,6 +283,19 @@ export const FeeRecordsTable = ({
   const [feesConfFilter, setFeesConfFilter] = useState("all");
   const [claimFilter, setClaimFilter] = useState("all");
   const [caseStatusFilter, setCaseStatusFilter] = useState("all");
+  // Minimized T16/T2/AUX column groups — collapses a claim type's 5 editable
+  // columns down to a single read-only Fee Due glance, so staff working a
+  // single claim type can't mistakenly enter Retro/Fee Due on the wrong one.
+  // Session-only (not persisted), same as this table's other view toggles.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<"t16" | "t2" | "aux">>(new Set());
+  const toggleGroupCollapse = (group: "t16" | "t2" | "aux") => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Client-side pagination over the filtered+sorted set. Page size is
@@ -1172,22 +1187,55 @@ export const FeeRecordsTable = ({
                 />
 
                 <th
-                  colSpan={5}
+                  colSpan={collapsedGroups.has("t16") ? 1 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
                 >
-                  T16
+                  <button
+                    type="button"
+                    onClick={() => toggleGroupCollapse("t16")}
+                    className="inline-flex items-center gap-1 cursor-pointer"
+                    aria-label={collapsedGroups.has("t16") ? "Expand T16 columns" : "Minimize T16 columns"}
+                    title={collapsedGroups.has("t16") ? "Expand T16 columns" : "Minimize T16 columns"}
+                  >
+                    T16
+                    {collapsedGroups.has("t16")
+                      ? <Maximize2 className="h-3 w-3" aria-hidden="true" />
+                      : <Minimize2 className="h-3 w-3" aria-hidden="true" />}
+                  </button>
                 </th>
                 <th
-                  colSpan={5}
+                  colSpan={collapsedGroups.has("t2") ? 1 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-blue-400" : "text-blue-600"}`}
                 >
-                  T2
+                  <button
+                    type="button"
+                    onClick={() => toggleGroupCollapse("t2")}
+                    className="inline-flex items-center gap-1 cursor-pointer"
+                    aria-label={collapsedGroups.has("t2") ? "Expand T2 columns" : "Minimize T2 columns"}
+                    title={collapsedGroups.has("t2") ? "Expand T2 columns" : "Minimize T2 columns"}
+                  >
+                    T2
+                    {collapsedGroups.has("t2")
+                      ? <Maximize2 className="h-3 w-3" aria-hidden="true" />
+                      : <Minimize2 className="h-3 w-3" aria-hidden="true" />}
+                  </button>
                 </th>
                 <th
-                  colSpan={5}
+                  colSpan={collapsedGroups.has("aux") ? 1 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-violet-400" : "text-violet-600"}`}
                 >
-                  AUX
+                  <button
+                    type="button"
+                    onClick={() => toggleGroupCollapse("aux")}
+                    className="inline-flex items-center gap-1 cursor-pointer"
+                    aria-label={collapsedGroups.has("aux") ? "Expand AUX columns" : "Minimize AUX columns"}
+                    title={collapsedGroups.has("aux") ? "Expand AUX columns" : "Minimize AUX columns"}
+                  >
+                    AUX
+                    {collapsedGroups.has("aux")
+                      ? <Maximize2 className="h-3 w-3" aria-hidden="true" />
+                      : <Minimize2 className="h-3 w-3" aria-hidden="true" />}
+                  </button>
                 </th>
                 <th
                   colSpan={3}
@@ -1254,49 +1302,73 @@ export const FeeRecordsTable = ({
                 )}
 
                 {/* T16 */}
-                <th
-                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-                >
-                  Retro
-                </th>
-                <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
-                <th className={`${thBase} ${t.textSub} text-right`}>
-                  Rec&apos;d
-                </th>
-                <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
-                  Date Rec&apos;d
-                </th>
+                {collapsedGroups.has("t16") ? (
+                  <th className={`${thBase} ${t.textSub} text-right ${groupBorder}`}>
+                    Fee Due
+                  </th>
+                ) : (
+                  <>
+                    <th
+                      className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
+                    >
+                      Retro
+                    </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>
+                      Rec&apos;d
+                    </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>
+                      Date Rec&apos;d
+                    </th>
+                  </>
+                )}
 
                 {/* T2 */}
-                <th
-                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-                >
-                  Retro
-                </th>
-                <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
-                <th className={`${thBase} ${t.textSub} text-right`}>
-                  Rec&apos;d
-                </th>
-                <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
-                  Date Rec&apos;d
-                </th>
+                {collapsedGroups.has("t2") ? (
+                  <th className={`${thBase} ${t.textSub} text-right ${groupBorder}`}>
+                    Fee Due
+                  </th>
+                ) : (
+                  <>
+                    <th
+                      className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
+                    >
+                      Retro
+                    </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>
+                      Rec&apos;d
+                    </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>
+                      Date Rec&apos;d
+                    </th>
+                  </>
+                )}
 
                 {/* AUX */}
-                <th
-                  className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
-                >
-                  Retro
-                </th>
-                <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
-                <th className={`${thBase} ${t.textSub} text-right`}>
-                  Rec&apos;d
-                </th>
-                <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
-                  Date Rec&apos;d
-                </th>
+                {collapsedGroups.has("aux") ? (
+                  <th className={`${thBase} ${t.textSub} text-right ${groupBorder}`}>
+                    Fee Due
+                  </th>
+                ) : (
+                  <>
+                    <th
+                      className={`${thBase} ${t.textSub} text-right ${groupBorder}`}
+                    >
+                      Retro
+                    </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Fee Due</th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>
+                      Rec&apos;d
+                    </th>
+                    <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>
+                      Date Rec&apos;d
+                    </th>
+                  </>
+                )}
 
                 {/* Totals */}
                 <th
@@ -1875,193 +1947,226 @@ export const FeeRecordsTable = ({
                     )}
 
                     {/* T16 */}
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                    >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro"}
-                        value={c.t16Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T16 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Retro", draft: String(c.t16Retro) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                    >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
-                        value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: c.t16FeeDue != null ? String(c.t16FeeDue) : "" }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                    >
-                      {currency(c.t16FeeReceived)}
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t16Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
-                      title="Auto-calculated: Fee Due − Rec'd"
-                    >
-                      {pendingDisplay(c.t16Pending)}
-                    </td>
-                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                      <FeePaymentPanel
-                        caseId={c.id}
-                        feeType="t16"
-                        currentTotal={c.t16FeeReceived}
-                        mostRecentDate={c.t16FeeReceivedDate}
-                        canEdit={canEditFees}
-                        dark={dark}
-                        onAdded={(amount, receivedDate) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
-                          }))
-                        }
-                        onDeleted={(amount) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
-                          }))
-                        }
-                      />
-                    </td>
+                    {collapsedGroups.has("t16") ? (
+                      <td
+                        className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
+                        title="Minimized — expand T16 to edit"
+                      >
+                        {c.t16FeeDue != null ? currency(c.t16FeeDue) : "—"}
+                      </td>
+                    ) : (
+                      <>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                        >
+                          <FeeAmountCell
+                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro"}
+                            value={c.t16Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                            canEdit={canEditFeeDue} saveLabel="T16 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Retro", draft: String(c.t16Retro) }); setFeeAmountError(null); }}
+                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                            onSave={handleFeeAmountSave}
+                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                          />
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${t.text}`}
+                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                        >
+                          <FeeAmountCell
+                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
+                            value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                            canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: c.t16FeeDue != null ? String(c.t16FeeDue) : "" }); setFeeAmountError(null); }}
+                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                            onSave={handleFeeAmountSave}
+                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                          />
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
+                        >
+                          {currency(c.t16FeeReceived)}
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t16Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                          title="Auto-calculated: Fee Due − Rec'd"
+                        >
+                          {pendingDisplay(c.t16Pending)}
+                        </td>
+                        <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                          <FeePaymentPanel
+                            caseId={c.id}
+                            feeType="t16"
+                            currentTotal={c.t16FeeReceived}
+                            mostRecentDate={c.t16FeeReceivedDate}
+                            canEdit={canEditFees}
+                            dark={dark}
+                            onAdded={(amount, receivedDate) =>
+                              setFeeOverrides((prev) => ({
+                                ...prev,
+                                [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
+                              }))
+                            }
+                            onDeleted={(amount) =>
+                              setFeeOverrides((prev) => ({
+                                ...prev,
+                                [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
+                              }))
+                            }
+                          />
+                        </td>
+                      </>
+                    )}
 
                     {/* T2 */}
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                    >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro"}
-                        value={c.t2Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T2 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Retro", draft: String(c.t2Retro) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                    >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
-                        value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: c.t2FeeDue != null ? String(c.t2FeeDue) : "" }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                    >
-                      {currency(c.t2FeeReceived)}
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t2Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
-                      title="Auto-calculated: Fee Due − Rec'd"
-                    >
-                      {pendingDisplay(c.t2Pending)}
-                    </td>
-                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                      <FeePaymentPanel
-                        caseId={c.id}
-                        feeType="t2"
-                        currentTotal={c.t2FeeReceived}
-                        mostRecentDate={c.t2FeeReceivedDate}
-                        canEdit={canEditFees}
-                        dark={dark}
-                        onAdded={(amount, receivedDate) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
-                          }))
-                        }
-                        onDeleted={(amount) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
-                          }))
-                        }
-                      />
-                    </td>
+                    {collapsedGroups.has("t2") ? (
+                      <td
+                        className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
+                        title="Minimized — expand T2 to edit"
+                      >
+                        {c.t2FeeDue != null ? currency(c.t2FeeDue) : "—"}
+                      </td>
+                    ) : (
+                      <>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                        >
+                          <FeeAmountCell
+                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro"}
+                            value={c.t2Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                            canEdit={canEditFeeDue} saveLabel="T2 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Retro", draft: String(c.t2Retro) }); setFeeAmountError(null); }}
+                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                            onSave={handleFeeAmountSave}
+                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                          />
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${t.text}`}
+                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                        >
+                          <FeeAmountCell
+                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
+                            value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                            canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: c.t2FeeDue != null ? String(c.t2FeeDue) : "" }); setFeeAmountError(null); }}
+                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                            onSave={handleFeeAmountSave}
+                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                          />
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
+                        >
+                          {currency(c.t2FeeReceived)}
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t2Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                          title="Auto-calculated: Fee Due − Rec'd"
+                        >
+                          {pendingDisplay(c.t2Pending)}
+                        </td>
+                        <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                          <FeePaymentPanel
+                            caseId={c.id}
+                            feeType="t2"
+                            currentTotal={c.t2FeeReceived}
+                            mostRecentDate={c.t2FeeReceivedDate}
+                            canEdit={canEditFees}
+                            dark={dark}
+                            onAdded={(amount, receivedDate) =>
+                              setFeeOverrides((prev) => ({
+                                ...prev,
+                                [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
+                              }))
+                            }
+                            onDeleted={(amount) =>
+                              setFeeOverrides((prev) => ({
+                                ...prev,
+                                [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
+                              }))
+                            }
+                          />
+                        </td>
+                      </>
+                    )}
 
                     {/* AUX */}
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                    >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro"}
-                        value={c.auxRetro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="AUX retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxRetro", draft: String(c.auxRetro) }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${t.text}`}
-                      onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                    >
-                      <FeeAmountCell
-                        active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
-                        value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                        canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
-                        onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: c.auxFeeDue != null ? String(c.auxFeeDue) : "" }); setFeeAmountError(null); }}
-                        onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                        onSave={handleFeeAmountSave}
-                        onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                      />
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                    >
-                      {currency(c.auxFeeReceived)}
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.auxPending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
-                      title="Auto-calculated: Fee Due − Rec'd"
-                    >
-                      {pendingDisplay(c.auxPending)}
-                    </td>
-                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                      <FeePaymentPanel
-                        caseId={c.id}
-                        feeType="aux"
-                        currentTotal={c.auxFeeReceived}
-                        mostRecentDate={c.auxFeeReceivedDate}
-                        canEdit={canEditFees}
-                        dark={dark}
-                        onAdded={(amount, receivedDate) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
-                          }))
-                        }
-                        onDeleted={(amount) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
-                          }))
-                        }
-                      />
-                    </td>
+                    {collapsedGroups.has("aux") ? (
+                      <td
+                        className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
+                        title="Minimized — expand AUX to edit"
+                      >
+                        {c.auxFeeDue != null ? currency(c.auxFeeDue) : "—"}
+                      </td>
+                    ) : (
+                      <>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
+                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                        >
+                          <FeeAmountCell
+                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro"}
+                            value={c.auxRetro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                            canEdit={canEditFeeDue} saveLabel="AUX retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
+                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxRetro", draft: String(c.auxRetro) }); setFeeAmountError(null); }}
+                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                            onSave={handleFeeAmountSave}
+                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                          />
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${t.text}`}
+                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
+                        >
+                          <FeeAmountCell
+                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
+                            value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
+                            canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
+                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: c.auxFeeDue != null ? String(c.auxFeeDue) : "" }); setFeeAmountError(null); }}
+                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
+                            onSave={handleFeeAmountSave}
+                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
+                          />
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
+                        >
+                          {currency(c.auxFeeReceived)}
+                        </td>
+                        <td
+                          className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.auxPending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
+                          title="Auto-calculated: Fee Due − Rec'd"
+                        >
+                          {pendingDisplay(c.auxPending)}
+                        </td>
+                        <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                          <FeePaymentPanel
+                            caseId={c.id}
+                            feeType="aux"
+                            currentTotal={c.auxFeeReceived}
+                            mostRecentDate={c.auxFeeReceivedDate}
+                            canEdit={canEditFees}
+                            dark={dark}
+                            onAdded={(amount, receivedDate) =>
+                              setFeeOverrides((prev) => ({
+                                ...prev,
+                                [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
+                              }))
+                            }
+                            onDeleted={(amount) =>
+                              setFeeOverrides((prev) => ({
+                                ...prev,
+                                [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
+                              }))
+                            }
+                          />
+                        </td>
+                      </>
+                    )}
 
                     {/* Totals */}
                     <td
