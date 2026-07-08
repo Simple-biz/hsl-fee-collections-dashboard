@@ -114,14 +114,8 @@ const COL_FOCUS: Record<string, MetricFocus[]> = {
   clientcalls: [],
   faxsent:     [],
   winsheets:   ["fees"],
-  t2:          ["aging"],
-  t16:         ["aging"],
-  conc:        ["aging"],
   collected:   ["fees"],
-  fullfee:     ["fees"],
   opennofees:  ["fees"],
-  openpartial: ["fees"],
-  openpif:     ["fees"],
 };
 
 type DateMode = "week" | "month" | "range" | "day";
@@ -189,9 +183,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
 
   const [agentSearch, setAgentSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
-  const [t2Days, setT2Days] = useState<60 | 90>(60);
-  const [t16Days, setT16Days] = useState<60 | 90>(60);
-  const [concDays, setConcDays] = useState<60 | 90>(60);
+  // The T2/T16/Conc aging columns (and their 60d/90d toggle buttons) were
+  // removed from the table, but "Needs attention" still checks these
+  // thresholds under the hood — fixed at 60d since there's no UI to change it.
+  const t2Days: 60 | 90 = 60;
+  const t16Days: 60 | 90 = 60;
+  const concDays: 60 | 90 = 60;
   const [needsAttention, setNeedsAttention] = useState(false);
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
 
@@ -812,60 +809,18 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <th className={`${thBase} ${t.textSub} text-left`}>Agent</th>
                     {showCol("cases")       && <th className={`${thBase} ${t.textSub} text-right`}>Open</th>}
                     {showCol("closedcases") && <th className={`${thBase} ${t.textSub} text-right`}>Closed</th>}
-                    {showCol("ssacalls")    && <th className={`${thBase} ${t.textSub} text-right`}>SSA Calls</th>}
+                    {showCol("opennofees")  && <th className={`${thBase} text-right ${dark ? "text-amber-400" : "text-amber-600"}`}>No Fees</th>}
+                    {showCol("collected")   && <th className={`${thBase} ${t.textSub} text-right`}>Collected</th>}
+                    {showCol("ssacalls")    && <th className={`${thBase} ${t.textSub} text-right border-l ${t.borderLight}`}>SSA Calls</th>}
                     {showCol("clientcalls") && <th className={`${thBase} ${t.textSub} text-right`}>Client Calls</th>}
                     {showCol("faxsent")     && <th className={`${thBase} ${t.textSub} text-right`}>Fax Sent</th>}
                     {showCol("winsheets")   && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
-                    {showCol("opennofees")  && <th className={`${thBase} text-right ${dark ? "text-amber-400" : "text-amber-600"}`}>No Fees</th>}
-                    {showCol("openpartial") && <th className={`${thBase} text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>Partial</th>}
-                    {showCol("openpif")     && <th className={`${thBase} text-right ${dark ? "text-emerald-400" : "text-emerald-600"}`}>PIF</th>}
-                    {showCol("t2") && (
-                      <th className={`${thBase} text-right`}>
-                        <button
-                          onClick={() => setT2Days((v) => v === 60 ? 90 : 60)}
-                          aria-pressed={t2Days === 90}
-                          aria-label={`T2 aging threshold, currently ${t2Days} days`}
-                          className={`ml-auto flex items-center gap-0.5 transition-colors ${t2Days === 90 ? (dark ? "text-violet-400" : "text-violet-600") : (dark ? "text-red-400" : "text-red-600")}`}
-                          title="Toggle 60d / 90d threshold"
-                        >
-                          T2 &gt;{t2Days}d
-                        </button>
-                      </th>
-                    )}
-                    {showCol("t16") && (
-                      <th className={`${thBase} text-right`}>
-                        <button
-                          onClick={() => setT16Days((v) => v === 60 ? 90 : 60)}
-                          aria-pressed={t16Days === 90}
-                          aria-label={`T16 aging threshold, currently ${t16Days} days`}
-                          className={`ml-auto flex items-center gap-0.5 transition-colors ${t16Days === 90 ? (dark ? "text-violet-400" : "text-violet-600") : (dark ? "text-red-400" : "text-red-600")}`}
-                          title="Toggle 60d / 90d threshold"
-                        >
-                          T16 &gt;{t16Days}d
-                        </button>
-                      </th>
-                    )}
-                    {showCol("conc") && (
-                      <th className={`${thBase} text-right`}>
-                        <button
-                          onClick={() => setConcDays((v) => v === 60 ? 90 : 60)}
-                          aria-pressed={concDays === 90}
-                          aria-label={`Concurrent aging threshold, currently ${concDays} days`}
-                          className={`ml-auto flex items-center gap-0.5 transition-colors ${concDays === 90 ? (dark ? "text-violet-400" : "text-violet-600") : (dark ? "text-red-400" : "text-red-600")}`}
-                          title="Toggle 60d / 90d threshold"
-                        >
-                          Conc &gt;{concDays}d
-                        </button>
-                      </th>
-                    )}
-                    {showCol("collected") && <th className={`${thBase} ${t.textSub} text-right`}>Collected</th>}
-                    {showCol("fullfee")   && <th className={`${thBase} ${t.textSub} text-right`}>Full Fee</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAgents.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className={`${tdBase} text-center ${t.textMuted} py-8`}>
+                      <td colSpan={9} className={`${tdBase} text-center ${t.textMuted} py-8`}>
                         No agents match the current filters.
                       </td>
                     </tr>
@@ -881,22 +836,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       </td>
                       {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}
                       {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
-                      {showCol("ssacalls")    && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekSsaCalls}</td>}
-                      {showCol("clientcalls") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekClientCalls}</td>}
-                      {showCol("faxsent")     && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekFaxSent}</td>}
-                      {showCol("winsheets")   && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
-                      {showCol("openpartial") && <td className={`${tdBase} text-right ${a.openPartial > 0 ? (dark ? "text-blue-400"    : "text-blue-600")    : t.textMuted}`}>{a.openPartial}</td>}
-                      {showCol("openpif")     && <td className={`${tdBase} text-right ${a.openPif     > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>{a.openPif}</td>}
-                      {showCol("t2")  && <td className={`${tdBase} text-right ${(t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90)   > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t2Days   === 60 ? a.unpaidT2Over60   : a.unpaidT2Over90}</td>}
-                      {showCol("t16") && <td className={`${tdBase} text-right ${(t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90)  > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{t16Days  === 60 ? a.unpaidT16Over60  : a.unpaidT16Over90}</td>}
-                      {showCol("conc") && <td className={`${tdBase} text-right ${(concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90) > 0 ? (dark ? "text-red-400 font-medium" : "text-red-600 font-medium") : t.textMuted}`}>{concDays === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90}</td>}
                       {showCol("collected") && (
                         <td className={`${tdBase} text-right font-semibold ${a.totalCollected > 0 ? "text-emerald-500" : t.textMuted}`}>
                           {a.totalCollected > 0 ? fmt(a.totalCollected) : "—"}
                         </td>
                       )}
-                      {showCol("fullfee") && <td className={`${tdBase} text-right ${t.text}`}>{a.casesFullFee}</td>}
+                      {showCol("ssacalls")    && <td className={`${tdBase} text-right ${t.textSub} border-l ${t.borderLight}`}>{a.weekSsaCalls}</td>}
+                      {showCol("clientcalls") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekClientCalls}</td>}
+                      {showCol("faxsent")     && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekFaxSent}</td>}
+                      {showCol("winsheets")   && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -905,18 +854,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
                     {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.openCases}</td>}
                     {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
-                    {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekSsaCalls}</td>}
+                    {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
+                    {showCol("collected")   && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.totalCollected)}</td>}
+                    {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold ${t.textSub} border-l ${t.borderLight}`}>{filteredTotals.weekSsaCalls}</td>}
                     {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
                     {showCol("winsheets")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
-                    {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
-                    {showCol("openpartial") && <td className={`${tdBase} text-right font-bold ${dark ? "text-blue-400"    : "text-blue-600"}`}>{filteredTotals.openPartial}</td>}
-                    {showCol("openpif")     && <td className={`${tdBase} text-right font-bold ${dark ? "text-emerald-400" : "text-emerald-600"}`}>{filteredTotals.openPif}</td>}
-                    {showCol("t2")   && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t2Days   === 60 ? filteredTotals.unpaidT2Over60   : filteredTotals.unpaidT2Over90}</td>}
-                    {showCol("t16")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{t16Days  === 60 ? filteredTotals.unpaidT16Over60  : filteredTotals.unpaidT16Over90}</td>}
-                    {showCol("conc") && <td className={`${tdBase} text-right font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{concDays === 60 ? filteredTotals.unpaidConcOver60 : filteredTotals.unpaidConcOver90}</td>}
-                    {showCol("collected") && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.totalCollected)}</td>}
-                    {showCol("fullfee")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.casesFullFee}</td>}
                   </tr>
                 </tfoot>
               </table>
