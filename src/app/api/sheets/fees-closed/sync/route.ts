@@ -40,6 +40,7 @@ const parseClaimType = (raw: string | null): string[] => {
 const toFeeRecordValues = (r: ParsedFeesClosedRow, clientId: number, closedAt: Date) => ({
   caseId: clientId,
   isClosed: true,
+  nextFollowUpDate: null,
   closedAt,
   winSheetStatus: "closed",
   syncStatus: "synced" as const,
@@ -266,6 +267,7 @@ export const POST = async (req: NextRequest) => {
             target: feeRecords.caseId,
             set: {
               isClosed: sql`excluded.is_closed`,
+              nextFollowUpDate: sql`excluded.next_follow_up_date`,
               closedAt: sql`excluded.closed_at`,
               winSheetStatus: sql`excluded.win_sheet_status`,
               syncStatus: sql`excluded.sync_status`,

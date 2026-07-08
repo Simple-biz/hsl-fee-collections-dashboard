@@ -37,7 +37,7 @@ export const GET = async (req: NextRequest) => {
       ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
       ${isClosedParam === "true" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = true` : sql``}
       ${isClosedParam === "false" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
-      ${dueToday ? sql`AND ${feeRecords.nextFollowUpDate} = CURRENT_DATE` : sql``}
+      ${dueToday ? sql`AND ${feeRecords.nextFollowUpDate} = CURRENT_DATE AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
     `;
 
     // Total count (respecting filters, ignoring pagination)

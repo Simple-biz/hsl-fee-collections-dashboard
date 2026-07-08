@@ -515,6 +515,7 @@ export const POST = async (req: NextRequest) => {
             .values({
               caseId: row.clientId,
               isClosed: true,
+              nextFollowUpDate: null,
               closedAt: row.closedAt,
               winSheetStatus: "closed",
               syncStatus: "synced",
@@ -524,6 +525,7 @@ export const POST = async (req: NextRequest) => {
               target: feeRecords.caseId,
               set: {
                 isClosed: true,
+                nextFollowUpDate: null,
                 closedAt: row.closedAt,
                 winSheetStatus: "closed",
                 syncStatus: "synced",
