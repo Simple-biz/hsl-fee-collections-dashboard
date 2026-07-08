@@ -319,16 +319,14 @@ export const GET = async (req: NextRequest) => {
       }),
     );
 
-    // "No fees" = has a real fee due and has received nothing at all yet —
-    // not a partial balance (some received, still owing) and not a
-    // PIF/fees_confirmation check, since that flags whether staff have
-    // *reviewed* the case, not whether any money has come in. Bucketed the
-    // same way here and in the No Fees Cases aging query below so this card
-    // and that table can never disagree.
+    // "No fees" = zero dollars received — same predicate as the "Unpaid
+    // >60d/>90d" aging filter on the Master Fees page, which the team
+    // validated as the accurate definition. Kept identical to the aging
+    // query below so this card and the aging buckets can never disagree
+    // (the buckets are always a subset of this total).
     const [feesStatus] = await db.execute(sql`
       SELECT COUNT(*) FILTER (
-        WHERE COALESCE(total_fees_expected, 0) > 0
-          AND COALESCE(total_fees_paid, 0) = 0
+        WHERE COALESCE(total_fees_paid, 0) = 0
       )::int AS no_fees_count
       FROM fee_records
       WHERE is_closed = false
@@ -338,12 +336,8 @@ export const GET = async (req: NextRequest) => {
       noFees: Number(feesStatus?.no_fees_count) || 0,
     };
 
-    // No Fees Cases — open cases with a real fee due and nothing received at
-    // all (same predicate as openCasesFeesStatus.noFees above), aged over 60
-    // days by approval_date. Returns the actual case rows (not just a count)
-    // so the Reports page can list them for reporting; over60/over90 counts
-    // are derived from this same list below so the card and the table can
-    // never disagree.
+    // No Fees Cases aging — same predicate as openCasesFeesStatus.noFees
+    // above (zero dollars received), aged over 60 days by approval_date.
     const noFeesCaseRows = await db.execute(sql`
       SELECT
         c.client_id AS id,
@@ -357,7 +351,6 @@ export const GET = async (req: NextRequest) => {
       FROM fee_records fr
       JOIN cases c ON c.client_id = fr.case_id
       WHERE fr.is_closed = FALSE
-        AND COALESCE(fr.total_fees_expected, 0) > 0
         AND COALESCE(fr.total_fees_paid, 0) = 0
         AND c.approval_date IS NOT NULL
         AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
