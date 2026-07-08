@@ -51,10 +51,13 @@ export function AcknowledgeAndCloseDialog({
     setSubmitting(markClosed ? "close" : "keep");
     setError(null);
     try {
-      const baseFields: Record<string, string | boolean> = {
+      const baseFields: Record<string, string | boolean | null> = {
         [triggerField]: triggerValue,
       };
-      if (markClosed) baseFields.isClosed = true;
+      if (markClosed) {
+        baseFields.isClosed = true;
+        baseFields.nextFollowUpDate = null;
+      }
       const res = await fetch(`/api/cases/${caseId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

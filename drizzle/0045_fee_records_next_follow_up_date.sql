@@ -1,0 +1,1 @@
+ALTER TABLE "fee_records" ADD COLUMN "next_follow_up_date" date;

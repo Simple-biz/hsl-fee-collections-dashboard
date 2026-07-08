@@ -21,9 +21,14 @@ export const GET = async (req: NextRequest) => {
     // isClosed: "true" → closed only, "false" → active only, anything else
     // (incl. absent) → no filter (preserves search/back-compat behavior).
     const isClosedParam = searchParams.get("isClosed");
+    // dueToday: cases with a follow-up scheduled for today — the result set
+    // is inherently small (however many follow-ups are due), so pagination
+    // is bypassed rather than risking truncation for a poller that needs
+    // every match.
+    const dueToday = searchParams.get("dueToday") === "true";
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = (page - 1) * limit;
+    const limit = dueToday ? 10000 : parseInt(searchParams.get("limit") || "50");
+    const offset = dueToday ? 0 : (page - 1) * limit;
 
     // Shared WHERE for the count and main queries.
     const whereClause = sql`TRUE
@@ -32,6 +37,7 @@ export const GET = async (req: NextRequest) => {
       ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
       ${isClosedParam === "true" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = true` : sql``}
       ${isClosedParam === "false" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
+      ${dueToday ? sql`AND ${feeRecords.nextFollowUpDate} = CURRENT_DATE AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
     `;
 
     // Total count (respecting filters, ignoring pagination)
@@ -94,6 +100,7 @@ export const GET = async (req: NextRequest) => {
         feesConfirmation: feeRecords.feesConfirmation,
         feesClosedTrigger: feeRecords.feesClosedTrigger,
         caseStatus: feeRecords.caseStatus,
+        nextFollowUpDate: feeRecords.nextFollowUpDate,
         winSheetLink: feeRecords.winSheetLink,
         winSheetLinkText: feeRecords.winSheetLinkText,
 
@@ -242,6 +249,7 @@ export const GET = async (req: NextRequest) => {
         feesConfirmation: r.feesConfirmation ?? null,
         feesClosedTrigger: r.feesClosedTrigger ?? null,
         caseStatus: r.caseStatus ?? null,
+        nextFollowUpDate: r.nextFollowUpDate ?? null,
         isClosed: r.isClosed ?? false,
         markedOverpaid: r.markedOverpaid ?? false,
         closedAt: r.closedAt ? r.closedAt.toISOString() : null,

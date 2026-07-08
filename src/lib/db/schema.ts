@@ -209,6 +209,7 @@ export const feeRecords = pgTable(
     feesConfirmation: varchar("fees_confirmation", { length: 50 }),
     feesClosedTrigger: varchar("fees_closed_trigger", { length: 50 }),
     dateAssignedToAgent: date("date_assigned_to_agent"),
+    nextFollowUpDate: date("next_follow_up_date"),
 
     // T16
     t16Retro: decimal("t16_retro", { precision: 12, scale: 2 }).default("0"),
@@ -587,6 +588,7 @@ export const notificationTypeEnum = pgEnum("notification_type_enum", [
   "fee_payment",
   "call_target_missed",
   "case_assigned",
+  "follow_up_due",
 ]);
 
 export const notificationSeverityEnum = pgEnum("notification_severity_enum", [
