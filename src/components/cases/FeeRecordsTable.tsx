@@ -1187,7 +1187,7 @@ export const FeeRecordsTable = ({
                 />
 
                 <th
-                  colSpan={collapsedGroups.has("t16") ? 1 : 5}
+                  colSpan={collapsedGroups.has("t16") ? 2 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-indigo-400" : "text-indigo-600"}`}
                 >
                   <button
@@ -1204,7 +1204,7 @@ export const FeeRecordsTable = ({
                   </button>
                 </th>
                 <th
-                  colSpan={collapsedGroups.has("t2") ? 1 : 5}
+                  colSpan={collapsedGroups.has("t2") ? 2 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-blue-400" : "text-blue-600"}`}
                 >
                   <button
@@ -1221,7 +1221,7 @@ export const FeeRecordsTable = ({
                   </button>
                 </th>
                 <th
-                  colSpan={collapsedGroups.has("aux") ? 1 : 5}
+                  colSpan={collapsedGroups.has("aux") ? 2 : 5}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-violet-400" : "text-violet-600"}`}
                 >
                   <button
@@ -1318,11 +1318,11 @@ export const FeeRecordsTable = ({
                       Rec&apos;d
                     </th>
                     <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-                    <th className={`${thBase} ${t.textSub} text-left`}>
-                      Date Rec&apos;d
-                    </th>
                   </>
                 )}
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Date Rec&apos;d
+                </th>
 
                 {/* T2 */}
                 {collapsedGroups.has("t2") ? (
@@ -1341,11 +1341,11 @@ export const FeeRecordsTable = ({
                       Rec&apos;d
                     </th>
                     <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-                    <th className={`${thBase} ${t.textSub} text-left`}>
-                      Date Rec&apos;d
-                    </th>
                   </>
                 )}
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Date Rec&apos;d
+                </th>
 
                 {/* AUX */}
                 {collapsedGroups.has("aux") ? (
@@ -1364,11 +1364,11 @@ export const FeeRecordsTable = ({
                       Rec&apos;d
                     </th>
                     <th className={`${thBase} ${t.textSub} text-right`}>Pending</th>
-                    <th className={`${thBase} ${t.textSub} text-left`}>
-                      Date Rec&apos;d
-                    </th>
                   </>
                 )}
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Date Rec&apos;d
+                </th>
 
                 {/* Totals */}
                 <th
@@ -1995,30 +1995,30 @@ export const FeeRecordsTable = ({
                         >
                           {pendingDisplay(c.t16Pending)}
                         </td>
-                        <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                          <FeePaymentPanel
-                            caseId={c.id}
-                            feeType="t16"
-                            currentTotal={c.t16FeeReceived}
-                            mostRecentDate={c.t16FeeReceivedDate}
-                            canEdit={canEditFees}
-                            dark={dark}
-                            onAdded={(amount, receivedDate) =>
-                              setFeeOverrides((prev) => ({
-                                ...prev,
-                                [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
-                              }))
-                            }
-                            onDeleted={(amount) =>
-                              setFeeOverrides((prev) => ({
-                                ...prev,
-                                [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
-                              }))
-                            }
-                          />
-                        </td>
                       </>
                     )}
+                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                      <FeePaymentPanel
+                        caseId={c.id}
+                        feeType="t16"
+                        currentTotal={c.t16FeeReceived}
+                        mostRecentDate={c.t16FeeReceivedDate}
+                        canEdit={canEditFees}
+                        dark={dark}
+                        onAdded={(amount, receivedDate) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
+                          }))
+                        }
+                        onDeleted={(amount) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
+                          }))
+                        }
+                      />
+                    </td>
 
                     {/* T2 */}
                     {collapsedGroups.has("t2") ? (
@@ -2069,30 +2069,30 @@ export const FeeRecordsTable = ({
                         >
                           {pendingDisplay(c.t2Pending)}
                         </td>
-                        <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                          <FeePaymentPanel
-                            caseId={c.id}
-                            feeType="t2"
-                            currentTotal={c.t2FeeReceived}
-                            mostRecentDate={c.t2FeeReceivedDate}
-                            canEdit={canEditFees}
-                            dark={dark}
-                            onAdded={(amount, receivedDate) =>
-                              setFeeOverrides((prev) => ({
-                                ...prev,
-                                [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
-                              }))
-                            }
-                            onDeleted={(amount) =>
-                              setFeeOverrides((prev) => ({
-                                ...prev,
-                                [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
-                              }))
-                            }
-                          />
-                        </td>
                       </>
                     )}
+                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                      <FeePaymentPanel
+                        caseId={c.id}
+                        feeType="t2"
+                        currentTotal={c.t2FeeReceived}
+                        mostRecentDate={c.t2FeeReceivedDate}
+                        canEdit={canEditFees}
+                        dark={dark}
+                        onAdded={(amount, receivedDate) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
+                          }))
+                        }
+                        onDeleted={(amount) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
+                          }))
+                        }
+                      />
+                    </td>
 
                     {/* AUX */}
                     {collapsedGroups.has("aux") ? (
@@ -2143,30 +2143,30 @@ export const FeeRecordsTable = ({
                         >
                           {pendingDisplay(c.auxPending)}
                         </td>
-                        <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                          <FeePaymentPanel
-                            caseId={c.id}
-                            feeType="aux"
-                            currentTotal={c.auxFeeReceived}
-                            mostRecentDate={c.auxFeeReceivedDate}
-                            canEdit={canEditFees}
-                            dark={dark}
-                            onAdded={(amount, receivedDate) =>
-                              setFeeOverrides((prev) => ({
-                                ...prev,
-                                [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
-                              }))
-                            }
-                            onDeleted={(amount) =>
-                              setFeeOverrides((prev) => ({
-                                ...prev,
-                                [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
-                              }))
-                            }
-                          />
-                        </td>
                       </>
                     )}
+                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
+                      <FeePaymentPanel
+                        caseId={c.id}
+                        feeType="aux"
+                        currentTotal={c.auxFeeReceived}
+                        mostRecentDate={c.auxFeeReceivedDate}
+                        canEdit={canEditFees}
+                        dark={dark}
+                        onAdded={(amount, receivedDate) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
+                          }))
+                        }
+                        onDeleted={(amount) =>
+                          setFeeOverrides((prev) => ({
+                            ...prev,
+                            [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
+                          }))
+                        }
+                      />
+                    </td>
 
                     {/* Totals */}
                     <td
