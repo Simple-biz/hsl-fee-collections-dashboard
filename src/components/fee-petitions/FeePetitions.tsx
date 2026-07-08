@@ -213,6 +213,7 @@ export const FeePetitions = () => {
   const [agingFilter, setAgingFilter] = useState<AgingFilter>(initialState.aging);
   const [assignedToFilter, setAssignedToFilter] = useState(initialState.assignedTo);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
+  const [unassignedCount, setUnassignedCount] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey>(initialState.sort);
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
@@ -416,6 +417,7 @@ export const FeePetitions = () => {
       setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
       if (Array.isArray(json.assignees)) setAssignees(json.assignees);
+      if (typeof json.unassignedCount === "number") setUnassignedCount(json.unassignedCount);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -989,6 +991,7 @@ export const FeePetitions = () => {
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
               <option value="">All Assigned</option>
+              <option value="__unassigned__">Unassigned ({unassignedCount})</option>
               {assignees.map((a) => (
                 <option key={a.name} value={a.name}>{a.name} ({a.count})</option>
               ))}
@@ -1089,7 +1092,7 @@ export const FeePetitions = () => {
             )}
             {assignedToFilter && (
               <span className={chipBase}>
-                Assigned: {assignedToFilter}
+                Assigned: {assignedToFilter === "__unassigned__" ? "Unassigned" : assignedToFilter}
                 <button aria-label="Clear assigned to filter" onClick={() => { urlMethodRef.current = "push"; setAssignedToFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
