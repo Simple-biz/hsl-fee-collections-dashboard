@@ -561,7 +561,6 @@ export const FeePetitions = () => {
         {} as Record<CheckboxKey, boolean>,
       ),
     }));
-    const notYetComplete = previouslyIncomplete.length;
     try {
       const result = await bulkMarkComplete({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
