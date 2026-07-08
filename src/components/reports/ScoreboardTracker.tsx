@@ -382,6 +382,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     unpaidT16Over90:    filteredAgents.reduce((s, a) => s + a.unpaidT16Over90, 0),
     unpaidConcOver90:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver90, 0),
     totalCollected:     filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
+    feesCollectedInWindow: filteredAgents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
     casesFullFee:       filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
     openNoFees:         filteredAgents.reduce((s, a) => s + a.openNoFees, 0),
     openPartial:        filteredAgents.reduce((s, a) => s + a.openPartial, 0),
@@ -838,8 +839,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
                       {showCol("collected") && (
-                        <td className={`${tdBase} text-right font-semibold ${a.totalCollected > 0 ? "text-emerald-500" : t.textMuted}`}>
-                          {a.totalCollected > 0 ? fmt(a.totalCollected) : "—"}
+                        <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
+                          {a.feesCollectedInWindow > 0 ? fmt(a.feesCollectedInWindow) : "—"}
                         </td>
                       )}
                       {showCol("ssacalls")    && <td className={`${tdBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{a.weekSsaCalls}</td>}
@@ -855,7 +856,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.openCases}</td>}
                     {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
                     {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
-                    {showCol("collected")   && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.totalCollected)}</td>}
+                    {showCol("collected")   && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.feesCollectedInWindow)}</td>}
                     {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{filteredTotals.weekSsaCalls}</td>}
                     {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
