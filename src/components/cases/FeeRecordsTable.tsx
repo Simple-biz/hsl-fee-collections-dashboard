@@ -109,6 +109,7 @@ const CASE_STATUS_COLORS: Record<string, { badge: string; badgeDark: string }> =
   "Incomplete win sheet":          { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
   "Missing fees":                  { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
   "NEED AUX FEE":                  { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
+  "FEE PETITION APPROVED":         { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
 };
 const CASE_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
 
@@ -894,6 +895,11 @@ export const FeeRecordsTable = ({
   // needs to grow on desktop), so every other frozen offset below shifts
   // right by exactly that much when mode === "closed".
   const colClosedOnW = `w-28 min-w-28 max-w-28`;
+  // Refresh is a leading frozen column in every mode, sitting right after the
+  // checkbox — fixed 56px at every breakpoint, so every other frozen offset
+  // below (Closed On, Case Name, Assigned, Fees Conf) shifts right by that
+  // much regardless of mode.
+  const colRefreshW = `w-14 min-w-14 max-w-14`;
   const isClosedMode = mode === "closed";
 
   // Every header cell is sticky vertically by default — the column-header
@@ -913,53 +919,62 @@ export const FeeRecordsTable = ({
   // Frozen column headers (row 2). Case Name freezes left on all screens;
   // Assigned freezes left only at sm+ (on mobile it keeps thBase's sticky-top
   // but scrolls horizontally). Corner cells use z-30 to cover both single-axis
-  // sticky neighbors during scroll. In "closed" mode, Closed On sits in front
-  // of Case Name, so Case Name/Assigned/Fees Conf's left offsets all shift
-  // right by colClosedOnW's 112px (7rem) — 40+112=152px=9.5rem, etc.
+  // sticky neighbors during scroll. Refresh (56px) is now the leading frozen
+  // column in every mode, so every offset below already includes it —
+  // checkbox(40) + refresh(56) = 96px = left-24 as the new baseline. In
+  // "closed" mode, Closed On additionally sits in front of Case Name, adding
+  // colClosedOnW's 112px on top of that — 96+112=208px=13rem, etc.
   const stickyTh1 = isClosedMode
-    ? `left-[9.5rem] z-30 ${colNameW} ${nameDivider}`
-    : `left-10 z-30 ${colNameW} ${nameDivider}`;
+    ? `left-52 z-30 ${colNameW} ${nameDivider}`
+    : `left-24 z-30 ${colNameW} ${nameDivider}`;
   // z-30 only at sm+ (where Assigned is a frozen corner). On mobile Assigned
   // scrolls, so no sticky-left. Freeze boundary moved to Fees Conf, so no divider here.
   // scrolls, so it must stay at thBase's z-20 — BELOW the frozen Case Name
   // (z-30) — otherwise it paints over the frozen "front index" on scroll.
   // Assigned: no divider — freeze boundary now sits after Fees Conf.
   const stickyTh2 = isClosedMode
-    ? `sm:left-[21.5rem] sm:z-30 ${colAssignedW}`
-    : `sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
+    ? `sm:left-[25rem] sm:z-30 ${colAssignedW}`
+    : `sm:left-72 sm:z-30 ${colAssignedW}`;
   // "Case Info" group label is split into cells so each part's freeze matches
   // the column beneath it. Three frozen columns: Case Name, Assigned, Fees
   // Conf (four, with Closed On, in "closed" mode).
   const stickyGroup = isClosedMode
-    ? `top-0! left-[9.5rem] z-30 ${colNameW} ${nameDivider}`
-    : `top-0! left-10 z-30 ${colNameW} ${nameDivider}`;
+    ? `top-0! left-52 z-30 ${colNameW} ${nameDivider}`
+    : `top-0! left-24 z-30 ${colNameW} ${nameDivider}`;
   const stickyGroup2 = isClosedMode
-    ? `top-0! sm:left-[21.5rem] sm:z-30 ${colAssignedW}`
-    : `top-0! sm:left-[14.5rem] sm:z-30 ${colAssignedW}`;
-  // Fees Conf is the 3rd frozen column (left offset = 40 + 192 + 160 = 392px
-  // = 24.5rem; + colClosedOnW's 112px = 504px = 31.5rem in "closed" mode).
+    ? `top-0! sm:left-[25rem] sm:z-30 ${colAssignedW}`
+    : `top-0! sm:left-72 sm:z-30 ${colAssignedW}`;
+  // Fees Conf is the 3rd frozen column (left offset = 96 + 192 + 160 = 448px
+  // = 28rem; + colClosedOnW's 112px = 560px = 35rem in "closed" mode).
   const stickyGroup3 = isClosedMode
-    ? `top-0! sm:left-[31.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`
-    : `top-0! sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
+    ? `top-0! sm:left-[35rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`
+    : `top-0! sm:left-[28rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
   const stickyTh3 = isClosedMode
-    ? `sm:left-[31.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`
-    : `sm:left-[24.5rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
+    ? `sm:left-[35rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`
+    : `sm:left-[28rem] sm:z-30 ${colFeesConfW} ${stickyDivider}`;
   const stickyTd1 = isClosedMode
-    ? `sticky left-[9.5rem] z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`
-    : `sticky left-10 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
+    ? `sticky left-52 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`
+    : `sticky left-24 z-10 ${colNameW} ${stickyBg} ${stickyHover} ${nameDivider}`;
   const stickyTd2 = isClosedMode
-    ? `sm:sticky sm:left-[21.5rem] sm:z-10 ${colAssignedW} ${stickyColBg}`
-    : `sm:sticky sm:left-[14.5rem] sm:z-10 ${colAssignedW} ${stickyColBg}`;
+    ? `sm:sticky sm:left-[25rem] sm:z-10 ${colAssignedW} ${stickyColBg}`
+    : `sm:sticky sm:left-72 sm:z-10 ${colAssignedW} ${stickyColBg}`;
   const stickyTd3 = isClosedMode
-    ? `sm:sticky sm:left-[31.5rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`
-    : `sm:sticky sm:left-[24.5rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`;
+    ? `sm:sticky sm:left-[35rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`
+    : `sm:sticky sm:left-[28rem] sm:z-10 ${colFeesConfW} ${stickyColBg} ${stickyDivider}`;
   const stickyCheckTh = `sticky top-0! left-0 z-30 w-10 min-w-10 ${stickyBg}`;
   const stickyCheckTd = `sticky left-0 z-10 w-10 min-w-10 ${stickyBg} ${stickyHover}`;
-  // Closed On — new frozen column, "closed" mode only, sitting exactly where
-  // Case Name used to (left-10) now that it's first.
-  const stickyGroupClosedOn = `top-0! left-10 z-30 ${colClosedOnW}`;
-  const stickyThClosedOn = `left-10 z-30 ${colClosedOnW}`;
-  const stickyTdClosedOn = `sticky left-10 z-10 ${colClosedOnW} ${stickyBg} ${stickyHover}`;
+  // Refresh — new leading frozen column (all modes), sitting right after the
+  // checkbox at left-10 (40px, the checkbox's own width). Spans both header
+  // rows like the checkbox, so (like stickyCheckTh) it's fully self-contained
+  // rather than combined with thBase — a rowSpan={2} cell needs top-0! for
+  // its whole height, not thBase's row-2-only top-8.
+  const stickyThRefresh = `h-8 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap sticky top-0! left-10 z-30 ${colRefreshW} ${stickyBg} ${t.textSub} text-center`;
+  const stickyTdRefresh = `sticky left-10 z-10 ${colRefreshW} ${stickyBg} ${stickyHover}`;
+  // Closed On — frozen, "closed" mode only, sitting right after Refresh
+  // (checkbox 40px + refresh 56px = 96px = left-24).
+  const stickyGroupClosedOn = `top-0! left-24 z-30 ${colClosedOnW}`;
+  const stickyThClosedOn = `left-24 z-30 ${colClosedOnW}`;
+  const stickyTdClosedOn = `sticky left-24 z-10 ${colClosedOnW} ${stickyBg} ${stickyHover}`;
 
   return (
     <div className={`relative rounded-xl border ${t.card}`}>
@@ -1153,6 +1168,16 @@ export const FeeRecordsTable = ({
                     className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                   />
                 </th>
+                {/* Refresh — moved to the front (frozen), before Case Name, so
+                    it's usable without scrolling right. Spans both header
+                    rows like the checkbox, since it has no group label.
+                    Icon-only (like the checkbox column) — the column is too
+                    narrow at this frozen width for the word "Refresh" to fit
+                    without colliding with "Case Info" next to it. */}
+                <th rowSpan={2} className={stickyThRefresh} title="Refresh">
+                  <RefreshCw className="h-3.5 w-3.5 inline" aria-hidden="true" />
+                  <span className="sr-only">Refresh</span>
+                </th>
                 {/* Closed On sits in front of Case Info's group, "closed" mode
                     only — same blank-spacer pattern as the Assigned/Fees Conf
                     cells below, just with nothing to label. */}
@@ -1244,7 +1269,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={isClosedMode ? 6 : 7}
+                  colSpan={isClosedMode ? 5 : 6}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -1407,7 +1432,6 @@ export const FeeRecordsTable = ({
                   Recent Update
                 </th>
                 <th className={`${thBase} ${t.textSub} text-center`}>Logs</th>
-                <th className={`${thBase} ${t.textSub} text-center`}>Refresh</th>
                 {/* Closed On moved to the front (frozen) in "closed" mode —
                     this trailing slot is Active-mode-only now. */}
                 {!isClosedMode && (
@@ -1445,6 +1469,26 @@ export const FeeRecordsTable = ({
                         aria-label={`Select ${c.name}`}
                         className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                       />
+                    </td>
+                    {/* Refresh — moved to the front (frozen), before Case
+                        Name, so it's usable without scrolling right. */}
+                    <td
+                      className={`${tdBase} text-center ${stickyTdRefresh}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleRowRefresh(c)}
+                        disabled={rowRefreshing.has(c.id)}
+                        aria-label={`Refresh ${c.name}`}
+                        title="Refresh this case's fee data from the server"
+                        className={`inline-flex items-center justify-center h-6 w-6 rounded ${t.hover} ${t.textSub} disabled:opacity-50`}
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${rowRefreshing.has(c.id) ? "animate-spin" : ""}`}
+                          aria-hidden="true"
+                        />
+                      </button>
                     </td>
                     {/* Closed On — frozen, "closed" mode only, first data
                         column so it's visible without scrolling. */}
@@ -2352,21 +2396,6 @@ export const FeeRecordsTable = ({
                       >
                         <MessageSquare className="h-3 w-3" aria-hidden="true" />
                         {c.notesCount}
-                      </button>
-                    </td>
-                    <td className={`${tdBase} text-center`} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => handleRowRefresh(c)}
-                        disabled={rowRefreshing.has(c.id)}
-                        aria-label={`Refresh ${c.name}`}
-                        title="Refresh this case's fee data from the server"
-                        className={`inline-flex items-center justify-center h-6 w-6 rounded ${t.hover} ${t.textSub} disabled:opacity-50`}
-                      >
-                        <RefreshCw
-                          className={`h-3.5 w-3.5 ${rowRefreshing.has(c.id) ? "animate-spin" : ""}`}
-                          aria-hidden="true"
-                        />
                       </button>
                     </td>
                     {/* Closed On moved to the front (frozen) in "closed" mode —

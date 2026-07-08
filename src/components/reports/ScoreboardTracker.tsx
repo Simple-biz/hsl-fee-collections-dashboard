@@ -811,8 +811,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("closedcases") && <th className={`${thBase} ${t.textSub} text-right`}>Closed</th>}
                     {showCol("opennofees")  && <th className={`${thBase} text-right ${dark ? "text-amber-400" : "text-amber-600"}`}>No Fees</th>}
                     {showCol("collected")   && <th className={`${thBase} ${t.textSub} text-right`}>Collected</th>}
-                    {showCol("ssacalls")    && <th className={`${thBase} ${t.textSub} text-right border-l ${t.borderLight}`}>SSA Calls</th>}
-                    {showCol("clientcalls") && <th className={`${thBase} ${t.textSub} text-right`}>Client Calls</th>}
+                    {showCol("ssacalls")    && <th className={`${thBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>SSA Calls</th>}
+                    {showCol("clientcalls") && <th className={`${thBase} text-right ${dark ? "text-indigo-400" : "text-indigo-600"}`}>Client Calls</th>}
                     {showCol("faxsent")     && <th className={`${thBase} ${t.textSub} text-right`}>Fax Sent</th>}
                     {showCol("winsheets")   && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
                   </tr>
@@ -842,8 +842,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           {a.totalCollected > 0 ? fmt(a.totalCollected) : "—"}
                         </td>
                       )}
-                      {showCol("ssacalls")    && <td className={`${tdBase} text-right ${t.textSub} border-l ${t.borderLight}`}>{a.weekSsaCalls}</td>}
-                      {showCol("clientcalls") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekClientCalls}</td>}
+                      {showCol("ssacalls")    && <td className={`${tdBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{a.weekSsaCalls}</td>}
+                      {showCol("clientcalls") && <td className={`${tdBase} text-right ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{a.weekClientCalls}</td>}
                       {showCol("faxsent")     && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekFaxSent}</td>}
                       {showCol("winsheets")   && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
                     </tr>
@@ -856,8 +856,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
                     {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
                     {showCol("collected")   && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.totalCollected)}</td>}
-                    {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold ${t.textSub} border-l ${t.borderLight}`}>{filteredTotals.weekSsaCalls}</td>}
-                    {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekClientCalls}</td>}
+                    {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{filteredTotals.weekSsaCalls}</td>}
+                    {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
                     {showCol("winsheets")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
                   </tr>
