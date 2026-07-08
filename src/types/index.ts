@@ -71,6 +71,7 @@ export interface CaseRow {
   feesConfirmation: string | null;
   feesClosedTrigger: string | null;
   caseStatus: string | null;
+  nextFollowUpDate: string | null;
   isClosed: boolean;
   markedOverpaid: boolean;
   closedAt: string | null;

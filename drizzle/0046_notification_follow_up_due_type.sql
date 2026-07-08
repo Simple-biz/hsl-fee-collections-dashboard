@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notification_type_enum" ADD VALUE 'follow_up_due';

@@ -151,7 +151,8 @@ type FeeField =
   | "approvedBy"
   | "feesConfirmation"
   | "caseStatus"
-  | "winSheetStatus";
+  | "winSheetStatus"
+  | "nextFollowUpDate";
 
 // Sends a single-field patch and logs an activity entry so the side
 // panel keeps a trail of who changed what.
@@ -252,6 +253,7 @@ export const FeeRecordsTable = ({
     | "approvedBy"
     | "feesConfirmation"
     | "caseStatus"
+    | "nextFollowUpDate"
     | "level"
     | "claim"
     | "status";
@@ -1180,7 +1182,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={isClosedMode ? 5 : 6}
+                  colSpan={isClosedMode ? 6 : 7}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -1311,6 +1313,9 @@ export const FeeRecordsTable = ({
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Remarks
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Next Follow-Up
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Recent Update
@@ -2161,6 +2166,28 @@ export const FeeRecordsTable = ({
                           <CaseStatusBadge value={cellValue(c, "caseStatus")} dark={dark} />
                         </button>
                       )}
+                    </td>
+                    {/* Next Follow-Up */}
+                    <td
+                      className={`${tdBase} ${t.textSub}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="date"
+                        value={cellValue(c, "nextFollowUpDate")}
+                        onChange={(e) =>
+                          handleVarcharChange(
+                            c,
+                            "fee",
+                            "nextFollowUpDate",
+                            "nextFollowUpDate",
+                            "Next Follow-Up",
+                            e.target.value,
+                          )
+                        }
+                        aria-label={`Next follow-up call date for ${c.name}`}
+                        className={`h-7 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
+                      />
                     </td>
                     <td className={`${tdBase} ${t.textSub} max-w-65`}>
                       {c.update && c.update !== "—" ? (

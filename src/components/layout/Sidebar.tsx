@@ -30,9 +30,20 @@ import {
   TableProperties,
   PhoneIncoming,
 } from "lucide-react";
+import { toast } from "sonner";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmtClaim } from "@/lib/formatters";
+import { fmtClaim, namesMatch } from "@/lib/formatters";
 import { ChangePasswordDialog } from "@/components/layout/ChangePasswordDialog";
+
+// Local getter, never toISOString() — that converts to UTC and can roll the
+// date back a day for anyone east of UTC.
+const todayLocalIso = (): string => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
 
 interface SidebarProps {
   open: boolean;
@@ -135,6 +146,35 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
     const interval = setInterval(fetchCount, 60000);
     return () => { clearInterval(interval); controller.abort(); };
   }, []);
+
+  // Poll for the current agent's own cases with a follow-up call due today,
+  // and toast once per case per day — checked periodically rather than on
+  // login, since sessions are long-lived and agents rarely log in fresh.
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    const checkFollowUps = async () => {
+      try {
+        const res = await fetch("/api/cases?dueToday=true", { signal });
+        if (!res.ok) return;
+        const json = await res.json();
+        const rows: { id: number; name: string; assigned: string }[] = json.data || [];
+        const today = todayLocalIso();
+        for (const row of rows) {
+          if (!namesMatch(row.assigned, session?.user?.name)) continue;
+          const key = `followupToasted-${row.id}-${today}`;
+          if (sessionStorage.getItem(key)) continue;
+          sessionStorage.setItem(key, "1");
+          toast.warning(`Follow-up call due today — ${row.name}`);
+        }
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+      }
+    };
+    checkFollowUps();
+    const interval = setInterval(checkFollowUps, 60000);
+    return () => { clearInterval(interval); controller.abort(); };
+  }, [session?.user?.name]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

@@ -50,7 +50,7 @@ export function FeesClosedConfirmDialog({
     setError(null);
     try {
       const feeFields = isClose
-        ? { isClosed: true, feesClosedTrigger: null }
+        ? { isClosed: true, feesClosedTrigger: null, nextFollowUpDate: null }
         : { isClosed: false, feesConfirmation: null, feesClosedTrigger: null };
       const logMessage = isClose
         ? "Fees Closed checked — moved to Fees Closed."
