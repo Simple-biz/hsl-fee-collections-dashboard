@@ -114,7 +114,12 @@ export const GET = async (req: NextRequest) => {
         : aging === "unpaid_90"
           ? sql`AND COALESCE(${feeRecords.totalFeesPaid}, 0) = 0 AND ${cases.approvalDate} IS NOT NULL AND (CURRENT_DATE - ${cases.approvalDate}::date) > 90`
           : sql``;
-    const assignedToClause = assignedTo ? sql`AND ${feePetitions.assignedTo} = ${assignedTo}` : sql``;
+    const assignedToClause =
+      assignedTo === "__unassigned__"
+        ? sql`AND ${feePetitions.assignedTo} IS NULL`
+        : assignedTo
+          ? sql`AND ${feePetitions.assignedTo} = ${assignedTo}`
+          : sql``;
 
     // Accept both the legacy enum value and the worksheet-direct label
     // saved via the dashboard dropdown (column C in the master sheet uses
@@ -154,6 +159,7 @@ export const GET = async (req: NextRequest) => {
     const assignees = assignedToRows
       .filter((r): r is { assignedTo: string; caseCount: number } => r.assignedTo != null)
       .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
+    const unassignedCount = assignedToRows.find((r) => r.assignedTo == null)?.caseCount ?? 0;
 
     // Single aggregate for stats + count. Fee totals sum across the FULL
     // filtered set (not just the current page), so they stay accurate
@@ -255,6 +261,7 @@ export const GET = async (req: NextRequest) => {
       totalFeeRequested,
       totalFeesReceived,
       assignees,
+      unassignedCount,
     });
   } catch (error) {
     console.error("GET /api/fee-petitions error:", error);
