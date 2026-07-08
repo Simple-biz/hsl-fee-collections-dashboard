@@ -58,7 +58,6 @@ interface FeePetitionRow {
 }
 
 type CheckboxKey =
-  | "noa"
   | "timeDelineation"
   | "feePetitionDoc"
   | "ltrToClmt"
@@ -75,7 +74,7 @@ type Assignee = { name: string; count: number };
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress"];
-const CHECKBOX_KEYS = ["noa", "timeDelineation", "feePetitionDoc", "ltrToClmt", "ltrToClmtWithSignature", "ltrToAlj", "faxConfFeePet"] as const;
+const CHECKBOX_KEYS = ["timeDelineation", "feePetitionDoc", "ltrToClmt", "ltrToClmtWithSignature", "ltrToAlj", "faxConfFeePet"] as const;
 
 const daysSince = (dateStr: string | null): number | null => {
   if (!dateStr) return null;
@@ -103,7 +102,6 @@ const DEFAULTS = {
 };
 
 const CHECKBOX_COLUMNS: { key: CheckboxKey; label: string }[] = [
-  { key: "noa", label: "NOA" },
   { key: "timeDelineation", label: "Time Delineation" },
   { key: "feePetitionDoc", label: "Fee Petition Doc" },
   { key: "ltrToClmt", label: "Ltr to Clmt" },
@@ -573,7 +571,7 @@ export const FeePetitions = () => {
           ids.includes(r.id)
             ? {
                 ...r,
-                noa: true, timeDelineation: true, feePetitionDoc: true,
+                timeDelineation: true, feePetitionDoc: true,
                 ltrToClmt: true, ltrToClmtWithSignature: true, ltrToAlj: true,
                 faxConfFeePet: true, updatedAt: today,
               }
@@ -735,7 +733,7 @@ export const FeePetitions = () => {
       }
       const headers = [
         "Case", "Approval Date", "Last Updated", "Progress",
-        "NOA", "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
+        "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
         "Ltr to Clmt w/ Signature", "Ltr to ALJ", "Fax Conf Fee Pet", "Notes",
       ];
       const escape = (v: string) => {
@@ -751,7 +749,6 @@ export const FeePetitions = () => {
             r.approvalDate ?? "",
             r.updatedAt ?? "",
             `${completedCount}/${CHECKBOX_COLUMNS.length}`,
-            r.noa ? "Yes" : "No",
             r.timeDelineation ? "Yes" : "No",
             r.feePetitionDoc ? "Yes" : "No",
             r.ltrToClmt ? "Yes" : "No",

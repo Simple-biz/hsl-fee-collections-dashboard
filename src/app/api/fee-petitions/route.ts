@@ -33,7 +33,6 @@ const resolveActiveFeeType = (
 
 const getMissingClause = (key: string | null) => {
   switch (key) {
-    case "noa": return sql`AND COALESCE(${feePetitions.noa}, false) = false`;
     case "timeDelineation": return sql`AND COALESCE(${feePetitions.timeDelineation}, false) = false`;
     case "feePetitionDoc": return sql`AND COALESCE(${feePetitions.feePetitionDoc}, false) = false`;
     case "ltrToClmt": return sql`AND COALESCE(${feePetitions.ltrToClmt}, false) = false`;
@@ -66,10 +65,10 @@ export const GET = async (req: NextRequest) => {
     const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, rawLimit), 10000) : 50;
     const offset = (page - 1) * limit;
 
-    // All 7 checklist fields true (NULLs from LEFT JOIN coalesce to false)
+    // All 6 checklist fields true (NULLs from LEFT JOIN coalesce to false).
+    // NOA dropped from the checklist — a petition can now be filed without it.
     const allChecked = sql`(
-      COALESCE(${feePetitions.noa}, false)
-      AND COALESCE(${feePetitions.timeDelineation}, false)
+      COALESCE(${feePetitions.timeDelineation}, false)
       AND COALESCE(${feePetitions.feePetitionDoc}, false)
       AND COALESCE(${feePetitions.ltrToClmt}, false)
       AND COALESCE(${feePetitions.ltrToClmtWithSignature}, false)
@@ -86,7 +85,6 @@ export const GET = async (req: NextRequest) => {
 
     // Sum of checked boxes — used for progress sort
     const progressExpr = sql`(
-      COALESCE(${feePetitions.noa}, false)::int +
       COALESCE(${feePetitions.timeDelineation}, false)::int +
       COALESCE(${feePetitions.feePetitionDoc}, false)::int +
       COALESCE(${feePetitions.ltrToClmt}, false)::int +
