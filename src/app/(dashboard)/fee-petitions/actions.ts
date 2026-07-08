@@ -76,7 +76,6 @@ export async function bulkMarkComplete(input: {
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
     const allTrue = {
-      noa: true,
       timeDelineation: true,
       feePetitionDoc: true,
       ltrToClmt: true,
@@ -99,7 +98,6 @@ export async function bulkMarkComplete(input: {
 }
 
 type ChecklistFields = {
-  noa: boolean;
   timeDelineation: boolean;
   feePetitionDoc: boolean;
   ltrToClmt: boolean;
