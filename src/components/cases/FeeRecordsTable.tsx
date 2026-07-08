@@ -394,24 +394,38 @@ export const FeeRecordsTable = ({
 
   // All PIF statuses for the filter dropdown — the full admin-configured
   // catalog (so every status is filterable even if no currently-loaded case
-  // has it yet), unioned with whatever's actually present on records so an
-  // inactive-but-still-set value remains filterable too.
+  // has it yet), in the admin-configured order, followed by any values
+  // actually present on records that aren't in the catalog (e.g. an
+  // inactive-but-still-set value), alphabetized since those have no defined
+  // order of their own.
   const feesConfValues = useMemo(() => {
-    const set = new Set((dropdownOptions.fees_confirmation ?? []).map((o) => o.name));
-    for (const c of cases) if (c.feesConfirmation != null) set.add(c.feesConfirmation);
-    return Array.from(set).sort();
+    const catalog = (dropdownOptions.fees_confirmation ?? []).map((o) => o.name);
+    const catalogSet = new Set(catalog);
+    const extras = Array.from(
+      new Set(
+        cases
+          .map((c) => c.feesConfirmation)
+          .filter((v): v is string => v != null && !catalogSet.has(v)),
+      ),
+    ).sort();
+    return [...catalog, ...extras];
   }, [cases, dropdownOptions.fees_confirmation]);
 
-  // Unique Remarks values present in the data for the quick-filter dropdown.
-  // Remarks predates the case_status dropdown catalog, so this includes
-  // whatever free-text values are actually on records today, not just the
-  // admin-configured options.
+  // Remarks values for the quick-filter dropdown — admin-configured catalog
+  // first (in its configured order), then any free-text values actually
+  // present on records that predate/aren't in the catalog, alphabetized.
   const caseStatusValues = useMemo(() => {
-    const set = new Set(
-      cases.map((c) => c.caseStatus).filter((v): v is string => v != null),
-    );
-    return Array.from(set).sort();
-  }, [cases]);
+    const catalog = (dropdownOptions.case_status ?? []).map((o) => o.name);
+    const catalogSet = new Set(catalog);
+    const extras = Array.from(
+      new Set(
+        cases
+          .map((c) => c.caseStatus)
+          .filter((v): v is string => v != null && !catalogSet.has(v)),
+      ),
+    ).sort();
+    return [...catalog, ...extras];
+  }, [cases, dropdownOptions.case_status]);
 
   const filtered = useMemo(() => {
     let d = [...cases];
