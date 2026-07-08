@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   DollarSign,
   Phone,
+  PhoneCall,
   UserPlus,
   CheckCheck,
   RefreshCw,
@@ -29,7 +30,7 @@ import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 
 interface Notification {
   id: string;
-  type: "case_aging" | "fee_payment" | "call_target_missed" | "case_assigned";
+  type: "case_aging" | "fee_payment" | "call_target_missed" | "case_assigned" | "follow_up_due";
   severity: "info" | "warning" | "critical";
   title: string;
   message: string;
@@ -71,6 +72,12 @@ const TYPE_META: Record<
     color: "text-blue-600 bg-blue-50 border-blue-200",
     darkColor: "text-blue-400 bg-blue-900/20 border-blue-800/50",
   },
+  follow_up_due: {
+    label: "Follow-Up Due",
+    icon: PhoneCall,
+    color: "text-orange-600 bg-orange-50 border-orange-200",
+    darkColor: "text-orange-400 bg-orange-900/20 border-orange-800/50",
+  },
 };
 
 const SEVERITY_DOT: Record<
@@ -88,6 +95,7 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
   { key: "fee_payment", label: "Payments" },
   { key: "call_target_missed", label: "Missed Calls" },
   { key: "case_assigned", label: "Assignments" },
+  { key: "follow_up_due", label: "Follow-Ups" },
 ];
 
 const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [

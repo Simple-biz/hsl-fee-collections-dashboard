@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { Toaster } from "@/components/ui/sonner";
 import { DateRangeProvider, useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
 
@@ -82,6 +83,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { eq, sql, desc, and, inArray } from "drizzle-orm";
+import { namesMatch } from "@/lib/formatters";
+
+// Notification types visible only to their assigned agent — nobody else,
+// including leads/admins, sees these (unlike the other types, which are
+// team-wide operational alerts visible to anyone with page access).
+const AGENT_ONLY_TYPES = new Set(["follow_up_due"]);
 
 // ============================================================================
 // GET /api/notifications
@@ -13,6 +20,14 @@ import { eq, sql, desc, and, inArray } from "drizzle-orm";
 // ============================================================================
 export const GET = async (req: NextRequest) => {
   try {
+    const session = await auth();
+    const agentName = session?.user?.name;
+    // Agent-only types (e.g. follow_up_due) are stripped out unless they
+    // belong to the requesting user — applied after the DB query since
+    // namesMatch tolerates case/whitespace drift that SQL equality wouldn't.
+    const visibleToSession = (row: { type: string; agentName: string | null }) =>
+      !AGENT_ONLY_TYPES.has(row.type) || namesMatch(row.agentName, agentName);
+
     const { searchParams } = new URL(req.url);
     const typeFilter = searchParams.get("type")?.split(",").filter(Boolean);
     const unreadOnly = searchParams.get("unread") === "true";
@@ -38,23 +53,26 @@ export const GET = async (req: NextRequest) => {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const rows = await db
-      .select()
-      .from(notifications)
-      .where(whereClause)
-      .orderBy(desc(notifications.createdAt))
-      .limit(limit);
+    const rows = (
+      await db
+        .select()
+        .from(notifications)
+        .where(whereClause)
+        .orderBy(desc(notifications.createdAt))
+        .limit(limit)
+    ).filter(visibleToSession);
 
-    // Unread count
-    const [{ count: unreadCount }] = await db
-      .select({ count: sql<number>`COUNT(*)::int` })
+    // Unread count — same agent-only scoping as above.
+    const unreadRows = await db
+      .select({ type: notifications.type, agentName: notifications.agentName })
       .from(notifications)
       .where(eq(notifications.isRead, false));
+    const unreadCount = unreadRows.filter(visibleToSession).length;
 
     // Optionally compute live alerts (expensive — use sparingly)
     let liveAlerts: typeof rows = [];
     if (computeLive) {
-      liveAlerts = await computeLiveAlerts();
+      liveAlerts = (await computeLiveAlerts()).filter(visibleToSession);
     }
 
     return NextResponse.json({
@@ -338,6 +356,39 @@ async function computeLiveAlerts() {
       isRead: false,
       readAt: null,
       createdAt: new Date(row.created_at),
+    });
+  }
+
+  // 5. Follow-up calls due today. Agent-scoped in the GET handler — this
+  // just computes the full set like the other four blocks.
+  const followUpsDueToday = await db.execute(sql`
+    SELECT
+      c.client_id,
+      c.first_name || ' ' || c.last_name AS claimant,
+      fr.assigned_to
+    FROM fee_records fr
+    JOIN cases c ON c.client_id = fr.case_id
+    WHERE fr.is_closed = FALSE
+      AND fr.next_follow_up_date = CURRENT_DATE
+    ORDER BY c.client_id
+  `);
+
+  for (const row of followUpsDueToday as unknown as {
+    client_id: number;
+    claimant: string;
+    assigned_to: string | null;
+  }[]) {
+    alerts.push({
+      id: `live-followup-${row.client_id}`,
+      type: "follow_up_due",
+      severity: "warning",
+      title: `Follow-up call due today — ${row.claimant}`,
+      message: `A follow-up call is scheduled for today for ${row.claimant}.`,
+      caseId: row.client_id,
+      agentName: row.assigned_to || null,
+      isRead: false,
+      readAt: null,
+      createdAt: new Date(),
     });
   }
 
