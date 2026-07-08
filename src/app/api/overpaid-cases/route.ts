@@ -52,7 +52,11 @@ export const GET = async (req: NextRequest) => {
     const whereClause = sql`${overpaidCondition}
       ${searchClause}
       ${statusClause}
-      ${agent ? sql`AND ${feeRecords.assignedTo} = ${agent}` : sql``}
+      ${agent === "__unassigned__"
+        ? sql`AND ${feeRecords.assignedTo} IS NULL`
+        : agent
+          ? sql`AND ${feeRecords.assignedTo} = ${agent}`
+          : sql``}
       ${ltrClause}
       ${minClause}
       ${maxClause}
@@ -80,6 +84,7 @@ export const GET = async (req: NextRequest) => {
     const agents = agentRows
       .filter((r): r is { assignedTo: string; caseCount: number } => r.assignedTo != null)
       .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
+    const unassignedCount = agentRows.find((r) => r.assignedTo == null)?.caseCount ?? 0;
 
     // Aggregate stats (respects all active filters including agent)
     const [agg] = await db
@@ -157,7 +162,7 @@ export const GET = async (req: NextRequest) => {
     const pageFeesReceived = pageFeesCents / 100;
     const pageOverpaid = pageOverpaidCents / 100;
 
-    return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedCount, ltrCount, agents, pageFeesReceived, pageOverpaid });
+    return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedCount, ltrCount, agents, unassignedCount, pageFeesReceived, pageOverpaid });
   } catch (error) {
     console.error("GET /api/overpaid-cases error:", error);
     return NextResponse.json(

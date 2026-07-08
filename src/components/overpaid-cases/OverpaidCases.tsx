@@ -121,6 +121,7 @@ export const OverpaidCases = () => {
   const [stats, setStats] = useState({ totalOverpaid: 0, ltrCount: 0 });
   const [pageTotals, setPageTotals] = useState({ pageFeesReceived: 0, pageOverpaid: 0 });
   const [agents, setAgents] = useState<{ name: string; count: number }[]>([]);
+  const [unassignedCount, setUnassignedCount] = useState(0);
 
   const [search, setSearch] = useState(initialState.search);
   const [appliedSearch, setAppliedSearch] = useState(initialState.search);
@@ -294,6 +295,7 @@ export const OverpaidCases = () => {
         pageOverpaid: typeof json.pageOverpaid === "number" ? json.pageOverpaid : 0,
       });
       if (Array.isArray(json.agents)) setAgents(json.agents);
+      if (typeof json.unassignedCount === "number") setUnassignedCount(json.unassignedCount);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
       ltrSnapshot.current = new Map(data.map((r) => [r.id, r.opLtrReceived]));
       opLtrDateSnapshot.current = new Map(data.map((r) => [r.id, r.opLtrDate]));
@@ -997,6 +999,7 @@ export const OverpaidCases = () => {
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
               <option value="">All Agents</option>
+              <option value="__unassigned__">Unassigned ({unassignedCount})</option>
               {agents.map((a) => (
                 <option key={a.name} value={a.name}>{a.name} ({a.count})</option>
               ))}
@@ -1102,7 +1105,7 @@ export const OverpaidCases = () => {
             )}
             {agentFilter && (
               <span className={chipBase}>
-                Agent: {agentFilter}
+                Agent: {agentFilter === "__unassigned__" ? "Unassigned" : agentFilter}
                 <button aria-label="Clear agent filter" onClick={() => { urlMethodRef.current = "push"; setAgentFilter(""); setPage(1); }} className="ml-0.5 hover:opacity-70">
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>
