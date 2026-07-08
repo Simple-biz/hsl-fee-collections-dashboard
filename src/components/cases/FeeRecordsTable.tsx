@@ -457,7 +457,9 @@ export const FeeRecordsTable = ({
         return ov !== undefined ? ov === assignedFilter : c.assigned === assignedFilter;
       });
     }
-    if (feesConfFilter !== "all")
+    if (feesConfFilter === "__none__")
+      d = d.filter((c) => c.feesConfirmation == null);
+    else if (feesConfFilter !== "all")
       d = d.filter((c) => c.feesConfirmation === feesConfFilter);
     if (claimFilter !== "all")
       d = d.filter((c) => c.claim === claimFilter);
@@ -984,6 +986,7 @@ export const FeeRecordsTable = ({
             className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
           >
             <option value="all">All PIF</option>
+            <option value="__none__">No Fees</option>
             {feesConfValues.map((v) => (
               <option key={v} value={v}>
                 {v}
