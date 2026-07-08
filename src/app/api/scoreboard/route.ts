@@ -59,8 +59,62 @@ export const GET = async (req: NextRequest) => {
     const startDate = useRange ? fromParam! : monday;
     const endExclusive = useRange ? addDays(toParam!, 1) : addDays(monday, 7);
 
-    // Per-agent totals for the window
+    // Fees collected within the window, from the actual payment ledger where
+    // one exists. `fee_records.{type}_fee_received` is a running lifetime
+    // total and `{type}_fee_received_date` is overwritten to the most recent
+    // payment's date on every add (see /api/cases/[id]/payments), so neither
+    // can be windowed directly for cases with more than one payment on the
+    // same fee type — doing so would attribute the whole lifetime total to
+    // one period and nothing to the others. Money that predates the
+    // fee_payments ledger (bulk Sheets/MyCase sync, CSV import) has no
+    // per-payment row at all, so it's treated as a single "legacy" payment
+    // dated by the fee_records received-date column, sized as whatever part
+    // of the lifetime total isn't already accounted for by real ledger rows.
     const teamTotals = await db.execute(sql`
+      WITH payment_sums AS (
+        SELECT case_id, fee_type, SUM(amount::numeric) AS paid_sum
+        FROM fee_payments
+        GROUP BY case_id, fee_type
+      ),
+      legacy_remainder AS (
+        SELECT
+          fr.case_id,
+          fr.assigned_to,
+          GREATEST(fr.t16_fee_received::numeric - COALESCE(p16.paid_sum, 0), 0) AS t16_remainder,
+          fr.t16_fee_received_date,
+          GREATEST(fr.t2_fee_received::numeric - COALESCE(p2.paid_sum, 0), 0) AS t2_remainder,
+          fr.t2_fee_received_date,
+          GREATEST(fr.aux_fee_received::numeric - COALESCE(pa.paid_sum, 0), 0) AS aux_remainder,
+          fr.aux_fee_received_date
+        FROM fee_records fr
+        LEFT JOIN payment_sums p16 ON p16.case_id = fr.case_id AND p16.fee_type = 't16'
+        LEFT JOIN payment_sums p2  ON p2.case_id  = fr.case_id AND p2.fee_type  = 't2'
+        LEFT JOIN payment_sums pa  ON pa.case_id  = fr.case_id AND pa.fee_type  = 'aux'
+      ),
+      ledger_in_window AS (
+        SELECT fr.assigned_to AS agent, fp.amount::numeric AS amt
+        FROM fee_payments fp
+        JOIN fee_records fr ON fr.case_id = fp.case_id
+        WHERE fp.received_date >= ${startDate}::date AND fp.received_date < ${endExclusive}::date
+
+        UNION ALL
+
+        SELECT assigned_to AS agent, t16_remainder AS amt FROM legacy_remainder
+        WHERE t16_fee_received_date >= ${startDate}::date AND t16_fee_received_date < ${endExclusive}::date
+          AND t16_remainder > 0.005
+
+        UNION ALL
+
+        SELECT assigned_to AS agent, t2_remainder AS amt FROM legacy_remainder
+        WHERE t2_fee_received_date >= ${startDate}::date AND t2_fee_received_date < ${endExclusive}::date
+          AND t2_remainder > 0.005
+
+        UNION ALL
+
+        SELECT assigned_to AS agent, aux_remainder AS amt FROM legacy_remainder
+        WHERE aux_fee_received_date >= ${startDate}::date AND aux_fee_received_date < ${endExclusive}::date
+          AND aux_remainder > 0.005
+      )
       SELECT
         tm.name AS agent,
         tm.team AS team,
@@ -142,15 +196,9 @@ export const GET = async (req: NextRequest) => {
         -- Total fees collected (all time for this agent)
         COALESCE((SELECT SUM(fr.total_fees_paid::numeric) FROM fee_records fr WHERE fr.assigned_to = tm.name), 0) AS total_collected,
 
-        -- Fees collected within the window (derived from per-type received dates)
+        -- Fees collected within the window (see ledger_in_window above)
         COALESCE((
-          SELECT SUM(
-            CASE WHEN fr.t2_fee_received_date >= ${startDate}::date AND fr.t2_fee_received_date < ${endExclusive}::date THEN fr.t2_fee_received::numeric ELSE 0 END +
-            CASE WHEN fr.t16_fee_received_date >= ${startDate}::date AND fr.t16_fee_received_date < ${endExclusive}::date THEN fr.t16_fee_received::numeric ELSE 0 END +
-            CASE WHEN fr.aux_fee_received_date >= ${startDate}::date AND fr.aux_fee_received_date < ${endExclusive}::date THEN fr.aux_fee_received::numeric ELSE 0 END
-          )
-          FROM fee_records fr
-          WHERE fr.assigned_to = tm.name
+          SELECT SUM(l.amt) FROM ledger_in_window l WHERE l.agent = tm.name
         ), 0) AS fees_collected_in_window,
 
         -- Cases with full fee collected (PIF)
