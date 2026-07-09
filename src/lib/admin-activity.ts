@@ -10,7 +10,9 @@ export type AdminAction =
   | "user.activate"
   | "user.deactivate"
   | "user.password_reset"
-  | "user.access_update";
+  | "user.access_update"
+  | "backup.export"
+  | "backup.restore";
 
 export interface AdminActor {
   id: number | null;

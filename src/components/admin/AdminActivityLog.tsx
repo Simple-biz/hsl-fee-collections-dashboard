@@ -28,6 +28,8 @@ const ACTION_META: Record<string, { label: string; tone: string }> = {
   "user.deactivate": { label: "Deactivated", tone: "amber" },
   "user.password_reset": { label: "Password", tone: "violet" },
   "user.access_update": { label: "Access", tone: "blue" },
+  "backup.export": { label: "Backup", tone: "violet" },
+  "backup.restore": { label: "Restore", tone: "amber" },
 };
 
 const toneClasses = (tone: string, dark: boolean): string => {

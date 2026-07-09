@@ -18,6 +18,7 @@ import {
   CaseActivityFeed,
   type CaseActivityEntry,
 } from "./CaseActivityFeed";
+import { BackupRestorePanel } from "./BackupRestorePanel";
 
 export type { AdminUser } from "./UsersTable";
 export type { AdminActivityEntry } from "./AdminActivityLog";
@@ -64,6 +65,7 @@ export function AdminPage({
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="activity">Activity Logs</TabsTrigger>
+          <TabsTrigger value="backup">Backup &amp; Restore</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
@@ -83,6 +85,10 @@ export function AdminPage({
               <CaseActivityFeed entries={caseActivity} />
             </TabsContent>
           </Tabs>
+        </TabsContent>
+
+        <TabsContent value="backup">
+          <BackupRestorePanel />
         </TabsContent>
       </Tabs>
     </div>
