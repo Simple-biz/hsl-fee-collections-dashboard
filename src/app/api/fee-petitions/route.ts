@@ -212,6 +212,7 @@ export const GET = async (req: NextRequest) => {
         ltrToClmtWithSignature: feePetitions.ltrToClmtWithSignature,
         ltrToAlj: feePetitions.ltrToAlj,
         faxConfFeePet: feePetitions.faxConfFeePet,
+        feePetitionApproved: feePetitions.feePetitionApproved,
         updateNote: feePetitions.updateNote,
         updatedAt: feePetitions.updatedAt,
       })
@@ -245,6 +246,7 @@ export const GET = async (req: NextRequest) => {
       ltrToClmtWithSignature: r.ltrToClmtWithSignature ?? false,
       ltrToAlj: r.ltrToAlj ?? false,
       faxConfFeePet: r.faxConfFeePet ?? false,
+      feePetitionApproved: r.feePetitionApproved ?? false,
       updateNote: r.updateNote ?? "",
     }));
 

@@ -1,11 +1,17 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { feePetitions } from "@/lib/db/schema";
+import { feePetitions, feeRecords } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseBool } from "@/lib/import/csv-parser";
 import { resolveCaseId } from "@/lib/import/resolve-case";
+import { requireCapability } from "@/lib/auth-helpers";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
+
+// Kept in sync with FeeRecordsTable.tsx's CASE_STATUS_COLORS — the literal
+// Remarks value that means the same thing as this page's "Fee Petition
+// Approved" column.
+const FEE_PETITION_APPROVED_REMARKS = "FEE PETITION APPROVED";
 
 const FIELD_KEYS = [
   "assignedTo",
@@ -16,6 +22,7 @@ const FIELD_KEYS = [
   "ltrToClmtWithSignature",
   "ltrToAlj",
   "faxConfFeePet",
+  "feePetitionApproved",
   "updateNote",
 ] as const;
 
@@ -52,14 +59,42 @@ export async function upsertFeePetition(input: {
       return { ok: false, error: `Note too long (max ${NOTE_MAX_LENGTH} characters)` };
     }
 
-    const [row] = await db
-      .insert(feePetitions)
-      .values({ caseId: input.caseId, ...updates })
-      .onConflictDoUpdate({
-        target: feePetitions.caseId,
-        set: { ...updates, updatedAt: new Date() },
-      })
-      .returning();
+    // Unlike the rest of this file's checklist fields, checking this one
+    // reaches into fee_records — the same field Master Fees gates behind
+    // case.update — so this specific write needs the same gate, even though
+    // the plain checklist toggles below intentionally don't require it.
+    if (updates.feePetitionApproved === true) {
+      const guard = await requireCapability("case.update");
+      if (!guard.ok) {
+        return { ok: false, error: "You don't have permission to approve fee petitions." };
+      }
+    }
+
+    // Checking "Fee Petition Approved" here also sets Remarks on Master Fees
+    // to match, so the two stay in sync regardless of which page someone
+    // edits from. Only syncs forward on check — unchecking doesn't touch
+    // Remarks, since Remarks has many other unrelated values and blanking it
+    // as a side effect of an unrelated checkbox would be a surprising, lossy
+    // side effect on a different page.
+    const row = await db.transaction(async (tx) => {
+      const [r] = await tx
+        .insert(feePetitions)
+        .values({ caseId: input.caseId, ...updates })
+        .onConflictDoUpdate({
+          target: feePetitions.caseId,
+          set: { ...updates, updatedAt: new Date() },
+        })
+        .returning();
+
+      if (updates.feePetitionApproved === true) {
+        await tx
+          .update(feeRecords)
+          .set({ caseStatus: FEE_PETITION_APPROVED_REMARKS, updatedAt: new Date() })
+          .where(eq(feeRecords.caseId, input.caseId));
+      }
+
+      return r;
+    });
 
     return { ok: true, data: row };
   } catch (error) {

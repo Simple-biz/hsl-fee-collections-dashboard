@@ -1,0 +1,1 @@
+ALTER TABLE "fee_petitions" ADD COLUMN "fee_petition_approved" boolean DEFAULT false NOT NULL;

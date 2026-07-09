@@ -349,6 +349,14 @@ export const feePetitions = pgTable(
     ltrToAlj: boolean("ltr_to_alj").notNull().default(false),
     faxConfFeePet: boolean("fax_conf_fee_pet").notNull().default(false),
 
+    // Outcome flag, not a filing step — kept separate from the checklist
+    // above. Synced with fee_records.case_status ("Remarks" on Master Fees):
+    // setting Remarks to "FEE PETITION APPROVED" checks this, and checking
+    // this sets Remarks to "FEE PETITION APPROVED". See upsertFeePetition
+    // (fee-petitions/actions.ts) and the PATCH handler in
+    // api/cases/[id]/route.ts for the two sync directions.
+    feePetitionApproved: boolean("fee_petition_approved").notNull().default(false),
+
     // Inline note
     updateNote: text("update_note").notNull().default(""),
 

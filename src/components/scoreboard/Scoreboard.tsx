@@ -2,7 +2,7 @@
 
 import { useState, useReducer, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight, Upload } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
@@ -293,13 +293,29 @@ export const Scoreboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map((row, rowIdx) => (
+                        {rows.map((row, rowIdx) => {
+                          // Trophy marks whoever topped this team for the
+                          // currently displayed week (rows are already sorted
+                          // by that week's value) — ties all get one, and a
+                          // week with zero closures for the whole team awards
+                          // none rather than crowning a 0.
+                          const isTopScorer =
+                            row.weekValues[0] > 0 && row.weekValues[0] === rows[0].weekValues[0];
+                          return (
                           <tr
                             key={row.agent}
                             className={`border-b ${t.borderLight} ${rowIdx % 2 !== 0 ? (dark ? "bg-neutral-800/20" : "bg-neutral-50/50") : ""}`}
                           >
                             <td className={`py-2.5 px-4 text-[14px] font-medium ${t.text}`}>
-                              {row.agent}
+                              <span
+                                className="inline-flex items-center gap-1.5"
+                                title={isTopScorer ? "Top scorer this week" : undefined}
+                              >
+                                {row.agent}
+                                {isTopScorer && (
+                                  <Trophy aria-hidden="true" className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                )}
+                              </span>
                             </td>
                             {row.weekValues.map((val, i) => (
                               <td key={i} className="py-2.5 px-3 text-center">
@@ -315,7 +331,8 @@ export const Scoreboard = () => {
                               </td>
                             ))}
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
