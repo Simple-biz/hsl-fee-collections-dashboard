@@ -37,6 +37,9 @@ export interface CaseRow {
   claim: string;
   date: string | null;
   status: WinSheetStatus;
+  // When the case itself was first added to the dashboard — powers Master
+  // Fees' "most recently added on top" default sort.
+  createdAt: string;
 
   // T16 section
   t16Retro: number;

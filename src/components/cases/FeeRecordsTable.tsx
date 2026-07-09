@@ -212,7 +212,8 @@ type SortKey =
   | "expected"
   | "paid"
   | "daysAfterApproval"
-  | "closedAt";
+  | "closedAt"
+  | "createdAt";
 type SortDir = "asc" | "desc";
 
 export const FeeRecordsTable = ({
@@ -297,7 +298,9 @@ export const FeeRecordsTable = ({
       return next;
     });
   };
-  const [sortKey, setSortKey] = useState<SortKey>("date");
+  // Fees Closed defaults to most-recently-closed on top; Master Fees
+  // defaults to most-recently-added on top (both requested by Ms. Jazz).
+  const [sortKey, setSortKey] = useState<SortKey>(mode === "closed" ? "closedAt" : "createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Client-side pagination over the filtered+sorted set. Page size is
   // user-selectable; "all" renders the whole filtered set on one page.
@@ -536,6 +539,10 @@ export const FeeRecordsTable = ({
         case "closedAt":
           av = a.closedAt || "";
           bv = b.closedAt || "";
+          break;
+        case "createdAt":
+          av = a.createdAt || "";
+          bv = b.createdAt || "";
           break;
       }
       if (av < bv) return sortDir === "asc" ? -1 : 1;
