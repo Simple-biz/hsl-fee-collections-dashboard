@@ -470,12 +470,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     }
   };
 
-  // Always call the latest handleSave from the debounce effect below without
-  // making the effect re-run (and reset its timer) on every render — handleSave
-  // itself isn't referentially stable since it closes over canEditAgent, which
-  // is recreated every render.
+  // Always call the latest handleSave from the debounce/unmount effects below
+  // without making them re-run (and reset the debounce timer) on every
+  // render — handleSave itself isn't referentially stable since it closes
+  // over canEditAgent, which is recreated every render.
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
 
   // Auto-save the call log ~1.5s after the last edit, so entries persist
   // without requiring a manual "Save All" click. The cells Map gets a new
@@ -489,6 +491,18 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
   }, [cells, dirty, entryOpen]);
+
+  // Covers the one gap the debounce/close-flush above don't: navigating to a
+  // different page entirely (not via the panel's own close button) within
+  // the debounce window. The effect above's cleanup would otherwise just
+  // clearTimeout the pending save on unmount and drop the edit silently.
+  // Empty deps — this must run its cleanup only on true unmount, not on every
+  // keystroke, which is why it reads dirty/handleSave through refs instead.
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current) handleSaveRef.current();
+    };
+  }, []);
 
   const adjustDay = (delta: number) => {
     const [y, m, d] = daySel.split("-").map(Number);
