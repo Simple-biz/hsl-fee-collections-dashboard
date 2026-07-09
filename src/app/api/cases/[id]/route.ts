@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog, userDetails } from "@/lib/db/schema";
+import { cases, feeRecords, feePetitions, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireCapability, requireAdmin, guardStatus } from "@/lib/auth-helpers";
 
@@ -525,6 +525,23 @@ export const PATCH = async (
         logMessage = logMessage
           ? `${logMessage} — also flagged as overpaid`
           : "Flagged as overpaid (PIF set to \"Overpaid\")";
+      }
+
+      // Mirrors the Overpaid auto-flag above: setting Remarks to "FEE
+      // PETITION APPROVED" also checks the Fee Petitions page's own "Fee
+      // Petition Approved" column, so the two stay in sync regardless of
+      // which page someone edits from. Only syncs forward — changing Remarks
+      // to something else doesn't uncheck it, since Remarks has many other
+      // unrelated values and the approval itself doesn't become untrue just
+      // because a note field changed.
+      if (feeFields.caseStatus === "FEE PETITION APPROVED") {
+        await db
+          .insert(feePetitions)
+          .values({ caseId, feePetitionApproved: true })
+          .onConflictDoUpdate({
+            target: feePetitions.caseId,
+            set: { feePetitionApproved: true, updatedAt: new Date() },
+          });
       }
 
       if (updates.length > 0) {
