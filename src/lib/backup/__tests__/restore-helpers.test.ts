@@ -6,6 +6,8 @@ import {
   valuesEqual,
   buildReconcileKey,
   toDbValue,
+  humanizedLabelMap,
+  buildHeaderKeyMap,
 } from "../restore-helpers";
 
 const casesCols = getTableColumns(cases);
@@ -120,5 +122,31 @@ describe("toDbValue", () => {
 
   it("passes non-null values through unchanged", () => {
     expect(toDbValue(feePetitionsCols.updateNote, "hello")).toBe("hello");
+  });
+});
+
+describe("humanizedLabelMap", () => {
+  it("maps distinct keys to their humanized labels", () => {
+    const map = humanizedLabelMap(["firstName", "clientId"]);
+    expect(map.get("First Name")).toBe("firstName");
+    expect(map.get("Client ID")).toBe("clientId");
+  });
+
+  it("throws when two keys humanize to the same label", () => {
+    expect(() => humanizedLabelMap(["foo", "Foo"])).toThrow(/collision/i);
+  });
+});
+
+describe("buildHeaderKeyMap", () => {
+  it("builds a real, collision-free map for every backed-up table's columns", () => {
+    expect(() => buildHeaderKeyMap(cases, ["fullSsn", "ssnEncrypted"])).not.toThrow();
+    expect(() => buildHeaderKeyMap(feeRecords)).not.toThrow();
+    expect(() => buildHeaderKeyMap(feePetitions)).not.toThrow();
+  });
+
+  it("excludes the given columns from the map", () => {
+    const map = buildHeaderKeyMap(cases, ["fullSsn", "ssnEncrypted"]);
+    expect(map.has("Full SSN")).toBe(false);
+    expect(map.has("First Name")).toBe(true);
   });
 });

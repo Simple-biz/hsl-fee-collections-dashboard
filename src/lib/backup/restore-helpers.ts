@@ -6,23 +6,29 @@ import { humanizeKey } from "@/lib/backup/humanize";
 // Maps this table's humanized column labels (as written by the export route)
 // back to their real (TS) column keys, so a restore doesn't depend on column
 // order matching between the export and the file the admin re-uploads.
-export const buildHeaderKeyMap = (
-  table: PgTable,
-  excludeColumns: string[] = [],
-): Map<string, string> => {
+// Two columns humanizing to the same label would silently make the second
+// one's values overwrite the first's on every restore — fail loudly instead,
+// since this can only be caught by inspection otherwise. Split out from
+// buildHeaderKeyMap so the collision check is testable without a real
+// PgTable/DB connection.
+export const humanizedLabelMap = (keys: string[]): Map<string, string> => {
   const map = new Map<string, string>();
-  for (const key of Object.keys(getTableColumns(table))) {
-    if (excludeColumns.includes(key)) continue;
+  for (const key of keys) {
     const label = humanizeKey(key);
-    // Two columns humanizing to the same label would silently make the
-    // second one's values overwrite the first's on every restore — fail
-    // loudly instead, since this can only be caught by inspection otherwise.
     if (map.has(label)) {
       throw new Error(`humanizeKey collision: "${map.get(label)}" and "${key}" both humanize to "${label}"`);
     }
     map.set(label, key);
   }
   return map;
+};
+
+export const buildHeaderKeyMap = (
+  table: PgTable,
+  excludeColumns: string[] = [],
+): Map<string, string> => {
+  const keys = Object.keys(getTableColumns(table)).filter((k) => !excludeColumns.includes(k));
+  return humanizedLabelMap(keys);
 };
 
 // Excel has no concept of a column's original JS/DB type — every cell is a
