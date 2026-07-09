@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { X, Upload, AlertTriangle, CheckCircle2, Loader2, FileSpreadsheet } from "lucide-react";
@@ -32,7 +32,6 @@ export function RestoreBackupModal({ onClose }: { onClose: () => void }) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,14 +41,27 @@ export function RestoreBackupModal({ onClose }: { onClose: () => void }) {
   const [included, setIncluded] = useState<Set<string>>(new Set());
   const [applied, setApplied] = useState<Record<string, { inserted: number; updated: number }> | null>(null);
 
+  const previewControllerRef = useRef<AbortController | null>(null);
+  const applyControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    previewControllerRef.current?.abort();
+    applyControllerRef.current?.abort();
+  }, []);
+
   const handlePreview = async () => {
     if (!file) return;
+    const controller = new AbortController();
+    previewControllerRef.current = controller;
     setLoading(true);
     setError(null);
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/admin/backup/restore?mode=preview", { method: "POST", body: form });
+      const res = await fetch("/api/admin/backup/restore?mode=preview", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `Preview failed (${res.status})`);
       const data = body as PreviewResponse;
@@ -58,6 +70,7 @@ export function RestoreBackupModal({ onClose }: { onClose: () => void }) {
         new Set(data.tables.filter((tb) => tb.counts.new > 0 || tb.counts.changed > 0).map((tb) => tb.key)),
       );
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -66,18 +79,25 @@ export function RestoreBackupModal({ onClose }: { onClose: () => void }) {
 
   const handleApply = async () => {
     if (!file || included.size === 0) return;
+    const controller = new AbortController();
+    applyControllerRef.current = controller;
     setApplying(true);
     setError(null);
     try {
       const form = new FormData();
       form.append("file", file);
       form.append("includeTables", JSON.stringify(Array.from(included)));
-      const res = await fetch("/api/admin/backup/restore?mode=apply", { method: "POST", body: form });
+      const res = await fetch("/api/admin/backup/restore?mode=apply", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `Restore failed (${res.status})`);
       setApplied(body.applied);
       toast.success("Restore complete");
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError((err as Error).message);
     } finally {
       setApplying(false);
@@ -161,9 +181,9 @@ export function RestoreBackupModal({ onClose }: { onClose: () => void }) {
                 until you review the summary and confirm. Restore never deletes rows.
               </p>
               <input
-                ref={fileInputRef}
                 type="file"
                 accept=".xlsx"
+                aria-label="Backup file"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className={`block w-full text-[13px] ${t.textSub}`}
               />

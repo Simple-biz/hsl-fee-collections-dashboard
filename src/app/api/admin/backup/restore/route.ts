@@ -1,7 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { getTableColumns, sql } from "drizzle-orm";
+import { getTableColumns, getTableName, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { logAdminActivity } from "@/lib/admin-activity";
@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const DETAIL_SAMPLE_LIMIT = 25;
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 type RowStatus = "new" | "changed" | "unchanged";
 
@@ -98,6 +99,12 @@ export const POST = async (req: NextRequest) => {
     const file = form.get("file");
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: "Missing 'file' field" }, { status: 400 });
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json(
+        { error: `File is too large (max ${MAX_FILE_BYTES / (1024 * 1024)}MB)` },
+        { status: 413 },
+      );
     }
 
     let includeTables: Set<string> | null = null;
@@ -248,6 +255,18 @@ export const POST = async (req: NextRequest) => {
           .insert(config.table)
           .values(insertValues)
           .onConflictDoUpdate({ target: targetColumns, set });
+
+        // A "new" row with an explicit id (reconcileBy includes "id") only
+        // arises for a serial PK when its underlying sequence is behind —
+        // otherwise that id would already exist and this would be an
+        // update, not an insert. Advancing the sequence here prevents the
+        // very next ordinary insert from colliding with a restored row.
+        if (config.reconcileBy.includes("id") && columns.id.columnType === "PgSerial") {
+          const tableName = getTableName(config.table);
+          await tx.execute(
+            sql`select setval(pg_get_serial_sequence(${tableName}, 'id'), (select max(id) from ${config.table}))`,
+          );
+        }
 
         applied[config.key] = {
           inserted: toApply.filter((r) => r.status === "new").length,
