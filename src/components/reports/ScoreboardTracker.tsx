@@ -224,9 +224,17 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     [currentYear],
   );
 
+  // Flushes any pending unsaved edit immediately rather than waiting out the
+  // autosave debounce — used wherever the call log panel closes, so a quick
+  // edit-then-close doesn't get silently dropped.
+  const closeEntryPanel = () => {
+    if (dirty) handleSaveRef.current();
+    setEntryOpen(false);
+  };
+
   const changeDateMode = (m: DateMode) => {
     setDateMode(m);
-    if (m !== "week" && m !== "day") setEntryOpen(false);
+    if (m !== "week" && m !== "day") closeEntryPanel();
   };
 
   const showCol = (key: string) =>
@@ -462,6 +470,26 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     }
   };
 
+  // Always call the latest handleSave from the debounce effect below without
+  // making the effect re-run (and reset its timer) on every render — handleSave
+  // itself isn't referentially stable since it closes over canEditAgent, which
+  // is recreated every render.
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  // Auto-save the call log ~1.5s after the last edit, so entries persist
+  // without requiring a manual "Save All" click. The cells Map gets a new
+  // reference on every keystroke (see setCell), which is what restarts this
+  // timer; the manual Save All button stays as an immediate/explicit option.
+  const AUTOSAVE_DELAY_MS = 1500;
+  useEffect(() => {
+    if (!dirty || !entryOpen) return;
+    const timer = setTimeout(() => {
+      handleSaveRef.current();
+    }, AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [cells, dirty, entryOpen]);
+
   const adjustDay = (delta: number) => {
     const [y, m, d] = daySel.split("-").map(Number);
     const date = new Date(y, m - 1, d + delta);
@@ -593,7 +621,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             {(dateMode === "week" || dateMode === "day") && (
               <>
                 <button
-                  onClick={() => setEntryOpen(!entryOpen)}
+                  onClick={() => (entryOpen ? closeEntryPanel() : setEntryOpen(true))}
                   className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
                     entryOpen
                       ? dark
@@ -878,7 +906,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
               <div>
                 <h3 className={`text-sm font-bold ${t.text}`}>Daily Call Log</h3>
                 <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-                  {windowLabel} — Enter SSA &amp; client call counts per agent
+                  {windowLabel} — Enter SSA &amp; client call counts per agent. Saves automatically.
                 </p>
               </div>
             </div>
@@ -900,7 +928,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 Save All
               </button>
               <button
-                onClick={() => setEntryOpen(false)}
+                onClick={closeEntryPanel}
                 className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
                 aria-label="Close call log"
               >
