@@ -330,6 +330,13 @@
       "when": 1783531103166,
       "tag": "0046_notification_follow_up_due_type",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783612204008,
+      "tag": "0047_fee_petitions_approved_flag",
+      "breakpoints": true
     }
   ]
 }

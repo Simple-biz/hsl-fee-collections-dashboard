@@ -54,6 +54,9 @@ interface FeePetitionRow {
   ltrToClmtWithSignature: boolean;
   ltrToAlj: boolean;
   faxConfFeePet: boolean;
+  // Outcome flag, not part of the filing checklist above — synced with
+  // Remarks ("FEE PETITION APPROVED") on Master Fees in both directions.
+  feePetitionApproved: boolean;
   updateNote: string;
 }
 
@@ -668,6 +671,27 @@ export const FeePetitions = () => {
     }
   };
 
+  // Standalone from toggleCheckbox above — this isn't a filing-checklist step
+  // (doesn't count toward completedCount/isComplete), and checking it syncs
+  // Remarks to "FEE PETITION APPROVED" on Master Fees server-side (see
+  // upsertFeePetition). Unchecking only updates this column, not Remarks.
+  const toggleFeePetitionApproved = async (id: number) => {
+    const prevRow = rows.find((r) => r.id === id);
+    if (!prevRow) return;
+    const next = !prevRow.feePetitionApproved;
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, feePetitionApproved: next } : r)));
+    try {
+      await patchPetition(id, { feePetitionApproved: next });
+      const today = new Date().toISOString().slice(0, 10);
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
+      setLiveMessage(`Fee Petition Approved ${next ? "checked" : "unchecked"}`);
+    } catch (err) {
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, feePetitionApproved: !next } : r)));
+      setLiveMessage("Save failed");
+      setError((err as Error).message);
+    }
+  };
+
   const updateAssignedTo = async (id: number, value: string) => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
@@ -794,7 +818,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 9;
+  const colSpan = CHECKBOX_COLUMNS.length + 10;
 
   return (
     <div className="space-y-4">
@@ -1177,6 +1201,9 @@ export const FeePetitions = () => {
                     {col.label}
                   </th>
                 ))}
+                <th className={`${thBase} ${t.textSub} text-center border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>
+                  Fee Petition Approved
+                </th>
                 <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>Update</th>
               </tr>
             </thead>
@@ -1353,6 +1380,21 @@ export const FeePetitions = () => {
                           />
                         </td>
                       ))}
+                      <td className={`${tdBase} text-center border-l ${t.borderLight}`}>
+                        <input
+                          type="checkbox"
+                          checked={row.feePetitionApproved}
+                          onChange={() => toggleFeePetitionApproved(row.id)}
+                          disabled={!canEditFees}
+                          aria-label={`Fee Petition Approved for ${row.claimant}`}
+                          title={
+                            canEditFees
+                              ? 'Also sets Remarks to "FEE PETITION APPROVED" on Master Fees'
+                              : "You don't have permission to approve fee petitions"
+                          }
+                          className="h-3.5 w-3.5 cursor-pointer accent-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        />
+                      </td>
                       <td className={`${tdBase}`}>
                         <NoteField
                           value={row.updateNote}
