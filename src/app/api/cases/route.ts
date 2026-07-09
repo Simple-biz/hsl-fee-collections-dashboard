@@ -62,6 +62,7 @@ export const GET = async (req: NextRequest) => {
         t16Decision: cases.t16Decision,
         approvalDate: cases.approvalDate,
         officeWithJurisdiction: cases.officeWithJurisdiction,
+        createdAt: cases.createdAt,
 
         // Fee record fields
         assignedTo: feeRecords.assignedTo,
@@ -216,6 +217,7 @@ export const GET = async (req: NextRequest) => {
         claim: r.claimTypeLabel === "T2_T16" || r.claimTypeLabel === "CONCURRENT" ? "CONC" : r.claimTypeLabel || "—",
         date: r.approvalDate || null,
         status: r.winSheetStatus || "not_started",
+        createdAt: r.createdAt.toISOString(),
 
         // T16
         t16Retro: Number(r.t16Retro) || 0,
