@@ -263,6 +263,15 @@ export const Scoreboard = () => {
               }))
               .sort((a, b) => b.weekValues[0] - a.weekValues[0]);
 
+            // Per-column (per-week) max, so each previous week's top scorer
+            // can get its own trophy next to that week's number — not just
+            // the currently-selected week. Same zero-exclusion as the
+            // by-name trophy: a week with no closures for the whole team
+            // awards nothing.
+            const maxPerColumn = weeks.map((_, i) =>
+              Math.max(...rows.map((r) => r.weekValues[i]), 0),
+            );
+
             return (
               <div key={key} className={`border-b last:border-b-0 ${t.borderLight}`}>
                 {/* Team header */}
@@ -317,19 +326,33 @@ export const Scoreboard = () => {
                                 )}
                               </span>
                             </td>
-                            {row.weekValues.map((val, i) => (
+                            {row.weekValues.map((val, i) => {
+                              // Excludes i === 0 — the current week already
+                              // gets its own trophy next to the agent's name
+                              // above, so this only covers previous weeks.
+                              const isTopForColumn = i > 0 && val > 0 && val === maxPerColumn[i];
+                              return (
                               <td key={i} className="py-2.5 px-3 text-center">
-                                {i === 0 ? (
-                                  <span
-                                    className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold ${thisWeekCellColor(val, currentWeekMax)}`}
-                                  >
-                                    {val}
-                                  </span>
-                                ) : (
-                                  <span className={`text-[14px] ${t.textSub}`}>{val}</span>
-                                )}
+                                <span
+                                  className="inline-flex items-center justify-center gap-1"
+                                  title={isTopForColumn ? "Top scorer that week" : undefined}
+                                >
+                                  {i === 0 ? (
+                                    <span
+                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold ${thisWeekCellColor(val, currentWeekMax)}`}
+                                    >
+                                      {val}
+                                    </span>
+                                  ) : (
+                                    <span className={`text-[14px] ${t.textSub}`}>{val}</span>
+                                  )}
+                                  {isTopForColumn && (
+                                    <Trophy aria-hidden="true" className="h-3 w-3 text-amber-500 shrink-0" />
+                                  )}
+                                </span>
                               </td>
-                            ))}
+                              );
+                            })}
                           </tr>
                           );
                         })}
