@@ -52,6 +52,7 @@ import { caseLevelVisual } from "@/lib/case-level-icons";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
+import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
@@ -331,6 +332,8 @@ export const FeeRecordsTable = ({
   const [archivePendingSource, setArchivePendingSource] = useState<
     "active_sheet" | "fees_closed_sheet"
   >("active_sheet");
+  const [bulkOverpaidSaving, setBulkOverpaidSaving] = useState(false);
+  const [bulkOverpaidError, setBulkOverpaidError] = useState<string | null>(null);
   // Optimistic overrides for fee payment totals after panel add/delete.
   // Pending is deliberately absent — it's fully derived (Fee Due minus
   // Received) by the compute_fee_totals trigger, never set optimistically.
@@ -352,11 +355,6 @@ export const FeeRecordsTable = ({
   }, [cases]);
   const [rowRefreshing, setRowRefreshing] = useState<Set<number>>(new Set());
   const rowRefreshAbortRef = useRef<Map<number, AbortController>>(new Map());
-  // Adding a case to the Overpaid Cases page is now a deliberate, per-row
-  // action (feesConfirmation flipping to "Overpaid" no longer does this
-  // automatically) — same abort/loading-state shape as the row refresh above.
-  const [markOverpaidSaving, setMarkOverpaidSaving] = useState<Set<number>>(new Set());
-  const markOverpaidAbortRef = useRef<Map<number, AbortController>>(new Map());
   type FeeAmountField =
     | "t16Retro" | "t16FeeDue"
     | "t2Retro" | "t2FeeDue"
@@ -375,15 +373,12 @@ export const FeeRecordsTable = ({
     const abortMap = patchAbortRef.current;
     const feeAmountRef = feeAmountAbortRef;
     const rowRefreshMap = rowRefreshAbortRef.current;
-    const markOverpaidMap = markOverpaidAbortRef.current;
     return () => {
       for (const ctrl of abortMap.values()) ctrl.abort();
       abortMap.clear();
       feeAmountRef.current?.abort();
       for (const ctrl of rowRefreshMap.values()) ctrl.abort();
       rowRefreshMap.clear();
-      for (const ctrl of markOverpaidMap.values()) ctrl.abort();
-      markOverpaidMap.clear();
     };
   }, []);
 
@@ -411,6 +406,29 @@ export const FeeRecordsTable = ({
       mode === "closed" ? "fees_closed_sheet" : "active_sheet",
     );
     setArchiveConfirmOpen(true);
+  };
+
+  // Adds the selected cases to the Overpaid Cases page at will — independent
+  // of whether the automatic PIF detection has flagged them "Overpaid" yet.
+  const handleBatchMarkOverpaid = async () => {
+    if (selectedIds.size === 0 || bulkOverpaidSaving) return;
+    setBulkOverpaidSaving(true);
+    setBulkOverpaidError(null);
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await bulkMarkOverpaid({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
+      setRowOverrides((prev) => {
+        const next = { ...prev };
+        for (const id of ids) next[id] = { ...next[id], markedOverpaid: true };
+        return next;
+      });
+      setSelectedIds(new Set());
+    } catch (err) {
+      setBulkOverpaidError((err as Error).message);
+    } finally {
+      setBulkOverpaidSaving(false);
+    }
   };
 
   // Unique assignees for filter dropdown
@@ -871,49 +889,6 @@ export const FeeRecordsTable = ({
     }
   };
 
-  // Explicit "add to Overpaid Cases" action — feesConfirmation flipping to
-  // "Overpaid" no longer auto-lists a case there, so this is the deliberate
-  // step that does. Reuses the existing feeFields PATCH path (marked_overpaid
-  // is already a writable field there) rather than a new endpoint.
-  const handleMarkOverpaid = async (c: CaseRow) => {
-    if (markOverpaidSaving.has(c.id)) return;
-    markOverpaidAbortRef.current.get(c.id)?.abort();
-    const controller = new AbortController();
-    markOverpaidAbortRef.current.set(c.id, controller);
-    setMarkOverpaidSaving((prev) => new Set(prev).add(c.id));
-    try {
-      const res = await fetch(`/api/cases/${c.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feeFields: { markedOverpaid: true },
-          logMessage: "Added to Overpaid Cases.",
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error ?? `Failed to add to Overpaid Cases (${res.status})`);
-      }
-      setRowOverrides((prev) => ({
-        ...prev,
-        [c.id]: { ...prev[c.id], markedOverpaid: true },
-      }));
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      console.error("Failed to mark case overpaid:", err);
-    } finally {
-      if (markOverpaidAbortRef.current.get(c.id) === controller) {
-        markOverpaidAbortRef.current.delete(c.id);
-      }
-      setMarkOverpaidSaving((prev) => {
-        const next = new Set(prev);
-        next.delete(c.id);
-        return next;
-      });
-    }
-  };
-
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
 
@@ -1184,16 +1159,37 @@ export const FeeRecordsTable = ({
         </div>
       </div>
 
-      {/* Floating batch action pill — fixed to the viewport bottom. Archive is
-          the only batch action; marking a case overpaid is Fees Conf-only
-          now (see the "Fees Confirmation" column) so it's a single,
-          unambiguous path instead of two ways to do the same thing. */}
+      {/* Floating batch action pill — fixed to the viewport bottom. Archive
+          and "Add to Overpaid Cases" (at will, independent of the automatic
+          PIF detection) are the two batch actions. */}
       {selectedIds.size > 0 && isAdmin && (
-        <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex justify-center">
+        <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
+          {bulkOverpaidError && (
+            <div
+              role="alert"
+              className="pointer-events-auto rounded-full bg-red-600 px-3 py-1 text-[12px] font-medium text-white shadow-lg"
+            >
+              {bulkOverpaidError}
+            </div>
+          )}
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
             <span className="text-[13px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
             </span>
+            {mode !== "closed" && canFinalize && (
+              <button
+                onClick={handleBatchMarkOverpaid}
+                disabled={bulkOverpaidSaving}
+                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-50"
+              >
+                {bulkOverpaidSaving ? (
+                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Plus aria-hidden="true" className="h-3 w-3" />
+                )}
+                Add to Overpaid Cases
+              </button>
+            )}
             <button
               onClick={handleBatchArchive}
               disabled={archiveConfirmOpen}
@@ -1683,86 +1679,63 @@ export const FeeRecordsTable = ({
                       className={`${tdBase} ${t.textSub} ${stickyTd3}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex flex-col gap-1">
-                        {canEditFeesConf && feesConfEditId === c.id ? (
-                          <select
-                            autoFocus
-                            value={cellValue(c, "feesConfirmation")}
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={() => setFeesConfEditId(null)}
-                            onChange={(e) => {
-                              handleVarcharChange(
-                                c,
-                                "fee",
-                                "feesConfirmation",
-                                "feesConfirmation",
-                                "PIF",
-                                e.target.value,
-                              );
-                              setFeesConfEditId(null);
-                            }}
-                            className={`w-full h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
-                            title={
-                              feesConfirmationOptions.length === 0
-                                ? "No options configured — add them in Settings"
-                                : undefined
-                            }
-                          >
-                            <option value="">— Select —</option>
-                            {(() => {
-                              const v = cellValue(c, "feesConfirmation");
-                              return (
-                                v &&
-                                !feesConfirmationOptions.some(
-                                  (o) => o.name === v,
-                                ) && <option value={v}>{v}</option>
-                              );
-                            })()}
-                            {feesConfirmationOptions
-                              .filter(
-                                (o) =>
-                                  o.isActive ||
-                                  o.name === cellValue(c, "feesConfirmation"),
-                              )
-                              .map((o) => (
-                                <option key={o.id} value={o.name}>
-                                  {o.name}
-                                </option>
-                              ))}
-                          </select>
-                        ) : canEditFeesConf ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setFeesConfEditId(c.id); }}
-                            className="cursor-pointer"
-                          >
-                            <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
-                          </button>
-                        ) : (
+                      {canEditFeesConf && feesConfEditId === c.id ? (
+                        <select
+                          autoFocus
+                          value={cellValue(c, "feesConfirmation")}
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={() => setFeesConfEditId(null)}
+                          onChange={(e) => {
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "feesConfirmation",
+                              "feesConfirmation",
+                              "PIF",
+                              e.target.value,
+                            );
+                            setFeesConfEditId(null);
+                          }}
+                          className={`w-full h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            feesConfirmationOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "feesConfirmation");
+                            return (
+                              v &&
+                              !feesConfirmationOptions.some(
+                                (o) => o.name === v,
+                              ) && <option value={v}>{v}</option>
+                            );
+                          })()}
+                          {feesConfirmationOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "feesConfirmation"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : canEditFeesConf ? (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setFeesConfEditId(c.id); }}
+                          className="cursor-pointer"
+                        >
                           <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
-                        )}
-                        {cellValue(c, "feesConfirmation") === "Overpaid" &&
-                          !c.markedOverpaid &&
-                          canFinalize && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkOverpaid(c);
-                              }}
-                              disabled={markOverpaidSaving.has(c.id)}
-                              title="Add this case to the Overpaid Cases page"
-                              className={`inline-flex items-center gap-1 self-start text-[11px] font-medium ${dark ? "text-amber-400 hover:text-amber-300" : "text-amber-700 hover:text-amber-800"} disabled:opacity-50`}
-                            >
-                              {markOverpaidSaving.has(c.id) ? (
-                                <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden="true" />
-                              ) : (
-                                <Plus className="h-2.5 w-2.5" aria-hidden="true" />
-                              )}
-                              Add to Overpaid Cases
-                            </button>
-                          )}
-                      </div>
+                        </button>
+                      ) : (
+                        <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
+                      )}
                     </td>
                     {/* Fees Closed — checkbox; check → close dialog; uncheck → reopen dialog */}
                     <td
