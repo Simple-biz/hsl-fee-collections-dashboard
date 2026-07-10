@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { teamMembers, feeRecords } from "@/lib/db/schema";
 import { eq, sql, count, sum, and } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+
+const postBodySchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  role: z.string().trim().min(1, "Role cannot be blank").optional(),
+  team: z.string().nullable().optional(),
+});
 
 // GET /api/team-members — list all team members with case stats
 export const GET = async () => {
@@ -70,16 +77,22 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const body = await req.json();
-    const { name, role, team } = body;
-
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    const rawBody = await req.json().catch(() => null);
+    const parsedBody = postBodySchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        {
+          error: parsedBody.error.issues[0]?.message ?? "Invalid request body",
+          issues: parsedBody.error.issues,
+        },
+        { status: 400 },
+      );
     }
+    const { name, role, team } = parsedBody.data;
 
-    const trimmedName = name.trim();
-    const trimmedRole = (role || "collections_specialist").trim();
-    const trimmedTeam = team ? String(team).trim() : null;
+    const trimmedName = name;
+    const trimmedRole = role || "collections_specialist";
+    const trimmedTeam = team ? team.trim() : null;
 
     // Check for duplicate
     const existing = await db
