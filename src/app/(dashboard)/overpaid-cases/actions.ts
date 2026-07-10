@@ -124,11 +124,10 @@ export async function bulkRestoreCleared(input: {
 // are keyed off the former two, and marked_overpaid is left alone so it
 // keeps reflecting whether this case was ever deliberately added. Instead
 // this stamps overpaid_dismissed_at, which the page's query excludes on,
-// and which only gets cleared by a deliberate re-add (PATCH /api/cases/[id]
-// with markedOverpaid:true, or markCaseOverpaid) — not automatically. Also
-// deletes the overpaid_cases metadata row so a case that becomes overpaid
-// again later starts clean rather than resurfacing stale
-// op-letter/checks-cleared data.
+// and which only gets cleared by a deliberate re-add (bulkMarkOverpaid or
+// markCaseOverpaid) — not automatically. Also deletes the overpaid_cases
+// metadata row so a case that becomes overpaid again later starts clean
+// rather than resurfacing stale op-letter/checks-cleared data.
 export async function bulkRemoveFromOverpaid(input: {
   caseIds: number[];
 }): Promise<Result> {
@@ -153,13 +152,38 @@ export async function bulkRemoveFromOverpaid(input: {
   }
 }
 
+// Adds selected cases to the Overpaid Cases view at will — a deliberate
+// batch action from Master Fees, independent of whether the automatic PIF
+// detection (fees_confirmation flipping to "Overpaid") has caught them yet.
+// Also clears any stale dismissal so a case that was previously removed via
+// bulkRemoveFromOverpaid reappears when explicitly re-added this way.
+export async function bulkMarkOverpaid(input: {
+  caseIds: number[];
+}): Promise<Result> {
+  try {
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) return { ok: false, error: "You don't have permission to mark cases overpaid." };
+    if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
+    if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
+    if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
+
+    await db
+      .update(feeRecords)
+      .set({ markedOverpaid: true, overpaidDismissedAt: null, updatedAt: new Date() })
+      .where(inArray(feeRecords.caseId, input.caseIds));
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkMarkOverpaid error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
 // Marks a single case overpaid directly — for old cases that never came
 // through Master Fees and shouldn't be added there just to flag them here.
-// The normal path is the "Add to Overpaid Cases" button on Master Fees
-// (PATCH /api/cases/[id] with feeFields.markedOverpaid:true), which needs a
-// fee_records row to PATCH; this covers the escape hatch for cases with no
-// fee history to track at all, right after AddCaseModal creates the bare
-// case record.
+// The normal path is bulkMarkOverpaid (the "Add to Overpaid Cases" batch
+// action on Master Fees), which needs a fee_records row to update; this
+// covers the escape hatch for cases with no fee history to track at all,
+// right after AddCaseModal creates the bare case record.
 export async function markCaseOverpaid(input: {
   caseId: number;
 }): Promise<Result> {
