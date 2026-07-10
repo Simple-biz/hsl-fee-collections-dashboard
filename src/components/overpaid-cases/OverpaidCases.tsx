@@ -962,7 +962,10 @@ export const OverpaidCases = () => {
                 <h3 className={`text-sm font-bold ${t.text} flex items-center gap-1.5`}>
                   Cases
                   {isRefreshing && (
-                    <Loader2 aria-label="Refreshing" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                    <>
+                      <Loader2 aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
+                      <span className="sr-only">Refreshing</span>
+                    </>
                   )}
                 </h3>
                 <p className={`text-[13px] ${t.textMuted} mt-0.5`}>

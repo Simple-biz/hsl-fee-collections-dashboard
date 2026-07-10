@@ -613,6 +613,11 @@ export const FeeRecordsTable = ({
     }
   };
 
+  const ariaSortFor = (key: SortKey): "ascending" | "descending" | "none" => {
+    if (sortKey !== key) return "none";
+    return sortDir === "asc" ? "ascending" : "descending";
+  };
+
   // Resolve the value the table should show for a varchar dropdown cell,
   // preferring an in-flight optimistic edit over the server-loaded row.
   const cellValue = (c: CaseRow, key: DropdownRowKey): string => {
@@ -1286,30 +1291,42 @@ export const FeeRecordsTable = ({
               <tr className={`border-b ${t.borderLight}`}>
                 {isClosedMode && (
                   <th
-                    className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyThClosedOn}`}
-                    onClick={() => toggleSort("closedAt")}
+                    aria-sort={ariaSortFor("closedAt")}
+                    className={`${thBase} ${t.textSub} text-left ${stickyThClosedOn}`}
                   >
-                    <span className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort("closedAt")}
+                      className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                    >
                       Closed On <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                    </span>
+                    </button>
                   </th>
                 )}
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh1}`}
-                  onClick={() => toggleSort("name")}
+                  aria-sort={ariaSortFor("name")}
+                  className={`${thBase} ${t.textSub} text-left ${stickyTh1}`}
                 >
-                  <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("name")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
                     Case Name <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                  </span>
+                  </button>
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer ${stickyTh2}`}
-                  onClick={() => toggleSort("assigned")}
-                  title="Sort to group rows by assignee"
+                  aria-sort={ariaSortFor("assigned")}
+                  className={`${thBase} ${t.textSub} text-left ${stickyTh2}`}
                 >
-                  <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("assigned")}
+                    title="Sort to group rows by assignee"
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
                     Assigned <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                  </span>
+                  </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left ${stickyTh3}`}>
                   PIF
@@ -1318,12 +1335,16 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
                 <th
-                  className={`${thBase} ${t.textSub} text-left cursor-pointer`}
-                  onClick={() => toggleSort("date")}
+                  aria-sort={ariaSortFor("date")}
+                  className={`${thBase} ${t.textSub} text-left`}
                 >
-                  <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("date")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
                     Approval <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                  </span>
+                  </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet Status</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
@@ -1409,20 +1430,28 @@ export const FeeRecordsTable = ({
                   Retro Due
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                  onClick={() => toggleSort("expected")}
+                  aria-sort={ariaSortFor("expected")}
+                  className={`${thBase} ${t.textSub} text-right`}
                 >
-                  <span className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("expected")}
+                    className="inline-flex items-center justify-end gap-1 w-full cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
                     Expected <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                  </span>
+                  </button>
                 </th>
                 <th
-                  className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                  onClick={() => toggleSort("paid")}
+                  aria-sort={ariaSortFor("paid")}
+                  className={`${thBase} ${t.textSub} text-right`}
                 >
-                  <span className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("paid")}
+                    className="inline-flex items-center justify-end gap-1 w-full cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
                     Paid <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                  </span>
+                  </button>
                 </th>
 
                 {/* Workflow */}
@@ -1443,13 +1472,17 @@ export const FeeRecordsTable = ({
                     this trailing slot is Active-mode-only now. */}
                 {!isClosedMode && (
                   <th
-                    className={`${thBase} ${t.textSub} text-right cursor-pointer`}
-                    onClick={() => toggleSort("daysAfterApproval")}
+                    aria-sort={ariaSortFor("daysAfterApproval")}
+                    className={`${thBase} ${t.textSub} text-right`}
                   >
-                    <span className="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort("daysAfterApproval")}
+                      className="inline-flex items-center justify-end gap-1 w-full cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                    >
                       Days
                       <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                    </span>
+                    </button>
                   </th>
                 )}
               </tr>
