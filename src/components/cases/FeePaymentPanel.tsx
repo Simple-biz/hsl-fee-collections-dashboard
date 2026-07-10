@@ -155,7 +155,7 @@ export function FeePaymentPanel({
           {feeType.toUpperCase()} Payment History
         </span>
         <span className={`text-[13px] font-medium ${t.textSub}`}>
-          Total: {currentTotal > 0 ? fmtFull(currentTotal) : "—"}
+          Total: {fmtFull(currentTotal)}
         </span>
       </div>
 
