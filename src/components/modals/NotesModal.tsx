@@ -190,9 +190,10 @@ export default function NotesModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -214,11 +215,12 @@ export default function NotesModal({
               disabled={!draft.trim() || adding}
               className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
             >
-              {adding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {adding && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
               Add Note
             </button>
             {actionError && (
               <span
+                role="alert"
                 className={`text-[13px] ${dark ? "text-red-400" : "text-red-600"}`}
               >
                 {actionError}
@@ -236,13 +238,14 @@ export default function NotesModal({
           <div
             className={`flex items-center justify-center py-12 ${t.textMuted}`}
           >
-            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+            <RefreshCw className="h-4 w-4 animate-spin mr-2" aria-hidden="true" />
             <span className="text-xs">Loading notes…</span>
           </div>
         )}
 
         {error && (
           <div
+            role="alert"
             className={`rounded-md border p-3 text-xs ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-700"}`}
           >
             {error}
@@ -253,7 +256,7 @@ export default function NotesModal({
           <div
             className={`flex flex-col items-center justify-center py-10 ${t.textMuted}`}
           >
-            <FileText className="h-6 w-6 mb-2" />
+            <FileText className="h-6 w-6 mb-2" aria-hidden="true" />
             <p className="text-xs">{isLeader ? "No notes for this case yet." : "No log entries for this case yet."}</p>
           </div>
         )}
@@ -294,7 +297,7 @@ export default function NotesModal({
                           className={`h-6 px-2 rounded text-[12px] font-semibold flex items-center gap-1 disabled:opacity-50 ${dark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-600 text-white hover:bg-red-700"}`}
                         >
                           {deletingId === n.id && (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                           )}
                           Delete
                         </button>
@@ -315,7 +318,7 @@ export default function NotesModal({
                             title="Edit note"
                             className={`-mt-1 h-6 w-6 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                           </button>
                         )}
                         <button
@@ -324,7 +327,7 @@ export default function NotesModal({
                           title="Delete note"
                           className={`-mt-1 -mr-1 h-6 w-6 shrink-0 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     ))}
@@ -344,7 +347,7 @@ export default function NotesModal({
                         className={`h-7 px-3 rounded-md text-[12px] font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
                       >
                         {savingEditId === n.id && (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                         )}
                         Save
                       </button>

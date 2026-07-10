@@ -214,9 +214,10 @@ export default function AddCaseModal({
           <h3 className={`text-sm font-bold ${t.text}`}>Add New Case</h3>
           <button
             onClick={onClose}
+            aria-label="Close"
             className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 

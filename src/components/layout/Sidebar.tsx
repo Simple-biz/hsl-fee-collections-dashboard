@@ -263,12 +263,16 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
         <div
           className={`h-14 border-b ${t.borderLight} flex items-center ${open ? "px-4 gap-3" : "justify-center"}`}
         >
-          <button onClick={onToggle} className="shrink-0">
+          <button
+            onClick={onToggle}
+            aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+            className="shrink-0"
+          >
             <div className={`flex items-center ${open ? "gap-2.5" : ""}`}>
               <div
                 className={`w-7 h-7 rounded-lg flex items-center justify-center ${t.logoBg}`}
               >
-                <DollarSign className={`h-4 w-4 ${t.logoIcon}`} />
+                <DollarSign className={`h-4 w-4 ${t.logoIcon}`} aria-hidden="true" />
               </div>
               {open && (
                 <div className="leading-tight">
@@ -285,9 +289,10 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
           {open && (
             <button
               onClick={onToggle}
+              aria-label="Collapse sidebar"
               className={`ml-auto ${t.textMuted} ${t.hover} rounded p-0.5`}
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -299,7 +304,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               onClick={() => setSearchOpen(true)}
               className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs ${t.searchBox} transition-colors`}
             >
-              <Search className="h-3.5 w-3.5" />
+              <Search className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Search cases</span>
               <span
                 className={`ml-auto text-[12px] px-1 py-0.5 rounded border ${t.kbdBg}`}
@@ -315,9 +320,10 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                 onToggle();
                 setTimeout(() => setSearchOpen(true), 200);
               }}
+              aria-label="Search cases"
               className={`w-full flex justify-center py-1.5 rounded-md ${t.hover}`}
             >
-              <Search className={`h-4 w-4 ${t.textMuted}`} />
+              <Search className={`h-4 w-4 ${t.textMuted}`} aria-hidden="true" />
             </button>
           </div>
         )}
