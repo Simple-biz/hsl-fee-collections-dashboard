@@ -528,11 +528,11 @@ export const ChroniclePull = () => {
         }`}
       >
         {fav ? (
-          <CheckCircle2 className="h-3.5 w-3.5" />
+          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
         ) : unfav ? (
-          <XCircle className="h-3.5 w-3.5" />
+          <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
         ) : (
-          <Clock className="h-3.5 w-3.5" />
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
         )}
         <span>{label}:</span> <span>{decision}</span>
       </div>
@@ -563,8 +563,7 @@ export const ChroniclePull = () => {
               className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-indigo-900/40" : "bg-indigo-50"}`}
             >
               <Database
-                className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-              />
+                className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-600"}`} aria-hidden="true" />
             </div>
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>
@@ -579,8 +578,7 @@ export const ChroniclePull = () => {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search
-                className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`}
-              />
+                className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${t.textMuted}`} aria-hidden="true" />
               <input
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
@@ -595,9 +593,9 @@ export const ChroniclePull = () => {
               className={`h-9 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 ${t.ctaBtn} disabled:opacity-40`}
             >
               {pulling ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               ) : (
-                <Download className="h-3.5 w-3.5" />
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
               )}
               {pulling ? "Pulling..." : "Pull"}
             </button>
@@ -613,8 +611,7 @@ export const ChroniclePull = () => {
               className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-violet-900/40" : "bg-violet-50"}`}
             >
               <FileSearch
-                className={`h-5 w-5 ${dark ? "text-violet-400" : "text-violet-600"}`}
-              />
+                className={`h-5 w-5 ${dark ? "text-violet-400" : "text-violet-600"}`} aria-hidden="true" />
             </div>
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>
@@ -681,9 +678,9 @@ export const ChroniclePull = () => {
               className={`h-9 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 ${t.ctaBtn} disabled:opacity-40`}
             >
               {searching ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               ) : (
-                <Search className="h-3.5 w-3.5" />
+                <Search className="h-3.5 w-3.5" aria-hidden="true" />
               )}
               {searching ? "Searching..." : "Search"}
             </button>
@@ -699,7 +696,7 @@ export const ChroniclePull = () => {
             <div
               className={`mt-3 rounded-lg border p-2.5 flex items-center gap-2 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
             >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="text-[14px]">{searchError}</span>
             </div>
           )}
@@ -752,7 +749,7 @@ export const ChroniclePull = () => {
                           className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[13px] font-semibold border ${t.outlineBtn}`}
                           title="Pull this client into the lookup above"
                         >
-                          <ArrowRight className="h-3 w-3" /> Pull
+                          <ArrowRight className="h-3 w-3" aria-hidden="true" /> Pull
                         </button>
                       </td>
                     </tr>
@@ -773,9 +770,10 @@ export const ChroniclePull = () => {
       {/* Notices */}
       {error && (
         <div
+          role="alert"
           className={`rounded-xl border p-3 flex items-center gap-2.5 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
-          <AlertCircle className="h-4 w-4 shrink-0" />
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="text-sm">{error}</span>
         </div>
       )}
@@ -783,7 +781,7 @@ export const ChroniclePull = () => {
         <div
           className={`rounded-xl border p-3 flex items-center gap-2.5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="text-sm">{importResult}</span>
         </div>
       )}
@@ -791,7 +789,7 @@ export const ChroniclePull = () => {
         <div
           className={`rounded-xl border p-3 flex items-center gap-2.5 ${dark ? "bg-amber-900/20 border-amber-800 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"}`}
         >
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="text-[13px]">
             Using mock data \u2014 set CHRONICLE_API_URL and CHRONICLE_API_KEY
             in .env.local
@@ -802,7 +800,7 @@ export const ChroniclePull = () => {
       {/* Loading */}
       {pulling && (
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
+          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} aria-hidden="true" />
           <span className={`ml-2 text-sm ${t.textSub}`}>
             Fetching from Chronicle...
           </span>
@@ -831,16 +829,13 @@ export const ChroniclePull = () => {
             <div className="flex items-center gap-2.5">
               {result.parsed.isFavorable ? (
                 <CheckCircle2
-                  className={`h-5 w-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                />
+                  className={`h-5 w-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`} aria-hidden="true" />
               ) : result.parsed.isUnfavorable ? (
                 <XCircle
-                  className={`h-5 w-5 ${dark ? "text-red-400" : "text-red-600"}`}
-                />
+                  className={`h-5 w-5 ${dark ? "text-red-400" : "text-red-600"}`} aria-hidden="true" />
               ) : (
                 <Clock
-                  className={`h-5 w-5 ${dark ? "text-amber-400" : "text-amber-600"}`}
-                />
+                  className={`h-5 w-5 ${dark ? "text-amber-400" : "text-amber-600"}`} aria-hidden="true" />
               )}
               <div>
                 <span className={`text-sm font-bold ${t.text}`}>
@@ -873,9 +868,9 @@ export const ChroniclePull = () => {
                   className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
                 >
                   {importing ? (
-                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                   ) : (
-                    <ArrowRight className="h-3 w-3" />
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
                   )}
                   Import to Dashboard
                 </button>
@@ -1015,8 +1010,7 @@ export const ChroniclePull = () => {
           >
             <div className="flex items-center gap-2.5">
               <FileSearch
-                className={`h-4 w-4 ${dark ? "text-violet-400" : "text-violet-600"}`}
-              />
+                className={`h-4 w-4 ${dark ? "text-violet-400" : "text-violet-600"}`} aria-hidden="true" />
               <div>
                 <span className={`text-xs font-bold ${t.text}`}>
                   PDF Data Extraction
@@ -1037,9 +1031,9 @@ export const ChroniclePull = () => {
                 } disabled:opacity-50 transition-colors`}
               >
                 {parsingPdf ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                 ) : (
-                  <FileSearch className="h-3 w-3" />
+                  <FileSearch className="h-3 w-3" aria-hidden="true" />
                 )}
                 {parsingPdf ? "Parsing PDF..." : "Parse PDF"}
               </button>
@@ -1056,7 +1050,7 @@ export const ChroniclePull = () => {
           {/* Loading */}
           {parsingPdf && (
             <div className="flex items-center justify-center py-8">
-              <RefreshCw className={`h-4 w-4 animate-spin ${t.textMuted}`} />
+              <RefreshCw className={`h-4 w-4 animate-spin ${t.textMuted}`} aria-hidden="true" />
               <span className={`ml-2 text-xs ${t.textSub}`}>
                 Downloading & parsing PDF (this may take a moment)...
               </span>
@@ -1068,7 +1062,7 @@ export const ChroniclePull = () => {
             <div
               className={`mx-4 my-3 rounded-lg p-2.5 flex items-center gap-2 text-xs ${dark ? "bg-red-900/20 text-red-400" : "bg-red-50 text-red-700"}`}
             >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {pdfError}
             </div>
           )}
@@ -1186,9 +1180,9 @@ export const ChroniclePull = () => {
                     className={`h-9 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 ${t.ctaBtn} disabled:opacity-50`}
                   >
                     {importing ? (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                     ) : (
-                      <ArrowRight className="h-3.5 w-3.5" />
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     )}
                     {importing
                       ? "Importing..."
@@ -1231,16 +1225,13 @@ export const ChroniclePull = () => {
               >
                 {pr.parsed.isFavorable ? (
                   <CheckCircle2
-                    className={`h-4 w-4 shrink-0 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                  />
+                    className={`h-4 w-4 shrink-0 ${dark ? "text-emerald-400" : "text-emerald-600"}`} aria-hidden="true" />
                 ) : pr.parsed.isUnfavorable ? (
                   <XCircle
-                    className={`h-4 w-4 shrink-0 ${dark ? "text-red-400" : "text-red-600"}`}
-                  />
+                    className={`h-4 w-4 shrink-0 ${dark ? "text-red-400" : "text-red-600"}`} aria-hidden="true" />
                 ) : (
                   <Clock
-                    className={`h-4 w-4 shrink-0 ${dark ? "text-amber-400" : "text-amber-600"}`}
-                  />
+                    className={`h-4 w-4 shrink-0 ${dark ? "text-amber-400" : "text-amber-600"}`} aria-hidden="true" />
                 )}
                 <div className="flex-1 min-w-0">
                   <span className={`text-[14px] font-semibold ${t.text}`}>
@@ -1280,7 +1271,7 @@ export const ChroniclePull = () => {
       {/* Empty state */}
       {!result && !pulling && pullHistory.length === 0 && (
         <div className={`rounded-xl border p-12 text-center ${t.card}`}>
-          <Database className={`h-10 w-10 mx-auto ${t.textMuted} mb-3`} />
+          <Database className={`h-10 w-10 mx-auto ${t.textMuted} mb-3`} aria-hidden="true" />
           <p className={`text-sm font-semibold ${t.text}`}>
             Look up a case from Chronicle
           </p>

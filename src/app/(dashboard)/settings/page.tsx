@@ -379,9 +379,10 @@ export default function SettingsPage() {
       {/* Error */}
       {error && (
         <div
+          role="alert"
           className={`rounded-xl border p-3 flex items-center gap-2 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
-          <AlertCircle className="h-4 w-4 shrink-0" />
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="text-xs">{error}</span>
         </div>
       )}
@@ -389,6 +390,7 @@ export default function SettingsPage() {
       {/* Save message */}
       {saveMsg && (
         <div
+          role="alert"
           className={`rounded-xl border p-3 flex items-center gap-2 ${
             saveMsg.startsWith("Error")
               ? dark
@@ -400,9 +402,9 @@ export default function SettingsPage() {
           }`}
         >
           {saveMsg.startsWith("Error") ? (
-            <AlertCircle className="h-4 w-4" />
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
           ) : (
-            <Check className="h-4 w-4" />
+            <Check className="h-4 w-4" aria-hidden="true" />
           )}
           <span className="text-xs font-medium">{saveMsg}</span>
         </div>
@@ -594,9 +596,10 @@ export default function SettingsPage() {
                         </div>
                         <button
                           onClick={() => handleDeleteCap(fc.id)}
+                          aria-label="Delete fee cap"
                           className={`h-7 w-7 rounded-md flex items-center justify-center ${dark ? "hover:bg-red-900/30 text-red-400" : "hover:bg-red-50 text-red-500"} opacity-50 hover:opacity-100 transition-opacity`}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" aria-hidden="true" />
                         </button>
                       </div>
                     ))}

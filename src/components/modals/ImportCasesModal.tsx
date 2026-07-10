@@ -224,9 +224,10 @@ export default function ImportCasesModal({
           <h3 className={`text-sm font-bold ${t.text}`}>Import Cases</h3>
           <button
             onClick={onClose}
+            aria-label="Close"
             className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -268,6 +269,7 @@ export default function ImportCasesModal({
         <div className="flex-1 overflow-y-auto p-5">
           {error && (
             <div
+              role="alert"
               className={`mb-4 rounded-md border p-3 text-xs ${dark ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-700"}`}
             >
               {error}

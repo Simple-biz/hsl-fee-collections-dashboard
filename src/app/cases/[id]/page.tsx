@@ -291,7 +291,7 @@ const FeeSection = memo(
               onClick={startEdit}
               className={`text-[12px] font-medium ${t.textMuted} flex items-center gap-1`}
             >
-              <Pencil className="h-2.5 w-2.5" /> Edit
+              <Pencil className="h-2.5 w-2.5" aria-hidden="true" /> Edit
             </button>
           ) : (
             <div className="flex gap-1.5">
@@ -299,7 +299,7 @@ const FeeSection = memo(
                 onClick={cancelInlineEdit}
                 className={`text-[12px] font-medium ${t.textMuted} flex items-center gap-0.5`}
               >
-                <X className="h-2.5 w-2.5" /> Cancel
+                <X className="h-2.5 w-2.5" aria-hidden="true" /> Cancel
               </button>
               <button
                 onClick={saveInline}
@@ -307,9 +307,9 @@ const FeeSection = memo(
                 className="text-[12px] font-semibold text-emerald-500 flex items-center gap-0.5 disabled:opacity-50"
               >
                 {localSaving ? (
-                  <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                  <RefreshCw className="h-2.5 w-2.5 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Save className="h-2.5 w-2.5" />
+                  <Save className="h-2.5 w-2.5" aria-hidden="true" />
                 )}{" "}
                 Save
               </button>
@@ -773,6 +773,7 @@ const CaseDetailPage = () => {
               >
                 <Trash2
                   className={`h-5 w-5 ${dark ? "text-red-400" : "text-red-600"}`}
+                  aria-hidden="true"
                 />
               </div>
               <div>
@@ -801,9 +802,9 @@ const CaseDetailPage = () => {
                 className="h-8 px-4 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
               >
                 {deleting ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3 w-3" aria-hidden="true" />
                 )}
                 {deleting ? "Deleting..." : "Delete Case"}
               </button>
@@ -858,20 +859,20 @@ const CaseDetailPage = () => {
                       onClick={() => setEditing(true)}
                       className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
                     >
-                      <Pencil className="h-3 w-3" /> Edit
+                      <Pencil className="h-3 w-3" aria-hidden="true" /> Edit
                     </button>
                     <button
                       onClick={() => setFeeModalOpen(true)}
                       className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
                     >
-                      <DollarSign className="h-3 w-3" /> Edit Fees
+                      <DollarSign className="h-3 w-3" aria-hidden="true" /> Edit Fees
                     </button>
                     {canDelete && (
                       <button
                         onClick={() => setDeleteConfirm(true)}
                         className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-red-800 text-red-400 hover:bg-red-900/30" : "border-red-200 text-red-600 hover:bg-red-50"}`}
                       >
-                        <Trash2 className="h-3 w-3" /> Delete
+                        <Trash2 className="h-3 w-3" aria-hidden="true" /> Delete
                       </button>
                     )}
                   </>
@@ -881,7 +882,7 @@ const CaseDetailPage = () => {
                       onClick={cancelEdit}
                       className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${t.outlineBtn}`}
                     >
-                      <X className="h-3 w-3" /> Cancel
+                      <X className="h-3 w-3" aria-hidden="true" /> Cancel
                     </button>
                     <button
                       onClick={handleSave}
@@ -889,9 +890,9 @@ const CaseDetailPage = () => {
                       className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
                     >
                       {saving ? (
-                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                       ) : (
-                        <Save className="h-3 w-3" />
+                        <Save className="h-3 w-3" aria-hidden="true" />
                       )}{" "}
                       Save
                     </button>
@@ -907,7 +908,7 @@ const CaseDetailPage = () => {
                       disabled={saving}
                       className="h-8 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-700 disabled:opacity-50"
                     >
-                      <CheckCircle2 className="h-3 w-3" /> Mark PIF
+                      <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> Mark PIF
                     </button>
                   )}
               </div>
@@ -919,9 +920,10 @@ const CaseDetailPage = () => {
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-4">
         {error && (
           <div
+            role="alert"
             className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
           >
-            <AlertCircle className="h-4 w-4 shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="text-sm">{error}</span>
             <button
               onClick={() => router.back()}
@@ -934,7 +936,7 @@ const CaseDetailPage = () => {
 
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} />
+            <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} aria-hidden="true" />
           </div>
         )}
 
@@ -946,7 +948,7 @@ const CaseDetailPage = () => {
                 <h4
                   className={`text-xs font-bold ${t.text} mb-3 flex items-center gap-2`}
                 >
-                  <FileText className="h-3.5 w-3.5" /> Case Information
+                  <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Case Information
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
@@ -979,7 +981,7 @@ const CaseDetailPage = () => {
                   </div>
                   <div>
                     <p className={lbl}>
-                      <Shield className="h-3 w-3 inline mr-1" />
+                      <Shield className="h-3 w-3 inline mr-1" aria-hidden="true" />
                       SSN
                     </p>
                     <p className={val}>
@@ -991,14 +993,14 @@ const CaseDetailPage = () => {
                   </div>
                   <div>
                     <p className={lbl}>
-                      <Phone className="h-3 w-3 inline mr-1" />
+                      <Phone className="h-3 w-3 inline mr-1" aria-hidden="true" />
                       Phone
                     </p>
                     <p className={val}>{caseData.phone || "—"}</p>
                   </div>
                   <div>
                     <p className={lbl}>
-                      <Mail className="h-3 w-3 inline mr-1" />
+                      <Mail className="h-3 w-3 inline mr-1" aria-hidden="true" />
                       Email
                     </p>
                     <p className={val}>{caseData.email || "—"}</p>
@@ -1020,7 +1022,7 @@ const CaseDetailPage = () => {
                       </select>
                     ) : (
                       <p className={`${val} flex items-center gap-1`}>
-                        <User className="h-3 w-3" /> {caseData.assigned}
+                        <User className="h-3 w-3" aria-hidden="true" /> {caseData.assigned}
                       </p>
                     )}
                   </div>
@@ -1047,7 +1049,7 @@ const CaseDetailPage = () => {
                       />
                     ) : (
                       <p className={`${val} flex items-center gap-1`}>
-                        <CalendarDays className="h-3 w-3" />{" "}
+                        <CalendarDays className="h-3 w-3" aria-hidden="true" />{" "}
                         {caseData.approvalDate
                           ? fmtDate(caseData.approvalDate)
                           : "—"}
@@ -1206,7 +1208,7 @@ const CaseDetailPage = () => {
                 <h4
                   className={`text-xs font-bold ${t.text} mb-3 flex items-center gap-2`}
                 >
-                  <DollarSign className="h-3.5 w-3.5" /> Financial Summary
+                  <DollarSign className="h-3.5 w-3.5" aria-hidden="true" /> Financial Summary
                   <span className={`text-[11px] font-normal ${t.textMuted}`}>
                     (computed)
                   </span>
@@ -1242,7 +1244,7 @@ const CaseDetailPage = () => {
                         className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-200"}`}
                       >
                         <div
-                          className="h-2 rounded-full bg-emerald-500 transition-all"
+                          className="h-2 rounded-full bg-emerald-500 transition-[width]"
                           style={{
                             width: `${Math.min(100, (caseData.paid / caseData.expected) * 100)}%`,
                           }}
@@ -1264,7 +1266,7 @@ const CaseDetailPage = () => {
                       <span
                         className={`text-[14px] font-semibold ${caseData.approvalCategory === ">60" ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-emerald-400" : "text-emerald-600"}`}
                       >
-                        <Clock className="h-3 w-3 inline mr-1" />
+                        <Clock className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         {caseData.daysAfterApproval}d (
                         {caseData.approvalCategory})
                       </span>
@@ -1287,7 +1289,7 @@ const CaseDetailPage = () => {
                 <h4
                   className={`text-xs font-bold ${t.text} mb-3 flex items-center gap-2`}
                 >
-                  <Shield className="h-3.5 w-3.5" /> PDF-Extracted Data
+                  <Shield className="h-3.5 w-3.5" aria-hidden="true" /> PDF-Extracted Data
                   <span className={`text-[11px] font-normal ${t.textMuted}`}>
                     (from Chronicle file)
                   </span>
@@ -1302,7 +1304,7 @@ const CaseDetailPage = () => {
                   {caseData.primaryDiagnosis && (
                     <div>
                       <p className={lbl}>
-                        <Stethoscope className="h-3 w-3 inline mr-1" />
+                        <Stethoscope className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Primary Dx
                       </p>
                       <p className={val}>
@@ -1316,7 +1318,7 @@ const CaseDetailPage = () => {
                   {caseData.secondaryDiagnosis && (
                     <div>
                       <p className={lbl}>
-                        <Stethoscope className="h-3 w-3 inline mr-1" />
+                        <Stethoscope className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Secondary Dx
                       </p>
                       <p className={val}>
@@ -1330,7 +1332,7 @@ const CaseDetailPage = () => {
                   {caseData.lastInsured && (
                     <div>
                       <p className={lbl}>
-                        <CalendarDays className="h-3 w-3 inline mr-1" />
+                        <CalendarDays className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         DLI
                       </p>
                       <p className={val}>{caseData.lastInsured}</p>
@@ -1339,7 +1341,7 @@ const CaseDetailPage = () => {
                   {caseData.blindDli && (
                     <div>
                       <p className={lbl}>
-                        <CalendarDays className="h-3 w-3 inline mr-1" />
+                        <CalendarDays className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Blind DLI
                       </p>
                       <p className={val}>{caseData.blindDli}</p>
@@ -1348,7 +1350,7 @@ const CaseDetailPage = () => {
                   {caseData.firmName && (
                     <div>
                       <p className={lbl}>
-                        <Building2 className="h-3 w-3 inline mr-1" />
+                        <Building2 className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Firm
                       </p>
                       <p className={val}>{caseData.firmName}</p>
@@ -1357,7 +1359,7 @@ const CaseDetailPage = () => {
                   {caseData.firmEin && (
                     <div>
                       <p className={lbl}>
-                        <Building2 className="h-3 w-3 inline mr-1" />
+                        <Building2 className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Firm EIN
                       </p>
                       <p className={val}>{caseData.firmEin}</p>
@@ -1366,7 +1368,7 @@ const CaseDetailPage = () => {
                   {caseData.hearingOffice && (
                     <div>
                       <p className={lbl}>
-                        <MapPin className="h-3 w-3 inline mr-1" />
+                        <MapPin className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Hearing Office
                       </p>
                       <p className={val}>{caseData.hearingOffice}</p>
@@ -1395,7 +1397,7 @@ const CaseDetailPage = () => {
                             key={i}
                             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-medium ${dark ? "bg-neutral-800/60 text-neutral-300" : "bg-neutral-100 text-neutral-700"}`}
                           >
-                            <User className="h-3 w-3" /> {rep.name}
+                            <User className="h-3 w-3" aria-hidden="true" /> {rep.name}
                             {rep.repId ? ` (${rep.repId})` : ""}
                           </span>
                         ))}
@@ -1407,7 +1409,7 @@ const CaseDetailPage = () => {
                   caseData.decisionHistory.length > 0 && (
                     <div className="mt-3">
                       <p className={`${lbl} mb-1.5`}>
-                        <Gavel className="h-3 w-3 inline mr-1" />
+                        <Gavel className="h-3 w-3 inline mr-1" aria-hidden="true" />
                         Decision History
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -1427,9 +1429,9 @@ const CaseDetailPage = () => {
                               }`}
                             >
                               {denied ? (
-                                <XCircle className="h-3 w-3" />
+                                <XCircle className="h-3 w-3" aria-hidden="true" />
                               ) : (
-                                <CheckCircle2 className="h-3 w-3" />
+                                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                               )}
                               {dec.level} • {dec.claimType} • {dec.result}
                               {dec.date ? ` (${dec.date})` : ""}
@@ -1490,7 +1492,7 @@ const CaseDetailPage = () => {
               <h4
                 className={`text-xs font-bold ${t.text} mb-4 flex items-center gap-2`}
               >
-                <MessageSquare className="h-3.5 w-3.5" /> Activity Log
+                <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" /> Activity Log
                 <span className={`ml-1 text-[12px] font-normal ${t.textMuted}`}>
                   ({caseData.activities?.length ?? 0}{" "}
                   {caseData.activities?.length === 1 ? "entry" : "entries"})
@@ -1519,9 +1521,9 @@ const CaseDetailPage = () => {
                     className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-40`}
                   >
                     {postingNote ? (
-                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                     ) : (
-                      <Send className="h-3 w-3" />
+                      <Send className="h-3 w-3" aria-hidden="true" />
                     )}{" "}
                     Post
                   </button>
