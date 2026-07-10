@@ -144,7 +144,7 @@ export const POST = async (req: NextRequest) => {
       for (const entry of body.entries) {
         const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } =
           entry;
-        if (!agent || !date) continue;
+        if (!agent || typeof agent !== "string" || !date) continue;
         if (!canWriteAgent(session, agent)) {
           skipped++;
           continue;
@@ -183,7 +183,7 @@ export const POST = async (req: NextRequest) => {
     // Single mode
     const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } = body;
 
-    if (!agent) {
+    if (!agent || typeof agent !== "string") {
       return NextResponse.json({ error: "agent is required" }, { status: 400 });
     }
     if (!canWriteAgent(session, agent)) {
