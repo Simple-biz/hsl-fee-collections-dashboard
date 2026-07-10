@@ -1043,14 +1043,26 @@ const CaseDetailPage = () => {
                       <Phone className="h-3 w-3 inline mr-1" aria-hidden="true" />
                       Phone
                     </p>
-                    <p className={val}>{caseData.phone || "—"}</p>
+                    {caseData.phone ? (
+                      <a href={`tel:${caseData.phone}`} className={`${val} hover:underline`}>
+                        {caseData.phone}
+                      </a>
+                    ) : (
+                      <p className={val}>—</p>
+                    )}
                   </div>
                   <div>
                     <p className={lbl}>
                       <Mail className="h-3 w-3 inline mr-1" aria-hidden="true" />
                       Email
                     </p>
-                    <p className={val}>{caseData.email || "—"}</p>
+                    {caseData.email ? (
+                      <a href={`mailto:${caseData.email}`} className={`${val} hover:underline`}>
+                        {caseData.email}
+                      </a>
+                    ) : (
+                      <p className={val}>—</p>
+                    )}
                   </div>
                   <div>
                     <p className={lbl}>Assigned To</p>
