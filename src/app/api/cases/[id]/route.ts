@@ -354,10 +354,7 @@ export const PATCH = async (
     // NOTE: any client-supplied author is intentionally ignored — the activity
     // author is stamped from the authenticated session below so it can't be
     // spoofed.
-    const { caseFields, feeFields, userDetailsFields, logMessage: clientLogMessage } = parsedBody.data;
-    // Mutable — the Overpaid auto-flag below appends to whatever the client
-    // sent so the activity log names the side effect, not just the edit.
-    let logMessage = clientLogMessage;
+    const { caseFields, feeFields, userDetailsFields, logMessage } = parsedBody.data;
 
     // Authorize: any update needs case.update. Finalizing fields (close/reopen,
     // mark overpaid, approvedBy) additionally need case.finalize, and editing
@@ -508,32 +505,18 @@ export const PATCH = async (
         updates.push("closed_at = NULL");
       }
 
-      // Setting Fees Confirmation to "Overpaid" also flags the case as
-      // overpaid — the same way a case shows up on Fee Petitions purely from
-      // its Level, it should show up on Overpaid Cases purely from this
-      // dropdown, without a separate manual "Mark Overpaid" step. Only
-      // auto-sets it on; correcting a mis-click back to another confirmation
-      // value doesn't auto-unmark it, since Overpaid Cases tracks its own
-      // resolution workflow (notices sent, checks cleared) that shouldn't
-      // silently disappear.
-      if (
-        feeFields.feesConfirmation === "Overpaid" &&
-        !("markedOverpaid" in feeFields)
-      ) {
-        updates.push("marked_overpaid = true");
-        // Clears a stale dismissal from an earlier, unrelated overpayment on
-        // this case — otherwise this new one would be silently hidden from
-        // Overpaid Cases by that old dismissal (same pattern as
-        // bulkRemoveFromOverpaid's own dismissal handling).
+      // Explicitly (re-)marking a case overpaid also clears any earlier
+      // dismissal — otherwise a case that was previously removed from the
+      // Overpaid Cases page (bulkRemoveFromOverpaid stamps this) would stay
+      // invisible there even after this deliberate re-add, since the page's
+      // query excludes on overpaid_dismissed_at regardless of marked_overpaid.
+      if (feeFields.markedOverpaid === true) {
         updates.push("overpaid_dismissed_at = NULL");
-        logMessage = logMessage
-          ? `${logMessage} — also flagged as overpaid`
-          : "Flagged as overpaid (PIF set to \"Overpaid\")";
       }
 
-      // Mirrors the Overpaid auto-flag above: setting Remarks to "FEE
-      // PETITION APPROVED" also checks the Fee Petitions page's own "Fee
-      // Petition Approved" column, so the two stay in sync regardless of
+      // Setting Remarks to "FEE PETITION APPROVED" also checks the Fee
+      // Petitions page's own "Fee Petition Approved" column, so the two stay
+      // in sync regardless of
       // which page someone edits from. Only syncs forward — changing Remarks
       // to something else doesn't uncheck it, since Remarks has many other
       // unrelated values and the approval itself doesn't become untrue just
