@@ -41,6 +41,17 @@ export const hasPageAccess = (
   key: PageKey,
 ): boolean => (pages ?? []).includes(key);
 
+/**
+ * The pages array to check against for a guard, given a session's baked-in
+ * `pages` (possibly empty/missing on a token minted before per-page access
+ * existed) and the user's role. Falls back to the role's defaults for a
+ * stale token, mirroring `sessionHasCapability`'s identical handling.
+ */
+export const effectivePagesForSession = (
+  pages: readonly PageKey[] | null | undefined,
+  role: string | null | undefined,
+): PageKey[] => (pages && pages.length > 0 ? [...pages] : rolePageDefaults(role));
+
 /** Effective set of capabilities a user has: role default ⊕ overrides. */
 export const effectiveCapabilities = (
   role: string | null | undefined,

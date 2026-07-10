@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { dropdownOptions } from "@/lib/db/schema";
 import { isDropdownCategory } from "@/lib/dropdown-categories";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 // GET /api/settings/dropdown-options?category=<key>
 // Returns rows ordered by (sortOrder, name). When no category is provided,
@@ -41,6 +42,14 @@ export const GET = async (req: NextRequest) => {
 // POST /api/settings/dropdown-options — create a new option within a category.
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const category = String(body?.category ?? "").trim();
     const name = String(body?.name ?? "").trim();

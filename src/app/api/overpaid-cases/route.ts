@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq, ilike, sql } from "drizzle-orm";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 const SORT_KEYS = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
@@ -10,6 +11,14 @@ type SortKey = (typeof SORT_KEYS)[number];
 // Returns cases where total_fees_paid > total_fees_expected
 export const GET = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("overpaid_cases");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status");

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Add days to a YYYY-MM-DD (UTC math, returns YYYY-MM-DD) — used for the
@@ -18,6 +19,14 @@ const addDays = (iso: string, days: number): string => {
 // metrics are current-state snapshots and ignore the window.
 export const GET = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("scoreboard");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const weekParam = searchParams.get("week");
     const fromParam = searchParams.get("from");

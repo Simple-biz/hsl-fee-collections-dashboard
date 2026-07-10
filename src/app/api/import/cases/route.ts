@@ -4,6 +4,7 @@ import { sql, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { parseWorksheet, type ParsedCaseRow } from "@/lib/import/xlsx-mapper";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -69,6 +70,14 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
 //     mode=replace  → TRUNCATE cases then insert everything (subject to selectedClientIds filter)
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const mode = (searchParams.get("mode") ?? "preview") as
       | "preview"

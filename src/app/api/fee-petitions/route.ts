@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cases, feePetitions, feeRecords } from "@/lib/db/schema";
 import { eq, ilike, sql } from "drizzle-orm";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
@@ -47,6 +48,14 @@ const getMissingClause = (key: string | null) => {
 // Lists cases at FEE_PETITION level with checklist state and aggregate stats
 export const GET = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("fee_petitions");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status"); // "complete" | "incomplete"

@@ -92,6 +92,7 @@ export const TeamManagement = () => {
     null,
   );
   const [deactivating, setDeactivating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   /* ---- Fetch ---- */
   const fetchMembers = useCallback(async () => {
@@ -204,26 +205,40 @@ export const TeamManagement = () => {
       return;
     }
     // Reactivate directly
+    setActionError(null);
     try {
-      await fetch("/api/team-members", {
+      const res = await fetch("/api/team-members", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: m.id, isActive: true }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to reactivate (${res.status})`);
+      }
       await fetchMembers();
-    } catch {}
+    } catch (err) {
+      setActionError((err as Error).message);
+    }
   };
 
   const confirmDeactivate = async () => {
     if (!confirmMember) return;
     setDeactivating(true);
+    setActionError(null);
     try {
-      await fetch(`/api/team-members?id=${confirmMember.id}`, {
+      const res = await fetch(`/api/team-members?id=${confirmMember.id}`, {
         method: "DELETE",
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to deactivate (${res.status})`);
+      }
       setConfirmMember(null);
       await fetchMembers();
-    } catch {}
+    } catch (err) {
+      setActionError((err as Error).message);
+    }
     setDeactivating(false);
   };
 
@@ -278,6 +293,16 @@ export const TeamManagement = () => {
           Add Member
         </button>
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          className={`rounded-xl border p-3 flex items-center gap-2 text-sm ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {actionError}
+        </div>
+      )}
 
       {/* ---- Stat Cards ---- */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

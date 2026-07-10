@@ -6,6 +6,7 @@ import {
   parseChronicleResponse,
   type ChronicleApiResponse,
 } from "@/lib/chronicle-client";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 // ============================================================================
 // MOCK DATA — 4 sample clients for development
@@ -233,6 +234,14 @@ const MOCK: Record<string, ChronicleApiResponse> = {
 
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("chronicle");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const { clientId } = await req.json();
     if (!clientId) {
       return NextResponse.json(
