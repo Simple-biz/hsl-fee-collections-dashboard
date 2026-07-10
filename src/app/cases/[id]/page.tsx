@@ -199,6 +199,7 @@ const FeeSection = memo(
 
     const [inlineEdit, setInlineEdit] = useState(false);
     const [localSaving, setLocalSaving] = useState(false);
+    const [localError, setLocalError] = useState<string | null>(null);
     // Use a single state object to minimize re-renders. Pending isn't part
     // of this — it's auto-calculated (Fee Due − Received) server-side.
     const [fields, setFields] = useState({ lr: "", ld: "", lrcv: "", ldt: "" });
@@ -214,14 +215,17 @@ const FeeSection = memo(
         lrcv: toStr(received),
         ldt: dateReceived || "",
       });
+      setLocalError(null);
       setInlineEdit(true);
     };
     const cancelInlineEdit = () => {
       setInlineEdit(false);
+      setLocalError(null);
     };
 
     const saveInline = async () => {
       setLocalSaving(true);
+      setLocalError(null);
       try {
         const feeFields: Record<string, number | string | null> = {};
         const changes: string[] = [];
@@ -258,7 +262,7 @@ const FeeSection = memo(
           return;
         }
 
-        await fetch(`/api/cases/${caseId}`, {
+        const res = await fetch(`/api/cases/${caseId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -266,10 +270,14 @@ const FeeSection = memo(
             logMessage: changes.join("; ") + ".",
           }),
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Failed to save (${res.status})`);
+        }
         setInlineEdit(false);
         await onSaved();
-      } catch {
-        /* */
+      } catch (err) {
+        setLocalError((err as Error).message);
       }
       setLocalSaving(false);
     };
@@ -308,6 +316,11 @@ const FeeSection = memo(
             </div>
           )}
         </div>
+        {localError && (
+          <p role="alert" className="text-[12px] font-medium text-red-500 mb-2">
+            {localError}
+          </p>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {inlineEdit ? (
             <>
@@ -456,8 +469,8 @@ const CaseDetailPage = () => {
     setDeleting(true);
     try {
       const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Failed to delete (${res.status})`);
       router.push("/");
     } catch (err) {
       setError((err as Error).message);
@@ -470,6 +483,7 @@ const CaseDetailPage = () => {
   // Activity
   const [newNote, setNewNote] = useState("");
   const [postingNote, setPostingNote] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
   // Admin-managed dropdown options (case_level, win_sheet_status, …) so the
@@ -629,13 +643,16 @@ const CaseDetailPage = () => {
           logMessage: changes.join(". ") + ".",
         }),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to save (${res.status})`);
+      }
       setSaveMsg("Saved!");
       setEditing(false);
       await fetchCase();
       setTimeout(() => setSaveMsg(null), 2000);
-    } catch {
-      setSaveMsg("Error saving");
+    } catch (err) {
+      setSaveMsg((err as Error).message);
     } finally {
       setSaving(false);
     }
@@ -651,8 +668,9 @@ const CaseDetailPage = () => {
   const handleMarkPIF = async () => {
     if (!caseData) return;
     setSaving(true);
+    setSaveMsg(null);
     try {
-      await fetch(`/api/cases/${id}`, {
+      const res = await fetch(`/api/cases/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -660,9 +678,13 @@ const CaseDetailPage = () => {
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to mark PIF (${res.status})`);
+      }
       await fetchCase();
-    } catch {
-      /* */
+    } catch (err) {
+      setSaveMsg((err as Error).message);
     }
     setSaving(false);
   };
@@ -672,6 +694,7 @@ const CaseDetailPage = () => {
   const handlePostNote = async () => {
     if (!newNote.trim()) return;
     setPostingNote(true);
+    setNoteError(null);
     try {
       const res = await fetch(`/api/cases/${id}`, {
         method: "POST",
@@ -680,7 +703,10 @@ const CaseDetailPage = () => {
           message: newNote.trim(),
         }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to post note (${res.status})`);
+      }
       const data = await res.json();
       if (caseData)
         setCaseData({
@@ -688,8 +714,8 @@ const CaseDetailPage = () => {
           activities: [data.activity, ...caseData.activities],
         });
       setNewNote("");
-    } catch {
-      /* */
+    } catch (err) {
+      setNoteError((err as Error).message);
     }
     setPostingNote(false);
   };
@@ -819,6 +845,7 @@ const CaseDetailPage = () => {
               <div className="ml-auto flex items-center gap-2">
                 {saveMsg && (
                   <span
+                    role="alert"
                     className={`text-xs font-medium ${saveMsg === "Saved!" ? "text-emerald-500" : "text-red-500"}`}
                   >
                     {saveMsg}
@@ -1499,6 +1526,11 @@ const CaseDetailPage = () => {
                     Post
                   </button>
                 </div>
+                {noteError && (
+                  <p role="alert" className="text-[12px] font-medium text-red-500 mt-2">
+                    {noteError}
+                  </p>
+                )}
               </div>
               {!caseData.activities || caseData.activities.length === 0 ? (
                 <p className={`text-sm ${t.textMuted} text-center py-8`}>
