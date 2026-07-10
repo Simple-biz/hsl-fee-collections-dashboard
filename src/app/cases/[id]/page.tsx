@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, memo } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useTheme } from "next-themes";
 import { useRouter, useParams } from "next/navigation";
 import {
@@ -200,6 +200,10 @@ const FeeSection = memo(
     const [inlineEdit, setInlineEdit] = useState(false);
     const [localSaving, setLocalSaving] = useState(false);
     const [localError, setLocalError] = useState<string | null>(null);
+    const saveAbortRef = useRef<AbortController | null>(null);
+    useEffect(() => {
+      return () => saveAbortRef.current?.abort();
+    }, []);
     // Use a single state object to minimize re-renders. Pending isn't part
     // of this — it's auto-calculated (Fee Due − Received) server-side.
     const [fields, setFields] = useState({ lr: "", ld: "", lrcv: "", ldt: "" });
@@ -224,6 +228,9 @@ const FeeSection = memo(
     };
 
     const saveInline = async () => {
+      saveAbortRef.current?.abort();
+      const controller = new AbortController();
+      saveAbortRef.current = controller;
       setLocalSaving(true);
       setLocalError(null);
       try {
@@ -269,6 +276,7 @@ const FeeSection = memo(
             feeFields,
             logMessage: changes.join("; ") + ".",
           }),
+          signal: controller.signal,
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -277,9 +285,11 @@ const FeeSection = memo(
         setInlineEdit(false);
         await onSaved();
       } catch (err) {
+        if ((err as Error).name === "AbortError") return;
         setLocalError((err as Error).message);
+      } finally {
+        if (!controller.signal.aborted) setLocalSaving(false);
       }
-      setLocalSaving(false);
     };
 
     return (
@@ -465,18 +475,38 @@ const CaseDetailPage = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const saveAbortRef = useRef<AbortController | null>(null);
+  const pifAbortRef = useRef<AbortController | null>(null);
+  const noteAbortRef = useRef<AbortController | null>(null);
+  const deleteAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => {
+      saveAbortRef.current?.abort();
+      pifAbortRef.current?.abort();
+      noteAbortRef.current?.abort();
+      deleteAbortRef.current?.abort();
+    };
+  }, []);
+
   const handleDelete = async () => {
+    deleteAbortRef.current?.abort();
+    const controller = new AbortController();
+    deleteAbortRef.current = controller;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/cases/${id}`, {
+        method: "DELETE",
+        signal: controller.signal,
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Failed to delete (${res.status})`);
       router.push("/");
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
       setDeleteConfirm(false);
     } finally {
-      setDeleting(false);
+      if (!controller.signal.aborted) setDeleting(false);
     }
   };
 
@@ -561,6 +591,9 @@ const CaseDetailPage = () => {
 
   const handleSave = async () => {
     if (!caseData) return;
+    saveAbortRef.current?.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
     setSaving(true);
     setSaveMsg(null);
     try {
@@ -642,6 +675,7 @@ const CaseDetailPage = () => {
           feeFields: Object.keys(feeFields).length > 0 ? feeFields : undefined,
           logMessage: changes.join(". ") + ".",
         }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -652,9 +686,10 @@ const CaseDetailPage = () => {
       await fetchCase();
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setSaveMsg((err as Error).message);
     } finally {
-      setSaving(false);
+      if (!controller.signal.aborted) setSaving(false);
     }
   };
 
@@ -667,6 +702,9 @@ const CaseDetailPage = () => {
 
   const handleMarkPIF = async () => {
     if (!caseData) return;
+    pifAbortRef.current?.abort();
+    const controller = new AbortController();
+    pifAbortRef.current = controller;
     setSaving(true);
     setSaveMsg(null);
     try {
@@ -677,6 +715,7 @@ const CaseDetailPage = () => {
           feeFields: { feesConfirmation: "Yes", winSheetStatus: "paid_in_full" },
           logMessage: "Marked as Paid in Full (PIF). Ready to close.",
         }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -684,15 +723,20 @@ const CaseDetailPage = () => {
       }
       await fetchCase();
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setSaveMsg((err as Error).message);
+    } finally {
+      if (!controller.signal.aborted) setSaving(false);
     }
-    setSaving(false);
   };
 
   // ---- Post note ----
 
   const handlePostNote = async () => {
     if (!newNote.trim()) return;
+    noteAbortRef.current?.abort();
+    const controller = new AbortController();
+    noteAbortRef.current = controller;
     setPostingNote(true);
     setNoteError(null);
     try {
@@ -702,6 +746,7 @@ const CaseDetailPage = () => {
         body: JSON.stringify({
           message: newNote.trim(),
         }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -715,9 +760,11 @@ const CaseDetailPage = () => {
         });
       setNewNote("");
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setNoteError((err as Error).message);
+    } finally {
+      if (!controller.signal.aborted) setPostingNote(false);
     }
-    setPostingNote(false);
   };
 
   // ---- Style helpers ----
