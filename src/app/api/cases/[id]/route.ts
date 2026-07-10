@@ -505,6 +505,15 @@ export const PATCH = async (
         updates.push("closed_at = NULL");
       }
 
+      // Explicitly (re-)marking a case overpaid also clears any earlier
+      // dismissal — otherwise a case that was previously removed from the
+      // Overpaid Cases page (bulkRemoveFromOverpaid stamps this) would stay
+      // invisible there even after this deliberate re-add, since the page's
+      // query excludes on overpaid_dismissed_at regardless of marked_overpaid.
+      if (feeFields.markedOverpaid === true) {
+        updates.push("overpaid_dismissed_at = NULL");
+      }
+
       // Setting Remarks to "FEE PETITION APPROVED" also checks the Fee
       // Petitions page's own "Fee Petition Approved" column, so the two stay
       // in sync regardless of

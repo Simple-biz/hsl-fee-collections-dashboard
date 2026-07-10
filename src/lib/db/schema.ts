@@ -272,10 +272,10 @@ export const feeRecords = pgTable(
     isClosed: boolean("is_closed").notNull().default(false),
     markedOverpaid: boolean("marked_overpaid").notNull().default(false),
     // Set when staff remove a case from the Overpaid Cases list without
-    // touching PIF/marked_overpaid (both stay mathematically accurate).
-    // Cleared automatically by the trigger the next time marked_overpaid
-    // transitions from false to true — a genuinely new overpayment should
-    // surface again even if an earlier one on this case was dismissed.
+    // touching PIF/marked_overpaid. Cleared when a case is deliberately
+    // (re-)marked overpaid (see PATCH /api/cases/[id] and markCaseOverpaid) —
+    // a genuinely new overpayment should surface again even if an earlier
+    // one on this case was dismissed.
     overpaidDismissedAt: timestamp("overpaid_dismissed_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
 
