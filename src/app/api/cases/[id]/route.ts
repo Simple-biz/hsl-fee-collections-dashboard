@@ -17,6 +17,10 @@ const patchBodySchema = z.object({
   logMessage: z.string().optional(),
 });
 
+const addNoteBodySchema = z.object({
+  message: z.string().trim().min(1, "Message is required"),
+});
+
 // Fee fields that count as "finalizing" a case — gated by case.finalize rather
 // than the broader case.update (members can record payments but not close,
 // reopen, mark overpaid, or sign off "OK to close").
@@ -637,20 +641,21 @@ export const POST = async (
     // Author is stamped from the session — a client-supplied author is ignored
     // so notes can't be attributed to someone else.
     const author = guard.session.user?.name?.trim() || "Unknown";
-    const { message } = await req.json();
-
-    if (!message?.trim()) {
+    const rawBody = await req.json().catch(() => null);
+    const parsedBody = addNoteBodySchema.safeParse(rawBody);
+    if (!parsedBody.success) {
       return NextResponse.json(
         { error: "Message is required" },
         { status: 400 },
       );
     }
+    const message = parsedBody.data.message;
 
     const [entry] = await db
       .insert(activityLog)
       .values({
         caseId,
-        message: message.trim(),
+        message,
         createdBy: author,
       })
       .returning({ id: activityLog.id, createdAt: activityLog.createdAt });
@@ -659,7 +664,7 @@ export const POST = async (
       status: "ok",
       activity: {
         id: entry.id,
-        message: message.trim(),
+        message,
         createdBy: author,
         createdAt: entry.createdAt,
       },
