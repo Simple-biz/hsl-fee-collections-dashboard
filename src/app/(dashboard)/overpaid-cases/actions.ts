@@ -121,13 +121,13 @@ export async function bulkRestoreCleared(input: {
 
 // Removes cases from the Overpaid Cases view without touching
 // fees_confirmation/is_closed/marked_overpaid — Master Fees and Fees Closed
-// are keyed off the former two, and marked_overpaid stays mathematically
-// accurate (the compute_fee_totals trigger re-derives it on every write
-// regardless, so fighting it directly doesn't stick). Instead this stamps
-// overpaid_dismissed_at, which the page's query excludes on, and which the
-// trigger only clears when a case transitions into a genuinely *new*
-// overpayment. Also deletes the overpaid_cases metadata row so a case that
-// becomes overpaid again later starts clean rather than resurfacing stale
+// are keyed off the former two, and marked_overpaid is left alone so it
+// keeps reflecting whether this case was ever deliberately added. Instead
+// this stamps overpaid_dismissed_at, which the page's query excludes on,
+// and which only gets cleared by a deliberate re-add (PATCH /api/cases/[id]
+// with markedOverpaid:true, or markCaseOverpaid) — not automatically. Also
+// deletes the overpaid_cases metadata row so a case that becomes overpaid
+// again later starts clean rather than resurfacing stale
 // op-letter/checks-cleared data.
 export async function bulkRemoveFromOverpaid(input: {
   caseIds: number[];
@@ -155,9 +155,10 @@ export async function bulkRemoveFromOverpaid(input: {
 
 // Marks a single case overpaid directly — for old cases that never came
 // through Master Fees and shouldn't be added there just to flag them here.
-// The normal path (setting PIF to "Overpaid" on Master Fees) already sets
-// marked_overpaid atomically; this covers the escape hatch for cases with
-// no fee history to track at all, right after AddCaseModal creates the bare
+// The normal path is the "Add to Overpaid Cases" button on Master Fees
+// (PATCH /api/cases/[id] with feeFields.markedOverpaid:true), which needs a
+// fee_records row to PATCH; this covers the escape hatch for cases with no
+// fee history to track at all, right after AddCaseModal creates the bare
 // case record.
 export async function markCaseOverpaid(input: {
   caseId: number;
