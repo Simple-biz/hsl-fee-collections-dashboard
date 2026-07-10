@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { teamMembers, feeRecords } from "@/lib/db/schema";
 import { eq, sql, count, sum, and } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+
+const patchBodySchema = z.object({
+  id: z.number(),
+  name: z.string().trim().min(1, "Name cannot be blank").optional(),
+  role: z.string().trim().min(1, "Role cannot be blank").optional(),
+  team: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
 
 // GET /api/team-members — list all team members with case stats
 export const GET = async () => {
@@ -121,21 +130,21 @@ export const PATCH = async (req: NextRequest) => {
       );
     }
 
-    const body = await req.json();
-    const { id, name, role, team, isActive } = body;
-
-    if (!id || typeof id !== "number") {
+    const rawBody = await req.json().catch(() => null);
+    const parsedBody = patchBodySchema.safeParse(rawBody);
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { error: "id (number) is required" },
+        { error: "Invalid request body", issues: parsedBody.error.issues },
         { status: 400 },
       );
     }
+    const { id, name, role, team, isActive } = parsedBody.data;
 
     const updates: Record<string, unknown> = {};
-    if (name !== undefined) updates.name = name.trim();
-    if (role !== undefined) updates.role = role.trim();
-    if (team !== undefined) updates.team = team ? String(team).trim() : null;
-    if (isActive !== undefined) updates.isActive = Boolean(isActive);
+    if (name !== undefined) updates.name = name;
+    if (role !== undefined) updates.role = role;
+    if (team !== undefined) updates.team = team ? team.trim() : null;
+    if (isActive !== undefined) updates.isActive = isActive;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
