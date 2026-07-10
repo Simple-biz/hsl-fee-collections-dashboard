@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { changeOwnPassword } from "@/lib/account-actions";
+import { changeOwnPassword } from "@/app/(dashboard)/actions";
 
 const MIN_LEN = 8;
 
