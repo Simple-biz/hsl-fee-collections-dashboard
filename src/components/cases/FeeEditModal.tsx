@@ -179,9 +179,10 @@ export default function FeeEditModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 

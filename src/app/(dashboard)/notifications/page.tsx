@@ -318,19 +318,21 @@ export default function NotificationsPage() {
               className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 border ${t.outlineBtn} disabled:opacity-40`}
             >
               {markingAll ? (
-                <RefreshCw className="h-3 w-3 animate-spin" />
+                <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
               ) : (
-                <CheckCheck className="h-3 w-3" />
+                <CheckCheck className="h-3 w-3" aria-hidden="true" />
               )}
               Mark all read
             </button>
             <button
               onClick={fetchNotifications}
               disabled={loading}
+              aria-label="Refresh notifications"
               className={`h-8 w-8 rounded-md flex items-center justify-center border ${t.outlineBtn}`}
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+                aria-hidden="true"
               />
             </button>
           </div>
@@ -380,9 +382,10 @@ export default function NotificationsPage() {
       {/* Error */}
       {error && (
         <div
+          role="alert"
           className={`rounded-xl border p-3 flex items-center gap-2 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
         >
-          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="text-xs">{error}</span>
         </div>
       )}
@@ -392,7 +395,7 @@ export default function NotificationsPage() {
         <div
           className={`rounded-xl border ${t.card} flex items-center justify-center py-16`}
         >
-          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
+          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} aria-hidden="true" />
           <span className={`ml-2 text-sm ${t.textSub}`}>
             Loading notifications...
           </span>

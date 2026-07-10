@@ -542,8 +542,9 @@ export const TeamManagement = () => {
                           onClick={() => openEditDialog(m)}
                           className={`rounded-md p-1.5 ${t.textMuted} hover:text-indigo-500 ${t.hover} transition-colors`}
                           title="Edit"
+                          aria-label="Edit"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => handleToggleActive(m)}
@@ -553,11 +554,12 @@ export const TeamManagement = () => {
                               : "hover:text-emerald-500"
                           } ${t.hover}`}
                           title={m.isActive ? "Deactivate" : "Reactivate"}
+                          aria-label={m.isActive ? "Deactivate" : "Reactivate"}
                         >
                           {m.isActive ? (
-                            <UserX className="h-3.5 w-3.5" />
+                            <UserX className="h-3.5 w-3.5" aria-hidden="true" />
                           ) : (
-                            <UserCheck className="h-3.5 w-3.5" />
+                            <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
                           )}
                         </button>
                       </div>
