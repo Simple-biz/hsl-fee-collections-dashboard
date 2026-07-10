@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { searchChronicleClients } from "@/lib/chronicle-client";
 
 // ============================================================================
@@ -8,13 +9,27 @@ import { searchChronicleClients } from "@/lib/chronicle-client";
 // against the live account before building the chronicle_id backfill.
 // ============================================================================
 
+const bodySchema = z.object({
+  firstName: z.string().trim().optional(),
+  lastName: z.string().trim().optional(),
+  last4Ssn: z.string().trim().optional(),
+  externalId: z.string().trim().optional(),
+});
+
 export const POST = async (req: NextRequest) => {
   try {
-    const body = await req.json();
-    const firstName = (body.firstName || "").trim() || undefined;
-    const lastName = (body.lastName || "").trim() || undefined;
-    const last4Ssn = (body.last4Ssn || "").trim() || undefined;
-    const externalId = (body.externalId || "").trim() || undefined;
+    const rawBody = await req.json().catch(() => null);
+    const parsedBody = bodySchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: "Invalid request body", issues: parsedBody.error.issues },
+        { status: 400 },
+      );
+    }
+    const firstName = parsedBody.data.firstName || undefined;
+    const lastName = parsedBody.data.lastName || undefined;
+    const last4Ssn = parsedBody.data.last4Ssn || undefined;
+    const externalId = parsedBody.data.externalId || undefined;
 
     if (!firstName && !lastName && !last4Ssn && !externalId) {
       return NextResponse.json(
