@@ -3,7 +3,9 @@ import { auth } from "@/auth";
 import type { Session } from "next-auth";
 import type { CapabilityKey } from "@/lib/access/capabilities";
 import { roleCapabilityDefaults } from "@/lib/access/capabilities";
-import { hasCapability } from "@/lib/access/resolve";
+import type { PageKey } from "@/lib/access/pages";
+import { rolePageDefaults } from "@/lib/access/role-defaults";
+import { hasCapability, hasPageAccess } from "@/lib/access/resolve";
 
 type AdminRole = "admin" | "system_admin";
 
@@ -72,6 +74,34 @@ export async function requireCapability(
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Unauthenticated" };
   if (!sessionHasCapability(session, capability)) {
+    return { ok: false, error: "Forbidden" };
+  }
+  return { ok: true, session };
+}
+
+export type PageAccessGuard =
+  | { ok: true; session: Session }
+  | { ok: false; error: "Unauthenticated" | "Forbidden" };
+
+/**
+ * Server-side guard mirroring the page a route's data actually belongs to
+ * (e.g. an /api/scoreboard route guarded by the "scoreboard" page). Several
+ * routes only enforced "is logged in" via the edge middleware and nothing
+ * else — this closes that gap by reusing the same effective-pages logic the
+ * middleware and sidebar already use, so a route's access always matches
+ * what the UI shows. Tokens minted before per-page access existed have no
+ * `pages` array — fall back to the role's defaults for those, matching
+ * `sessionHasCapability`'s identical stale-token handling.
+ */
+export async function requirePageAccess(
+  pageKey: PageKey,
+): Promise<PageAccessGuard> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Unauthenticated" };
+  const pages = session.user.pages;
+  const effectivePages =
+    pages && pages.length > 0 ? pages : rolePageDefaults(session.user.role);
+  if (!hasPageAccess(effectivePages, pageKey)) {
     return { ok: false, error: "Forbidden" };
   }
   return { ok: true, session };

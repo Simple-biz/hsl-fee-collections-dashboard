@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 interface ConnectionStatus {
   service: string;
@@ -12,6 +13,14 @@ interface ConnectionStatus {
 // GET /api/settings/connections?test=true
 export const GET = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const shouldTest = new URL(req.url).searchParams.get("test") === "true";
     const connections: ConnectionStatus[] = [];
 

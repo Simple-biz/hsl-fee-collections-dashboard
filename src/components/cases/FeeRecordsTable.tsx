@@ -1122,12 +1122,14 @@ export const FeeRecordsTable = ({
               <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add Case
             </button>
           )}
-          <button
-            onClick={() => setImportOpen(true)}
-            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.outlineBtn}`}
-          >
-            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Import
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.outlineBtn}`}
+            >
+              <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Import
+            </button>
+          )}
         </div>
       </div>
 

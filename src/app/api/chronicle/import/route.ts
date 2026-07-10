@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 interface ImportCase {
   chronicleClientId: number;
@@ -52,6 +53,14 @@ interface PdfFields {
 // POST /api/chronicle/import — Import selected cases into DB with optional PDF-extracted fields
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("chronicle");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const body = await req.json();
     const importCases: ImportCase[] = body.cases;
     const pdfFields: PdfFields | null = body.pdfFields || null;

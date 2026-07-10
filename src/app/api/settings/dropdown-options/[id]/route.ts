@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { dropdownOptions } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 const resolveId = async (context: {
   params: { id: string } | Promise<{ id: string }>;
@@ -26,6 +27,14 @@ export const PATCH = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const id = await resolveId(context);
     if (!Number.isFinite(id)) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -85,6 +94,14 @@ export const DELETE = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const id = await resolveId(context);
     if (!Number.isFinite(id)) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
