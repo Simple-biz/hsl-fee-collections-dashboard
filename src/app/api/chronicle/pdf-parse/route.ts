@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseChronicleAllFile } from "@/lib/chronicle-pdf-parser";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 // pdf-parse v1 tries to load a test PDF on require() — import from lib directly to avoid this
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -9,6 +10,14 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    const guard = await requirePageAccess("chronicle");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const body = await request.json();
     const { allFileLink } = body;
 

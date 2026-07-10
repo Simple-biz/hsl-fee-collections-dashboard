@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { appSettings, feeCapHistory } from "@/lib/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 // ============================================================================
 // GET /api/settings
@@ -9,6 +10,14 @@ import { eq, sql, desc } from "drizzle-orm";
 // ============================================================================
 export const GET = async () => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const settings = await db
       .select()
       .from(appSettings)
@@ -56,6 +65,14 @@ export const GET = async () => {
 // ============================================================================
 export const PATCH = async (req: NextRequest) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guard.error === "Unauthenticated" ? 401 : 403 },
+      );
+    }
+
     const body = await req.json();
 
     // Update settings

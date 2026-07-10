@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { teamMembers, feeRecords } from "@/lib/db/schema";
 import { eq, sql, count, sum, and } from "drizzle-orm";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 // GET /api/team-members — list all team members with case stats
 export const GET = async () => {
@@ -61,6 +62,14 @@ export const GET = async () => {
 // POST /api/team-members — create new team member
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("team");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const body = await req.json();
     const { name, role, team } = body;
 
@@ -104,6 +113,14 @@ export const POST = async (req: NextRequest) => {
 // PATCH /api/team-members — update team member
 export const PATCH = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("team");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const body = await req.json();
     const { id, name, role, team, isActive } = body;
 
@@ -195,6 +212,14 @@ export const PATCH = async (req: NextRequest) => {
 // DELETE /api/team-members?id=X — soft-delete (deactivate)
 export const DELETE = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("team");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const id = Number(searchParams.get("id"));
 
