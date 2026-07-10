@@ -882,7 +882,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
                       {showCol("collected") && (
                         <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
-                          {a.feesCollectedInWindow > 0 ? fmt(a.feesCollectedInWindow) : "—"}
+                          {fmt(a.feesCollectedInWindow)}
                         </td>
                       )}
                       {showCol("ssacalls")    && <td className={`${tdBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{a.weekSsaCalls}</td>}

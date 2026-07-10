@@ -845,7 +845,7 @@ const SourceRowsTable = ({
                 </span>
               </td>
               <td className={`${t.text} px-3 py-1.5 text-right tabular-nums font-medium`}>
-                {r.totalExpected > 0 ? fmtFull(r.totalExpected) : "—"}
+                {fmtFull(r.totalExpected)}
               </td>
               <td className="px-3 py-1.5 text-center">
                 {r.hasNotes ? (

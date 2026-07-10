@@ -476,7 +476,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
                           {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                         </td>
                         <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                          {row.feesReceived != null && row.feesReceived > 0 ? fmt(row.feesReceived) : "—"}
+                          {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>
