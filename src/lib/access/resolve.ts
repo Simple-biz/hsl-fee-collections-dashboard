@@ -21,6 +21,17 @@ export interface AccessOverrides {
   capabilities?: CapabilityOverrides;
 }
 
+const isAdminRole = (role: string | null | undefined): boolean =>
+  role === "admin" || role === "system_admin";
+
+// These pages have no partial-access model — their route (and API, for
+// Settings) checks the literal admin/system_admin role server-side, not page
+// access or a capability. Granting them via a per-user override would show
+// the page in the sidebar and let navigation start, but every subsequent
+// server check would still reject a non-admin — a page override can never
+// actually make these usable, so it must never be offered as one.
+const ADMIN_ONLY_PAGES: readonly PageKey[] = ["admin", "archive", "settings"];
+
 /** Effective set of pages a user may open: role default ⊕ overrides. */
 export const effectivePages = (
   role: string | null | undefined,
@@ -31,6 +42,9 @@ export const effectivePages = (
   for (const [key, granted] of Object.entries(pageOverrides)) {
     if (granted) set.add(key as PageKey);
     else set.delete(key as PageKey);
+  }
+  if (!isAdminRole(role)) {
+    for (const key of ADMIN_ONLY_PAGES) set.delete(key);
   }
   return [...set];
 };
