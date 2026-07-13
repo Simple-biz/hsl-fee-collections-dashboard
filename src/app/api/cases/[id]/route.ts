@@ -3,7 +3,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, feePetitions, activityLog, userDetails } from "@/lib/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireCapability, requireAdmin, guardStatus } from "@/lib/auth-helpers";
+import { auth } from "@/auth";
+import { requireCapability, requireAdmin, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
 
 // Loose on purpose — the actual set of writable columns is whitelisted by
 // CASE_FIELD_MAP/FEE_FIELD_MAP/UD_FIELD_MAP below. This just rejects a
@@ -49,6 +50,12 @@ export const GET = async (
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    const canViewPii = sessionHasCapability(session, "case.editPii");
+
     const caseId = await resolveParams(context);
 
     if (isNaN(caseId)) {
@@ -216,9 +223,10 @@ export const GET = async (
       winSheetLink: row.winSheetLink ?? null,
       winSheetLinkText: row.winSheetLinkText ?? null,
 
-      // PDF-extracted fields
-      fullSsn: row.fullSsn || null,
-      dob: row.dob || null,
+      // PDF-extracted fields — SSN/DOB are identity PII, gated by case.editPii
+      // on read as well as write (write gate lives in PATCH below).
+      fullSsn: canViewPii ? row.fullSsn || null : null,
+      dob: canViewPii ? row.dob || null : null,
       email: row.email || null,
       phone: row.phone || null,
       primaryDiagnosis: row.primaryDiagnosis || null,
@@ -303,12 +311,12 @@ export const GET = async (
         country: row.udCountry || null,
         cellPhone: row.udCellPhone || null,
         email: row.udEmail || null,
-        ssn: row.udSsn || null,
-        dateOfBirth: row.udDateOfBirth || null,
+        ssn: canViewPii ? row.udSsn || null : null,
+        dateOfBirth: canViewPii ? row.udDateOfBirth || null : null,
         ageAtApproval: row.udAgeAtApproval || null,
-        placeOfBirth: row.udPlaceOfBirth || null,
-        mothersName: row.udMothersName || null,
-        fathersName: row.udFathersName || null,
+        placeOfBirth: canViewPii ? row.udPlaceOfBirth || null : null,
+        mothersName: canViewPii ? row.udMothersName || null : null,
+        fathersName: canViewPii ? row.udFathersName || null : null,
       },
 
       // Activity log

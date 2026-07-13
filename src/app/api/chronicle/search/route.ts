@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { searchChronicleClients } from "@/lib/chronicle-client";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 // ============================================================================
 // POST /api/chronicle/search — Search Chronicle clients (test/lookup helper)
@@ -18,6 +19,14 @@ const bodySchema = z.object({
 
 export const POST = async (req: NextRequest) => {
   try {
+    const guard = await requirePageAccess("chronicle");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const rawBody = await req.json().catch(() => null);
     const parsedBody = bodySchema.safeParse(rawBody);
     if (!parsedBody.success) {
