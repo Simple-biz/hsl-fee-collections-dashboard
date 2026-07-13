@@ -513,6 +513,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const thBase = `py-2.5 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap`;
   const tdBase = `py-2.5 px-3 text-[14px] whitespace-nowrap tabular-nums`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
+  const agentGroupBorder = dark ? "border-neutral-600" : "border-neutral-300";
   const rowHover  = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const miniInput = `w-12 h-6 px-1 text-center text-[13px] rounded border outline-none tabular-nums ${t.inputBg}`;
 
@@ -1056,7 +1057,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         )}
                       </tr>
                       {/* Fax Sent */}
-                      <tr className={`border-b ${rowBorder}`}>
+                      <tr className={`border-b-2 ${agentGroupBorder}`}>
                         <td className={`px-2 py-1.5 text-[12px] font-medium whitespace-nowrap ${dark ? "text-rose-400" : "text-rose-600"}`}>Fax Sent</td>
                         {entryDays.map((day) => (
                           <td key={day.date} className="px-1 py-1 text-center">
