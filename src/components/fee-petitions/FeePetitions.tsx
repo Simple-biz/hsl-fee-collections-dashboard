@@ -26,6 +26,7 @@ import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportF
 import { CompletedPetitions } from "./CompletedPetitions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { NoteField } from "@/components/shared/NoteField";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -1270,10 +1271,7 @@ export const FeePetitions = () => {
                         title={row.claimant}
                       >
                         <a
-                          // Same fallback CaseDetailSheet's MyCase button uses
-                          // — external_id isn't populated for every case, but
-                          // the case's own numeric id still resolves on MyCase.
-                          href={row.externalId || `https://rgdr.mycase.com/court_cases/${row.id}`}
+                          href={row.externalId || buildMyCaseUrl(row.id)}
                           target="_blank"
                           rel="noreferrer"
                           className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}

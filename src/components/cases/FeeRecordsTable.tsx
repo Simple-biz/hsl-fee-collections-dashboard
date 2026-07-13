@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { FeePaymentPanel } from "@/components/cases/FeePaymentPanel";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
 import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
@@ -1594,10 +1595,7 @@ export const FeeRecordsTable = ({
                           the frozen column onto Assigned during h-scroll. */}
                       <div className="flex flex-col gap-0.5 overflow-hidden">
                         <a
-                          // Same fallback CaseDetailSheet's MyCase button uses
-                          // — external_id isn't populated for every case, but
-                          // the case's own numeric id still resolves on MyCase.
-                          href={c.externalId || `https://rgdr.mycase.com/court_cases/${c.id}`}
+                          href={c.externalId || buildMyCaseUrl(c.id)}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}

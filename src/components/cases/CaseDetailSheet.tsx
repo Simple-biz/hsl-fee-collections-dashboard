@@ -28,6 +28,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { themeClasses } from "@/lib/theme-classes";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { MyCaseDocumentsDialog } from "@/components/cases/MyCaseDocumentsDialog";
 import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import {
@@ -639,7 +640,7 @@ export default function CaseDetailSheet({
                     <p className={`${val} text-indigo-500`}>#{data.id}</p>
                   </div>
                   <a
-                    href={data.externalId || `https://rgdr.mycase.com/court_cases/${data.id}`}
+                    href={data.externalId || buildMyCaseUrl(data.id)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-bold uppercase transition-colors ${dark ? "bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
