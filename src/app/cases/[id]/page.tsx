@@ -786,7 +786,7 @@ const CaseDetailPage = () => {
       {feeModalOpen && caseData && (
         <FeeEditModal
           dark={dark}
-          caseId={id}
+          caseId={caseData.id}
           t16Retro={caseData.t16Retro}
           t16FeeDue={caseData.t16FeeDue}
           t16FeeReceived={caseData.t16FeeReceived}

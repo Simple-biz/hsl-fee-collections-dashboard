@@ -12,7 +12,7 @@ const toStrFeeDue = (v: number | null) => ((v ?? 0) > 0 ? String(v) : "");
 
 interface FeeEditModalProps {
   dark: boolean;
-  caseId: string;
+  caseId: number;
   t16Retro: number;
   t16FeeDue: number | null;
   t16FeeReceived: number;
