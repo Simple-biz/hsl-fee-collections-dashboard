@@ -446,17 +446,20 @@ export const PATCH = async (
         externalId: "external_id",
       };
 
+      // Column names come only from the fixed map above (never from request
+      // data) — sql.raw() only ever sees a trusted column name here. Values
+      // are bound as query parameters via the sql`` tag rather than
+      // string-concatenated, so no manual escaping is needed.
       const updates = Object.entries(caseFields)
         .filter(([k]) => CASE_FIELD_MAP[k])
         .map(([k, v]) => {
-          const col = CASE_FIELD_MAP[k];
-          if (v === null) return `${col} = NULL`;
-          return `${col} = '${String(v).replace(/'/g, "''")}'`;
+          const col = sql.raw(CASE_FIELD_MAP[k]);
+          return v === null ? sql`${col} = NULL` : sql`${col} = ${v}`;
         });
 
       if (updates.length > 0) {
         await db.execute(
-          sql`UPDATE cases SET ${sql.raw(updates.join(", "))}, updated_at = NOW() WHERE client_id = ${caseId}`,
+          sql`UPDATE cases SET ${sql.join(updates, sql`, `)}, updated_at = NOW() WHERE client_id = ${caseId}`,
         );
       }
     }
@@ -495,22 +498,21 @@ export const PATCH = async (
         markedOverpaid: "marked_overpaid",
       };
 
+      // Column names come only from the fixed map above; values are bound as
+      // query parameters via the sql`` tag rather than string-concatenated.
       const updates = Object.entries(feeFields)
         .filter(([k]) => FEE_FIELD_MAP[k])
         .map(([k, v]) => {
-          const col = FEE_FIELD_MAP[k];
-          if (v === null) return `${col} = NULL`;
-          if (typeof v === "boolean") return `${col} = ${v}`;
-          if (typeof v === "number") return `${col} = ${v}`;
-          return `${col} = '${String(v).replace(/'/g, "''")}'`;
+          const col = sql.raw(FEE_FIELD_MAP[k]);
+          return v === null ? sql`${col} = NULL` : sql`${col} = ${v}`;
         });
 
       // When isClosed flips, also stamp/clear closed_at so the fees-closed
       // page can show "closed on …" without the client having to track time.
       if (feeFields.isClosed === true) {
-        updates.push("closed_at = NOW()");
+        updates.push(sql`closed_at = NOW()`);
       } else if (feeFields.isClosed === false) {
-        updates.push("closed_at = NULL");
+        updates.push(sql`closed_at = NULL`);
       }
 
       // Explicitly (re-)marking a case overpaid also clears any earlier
@@ -519,7 +521,7 @@ export const PATCH = async (
       // invisible there even after this deliberate re-add, since the page's
       // query excludes on overpaid_dismissed_at regardless of marked_overpaid.
       if (feeFields.markedOverpaid === true) {
-        updates.push("overpaid_dismissed_at = NULL");
+        updates.push(sql`overpaid_dismissed_at = NULL`);
       }
 
       // Setting Remarks to "FEE PETITION APPROVED" also checks the Fee
@@ -548,7 +550,7 @@ export const PATCH = async (
         // and a real footgun for closed ones (the trigger skips closed
         // records entirely, so a stray write here would actually persist).
         await db.execute(sql`
-          UPDATE fee_records SET ${sql.raw(updates.join(", "))}, updated_at = NOW()
+          UPDATE fee_records SET ${sql.join(updates, sql`, `)}, updated_at = NOW()
           WHERE case_id = ${caseId}
         `);
       }
@@ -556,34 +558,26 @@ export const PATCH = async (
 
     // Update user_details fields if provided
     if (userDetailsFields && Object.keys(userDetailsFields).length > 0) {
-      const UD_FIELD_MAP: Record<string, string> = {
-        ssnLast4: "ssn_last4",
-        chronicleId: "chronicle_id",
-      };
+      const UD_FIELD_MAP = {
+        ssnLast4: "ssnLast4",
+        chronicleId: "chronicleId",
+      } as const;
 
-      const colDefs: { col: string; sqlVal: string }[] = [];
+      const udUpdates: Partial<typeof userDetails.$inferInsert> = {};
       for (const [k, v] of Object.entries(userDetailsFields)) {
-        const col = UD_FIELD_MAP[k];
+        const col = UD_FIELD_MAP[k as keyof typeof UD_FIELD_MAP];
         if (!col) continue;
-        let sqlVal: string;
-        if (v === null) sqlVal = "NULL";
-        else if (typeof v === "number") sqlVal = String(v);
-        else sqlVal = `'${String(v).replace(/'/g, "''")}'`;
-        colDefs.push({ col, sqlVal });
+        (udUpdates as Record<string, string | number | boolean | null>)[col] = v;
       }
 
-      if (colDefs.length > 0) {
-        const insertCols = colDefs.map((d) => d.col).join(", ");
-        const insertVals = colDefs.map((d) => d.sqlVal).join(", ");
-        const conflictSet = colDefs.map((d) => `${d.col} = ${d.sqlVal}`).join(", ");
-        await db.execute(
-          sql`
-            INSERT INTO user_details (case_id, ${sql.raw(insertCols)}, updated_at)
-            VALUES (${caseId}, ${sql.raw(insertVals)}, NOW())
-            ON CONFLICT (case_id) DO UPDATE
-              SET ${sql.raw(conflictSet)}, updated_at = NOW()
-          `,
-        );
+      if (Object.keys(udUpdates).length > 0) {
+        await db
+          .insert(userDetails)
+          .values({ caseId, ...udUpdates })
+          .onConflictDoUpdate({
+            target: userDetails.caseId,
+            set: { ...udUpdates, updatedAt: new Date() },
+          });
       }
     }
 

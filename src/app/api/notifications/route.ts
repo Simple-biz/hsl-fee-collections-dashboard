@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
@@ -9,6 +10,20 @@ import { namesMatch } from "@/lib/formatters";
 // including leads/admins, sees these (unlike the other types, which are
 // team-wide operational alerts visible to anyone with page access).
 const AGENT_ONLY_TYPES = new Set(["follow_up_due"]);
+
+const postBodySchema = z.object({
+  type: z.enum(["case_aging", "fee_payment", "call_target_missed", "case_assigned", "follow_up_due"]),
+  severity: z.enum(["info", "warning", "critical"]).optional(),
+  title: z.string().trim().min(1).max(300),
+  message: z.string().trim().min(1),
+  caseId: z.number().int().nullable().optional(),
+  agentName: z.string().trim().max(100).nullable().optional(),
+});
+
+const patchBodySchema = z.union([
+  z.object({ markAllRead: z.literal(true) }),
+  z.object({ ids: z.array(z.string()).min(1) }),
+]);
 
 // ============================================================================
 // GET /api/notifications
@@ -96,15 +111,19 @@ export const GET = async (req: NextRequest) => {
 // ============================================================================
 export const POST = async (req: NextRequest) => {
   try {
-    const body = await req.json();
-    const { type, severity, title, message, caseId, agentName } = body;
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
 
-    if (!type || !title || !message) {
+    const parsedBody = postBodySchema.safeParse(await req.json());
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { error: "type, title, and message are required" },
-        { status: 400 },
+        { error: "Invalid request body", details: parsedBody.error.flatten() },
+        { status: 422 },
       );
     }
+    const { type, severity, title, message, caseId, agentName } = parsedBody.data;
 
     const [row] = await db
       .insert(notifications)
@@ -134,9 +153,21 @@ export const POST = async (req: NextRequest) => {
 // ============================================================================
 export const PATCH = async (req: NextRequest) => {
   try {
-    const body = await req.json();
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
 
-    if (body.markAllRead) {
+    const parsedBody = patchBodySchema.safeParse(await req.json());
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: "Invalid request body", details: parsedBody.error.flatten() },
+        { status: 422 },
+      );
+    }
+    const body = parsedBody.data;
+
+    if ("markAllRead" in body) {
       await db
         .update(notifications)
         .set({ isRead: true, readAt: new Date() })
@@ -145,19 +176,12 @@ export const PATCH = async (req: NextRequest) => {
       return NextResponse.json({ status: "ok", message: "All marked as read" });
     }
 
-    if (body.ids && Array.isArray(body.ids) && body.ids.length > 0) {
-      await db
-        .update(notifications)
-        .set({ isRead: true, readAt: new Date() })
-        .where(inArray(notifications.id, body.ids));
+    await db
+      .update(notifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(inArray(notifications.id, body.ids));
 
-      return NextResponse.json({ status: "ok", count: body.ids.length });
-    }
-
-    return NextResponse.json(
-      { error: "ids or markAllRead required" },
-      { status: 400 },
-    );
+    return NextResponse.json({ status: "ok", count: body.ids.length });
   } catch (error) {
     console.error("PATCH /api/notifications error:", error);
     return NextResponse.json(

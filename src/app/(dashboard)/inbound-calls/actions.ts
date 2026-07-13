@@ -1,5 +1,6 @@
 "use server";
 
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
 import { parseBool, parseDate } from "@/lib/import/csv-parser";
@@ -19,6 +20,16 @@ function getMondayOf(dateStr: string): string {
 export async function bulkImportInboundCalls(
   rawRows: Record<string, string>[],
 ): Promise<ImportResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return {
+      imported: 0,
+      failed: 0,
+      rowErrors: [],
+      error: "You must be signed in to import inbound calls.",
+    };
+  }
+
   let imported = 0;
   const rowErrors: ImportResult["rowErrors"] = [];
 

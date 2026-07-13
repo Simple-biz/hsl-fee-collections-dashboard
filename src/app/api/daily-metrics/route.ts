@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -6,6 +7,19 @@ import { dailyMetrics } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { sessionHasCapability } from "@/lib/auth-helpers";
 import { namesMatch } from "@/lib/formatters";
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const metricCountSchema = z.number().int().min(0).optional();
+const metricEntrySchema = z.object({
+  agent: z.string().trim().min(1),
+  date: z.string().regex(DATE_RE, "Invalid date (expected YYYY-MM-DD)"),
+  ssaCalls: metricCountSchema,
+  clientCallsIb: metricCountSchema,
+  clientCallsOb: metricCountSchema,
+  winSheetsCreated: metricCountSchema,
+  faxSent: metricCountSchema,
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
 
 // Members can only log their own calls — agent_name is matched against the
 // session's display name (team_members.name mirrors users.name for real
@@ -141,10 +155,14 @@ export const POST = async (req: NextRequest) => {
     if (body.entries && Array.isArray(body.entries)) {
       const results = [];
       let skipped = 0;
-      for (const entry of body.entries) {
+      for (const rawEntry of body.entries) {
+        const parsedEntry = metricEntrySchema.safeParse(rawEntry);
+        if (!parsedEntry.success) {
+          skipped++;
+          continue;
+        }
         const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } =
-          entry;
-        if (!agent || typeof agent !== "string" || !date) continue;
+          parsedEntry.data;
         if (!canWriteAgent(session, agent)) {
           skipped++;
           continue;
@@ -181,11 +199,18 @@ export const POST = async (req: NextRequest) => {
     }
 
     // Single mode
-    const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } = body;
-
-    if (!agent || typeof agent !== "string") {
-      return NextResponse.json({ error: "agent is required" }, { status: 400 });
+    const parsedSingle = metricEntrySchema
+      .extend({ date: z.string().regex(DATE_RE, "Invalid date (expected YYYY-MM-DD)").optional() })
+      .safeParse(body);
+    if (!parsedSingle.success) {
+      return NextResponse.json(
+        { error: "Invalid request body", details: parsedSingle.error.flatten() },
+        { status: 422 },
+      );
     }
+    const { agent, date, ssaCalls, clientCallsIb, clientCallsOb, winSheetsCreated, faxSent, notes } =
+      parsedSingle.data;
+
     if (!canWriteAgent(session, agent)) {
       return NextResponse.json(
         { error: "You can only log your own calls." },
