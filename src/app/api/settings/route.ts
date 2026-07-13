@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { appSettings, feeCapHistory } from "@/lib/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth-helpers";
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const settingsValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+const feeCapBodySchema = z.object({
+  effectiveDate: z.string().regex(DATE_RE, "Invalid date (expected YYYY-MM-DD)"),
+  capAmount: z
+    .union([z.string(), z.number()])
+    .transform((v) => Number(v))
+    .refine((v) => Number.isFinite(v) && v > 0, "capAmount must be a positive number"),
+  notes: z.string().trim().max(200).nullable().optional(),
+});
 
 // ============================================================================
 // GET /api/settings
@@ -77,7 +89,14 @@ export const PATCH = async (req: NextRequest) => {
 
     // Update settings
     if (body.settings && typeof body.settings === "object") {
-      const entries = Object.entries(body.settings) as [string, string][];
+      const parsedSettings = z.record(z.string(), settingsValueSchema).safeParse(body.settings);
+      if (!parsedSettings.success) {
+        return NextResponse.json(
+          { error: "Invalid settings values", details: parsedSettings.error.flatten() },
+          { status: 422 },
+        );
+      }
+      const entries = Object.entries(parsedSettings.data);
       for (const [key, value] of entries) {
         await db
           .update(appSettings)
@@ -89,13 +108,14 @@ export const PATCH = async (req: NextRequest) => {
 
     // Add fee cap
     if (body.feeCap) {
-      const { effectiveDate, capAmount, notes } = body.feeCap;
-      if (!effectiveDate || !capAmount) {
+      const parsedFeeCap = feeCapBodySchema.safeParse(body.feeCap);
+      if (!parsedFeeCap.success) {
         return NextResponse.json(
-          { error: "effectiveDate and capAmount required" },
-          { status: 400 },
+          { error: "Invalid fee cap", details: parsedFeeCap.error.flatten() },
+          { status: 422 },
         );
       }
+      const { effectiveDate, capAmount, notes } = parsedFeeCap.data;
       const [row] = await db
         .insert(feeCapHistory)
         .values({
@@ -116,10 +136,14 @@ export const PATCH = async (req: NextRequest) => {
 
     // Delete fee cap
     if (body.deleteFeeCap) {
+      const parsedId = z.coerce.number().int().positive().safeParse(body.deleteFeeCap);
+      if (!parsedId.success) {
+        return NextResponse.json({ error: "Invalid deleteFeeCap id" }, { status: 422 });
+      }
       await db
         .delete(feeCapHistory)
-        .where(eq(feeCapHistory.id, body.deleteFeeCap));
-      return NextResponse.json({ status: "ok", deleted: body.deleteFeeCap });
+        .where(eq(feeCapHistory.id, parsedId.data));
+      return NextResponse.json({ status: "ok", deleted: parsedId.data });
     }
 
     return NextResponse.json(
