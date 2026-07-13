@@ -26,6 +26,7 @@ import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportF
 import { CompletedPetitions } from "./CompletedPetitions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { NoteField } from "@/components/shared/NoteField";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -1269,19 +1270,15 @@ export const FeePetitions = () => {
                         className={`${tdBase} ${t.text} font-semibold w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
-                        {row.externalId ? (
-                          <a
-                            href={row.externalId}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                          >
-                            <span className="truncate">{row.claimant}</span>
-                            <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
-                          </a>
-                        ) : (
-                          <span className="truncate block">{row.claimant}</span>
-                        )}
+                        <a
+                          href={row.externalId || buildMyCaseUrl(row.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                        >
+                          <span className="truncate">{row.claimant}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+                        </a>
                         {row.updatedAt && (
                           <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                             Updated {formatRelativeDate(row.updatedAt)}
