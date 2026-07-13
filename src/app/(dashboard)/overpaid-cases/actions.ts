@@ -25,6 +25,8 @@ export async function upsertOverpaidCase(input: {
   fields: Updates;
 }): Promise<Result<{ data: typeof overpaidCases.$inferSelect }>> {
   try {
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) return { ok: false, error: "You don't have permission to edit overpaid cases." };
     if (!Number.isFinite(input.caseId)) {
       return { ok: false, error: "Invalid case ID" };
     }
@@ -79,6 +81,8 @@ export async function bulkMarkCleared(input: {
   caseIds: number[];
 }): Promise<Result> {
   try {
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) return { ok: false, error: "You don't have permission to clear checks." };
     if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
@@ -101,6 +105,8 @@ export async function bulkRestoreCleared(input: {
   caseIds: number[];
 }): Promise<Result> {
   try {
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) return { ok: false, error: "You don't have permission to restore checks." };
     if (!input.caseIds.length) return { ok: false, error: "No cases to restore" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
