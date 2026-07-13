@@ -816,7 +816,6 @@ export const FeeRecordsTable = ({
       }
       const patch: Partial<CaseRow> = {
         externalId: d.externalId ?? null,
-        chronicleId: d.userDetails?.chronicleId ?? null,
         assigned: d.assigned || "—",
         level: d.level || "—",
         claim: d.claim || "—",
