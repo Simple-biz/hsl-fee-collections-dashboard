@@ -816,7 +816,6 @@ export const FeeRecordsTable = ({
       }
       const patch: Partial<CaseRow> = {
         externalId: d.externalId ?? null,
-        chronicleId: d.userDetails?.chronicleId ?? null,
         assigned: d.assigned || "—",
         level: d.level || "—",
         claim: d.claim || "—",
@@ -1268,7 +1267,7 @@ export const FeeRecordsTable = ({
                   className={`${thBase} ${t.textSub} text-left ${stickyGroup3}`}
                 />
                 <th
-                  colSpan={canSeeLeaderNotes ? 7 : 6}
+                  colSpan={canSeeLeaderNotes ? 9 : 8}
                   aria-hidden="true"
                   className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
                 />
@@ -1331,7 +1330,7 @@ export const FeeRecordsTable = ({
                   Totals
                 </th>
                 <th
-                  colSpan={isClosedMode ? 5 : 6}
+                  colSpan={isClosedMode ? 3 : 4}
                   className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${t.textSub}`}
                 >
                   Workflow
@@ -1399,6 +1398,12 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left`}>Win Sheet Status</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Win Sheet
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>
+                  Approved By
+                </th>
+                <th className={`${thBase} ${t.textSub} text-left`}>
+                  Remarks
                 </th>
                 {canSeeLeaderNotes && (
                   <th className={`${thBase} ${t.textSub} text-center`}>Leader Notes</th>
@@ -1506,12 +1511,6 @@ export const FeeRecordsTable = ({
 
                 {/* Workflow */}
                 <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>
-                  Approved By
-                </th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
-                  Remarks
-                </th>
-                <th className={`${thBase} ${t.textSub} text-left`}>
                   Next Follow-Up
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
@@ -1588,7 +1587,7 @@ export const FeeRecordsTable = ({
                       </td>
                     )}
                     {/* Case Info — first two columns are frozen.
-                        Name deep-links to MyCase (external_id); a Chronicle
+                        Name deep-links to MyCase (external_id); a Win Sheet
                         link and the long-form claim label sit on a sub-line. */}
                     <td className={`${tdBase} ${stickyTd1}`} title={c.name}>
                       {/* overflow-hidden keeps the sub-line from spilling past
@@ -1618,15 +1617,15 @@ export const FeeRecordsTable = ({
                               </span>
                             ) : null;
                           })()}
-                          {c.chronicleId != null && (
+                          {c.winSheetLink && (
                             <a
-                              href={`https://app.chroniclelegal.com/dashboard/clients/${c.chronicleId}`}
+                              href={c.winSheetLink}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                               className={`inline-flex items-center gap-0.5 hover:underline shrink-0 ${dark ? "text-blue-400" : "text-blue-600"}`}
                             >
-                              Chronicle
+                              Win Sheet
                               <ExternalLink
                                 className="h-2.5 w-2.5"
                                 aria-hidden="true"
@@ -2039,6 +2038,108 @@ export const FeeRecordsTable = ({
                       )}
                     </td>
 
+                    {/* Approved By */}
+                    <td
+                      className={`${tdBase} ${t.textSub} ${groupBorder}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {mode === "closed" || !canFinalize ? (
+                        cellValue(c, "approvedBy") || "—"
+                      ) : (
+                        <Listbox
+                          value={cellValue(c, "approvedBy")}
+                          onChange={(v) =>
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "approvedBy",
+                              "approvedBy",
+                              "Approved By",
+                              v,
+                            )
+                          }
+                          dark={dark}
+                          t={t}
+                          aria-label="Approved By"
+                          title={
+                            approvedByOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                          options={buildListboxOptions(
+                            approvedByOptions,
+                            cellValue(c, "approvedBy"),
+                            undefined,
+                            (name) => {
+                              const leader = leaders.find((l) => l.name === name);
+                              return leader ? teamRowTint(leader.team, dark) : undefined;
+                            },
+                          )}
+                        />
+                      )}
+                    </td>
+                    {/* Remarks */}
+                    <td
+                      className={`${tdBase} ${t.textSub}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {caseStatusEditId === c.id ? (
+                        <select
+                          autoFocus
+                          value={cellValue(c, "caseStatus")}
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={() => setCaseStatusEditId(null)}
+                          onChange={(e) => {
+                            handleVarcharChange(
+                              c,
+                              "fee",
+                              "caseStatus",
+                              "caseStatus",
+                              "Remarks",
+                              e.target.value,
+                            );
+                            setCaseStatusEditId(null);
+                          }}
+                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
+                          title={
+                            caseStatusOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                        >
+                          <option value="">— Select —</option>
+                          {(() => {
+                            const v = cellValue(c, "caseStatus");
+                            return (
+                              v &&
+                              !caseStatusOptions.some((o) => o.name === v) && (
+                                <option value={v}>{v}</option>
+                              )
+                            );
+                          })()}
+                          {caseStatusOptions
+                            .filter(
+                              (o) =>
+                                o.isActive ||
+                                o.name === cellValue(c, "caseStatus"),
+                            )
+                            .map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setCaseStatusEditId(c.id); }}
+                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                          aria-label={`Edit Remarks: ${cellValue(c, "caseStatus") || "not set"}`}
+                        >
+                          <CaseStatusBadge value={cellValue(c, "caseStatus")} dark={dark} />
+                        </button>
+                      )}
+                    </td>
+
                     {/* Leader Notes — separate, quieter thread; column
                         (header + cell) only renders for leaderNotes.access,
                         so members never see it exists. Small icon only —
@@ -2314,109 +2415,9 @@ export const FeeRecordsTable = ({
                     </td>
 
                     {/* Workflow */}
-                    <td
-                      className={`${tdBase} ${t.textSub} ${groupBorder}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {mode === "closed" || !canFinalize ? (
-                        cellValue(c, "approvedBy") || "—"
-                      ) : (
-                        <Listbox
-                          value={cellValue(c, "approvedBy")}
-                          onChange={(v) =>
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "approvedBy",
-                              "approvedBy",
-                              "Approved By",
-                              v,
-                            )
-                          }
-                          dark={dark}
-                          t={t}
-                          aria-label="Approved By"
-                          title={
-                            approvedByOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                          options={buildListboxOptions(
-                            approvedByOptions,
-                            cellValue(c, "approvedBy"),
-                            undefined,
-                            (name) => {
-                              const leader = leaders.find((l) => l.name === name);
-                              return leader ? teamRowTint(leader.team, dark) : undefined;
-                            },
-                          )}
-                        />
-                      )}
-                    </td>
-                    {/* Remarks */}
-                    <td
-                      className={`${tdBase} ${t.textSub}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {caseStatusEditId === c.id ? (
-                        <select
-                          autoFocus
-                          value={cellValue(c, "caseStatus")}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => setCaseStatusEditId(null)}
-                          onChange={(e) => {
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "caseStatus",
-                              "caseStatus",
-                              "Remarks",
-                              e.target.value,
-                            );
-                            setCaseStatusEditId(null);
-                          }}
-                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            caseStatusOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "caseStatus");
-                            return (
-                              v &&
-                              !caseStatusOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {caseStatusOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "caseStatus"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setCaseStatusEditId(c.id); }}
-                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                          aria-label={`Edit Remarks: ${cellValue(c, "caseStatus") || "not set"}`}
-                        >
-                          <CaseStatusBadge value={cellValue(c, "caseStatus")} dark={dark} />
-                        </button>
-                      )}
-                    </td>
                     {/* Next Follow-Up */}
                     <td
-                      className={`${tdBase} ${t.textSub}`}
+                      className={`${tdBase} ${t.textSub} ${groupBorder}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
