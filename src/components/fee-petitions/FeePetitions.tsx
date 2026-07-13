@@ -1269,19 +1269,18 @@ export const FeePetitions = () => {
                         className={`${tdBase} ${t.text} font-semibold w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
-                        {row.externalId ? (
-                          <a
-                            href={row.externalId}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
-                          >
-                            <span className="truncate">{row.claimant}</span>
-                            <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
-                          </a>
-                        ) : (
-                          <span className="truncate block">{row.claimant}</span>
-                        )}
+                        <a
+                          // Same fallback CaseDetailSheet's MyCase button uses
+                          // — external_id isn't populated for every case, but
+                          // the case's own numeric id still resolves on MyCase.
+                          href={row.externalId || `https://rgdr.mycase.com/court_cases/${row.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                        >
+                          <span className="truncate">{row.claimant}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+                        </a>
                         {row.updatedAt && (
                           <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                             Updated {formatRelativeDate(row.updatedAt)}
