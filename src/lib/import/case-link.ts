@@ -22,6 +22,17 @@ export const extractMyCaseId = (url: string | null | undefined): number | null =
   return m ? Number(m[1]) : null;
 };
 
+// This firm's MyCase tenant — confirmed working 2026-07-14.
+const MYCASE_BASE_URL = "https://rgdr.mycase.com/court_cases/";
+
+/**
+ * Build a MyCase court_cases URL from a case's own numeric id. Used as a
+ * fallback wherever a case's stored `external_id` link hasn't been
+ * populated by a sync — the case's own id still resolves on MyCase.
+ */
+export const buildMyCaseUrl = (id: number | string): string =>
+  `${MYCASE_BASE_URL}${id}`;
+
 // Chronicle client URLs look like
 //   https://app.chroniclelegal.com/dashboard/clients/12345
 // The path segment before /clients/ can vary, so allow any prefix.

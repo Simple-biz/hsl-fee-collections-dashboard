@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { FeePaymentPanel } from "@/components/cases/FeePaymentPanel";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
 import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
@@ -1593,25 +1594,19 @@ export const FeeRecordsTable = ({
                       {/* overflow-hidden keeps the sub-line from spilling past
                           the frozen column onto Assigned during h-scroll. */}
                       <div className="flex flex-col gap-0.5 overflow-hidden">
-                        {c.externalId ? (
-                          <a
-                            href={c.externalId}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className={`inline-flex items-center gap-1 max-w-full ${t.text} font-semibold hover:underline`}
-                          >
-                            <span className="truncate">{c.name}</span>
-                            <ExternalLink
-                              className="h-3 w-3 shrink-0 opacity-50"
-                              aria-hidden="true"
-                            />
-                          </a>
-                        ) : (
-                          <span className={`${t.text} font-semibold truncate`}>
-                            {c.name}
-                          </span>
-                        )}
+                        <a
+                          href={c.externalId || buildMyCaseUrl(c.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className={`inline-flex items-center gap-1 max-w-full ${t.text} font-semibold hover:underline`}
+                        >
+                          <span className="truncate">{c.name}</span>
+                          <ExternalLink
+                            className="h-3 w-3 shrink-0 opacity-50"
+                            aria-hidden="true"
+                          />
+                        </a>
                         <div className="flex items-center gap-2 text-[13px] leading-none min-w-0">
                           {(() => {
                             // Mirror the Claim column's optimistic value so the
