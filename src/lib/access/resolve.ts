@@ -21,7 +21,9 @@ export interface AccessOverrides {
   capabilities?: CapabilityOverrides;
 }
 
-const isAdminRole = (role: string | null | undefined): boolean =>
+// Local, edge-safe copy of the same check as auth-helpers.ts's isAdminRole —
+// can't import that here since its file is marked "server-only".
+const roleIsAdmin = (role: string | null | undefined): boolean =>
   role === "admin" || role === "system_admin";
 
 // These pages have no partial-access model — their route (and API, for
@@ -43,7 +45,7 @@ export const effectivePages = (
     if (granted) set.add(key as PageKey);
     else set.delete(key as PageKey);
   }
-  if (!isAdminRole(role)) {
+  if (!roleIsAdmin(role)) {
     for (const key of ADMIN_ONLY_PAGES) set.delete(key);
   }
   return [...set];
