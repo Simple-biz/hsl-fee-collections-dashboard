@@ -32,6 +32,85 @@ const resolveActiveFeeType = (
   return "t16";
 };
 
+// Shared by the list query and the single-row refresh query below, so both
+// stay in lockstep — a per-row refresh must return the exact same shape the
+// list endpoint would have given that row.
+const ROW_COLUMNS = {
+  clientId: cases.clientId,
+  firstName: cases.firstName,
+  lastName: cases.lastName,
+  externalId: cases.externalId,
+  approvalDate: cases.approvalDate,
+  claimTypeLabel: cases.claimTypeLabel,
+  totalFeesExpected: feeRecords.totalFeesExpected,
+  totalFeesPaid: feeRecords.totalFeesPaid,
+  t16Retro: feeRecords.t16Retro,
+  t2Retro: feeRecords.t2Retro,
+  auxRetro: feeRecords.auxRetro,
+  assignedTo: feePetitions.assignedTo,
+  noa: feePetitions.noa,
+  timeDelineation: feePetitions.timeDelineation,
+  feePetitionDoc: feePetitions.feePetitionDoc,
+  ltrToClmt: feePetitions.ltrToClmt,
+  ltrToClmtWithSignature: feePetitions.ltrToClmtWithSignature,
+  ltrToAlj: feePetitions.ltrToAlj,
+  faxConfFeePet: feePetitions.faxConfFeePet,
+  feePetitionApproved: feePetitions.feePetitionApproved,
+  updateNote: feePetitions.updateNote,
+  updatedAt: feePetitions.updatedAt,
+};
+
+type FeePetitionQueryRow = {
+  clientId: number;
+  firstName: string | null;
+  lastName: string | null;
+  externalId: string | null;
+  approvalDate: string | null;
+  claimTypeLabel: string | null;
+  totalFeesExpected: string | number | null;
+  totalFeesPaid: string | number | null;
+  t16Retro: string | number | null;
+  t2Retro: string | number | null;
+  auxRetro: string | number | null;
+  assignedTo: string | null;
+  noa: boolean | null;
+  timeDelineation: boolean | null;
+  feePetitionDoc: boolean | null;
+  ltrToClmt: boolean | null;
+  ltrToClmtWithSignature: boolean | null;
+  ltrToAlj: boolean | null;
+  faxConfFeePet: boolean | null;
+  feePetitionApproved: boolean | null;
+  updateNote: string | null;
+  updatedAt: Date | null;
+};
+
+const toFeePetitionRow = (r: FeePetitionQueryRow) => ({
+  id: r.clientId,
+  claimant: `${r.lastName}, ${r.firstName}`,
+  externalId: r.externalId ?? null,
+  approvalDate: r.approvalDate ?? null,
+  updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
+  feeAmount: r.totalFeesExpected != null ? Number(r.totalFeesExpected) : null,
+  feesReceived: r.totalFeesPaid != null ? Number(r.totalFeesPaid) : null,
+  activeFeeType: resolveActiveFeeType(
+    r.claimTypeLabel,
+    Number(r.t16Retro) || 0,
+    Number(r.t2Retro) || 0,
+    Number(r.auxRetro) || 0,
+  ),
+  assignedTo: r.assignedTo ?? null,
+  noa: r.noa ?? false,
+  timeDelineation: r.timeDelineation ?? false,
+  feePetitionDoc: r.feePetitionDoc ?? false,
+  ltrToClmt: r.ltrToClmt ?? false,
+  ltrToClmtWithSignature: r.ltrToClmtWithSignature ?? false,
+  ltrToAlj: r.ltrToAlj ?? false,
+  faxConfFeePet: r.faxConfFeePet ?? false,
+  feePetitionApproved: r.feePetitionApproved ?? false,
+  updateNote: r.updateNote ?? "",
+});
+
 const getMissingClause = (key: string | null) => {
   switch (key) {
     case "timeDelineation": return sql`AND COALESCE(${feePetitions.timeDelineation}, false) = false`;
@@ -57,6 +136,29 @@ export const GET = async (req: NextRequest) => {
     }
 
     const { searchParams } = new URL(req.url);
+
+    // Per-row refresh (Fee Petitions table) — bypasses every list filter
+    // and pagination, since the caller already knows which row it wants
+    // and just needs its current server state after an edit.
+    const caseIdParam = searchParams.get("caseId");
+    if (caseIdParam) {
+      const caseId = parseInt(caseIdParam, 10);
+      if (!Number.isFinite(caseId)) {
+        return NextResponse.json({ error: "Invalid caseId" }, { status: 400 });
+      }
+      const [r] = await db
+        .select(ROW_COLUMNS)
+        .from(cases)
+        .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
+        .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
+        .where(eq(cases.clientId, caseId))
+        .limit(1);
+      if (!r) {
+        return NextResponse.json({ error: "Case not found" }, { status: 404 });
+      }
+      return NextResponse.json({ data: [toFeePetitionRow(r)] });
+    }
+
     const search = searchParams.get("search");
     const status = searchParams.get("status"); // "complete" | "incomplete"
     const touched = searchParams.get("touched"); // "none" = no fee_petitions row yet
@@ -201,30 +303,7 @@ export const GET = async (req: NextRequest) => {
             : sql`${cases.approvalDate} ${dir} NULLS LAST`;
 
     const rows = await db
-      .select({
-        clientId: cases.clientId,
-        firstName: cases.firstName,
-        lastName: cases.lastName,
-        externalId: cases.externalId,
-        approvalDate: cases.approvalDate,
-        claimTypeLabel: cases.claimTypeLabel,
-        totalFeesExpected: feeRecords.totalFeesExpected,
-        totalFeesPaid: feeRecords.totalFeesPaid,
-        t16Retro: feeRecords.t16Retro,
-        t2Retro: feeRecords.t2Retro,
-        auxRetro: feeRecords.auxRetro,
-        assignedTo: feePetitions.assignedTo,
-        noa: feePetitions.noa,
-        timeDelineation: feePetitions.timeDelineation,
-        feePetitionDoc: feePetitions.feePetitionDoc,
-        ltrToClmt: feePetitions.ltrToClmt,
-        ltrToClmtWithSignature: feePetitions.ltrToClmtWithSignature,
-        ltrToAlj: feePetitions.ltrToAlj,
-        faxConfFeePet: feePetitions.faxConfFeePet,
-        feePetitionApproved: feePetitions.feePetitionApproved,
-        updateNote: feePetitions.updateNote,
-        updatedAt: feePetitions.updatedAt,
-      })
+      .select(ROW_COLUMNS)
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -233,31 +312,7 @@ export const GET = async (req: NextRequest) => {
       .limit(limit)
       .offset(offset);
 
-    const data = rows.map((r) => ({
-      id: r.clientId,
-      claimant: `${r.lastName}, ${r.firstName}`,
-      externalId: r.externalId ?? null,
-      approvalDate: r.approvalDate ?? null,
-      updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
-      feeAmount: r.totalFeesExpected != null ? Number(r.totalFeesExpected) : null,
-      feesReceived: r.totalFeesPaid != null ? Number(r.totalFeesPaid) : null,
-      activeFeeType: resolveActiveFeeType(
-        r.claimTypeLabel,
-        Number(r.t16Retro) || 0,
-        Number(r.t2Retro) || 0,
-        Number(r.auxRetro) || 0,
-      ),
-      assignedTo: r.assignedTo ?? null,
-      noa: r.noa ?? false,
-      timeDelineation: r.timeDelineation ?? false,
-      feePetitionDoc: r.feePetitionDoc ?? false,
-      ltrToClmt: r.ltrToClmt ?? false,
-      ltrToClmtWithSignature: r.ltrToClmtWithSignature ?? false,
-      ltrToAlj: r.ltrToAlj ?? false,
-      faxConfFeePet: r.faxConfFeePet ?? false,
-      feePetitionApproved: r.feePetitionApproved ?? false,
-      updateNote: r.updateNote ?? "",
-    }));
+    const data = rows.map(toFeePetitionRow);
 
     return NextResponse.json({
       data,
