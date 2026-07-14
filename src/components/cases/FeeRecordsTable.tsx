@@ -291,8 +291,8 @@ export const FeeRecordsTable = ({
   // columns down to a single read-only Fee Due glance, so staff working a
   // single claim type can't mistakenly enter Retro/Fee Due on the wrong one.
   // Session-only (not persisted), same as this table's other view toggles.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<"t16" | "t2" | "aux">>(new Set());
-  const toggleGroupCollapse = (group: "t16" | "t2" | "aux") => {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<"caseStatus" | "t16" | "t2" | "aux">>(new Set());
+  const toggleGroupCollapse = (group: "caseStatus" | "t16" | "t2" | "aux") => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
@@ -1285,7 +1285,28 @@ export const FeeRecordsTable = ({
                   className={`${thBase} ${t.textSub} text-left ${stickyGroup3}`}
                 />
                 <th
-                  colSpan={(isClosedMode ? 8 : 7) + (canSeeLeaderNotes ? 1 : 0)}
+                  colSpan={
+                    collapsedGroups.has("caseStatus")
+                      ? 1
+                      : (isClosedMode ? 6 : 5) + (canSeeLeaderNotes ? 1 : 0)
+                  }
+                  className={`${thBase} text-center ${groupBorder} ${stickyThRow1} ${dark ? "text-teal-400" : "text-teal-600"}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleGroupCollapse("caseStatus")}
+                    className="inline-flex items-center gap-1 cursor-pointer"
+                    aria-label={collapsedGroups.has("caseStatus") ? "Expand Case Status columns" : "Minimize Case Status columns"}
+                    title={collapsedGroups.has("caseStatus") ? "Expand Case Status columns" : "Minimize Case Status columns"}
+                  >
+                    Case Status
+                    {collapsedGroups.has("caseStatus")
+                      ? <Maximize2 className="h-3 w-3" aria-hidden="true" />
+                      : <Minimize2 className="h-3 w-3" aria-hidden="true" />}
+                  </button>
+                </th>
+                <th
+                  colSpan={2}
                   aria-hidden="true"
                   className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
                 />
@@ -1398,12 +1419,17 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left ${stickyTh3}`}>
                   PIF
                 </th>
-                {/* Fees Closed — Fees Closed page only now; closing from
-                    Master Fees is a batch action (see the selection pill). */}
+                {/* Case Status group — Level/Claim/Approval/Win Sheet Status/
+                    Win Sheet/Leader Notes (+ Fees Closed reopen on the Fees
+                    Closed page); collapses to one blank header cell. */}
+                {collapsedGroups.has("caseStatus") ? (
+                  <th aria-hidden="true" className={`${thBase} ${groupBorder}`} />
+                ) : (
+                  <>
                 {isClosedMode && (
-                  <th className={`${thBase} ${t.textSub} text-left`}>Fees Closed</th>
+                  <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>Fees Closed</th>
                 )}
-                <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
+                <th className={`${thBase} ${t.textSub} text-left ${isClosedMode ? "" : groupBorder}`}>Level</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
                 <th
                   aria-sort={ariaSortFor("date")}
@@ -1421,16 +1447,17 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Win Sheet
                 </th>
+                {canSeeLeaderNotes && (
+                  <th className={`${thBase} ${t.textSub} text-center`}>Leader Notes</th>
+                )}
+                  </>
+                )}
                 <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>
                   Approved By
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Remarks
                 </th>
-                {canSeeLeaderNotes && (
-                  <th className={`${thBase} ${t.textSub} text-center`}>Leader Notes</th>
-                )}
-
                 {/* T16 */}
                 {collapsedGroups.has("t16") ? (
                   <th className={`${thBase} ${t.textSub} text-right ${groupBorder}`}>
@@ -1753,12 +1780,19 @@ export const FeeRecordsTable = ({
                         <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
                       )}
                     </td>
+                    {/* Case Status group — Level/Claim/Approval/Win Sheet
+                        Status/Win Sheet/Leader Notes (+ Fees Closed reopen on
+                        the Fees Closed page); collapses to one blank cell. */}
+                    {collapsedGroups.has("caseStatus") ? (
+                      <td aria-hidden="true" className={`${tdBase} ${groupBorder}`} />
+                    ) : (
+                      <>
                     {/* Fees Closed — Fees Closed page only; checked, unchecking
                         opens the reopen dialog. Closing from Master Fees is a
                         batch action now (see the selection pill). */}
                     {isClosedMode && (
                       <td
-                        className={`${tdBase} text-center`}
+                        className={`${tdBase} text-center ${groupBorder}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -1773,7 +1807,7 @@ export const FeeRecordsTable = ({
                     )}
                     {/* Level — varchar; lives on the cases row. */}
                     <td
-                      className={`${tdBase}`}
+                      className={`${tdBase} ${isClosedMode ? "" : groupBorder}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Listbox
@@ -2051,6 +2085,38 @@ export const FeeRecordsTable = ({
                         </div>
                       )}
                     </td>
+                    {canSeeLeaderNotes && (
+                      <td
+                        className={`${tdBase} text-center`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLeaderNotesFor({ id: c.id, name: c.name });
+                          }}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
+                            c.leaderNotesCount > 0
+                              ? dark
+                                ? "bg-violet-900/40 text-violet-400 hover:bg-violet-900/60"
+                                : "bg-violet-50 text-violet-700 hover:bg-violet-100"
+                              : dark
+                                ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
+                                : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
+                          }`}
+                          title={
+                            c.leaderNotesCount > 0
+                              ? `View ${c.leaderNotesCount} leader note${c.leaderNotesCount === 1 ? "" : "s"}`
+                              : "No leader notes yet"
+                          }
+                        >
+                          <MessageSquare className="h-3 w-3" aria-hidden="true" />
+                          {c.leaderNotesCount}
+                        </button>
+                      </td>
+                    )}
+                      </>
+                    )}
 
                     {/* Approved By */}
                     <td
@@ -2153,41 +2219,6 @@ export const FeeRecordsTable = ({
                         </button>
                       )}
                     </td>
-
-                    {/* Leader Notes — separate, quieter thread; column
-                        (header + cell) only renders for leaderNotes.access,
-                        so members never see it exists. Small icon only —
-                        text shown in the modal on click, not inline. */}
-                    {canSeeLeaderNotes && (
-                      <td
-                        className={`${tdBase} text-center`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLeaderNotesFor({ id: c.id, name: c.name });
-                          }}
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
-                            c.leaderNotesCount > 0
-                              ? dark
-                                ? "bg-violet-900/40 text-violet-400 hover:bg-violet-900/60"
-                                : "bg-violet-50 text-violet-700 hover:bg-violet-100"
-                              : dark
-                                ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
-                                : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
-                          }`}
-                          title={
-                            c.leaderNotesCount > 0
-                              ? `View ${c.leaderNotesCount} leader note${c.leaderNotesCount === 1 ? "" : "s"}`
-                              : "No leader notes yet"
-                          }
-                        >
-                          <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                          {c.leaderNotesCount}
-                        </button>
-                      </td>
-                    )}
 
                     {/* T16 */}
                     {collapsedGroups.has("t16") ? (
