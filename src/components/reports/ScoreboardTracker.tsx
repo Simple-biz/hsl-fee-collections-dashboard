@@ -600,7 +600,21 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         )}
                       </td>
                       <td className={`${tdBase} ${t.textSub}`}>{c.assigned}</td>
-                      <td className={`${tdBase} ${t.textSub}`}>{c.level.replace(/_/g, " ")}</td>
+                      {(() => {
+                        const level = c.level.replace(/_/g, " ");
+                        const isFeePetition = level.trim().toUpperCase() === "FEE PETITION";
+                        return (
+                          <td
+                            className={`${tdBase} ${
+                              isFeePetition
+                                ? `font-semibold ${dark ? "text-red-400" : "text-red-600"}`
+                                : t.textSub
+                            }`}
+                          >
+                            {level}
+                          </td>
+                        );
+                      })()}
                       <td className={`${tdBase} ${t.textSub}`}>{c.claim}</td>
                       <td className={`${tdBase} ${t.textSub}`}>{fmtDate(c.approvalDate)}</td>
                       <td
