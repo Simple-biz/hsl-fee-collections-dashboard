@@ -1031,6 +1031,17 @@ export const FeePetitions = () => {
               ))}
             </select>
             <button
+              onClick={fetchPetitions}
+              disabled={loading}
+              aria-label="Refresh petitions"
+              className={`h-8 px-2.5 rounded-md border text-xs font-medium flex items-center gap-1 ${t.outlineBtn} disabled:opacity-40`}
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+            </button>
+            <button
               onClick={downloadCsv}
               disabled={exporting || total === 0}
               aria-label={selectedIds.size > 0 ? `Export ${selectedIds.size} selected to CSV` : "Export filtered to CSV"}
