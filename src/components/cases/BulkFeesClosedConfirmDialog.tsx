@@ -16,8 +16,18 @@ interface BulkFeesClosedConfirmDialogProps {
   open: boolean;
   caseIds: number[];
   onClose: () => void;
-  onClosed: () => void;
+  // Fired after a partial failure so the parent can refresh table data
+  // (some cases did close) without touching the row selection.
+  onProgress: () => void;
+  // Fired only once every targeted case has closed — parent clears the
+  // selection and refreshes.
+  onSuccess: () => void;
 }
+
+// Closing hundreds of selected cases at once shouldn't open hundreds of
+// simultaneous connections to the (serverless) DB — cap how many PATCHes
+// are in flight together, not how many cases can be closed in one go.
+const CONCURRENCY = 8;
 
 // Closes each selected case through the same PATCH the single-row Fees
 // Closed checkbox used, so permission checks, the closed_at stamp, and
@@ -38,44 +48,79 @@ const closeSingleCase = async (caseId: number, signal: AbortSignal) => {
   }
 };
 
+// Runs the closes CONCURRENCY at a time and returns the ids that failed.
+const closeCasesThrottled = async (
+  ids: number[],
+  signal: AbortSignal,
+): Promise<number[]> => {
+  const failed: number[] = [];
+  for (let i = 0; i < ids.length; i += CONCURRENCY) {
+    const batch = ids.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map((id) => closeSingleCase(id, signal)),
+    );
+    if (signal.aborted) return failed;
+    batch.forEach((id, j) => {
+      if (results[j].status === "rejected") failed.push(id);
+    });
+  }
+  return failed;
+};
+
 export function BulkFeesClosedConfirmDialog({
   open,
   caseIds,
   onClose,
-  onClosed,
+  onProgress,
+  onSuccess,
 }: BulkFeesClosedConfirmDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The working set — shrinks to just the failed ids after a partial
+  // failure, so retrying only re-attempts the cases that actually failed
+  // instead of re-closing (and re-stamping closed_at on) ones that already
+  // succeeded.
+  const [remainingIds, setRemainingIds] = useState<number[]>(caseIds);
   const controllerRef = useRef<AbortController | null>(null);
 
-  const count = caseIds.length;
+  // Reset the working set to the fresh selection each time the dialog opens
+  // — adjusted during render (not an effect) per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setRemainingIds(caseIds);
+      setError(null);
+    }
+  }
+
+  const count = remainingIds.length;
 
   const handleConfirm = async () => {
-    if (submitting) return;
+    if (submitting || count === 0) return;
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
     setSubmitting(true);
     setError(null);
 
-    const results = await Promise.allSettled(
-      caseIds.map((id) => closeSingleCase(id, controller.signal)),
-    );
+    const attempted = remainingIds;
+    const failedIds = await closeCasesThrottled(attempted, controller.signal);
     if (controller.signal.aborted) return;
-
-    const failed = results.filter((r) => r.status === "rejected").length;
     setSubmitting(false);
 
-    if (failed > 0) {
+    if (failedIds.length > 0) {
+      setRemainingIds(failedIds);
       setError(
-        failed === count
-          ? `Failed to close ${failed === 1 ? "the case" : `all ${failed} cases`}.`
-          : `${failed} of ${count} cases failed to close — the rest were closed successfully.`,
+        failedIds.length === attempted.length
+          ? `Failed to close ${failedIds.length === 1 ? "the case" : `all ${failedIds.length} cases`}.`
+          : `${failedIds.length} of ${attempted.length} cases failed to close — the rest closed successfully. Try again to retry the failed one${failedIds.length === 1 ? "" : "s"}.`,
       );
-      onClosed();
+      onProgress();
       return;
     }
-    onClosed();
+    onSuccess();
     onClose();
   };
 

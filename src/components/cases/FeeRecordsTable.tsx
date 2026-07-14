@@ -2675,7 +2675,8 @@ export const FeeRecordsTable = ({
         open={bulkCloseConfirmOpen}
         caseIds={bulkClosePendingIds}
         onClose={() => setBulkCloseConfirmOpen(false)}
-        onClosed={() => {
+        onProgress={() => onImported?.()}
+        onSuccess={() => {
           setSelectedIds(new Set());
           onImported?.();
         }}
