@@ -129,6 +129,7 @@ export const GET = async (req: NextRequest) => {
         clientId: cases.clientId,
         firstName: cases.firstName,
         lastName: cases.lastName,
+        externalId: cases.externalId,
         assignedTo: feeRecords.assignedTo,
         feesReceived: sql<string>`ROUND(${feeRecords.totalFeesPaid}::numeric, 2)`,
         overpaidAmount: overpaidCases.overpaidAmount,
@@ -152,6 +153,7 @@ export const GET = async (req: NextRequest) => {
     const data = rows.map((r) => ({
       id: r.clientId,
       claimant: `${r.lastName}, ${r.firstName}`,
+      externalId: r.externalId ?? null,
       assignedTo: r.assignedTo ?? null,
       feesReceived: Number(r.feesReceived),
       overpaidAmount: r.overpaidAmount != null ? Number(r.overpaidAmount) : null,
