@@ -28,6 +28,9 @@ function hashString(s: string): number {
 // palette is ever reordered or trimmed.
 const OVERRIDES: Record<string, { light: string; dark: string }> = {
   Aurora: { light: "bg-pink-50 text-pink-800 border-pink-200 hover:bg-pink-100", dark: "bg-pink-900/20 text-pink-300 border-pink-800/60 hover:bg-pink-900/30" },
+  // Jane's hash landed on fuchsia, too close to Jace's pink — both T2, and
+  // the two sort next to each other alphabetically in that team's roster.
+  Jane: { light: "bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100", dark: "bg-orange-900/20 text-orange-300 border-orange-800/60 hover:bg-orange-900/30" },
 };
 
 // Deterministic per-name color — the same person always lands on the same
