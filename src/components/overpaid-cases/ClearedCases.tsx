@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
 import {
   Search,
   ArrowUp,
@@ -18,15 +17,18 @@ import {
   RefreshCw,
   TrendingDown,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull, fmtDateLong } from "@/lib/formatters";
 import { upsertOverpaidCase, bulkRestoreCleared } from "@/app/(dashboard)/overpaid-cases/actions";
 import { NoteField } from "@/components/shared/NoteField";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 
 interface ClearedRow {
   id: number;
   claimant: string;
+  externalId: string | null;
   assignedTo: string | null;
   region: string | null;
   feesReceived: number;
@@ -669,12 +671,15 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                           className={`${tdBase} font-semibold max-w-45 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
                           title={row.claimant}
                         >
-                          <Link
-                            href={`/cases/${row.id}`}
-                            className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                          <a
+                            href={row.externalId || buildMyCaseUrl(row.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
                           >
-                            {row.claimant}
-                          </Link>
+                            <span className="truncate">{row.claimant}</span>
+                            <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+                          </a>
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo ?? "—"}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{row.region ?? "—"}</td>

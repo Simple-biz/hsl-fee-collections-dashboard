@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
   Search,
@@ -20,9 +19,11 @@ import {
   X,
   Undo2,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtFull } from "@/lib/formatters";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { upsertOverpaidCase, updateFeesConfirmation, bulkMarkCleared, bulkRestoreCleared, bulkRemoveFromOverpaid, markCaseOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
 import AddCaseModal from "@/components/modals/AddCaseModal";
 import { fetchDropdownOptions, type DropdownOptionsByCategory } from "@/lib/dropdown-options";
@@ -34,6 +35,7 @@ import { useCapabilities } from "@/hooks/useCapabilities";
 interface OverpaidCaseRow {
   id: number;
   claimant: string;
+  externalId: string | null;
   assignedTo: string | null;
   region: string | null;
   feesReceived: number;
@@ -1295,9 +1297,15 @@ export const OverpaidCases = () => {
                             />
                           )}
                           <div className="min-w-0">
-                            <Link href={`/cases/${row.id}`} className={`hover:underline truncate block ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
-                              {row.claimant}
-                            </Link>
+                            <a
+                              href={row.externalId || buildMyCaseUrl(row.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`inline-flex items-center gap-1 max-w-full truncate hover:underline ${dark ? "text-indigo-400" : "text-indigo-600"}`}
+                            >
+                              <span className="truncate">{row.claimant}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+                            </a>
                             {row.updatedAt && (
                               <p className={`text-[12px] ${t.textMuted} mt-0.5 font-normal`}>
                                 Updated {formatRelativeDate(row.updatedAt)}
