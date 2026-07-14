@@ -48,6 +48,7 @@ import MyCaseSyncModal from "@/components/modals/MyCaseSyncModal";
 import NotesModal from "@/components/modals/NotesModal";
 import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
+import { BulkFeesClosedConfirmDialog } from "./BulkFeesClosedConfirmDialog";
 import { Listbox } from "@/components/shared/Listbox";
 import { caseLevelVisual } from "@/lib/case-level-icons";
 import { buildListboxOptions } from "@/lib/listbox-options";
@@ -235,7 +236,6 @@ export const FeeRecordsTable = ({
   const { data: session } = useSession();
   const isAdmin =
     session?.user?.role === "admin" || session?.user?.role === "system_admin";
-  const isLead = session?.user?.role === "lead";
   const { can } = useCapabilities();
   const canCreate = can("case.create");
   const canFinalize = can("case.finalize");
@@ -270,8 +270,8 @@ export const FeeRecordsTable = ({
     Record<number, Partial<Record<DropdownRowKey, string>>>
   >({});
 
-  // Case targeted by the Fees Closed / Reopen confirmation dialogs.
-  const [closeConfirmCase, setCloseConfirmCase] = useState<CaseRow | null>(null);
+  // Case targeted by the Reopen confirmation dialog (Fees Closed page only —
+  // closing is now a batch action, see bulkCloseConfirmOpen below).
   const [reopenConfirmCase, setReopenConfirmCase] = useState<CaseRow | null>(null);
 
   // Win sheet link inline edit state.
@@ -335,6 +335,8 @@ export const FeeRecordsTable = ({
   >("active_sheet");
   const [bulkOverpaidSaving, setBulkOverpaidSaving] = useState(false);
   const [bulkOverpaidError, setBulkOverpaidError] = useState<string | null>(null);
+  const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
+  const [bulkClosePendingIds, setBulkClosePendingIds] = useState<number[]>([]);
   // Optimistic overrides for fee payment totals after panel add/delete.
   // Pending is deliberately absent — it's fully derived (Fee Due minus
   // Received) by the compute_fee_totals trigger, never set optimistically.
@@ -407,6 +409,12 @@ export const FeeRecordsTable = ({
       mode === "closed" ? "fees_closed_sheet" : "active_sheet",
     );
     setArchiveConfirmOpen(true);
+  };
+
+  const handleBatchFeesClosed = () => {
+    if (selectedIds.size === 0) return;
+    setBulkClosePendingIds(Array.from(selectedIds));
+    setBulkCloseConfirmOpen(true);
   };
 
   // Adds the selected cases to the Overpaid Cases page at will — independent
@@ -1159,9 +1167,9 @@ export const FeeRecordsTable = ({
         </div>
       </div>
 
-      {/* Floating batch action pill — fixed to the viewport bottom. Archive
-          and "Add to Overpaid Cases" (at will, independent of the automatic
-          PIF detection) are the two batch actions. */}
+      {/* Floating batch action pill — fixed to the viewport bottom. Fees
+          Closed, Archive, and "Add to Overpaid Cases" (at will, independent
+          of the automatic PIF detection) are the batch actions. */}
       {selectedIds.size > 0 && isAdmin && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
           {bulkOverpaidError && (
@@ -1176,6 +1184,16 @@ export const FeeRecordsTable = ({
             <span className="text-[13px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
             </span>
+            {mode !== "closed" && canFinalize && (
+              <button
+                onClick={handleBatchFeesClosed}
+                disabled={bulkCloseConfirmOpen}
+                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+              >
+                <Check aria-hidden="true" className="h-3 w-3" />
+                Fees Closed
+              </button>
+            )}
             {mode !== "closed" && canFinalize && (
               <button
                 onClick={handleBatchMarkOverpaid}
@@ -1267,7 +1285,7 @@ export const FeeRecordsTable = ({
                   className={`${thBase} ${t.textSub} text-left ${stickyGroup3}`}
                 />
                 <th
-                  colSpan={canSeeLeaderNotes ? 9 : 8}
+                  colSpan={(isClosedMode ? 8 : 7) + (canSeeLeaderNotes ? 1 : 0)}
                   aria-hidden="true"
                   className={`${thBase} ${t.textSub} text-left ${stickyThRow1}`}
                 />
@@ -1380,7 +1398,11 @@ export const FeeRecordsTable = ({
                 <th className={`${thBase} ${t.textSub} text-left ${stickyTh3}`}>
                   PIF
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left`}>Fees Closed</th>
+                {/* Fees Closed — Fees Closed page only now; closing from
+                    Master Fees is a batch action (see the selection pill). */}
+                {isClosedMode && (
+                  <th className={`${thBase} ${t.textSub} text-left`}>Fees Closed</th>
+                )}
                 <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
                 <th
@@ -1731,12 +1753,14 @@ export const FeeRecordsTable = ({
                         <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
                       )}
                     </td>
-                    {/* Fees Closed — checkbox; check → close dialog; uncheck → reopen dialog */}
-                    <td
-                      className={`${tdBase} text-center`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {mode === "closed" ? (
+                    {/* Fees Closed — Fees Closed page only; checked, unchecking
+                        opens the reopen dialog. Closing from Master Fees is a
+                        batch action now (see the selection pill). */}
+                    {isClosedMode && (
+                      <td
+                        className={`${tdBase} text-center`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
                           type="checkbox"
                           checked
@@ -1745,18 +1769,8 @@ export const FeeRecordsTable = ({
                           disabled={!canFinalize}
                           onChange={() => setReopenConfirmCase(c)}
                         />
-                      ) : (isAdmin || isLead) && canFinalize ? (
-                        <input
-                          type="checkbox"
-                          checked={false}
-                          className="h-4 w-4 cursor-pointer"
-                          aria-label="Mark as Fees Closed"
-                          onChange={() => setCloseConfirmCase(c)}
-                        />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+                      </td>
+                    )}
                     {/* Level — varchar; lives on the cases row. */}
                     <td
                       className={`${tdBase}`}
@@ -2657,14 +2671,13 @@ export const FeeRecordsTable = ({
         }}
       />
 
-      <FeesClosedConfirmDialog
-        open={closeConfirmCase !== null}
-        mode="close"
-        caseId={closeConfirmCase?.id ?? null}
-        caseName={closeConfirmCase?.name ?? ""}
-        onClose={() => setCloseConfirmCase(null)}
-        onConfirmed={() => {
-          setCloseConfirmCase(null);
+      <BulkFeesClosedConfirmDialog
+        open={bulkCloseConfirmOpen}
+        caseIds={bulkClosePendingIds}
+        onClose={() => setBulkCloseConfirmOpen(false)}
+        onProgress={() => onImported?.()}
+        onSuccess={() => {
+          setSelectedIds(new Set());
           onImported?.();
         }}
       />
