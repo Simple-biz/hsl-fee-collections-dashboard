@@ -415,6 +415,10 @@ export const FeePetitions = () => {
       const json = await res.json();
       const data: FeePetitionRow[] = json.data || [];
       setRows(data);
+      // A full list refetch supersedes any per-row refresh snapshot taken
+      // before it — must not outlive this, or a stale rowOverrides entry
+      // would keep shadowing newer data for that row indefinitely.
+      setRowOverrides({});
       setSelectedIds(new Set());
       setBulkConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
@@ -434,6 +438,52 @@ export const FeePetitions = () => {
     return () => { fetchAbortRef.current?.abort(); };
   }, [fetchPetitions]);
 
+  // Re-fetches one petition and patches just its row — lets staff confirm a
+  // checkbox/assignee edit's saved state without reloading (and losing
+  // their filters/page/scroll position on) the whole table. `updateNote` is
+  // deliberately excluded from the patch — it has its own dedicated
+  // draft/save flow (setUpdateNoteLocal writes straight into `rows`, ahead
+  // of persistUpdateNote's debounced save), and patching it here would
+  // silently revert an in-progress, not-yet-saved note back to the
+  // pre-edit server value if a refresh landed mid-draft.
+  const handleRowRefresh = async (id: number) => {
+    rowRefreshAbortRef.current.get(id)?.abort();
+    const controller = new AbortController();
+    rowRefreshAbortRef.current.set(id, controller);
+    setRowRefreshing((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch(`/api/fee-petitions?caseId=${id}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Failed to refresh petition (${res.status})`);
+      const json = await res.json();
+      const fresh: FeePetitionRow | undefined = json.data?.[0];
+      if (!fresh) throw new Error("Petition not found");
+      const patch: Partial<FeePetitionRow> = { ...fresh };
+      delete patch.updateNote;
+      setRowOverrides((prev) => ({ ...prev, [id]: patch }));
+      setFeeAmountOverrides((prev) => {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      console.error("Failed to refresh row:", err);
+      setLiveMessage("Refresh failed");
+    } finally {
+      if (rowRefreshAbortRef.current.get(id) === controller) {
+        rowRefreshAbortRef.current.delete(id);
+      }
+      setRowRefreshing((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   // Fee Requested/Fees Received have no single editable column of their own
   // (they're sums of t16/t2/aux Fee Due and Fee Received) — each cell edits
   // row.activeFeeType's column directly (resolved server-side to whichever
@@ -450,6 +500,16 @@ export const FeePetitions = () => {
     Record<number, Partial<Pick<FeePetitionRow, "feeAmount" | "feesReceived">>>
   >({});
   const feeAmountAbortRef = useRef<AbortController | null>(null);
+
+  // Per-row "refresh" — re-fetches one petition from the server and patches
+  // just that row, so staff can see a checkbox/note/assignee edit's saved
+  // state confirmed without reloading (and losing their filters/page/scroll
+  // position on) the whole table. Mirrors Master Fees' rowOverrides pattern;
+  // cleared inside fetchPetitions itself (not a [rows] effect, since rows
+  // also changes on every unrelated optimistic edit in this file).
+  const [rowOverrides, setRowOverrides] = useState<Record<number, Partial<FeePetitionRow>>>({});
+  const [rowRefreshing, setRowRefreshing] = useState<Set<number>>(new Set());
+  const rowRefreshAbortRef = useRef<Map<number, AbortController>>(new Map());
 
   const saveFeeAmount = useCallback(async () => {
     if (!feeAmountEdit || feeAmountSaving) return;
@@ -819,7 +879,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 10;
+  const colSpan = CHECKBOX_COLUMNS.length + 11;
 
   return (
     <div className="space-y-4">
@@ -1154,9 +1214,15 @@ export const FeePetitions = () => {
                     className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                   />
                 </th>
+                {/* Refresh — frozen, right after the checkbox, before
+                    Claimant, so it's usable without scrolling right. */}
+                <th className={`${thBase} w-14 text-center sticky left-10 top-0 z-30 ${stickyHeaderBg}`} title="Refresh">
+                  <RefreshCw className="h-3.5 w-3.5 inline" aria-hidden="true" />
+                  <span className="sr-only">Refresh</span>
+                </th>
                 <th
                   aria-sort={ariaSortFor("claimant")}
-                  className={`${thBase} w-40 ${t.textSub} text-left sticky left-10 top-0 z-30 ${stickyHeaderBg}`}
+                  className={`${thBase} w-40 ${t.textSub} text-left sticky left-24 top-0 z-30 ${stickyHeaderBg}`}
                 >
                   <button
                     type="button"
@@ -1166,7 +1232,7 @@ export const FeePetitions = () => {
                     Claimant {sortIcon("claimant")}
                   </button>
                 </th>
-                <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[200px] top-0 z-30 ${stickyHeaderBg}`}>
+                <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[256px] top-0 z-30 ${stickyHeaderBg}`}>
                   Fee Requested
                 </th>
                 <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
@@ -1250,7 +1316,7 @@ export const FeePetitions = () => {
                 </tr>
               ) : (
                 rows.map((rawRow) => {
-                  const row = { ...rawRow, ...feeAmountOverrides[rawRow.id] };
+                  const row = { ...rawRow, ...feeAmountOverrides[rawRow.id], ...rowOverrides[rawRow.id] };
                   const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (row[c.key] ? 1 : 0), 0);
                   const isComplete = completedCount === CHECKBOX_COLUMNS.length;
                   const isSelected = selectedIds.has(row.id);
@@ -1277,8 +1343,23 @@ export const FeePetitions = () => {
                           className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                         />
                       </td>
+                      <td className={`${tdBase} text-center sticky left-10 z-10 ${stickyBg} ${stickyHover}`}>
+                        <button
+                          type="button"
+                          onClick={() => handleRowRefresh(row.id)}
+                          disabled={rowRefreshing.has(row.id)}
+                          aria-label={`Refresh ${row.claimant}`}
+                          title="Refresh this petition's data from the server"
+                          className={`inline-flex items-center justify-center h-6 w-6 rounded ${t.hover} ${t.textSub} disabled:opacity-50`}
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 ${rowRefreshing.has(row.id) ? "animate-spin" : ""}`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                      </td>
                       <td
-                        className={`${tdBase} ${t.text} font-semibold w-40 sticky left-10 z-10 ${stickyBg} ${stickyHover}`}
+                        className={`${tdBase} ${t.text} font-semibold w-40 sticky left-24 z-10 ${stickyBg} ${stickyHover}`}
                         title={row.claimant}
                       >
                         <a
@@ -1297,7 +1378,7 @@ export const FeePetitions = () => {
                         )}
                       </td>
                       <td
-                        className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[200px] z-10 ${stickyBg} ${stickyHover}`}
+                        className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[256px] z-10 ${stickyBg} ${stickyHover}`}
                       >
                         <FeeAmountCell
                           active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feeAmount"}
