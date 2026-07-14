@@ -75,6 +75,7 @@ interface NoFeesCaseRow {
   name: string;
   externalId: string | null;
   assigned: string;
+  level: string;
   claim: string;
   approvalDate: string | null;
   daysSinceApproval: number;
@@ -574,6 +575,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   <tr className={`border-b ${t.borderLight}`}>
                     <th className={`${thBase} ${t.textSub} text-left`}>Case Name</th>
                     <th className={`${thBase} ${t.textSub} text-left`}>Assigned</th>
+                    <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
                     <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
                     <th className={`${thBase} ${t.textSub} text-left`}>Approval</th>
                     <th className={`${thBase} ${t.textSub} text-right`}>Days</th>
@@ -598,6 +600,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         )}
                       </td>
                       <td className={`${tdBase} ${t.textSub}`}>{c.assigned}</td>
+                      <td className={`${tdBase} ${t.textSub}`}>{c.level.replace(/_/g, " ")}</td>
                       <td className={`${tdBase} ${t.textSub}`}>{c.claim}</td>
                       <td className={`${tdBase} ${t.textSub}`}>{fmtDate(c.approvalDate)}</td>
                       <td

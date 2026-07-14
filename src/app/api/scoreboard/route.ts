@@ -402,6 +402,7 @@ export const GET = async (req: NextRequest) => {
         c.last_name AS last_name,
         c.external_id AS external_id,
         fr.assigned_to AS assigned,
+        c.level_won AS level_won,
         c.claim_type_label AS claim_type_label,
         c.approval_date AS approval_date,
         (CURRENT_DATE - c.approval_date)::int AS days_since_approval
@@ -418,6 +419,7 @@ export const GET = async (req: NextRequest) => {
       last_name: string | null;
       external_id: string | null;
       assigned: string | null;
+      level_won: string | null;
       claim_type_label: string | null;
       approval_date: string | null;
       days_since_approval: number;
@@ -428,6 +430,7 @@ export const GET = async (req: NextRequest) => {
       name: `${r.last_name ?? ""}, ${r.first_name ?? ""}`,
       externalId: r.external_id,
       assigned: r.assigned || "—",
+      level: r.level_won || "—",
       claim: r.claim_type_label === "T2_T16" || r.claim_type_label === "CONCURRENT" ? "CONC" : r.claim_type_label || "—",
       approvalDate: r.approval_date,
       daysSinceApproval: Number(r.days_since_approval) || 0,
