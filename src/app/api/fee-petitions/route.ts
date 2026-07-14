@@ -137,9 +137,12 @@ export const GET = async (req: NextRequest) => {
 
     const { searchParams } = new URL(req.url);
 
-    // Per-row refresh (Fee Petitions table) — bypasses every list filter
-    // and pagination, since the caller already knows which row it wants
-    // and just needs its current server state after an edit.
+    // Per-row refresh (Fee Petitions table) — bypasses list filters like
+    // search/status/touched/missing/aging/assignedTo and pagination, since
+    // the caller already knows which row it wants and just needs its
+    // current server state after an edit. Still scoped to the same
+    // Fee Petition / not-closed universe as the list query, though, so this
+    // can't be used to pull fee-petition-shaped data for an arbitrary case.
     const caseIdParam = searchParams.get("caseId");
     if (caseIdParam) {
       const caseId = parseInt(caseIdParam, 10);
@@ -151,7 +154,9 @@ export const GET = async (req: NextRequest) => {
         .from(cases)
         .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
         .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
-        .where(eq(cases.clientId, caseId))
+        .where(sql`${cases.clientId} = ${caseId}
+          AND ${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
+          AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)`)
         .limit(1);
       if (!r) {
         return NextResponse.json({ error: "Case not found" }, { status: 404 });

@@ -439,8 +439,13 @@ export const FeePetitions = () => {
   }, [fetchPetitions]);
 
   // Re-fetches one petition and patches just its row — lets staff confirm a
-  // checkbox/note/assignee edit's saved state without reloading (and losing
-  // their filters/page/scroll position on) the whole table.
+  // checkbox/assignee edit's saved state without reloading (and losing
+  // their filters/page/scroll position on) the whole table. `updateNote` is
+  // deliberately excluded from the patch — it has its own dedicated
+  // draft/save flow (setUpdateNoteLocal writes straight into `rows`, ahead
+  // of persistUpdateNote's debounced save), and patching it here would
+  // silently revert an in-progress, not-yet-saved note back to the
+  // pre-edit server value if a refresh landed mid-draft.
   const handleRowRefresh = async (id: number) => {
     rowRefreshAbortRef.current.get(id)?.abort();
     const controller = new AbortController();
@@ -454,14 +459,15 @@ export const FeePetitions = () => {
       const json = await res.json();
       const fresh: FeePetitionRow | undefined = json.data?.[0];
       if (!fresh) throw new Error("Petition not found");
-      setRowOverrides((prev) => ({ ...prev, [id]: fresh }));
+      const patch: Partial<FeePetitionRow> = { ...fresh };
+      delete patch.updateNote;
+      setRowOverrides((prev) => ({ ...prev, [id]: patch }));
       setFeeAmountOverrides((prev) => {
         if (!(id in prev)) return prev;
         const next = { ...prev };
         delete next[id];
         return next;
       });
-      noteSnapshot.current.set(id, fresh.updateNote);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       console.error("Failed to refresh row:", err);
