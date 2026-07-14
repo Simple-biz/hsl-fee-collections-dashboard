@@ -1423,13 +1423,13 @@ export const FeeRecordsTable = ({
                     Win Sheet/Leader Notes (+ Fees Closed reopen on the Fees
                     Closed page); collapses to one blank header cell. */}
                 {collapsedGroups.has("caseStatus") ? (
-                  <th aria-hidden="true" className={thBase} />
+                  <th aria-hidden="true" className={`${thBase} ${groupBorder}`} />
                 ) : (
                   <>
                 {isClosedMode && (
-                  <th className={`${thBase} ${t.textSub} text-left`}>Fees Closed</th>
+                  <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>Fees Closed</th>
                 )}
-                <th className={`${thBase} ${t.textSub} text-left`}>Level</th>
+                <th className={`${thBase} ${t.textSub} text-left ${isClosedMode ? "" : groupBorder}`}>Level</th>
                 <th className={`${thBase} ${t.textSub} text-left`}>Claim</th>
                 <th
                   aria-sort={ariaSortFor("date")}
@@ -1784,7 +1784,7 @@ export const FeeRecordsTable = ({
                         Status/Win Sheet/Leader Notes (+ Fees Closed reopen on
                         the Fees Closed page); collapses to one blank cell. */}
                     {collapsedGroups.has("caseStatus") ? (
-                      <td aria-hidden="true" className={tdBase} />
+                      <td aria-hidden="true" className={`${tdBase} ${groupBorder}`} />
                     ) : (
                       <>
                     {/* Fees Closed — Fees Closed page only; checked, unchecking
@@ -1792,7 +1792,7 @@ export const FeeRecordsTable = ({
                         batch action now (see the selection pill). */}
                     {isClosedMode && (
                       <td
-                        className={`${tdBase} text-center`}
+                        className={`${tdBase} text-center ${groupBorder}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -1807,7 +1807,7 @@ export const FeeRecordsTable = ({
                     )}
                     {/* Level — varchar; lives on the cases row. */}
                     <td
-                      className={`${tdBase}`}
+                      className={`${tdBase} ${isClosedMode ? "" : groupBorder}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Listbox
