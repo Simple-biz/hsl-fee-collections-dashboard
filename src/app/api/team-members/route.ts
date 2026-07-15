@@ -199,7 +199,9 @@ export const PATCH = async (req: NextRequest) => {
           );
         }
 
-        // Cascade rename in fee_records
+        // Cascade rename to fee_records (string reference, no FK).
+        // daily_metrics.agent_name has ON UPDATE CASCADE on its FK to
+        // team_members.name, so Postgres cascades that automatically.
         await db
           .update(feeRecords)
           .set({ assignedTo: updates.name as string })
@@ -207,6 +209,7 @@ export const PATCH = async (req: NextRequest) => {
       }
     }
 
+    // Non-rename update (role / team / isActive only)
     const [updated] = await db
       .update(teamMembers)
       .set(updates)
