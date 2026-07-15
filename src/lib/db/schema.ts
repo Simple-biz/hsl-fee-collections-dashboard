@@ -558,7 +558,7 @@ export const dailyMetrics = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     agentName: varchar("agent_name", { length: 100 })
       .notNull()
-      .references(() => teamMembers.name),
+      .references(() => teamMembers.name, { onUpdate: "cascade" }),
     metricDate: date("metric_date").notNull().defaultNow(),
     ssaCalls: integer("ssa_calls").notNull().default(0),
     clientCallsIb: integer("client_calls_ib").notNull().default(0),
