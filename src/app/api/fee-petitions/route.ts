@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { cases, feePetitions, feeRecords } from "@/lib/db/schema";
-import { eq, ilike, sql } from "drizzle-orm";
+import { cases, feePetitions, feeRecords, activityLog } from "@/lib/db/schema";
+import { eq, ilike, sql, inArray } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
 const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt"] as const;
@@ -57,6 +57,8 @@ const ROW_COLUMNS = {
   faxConfFeePet: feePetitions.faxConfFeePet,
   feePetitionApproved: feePetitions.feePetitionApproved,
   updateNote: feePetitions.updateNote,
+  nextFollowUpDate: feePetitions.nextFollowUpDate,
+  feePetitionUuid: feePetitions.id,
   updatedAt: feePetitions.updatedAt,
 };
 
@@ -82,6 +84,8 @@ type FeePetitionQueryRow = {
   faxConfFeePet: boolean | null;
   feePetitionApproved: boolean | null;
   updateNote: string | null;
+  nextFollowUpDate: string | null;
+  feePetitionUuid: string | null;
   updatedAt: Date | null;
 };
 
@@ -109,6 +113,10 @@ const toFeePetitionRow = (r: FeePetitionQueryRow) => ({
   faxConfFeePet: r.faxConfFeePet ?? false,
   feePetitionApproved: r.feePetitionApproved ?? false,
   updateNote: r.updateNote ?? "",
+  nextFollowUpDate: r.nextFollowUpDate ?? null,
+  // logCount and recentUpdate are merged in after the batch log-stats query
+  logCount: 0,
+  recentUpdate: null as string | null,
 });
 
 const getMissingClause = (key: string | null) => {
@@ -306,6 +314,52 @@ export const GET = async (req: NextRequest) => {
       .offset(offset);
 
     const data = rows.map(toFeePetitionRow);
+
+    // Batch-fetch log stats (count + most recent message) for rows that have
+    // a fee_petitions record. Rows never touched by staff have no UUID yet and
+    // keep the default logCount=0 / recentUpdate=null from toFeePetitionRow.
+    const petitionUuids = rows
+      .map((r) => r.feePetitionUuid)
+      .filter((id): id is string => id != null);
+
+    if (petitionUuids.length > 0) {
+      const [countRows, recentRows] = await Promise.all([
+        db
+          .select({
+            feePetitionId: activityLog.feePetitionId,
+            count: sql<number>`COUNT(*)::int`,
+          })
+          .from(activityLog)
+          .where(inArray(activityLog.feePetitionId, petitionUuids))
+          .groupBy(activityLog.feePetitionId),
+        db.execute(sql`
+          SELECT fee_petition_id::text, message
+          FROM (
+            SELECT fee_petition_id, message,
+                   ROW_NUMBER() OVER (PARTITION BY fee_petition_id ORDER BY created_at DESC) AS rn
+            FROM activity_log
+            WHERE fee_petition_id = ANY(ARRAY[${sql.join(petitionUuids.map((id) => sql`${id}`), sql`, `)}]::uuid[])
+          ) ranked
+          WHERE rn = 1
+        `),
+      ]);
+
+      const countMap = new Map(countRows.map((r) => [r.feePetitionId, r.count]));
+      const recentMap = new Map(
+        (recentRows as unknown as { fee_petition_id: string; message: string }[]).map((r) => [
+          r.fee_petition_id,
+          r.message,
+        ]),
+      );
+
+      const clientIdToUuid = new Map(rows.map((r) => [r.clientId, r.feePetitionUuid]));
+      for (const row of data) {
+        const uuid = clientIdToUuid.get(row.id);
+        if (!uuid) continue;
+        row.logCount = countMap.get(uuid) ?? 0;
+        row.recentUpdate = recentMap.get(uuid) ?? null;
+      }
+    }
 
     return NextResponse.json({
       data,

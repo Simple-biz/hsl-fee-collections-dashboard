@@ -24,6 +24,7 @@ const FIELD_KEYS = [
   "faxConfFeePet",
   "feePetitionApproved",
   "updateNote",
+  "nextFollowUpDate",
 ] as const;
 
 const NOTE_MAX_LENGTH = 5000;

@@ -19,6 +19,7 @@ import {
   X,
   Undo2,
   ExternalLink,
+  MessageSquare,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
@@ -27,7 +28,8 @@ import { CompletedPetitions } from "./CompletedPetitions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
-import { NoteField } from "@/components/shared/NoteField";
+import NotesModal from "@/components/modals/NotesModal";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { Listbox } from "@/components/shared/Listbox";
@@ -58,6 +60,9 @@ interface FeePetitionRow {
   // Remarks ("FEE PETITION APPROVED") on Master Fees in both directions.
   feePetitionApproved: boolean;
   updateNote: string;
+  nextFollowUpDate: string | null;
+  recentUpdate: string | null;
+  logCount: number;
 }
 
 type CheckboxKey =
@@ -286,18 +291,8 @@ export const FeePetitions = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlParams]);
 
-  const noteSnapshot = useRef<Map<number, string>>(new Map());
-  const [noteState, setNoteState] = useState<Record<number, "saving" | "saved" | undefined>>({});
+  const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(null);
   const [liveMessage, setLiveMessage] = useState("");
-  const savedTimerRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
-
-  useEffect(() => {
-    const timers = savedTimerRef.current;
-    return () => {
-      for (const t of timers.values()) clearTimeout(t);
-      timers.clear();
-    };
-  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -311,6 +306,7 @@ export const FeePetitions = () => {
   const fetchAbortRef = useRef<AbortController | null>(null);
   const completedCountAbortRef = useRef<AbortController | null>(null);
   const allTotalsAbortRef = useRef<AbortController | null>(null);
+  const notesRefreshAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -421,7 +417,6 @@ export const FeePetitions = () => {
       setTotal(typeof json.total === "number" ? json.total : data.length);
       if (Array.isArray(json.assignees)) setAssignees(json.assignees);
       if (typeof json.unassignedCount === "number") setUnassignedCount(json.unassignedCount);
-      noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
@@ -437,12 +432,9 @@ export const FeePetitions = () => {
 
   // Re-fetches one petition and patches just its row — lets staff confirm a
   // checkbox/assignee edit's saved state without reloading (and losing
-  // their filters/page/scroll position on) the whole table. `updateNote` is
-  // deliberately excluded from the patch — it has its own dedicated
-  // draft/save flow (setUpdateNoteLocal writes straight into `rows`, ahead
-  // of persistUpdateNote's debounced save), and patching it here would
-  // silently revert an in-progress, not-yet-saved note back to the
-  // pre-edit server value if a refresh landed mid-draft.
+  // their filters/page/scroll position on) the whole table. `updateNote`,
+  // `recentUpdate`, and `logCount` are excluded — they are either legacy or
+  // derived from the notes log which has its own refresh path.
   const handleRowRefresh = async (id: number) => {
     rowRefreshAbortRef.current.get(id)?.abort();
     const controller = new AbortController();
@@ -458,6 +450,9 @@ export const FeePetitions = () => {
       if (!fresh) throw new Error("Petition not found");
       const patch: Partial<FeePetitionRow> = { ...fresh };
       delete patch.updateNote;
+      delete patch.recentUpdate;
+      delete patch.logCount;
+      delete patch.nextFollowUpDate;
       setRowOverrides((prev) => ({ ...prev, [id]: patch }));
       setFeeAmountOverrides((prev) => {
         if (!(id in prev)) return prev;
@@ -757,29 +752,37 @@ export const FeePetitions = () => {
     }
   };
 
-  const setUpdateNoteLocal = (id: number, value: string) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updateNote: value } : r)));
+  const persistFollowUpDate = async (row: FeePetitionRow, value: string) => {
+    const nextDate = value || null;
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, nextFollowUpDate: nextDate } : r)));
+    try {
+      await patchPetition(row.id, { nextFollowUpDate: nextDate });
+    } catch (err) {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, nextFollowUpDate: row.nextFollowUpDate } : r)));
+      setLiveMessage("Failed to save follow-up date");
+      setError((err as Error).message);
+    }
   };
 
-  const persistUpdateNote = async (row: FeePetitionRow) => {
-    if (noteSnapshot.current.get(row.id) === row.updateNote) return;
-    const existingTimer = savedTimerRef.current.get(row.id);
-    if (existingTimer) clearTimeout(existingTimer);
-    setNoteState((s) => ({ ...s, [row.id]: "saving" }));
+  const handleNotesChanged = async (caseId: number) => {
+    notesRefreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    notesRefreshAbortRef.current = controller;
     try {
-      await patchPetition(row.id, { updateNote: row.updateNote });
-      noteSnapshot.current.set(row.id, row.updateNote);
-      setNoteState((s) => ({ ...s, [row.id]: "saved" }));
-      setLiveMessage("Note saved");
-      const timer = setTimeout(() => {
-        setNoteState((s) => ({ ...s, [row.id]: undefined }));
-        savedTimerRef.current.delete(row.id);
-      }, 1500);
-      savedTimerRef.current.set(row.id, timer);
+      const res = await fetch(`/api/fee-petitions/${caseId}/notes`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to load notes (${res.status})`);
+      const json = await res.json();
+      const notes: { message: string }[] = json.data ?? [];
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === caseId
+            ? { ...r, logCount: notes.length, recentUpdate: notes[0]?.message ?? null }
+            : r,
+        ),
+      );
     } catch (err) {
-      setNoteState((s) => ({ ...s, [row.id]: undefined }));
-      setLiveMessage("Note save failed");
-      setError((err as Error).message);
+      if ((err as Error).name === "AbortError") return;
+      // ignore — badge stays stale, user can refresh manually
     }
   };
 
@@ -828,7 +831,7 @@ export const FeePetitions = () => {
             r.ltrToClmtWithSignature ? "Yes" : "No",
             r.ltrToAlj ? "Yes" : "No",
             r.faxConfFeePet ? "Yes" : "No",
-            escape(r.updateNote),
+            escape(r.recentUpdate ?? r.updateNote ?? ""),
           ].join(",");
         }),
       ].join("\n");
@@ -868,7 +871,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 10;
+  const colSpan = CHECKBOX_COLUMNS.length + 12;
 
   return (
     <div className="space-y-4">
@@ -1270,7 +1273,9 @@ export const FeePetitions = () => {
                 <th className={`${thBase} ${t.textSub} text-center border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>
                   Fee Petition Approved
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>Update</th>
+                <th className={`${thBase} ${t.textSub} text-left border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>Next Follow-Up</th>
+                <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>Recent Update</th>
+                <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>Logs</th>
               </tr>
             </thead>
             <tbody>
@@ -1451,15 +1456,57 @@ export const FeePetitions = () => {
                           className="h-3.5 w-3.5 cursor-pointer accent-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </td>
-                      <td className={`${tdBase}`}>
-                        <NoteField
-                          value={row.updateNote}
-                          onChange={(v) => setUpdateNoteLocal(row.id, v)}
-                          onSave={() => persistUpdateNote(row)}
-                          dark={dark}
-                          t={t}
-                          status={noteState[row.id]}
+                      {/* Next Follow-Up */}
+                      <td className={`${tdBase} border-l ${t.borderLight}`} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="date"
+                          value={row.nextFollowUpDate ?? ""}
+                          onChange={(e) => persistFollowUpDate(row, e.target.value)}
+                          aria-label={`Next follow-up date for ${row.claimant}`}
+                          className={`h-7 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
                         />
+                      </td>
+                      {/* Recent Update */}
+                      <td className={`${tdBase} ${t.textSub} max-w-65`}>
+                        {row.recentUpdate ? (
+                          <HoverCard openDelay={150} closeDelay={50}>
+                            <HoverCardTrigger asChild>
+                              <span className="block truncate">{row.recentUpdate}</span>
+                            </HoverCardTrigger>
+                            <HoverCardContent
+                              align="start"
+                              collisionPadding={12}
+                              className="w-auto max-w-[min(28rem,90vw)] p-3 text-[14px] leading-relaxed whitespace-pre-wrap wrap-break-word"
+                            >
+                              {row.recentUpdate}
+                            </HoverCardContent>
+                          </HoverCard>
+                        ) : (
+                          <span className={`block truncate ${t.textMuted}`}>—</span>
+                        )}
+                      </td>
+                      {/* Logs count */}
+                      <td className={`${tdBase} text-center`}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNotesFor({ id: row.id, name: row.claimant });
+                          }}
+                          aria-label={row.logCount > 0 ? `View ${row.logCount} log entr${row.logCount === 1 ? "y" : "ies"}` : "No log entries yet"}
+                          title={row.logCount > 0 ? `View ${row.logCount} log entr${row.logCount === 1 ? "y" : "ies"}` : "No log entries yet"}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
+                            row.logCount > 0
+                              ? dark
+                                ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
+                                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                              : dark
+                                ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
+                                : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
+                          }`}
+                        >
+                          <MessageSquare aria-hidden="true" className="h-3 w-3" />
+                          {row.logCount}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1516,6 +1563,17 @@ export const FeePetitions = () => {
       </div>
 
       <CompletedPetitions dark={dark} />
+
+      {notesFor && (
+        <NotesModal
+          dark={dark}
+          caseId={notesFor.id}
+          caseName={notesFor.name}
+          apiPathOverride={`/api/fee-petitions/${notesFor.id}/notes`}
+          onClose={() => setNotesFor(null)}
+          onChanged={() => handleNotesChanged(notesFor.id)}
+        />
+      )}
     </div>
   );
 };
