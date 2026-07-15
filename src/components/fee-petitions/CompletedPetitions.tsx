@@ -28,6 +28,7 @@ interface CompletedRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
+  feesReceived: number | null;
   assignedTo: string | null;
   noa: boolean;
   timeDelineation: boolean;
@@ -254,8 +255,8 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
-  // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + note
-  const colSpan = CHECKBOX_COLUMNS.length + 7;
+  // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + approved flag + note
+  const colSpan = CHECKBOX_COLUMNS.length + 8;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -391,8 +392,11 @@ export const CompletedPetitions = ({ dark }: Props) => {
                       Claimant {sortIcon("claimant")}
                     </button>
                   </th>
-                  <th className={`${thBase} w-24 min-w-24 max-w-24 ${t.textSub} text-right sticky left-40 top-0 z-30 ${stickyHeaderBg}`}>
+                  <th className={`${thBase} w-24 min-w-24 max-w-24 overflow-hidden ${t.textSub} text-right sticky left-40 top-0 z-30 ${stickyHeaderBg}`}>
                     Fee Requested
+                  </th>
+                  <th className={`${thBase} w-28 min-w-28 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
+                    Fees Received
                   </th>
                   <th
                     aria-sort={sortKey === "approvalDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
@@ -494,6 +498,9 @@ export const CompletedPetitions = ({ dark }: Props) => {
                           className={`${tdBase} w-24 min-w-24 max-w-24 ${t.text} text-right font-medium tabular-nums sticky left-40 z-10 ${stickyBg} ${stickyHover}`}
                         >
                           {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
+                        </td>
+                        <td className={`${tdBase} w-28 min-w-28 ${t.textMuted} text-right tabular-nums`}>
+                          {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>
