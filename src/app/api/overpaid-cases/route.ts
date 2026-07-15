@@ -4,7 +4,7 @@ import { cases, feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq, ilike, sql } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
-const SORT_KEYS = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo"] as const;
+const SORT_KEYS = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo", "createdAt"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 
 // GET /api/overpaid-cases?page=&limit=&search=&sort=&dir=&status=&agent=&ltr=&minAmount=&maxAmount=
@@ -29,7 +29,7 @@ export const GET = async (req: NextRequest) => {
     const sortParam = searchParams.get("sort");
     const sort: SortKey = SORT_KEYS.includes(sortParam as SortKey)
       ? (sortParam as SortKey)
-      : "overpaidAmount";
+      : "createdAt";
     const dir = searchParams.get("dir") === "asc" ? sql`asc` : sql`desc`;
     const rawPage = parseInt(searchParams.get("page") || "1");
     const rawLimit = parseInt(searchParams.get("limit") || "50");
@@ -122,7 +122,9 @@ export const GET = async (req: NextRequest) => {
             ? sql`${overpaidCases.opLtrReceived} ${dir} NULLS LAST`
             : sort === "assignedTo"
               ? sql`${feeRecords.assignedTo} ${dir} NULLS LAST`
-              : sql`${overpaidCases.overpaidAmount} ${dir} NULLS LAST`;
+              : sort === "overpaidAmount"
+                ? sql`${overpaidCases.overpaidAmount} ${dir} NULLS LAST`
+                : sql`${cases.createdAt} ${dir} NULLS LAST`;
 
     const rows = await db
       .select({
