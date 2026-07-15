@@ -101,7 +101,7 @@ function WinSheetStatusBadge({ value, dark }: { value: string | null | undefined
 // Review" vs. the current "Ready for Review (Specialist)"). One-off custom
 // remarks not listed here fall through to the neutral fallback below.
 const CASE_STATUS_COLORS: Record<string, { badge: string; badgeDark: string }> = {
-  "Ready for Review (Specialist)": { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
+  "Ready for Review (Specialist)": { badge: "bg-green-50 text-green-700 border-green-300",     badgeDark: "bg-green-900/40 text-green-300 border-green-700"   },
   "Ready for Review":              { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
   "Pending for Review":            { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
   "Reviewing (Management)":        { badge: "bg-violet-50 text-violet-700 border-violet-300", badgeDark: "bg-violet-900/40 text-violet-300 border-violet-700" },
