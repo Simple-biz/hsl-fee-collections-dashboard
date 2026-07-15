@@ -352,8 +352,9 @@ export const GET = async (req: NextRequest) => {
         ]),
       );
 
+      const clientIdToUuid = new Map(rows.map((r) => [r.clientId, r.feePetitionUuid]));
       for (const row of data) {
-        const uuid = rows.find((r) => r.clientId === row.id)?.feePetitionUuid;
+        const uuid = clientIdToUuid.get(row.id);
         if (!uuid) continue;
         row.logCount = countMap.get(uuid) ?? 0;
         row.recentUpdate = recentMap.get(uuid) ?? null;

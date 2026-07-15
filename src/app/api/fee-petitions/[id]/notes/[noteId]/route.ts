@@ -7,6 +7,10 @@ import { db } from "@/lib/db";
 import { activityLog, feePetitions } from "@/lib/db/schema";
 import { requirePageAccess, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
 
+// createdBy stores the author's display name at write-time (same pattern as
+// the general case-log route). If a display name is later corrected, the
+// author falls back to the case.delete admin override. A future migration
+// could add a createdByUserId column for a stable key.
 const canModifyNote = (session: Session, createdBy: string | null) => {
   const author = session.user?.name?.trim();
   return (!!author && author === createdBy) || sessionHasCapability(session, "case.delete");

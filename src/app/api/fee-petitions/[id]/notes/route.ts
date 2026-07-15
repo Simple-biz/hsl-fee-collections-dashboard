@@ -100,11 +100,23 @@ export const POST = async (
       .where(eq(feePetitions.caseId, caseId));
 
     if (!petition) {
+      // onConflictDoNothing guards against a unique-constraint 500 when two
+      // concurrent first-note POSTs for the same untouched case race here.
       const [created] = await db
         .insert(feePetitions)
         .values({ caseId })
+        .onConflictDoNothing()
         .returning({ id: feePetitions.id });
-      petition = created;
+      if (created) {
+        petition = created;
+      } else {
+        // Another concurrent request won the INSERT race — re-fetch the row.
+        const [existing] = await db
+          .select({ id: feePetitions.id })
+          .from(feePetitions)
+          .where(eq(feePetitions.caseId, caseId));
+        petition = existing;
+      }
     }
 
     const author = guard.session.user?.name?.trim() || "Unknown";

@@ -306,6 +306,7 @@ export const FeePetitions = () => {
   const fetchAbortRef = useRef<AbortController | null>(null);
   const completedCountAbortRef = useRef<AbortController | null>(null);
   const allTotalsAbortRef = useRef<AbortController | null>(null);
+  const notesRefreshAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -451,6 +452,7 @@ export const FeePetitions = () => {
       delete patch.updateNote;
       delete patch.recentUpdate;
       delete patch.logCount;
+      delete patch.nextFollowUpDate;
       setRowOverrides((prev) => ({ ...prev, [id]: patch }));
       setFeeAmountOverrides((prev) => {
         if (!(id in prev)) return prev;
@@ -763,10 +765,12 @@ export const FeePetitions = () => {
   };
 
   const handleNotesChanged = async (caseId: number) => {
-    let cancelled = false;
+    notesRefreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    notesRefreshAbortRef.current = controller;
     try {
-      const res = await fetch(`/api/fee-petitions/${caseId}/notes`);
-      if (!res.ok || cancelled) return;
+      const res = await fetch(`/api/fee-petitions/${caseId}/notes`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to load notes (${res.status})`);
       const json = await res.json();
       const notes: { message: string }[] = json.data ?? [];
       setRows((prev) =>
@@ -776,10 +780,10 @@ export const FeePetitions = () => {
             : r,
         ),
       );
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       // ignore — badge stays stale, user can refresh manually
     }
-    return () => { cancelled = true; };
   };
 
   const downloadCsv = async () => {
