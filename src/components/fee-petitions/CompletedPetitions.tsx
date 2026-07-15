@@ -392,10 +392,10 @@ export const CompletedPetitions = ({ dark }: Props) => {
                       Claimant {sortIcon("claimant")}
                     </button>
                   </th>
-                  <th className={`${thBase} w-24 min-w-24 max-w-24 ${t.textSub} text-right sticky left-40 top-0 z-30 ${stickyHeaderBg}`}>
+                  <th className={`${thBase} w-24 min-w-24 max-w-24 overflow-hidden ${t.textSub} text-right sticky left-40 top-0 z-30 ${stickyHeaderBg}`}>
                     Fee Requested
                   </th>
-                  <th className={`${thBase} ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
+                  <th className={`${thBase} w-28 min-w-28 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
                     Fees Received
                   </th>
                   <th
@@ -499,7 +499,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
                         >
                           {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                         </td>
-                        <td className={`${tdBase} ${t.textMuted} text-right tabular-nums`}>
+                        <td className={`${tdBase} w-28 min-w-28 ${t.textMuted} text-right tabular-nums`}>
                           {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
