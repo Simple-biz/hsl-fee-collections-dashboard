@@ -16,7 +16,6 @@ import {
   RefreshCw,
   ChevronRight,
   Eye,
-  ClipboardList,
   Activity,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
