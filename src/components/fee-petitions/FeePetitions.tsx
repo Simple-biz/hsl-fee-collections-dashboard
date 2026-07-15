@@ -641,9 +641,6 @@ export const FeePetitions = () => {
             : r,
         ),
       );
-      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-      setTotal((tot) => Math.max(0, tot - ids.length));
-      fetchCompletedCount();
       clearSelection();
       if (snapshot.length > 0) {
         setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
@@ -710,9 +707,6 @@ export const FeePetitions = () => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
     const next = !prevRow[key];
-    const isComplete = CHECKBOX_COLUMNS.every((c) =>
-      c.key === key ? next : prevRow[c.key],
-    );
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: next } : r)));
     try {
       await patchPetition(id, { [key]: next });
@@ -720,11 +714,6 @@ export const FeePetitions = () => {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
       const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
       setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
-      if (isComplete) {
-        setRows((prev) => prev.filter((r) => r.id !== id));
-        setTotal((tot) => Math.max(0, tot - 1));
-        fetchCompletedCount();
-      }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
       setLiveMessage("Save failed");
@@ -732,10 +721,11 @@ export const FeePetitions = () => {
     }
   };
 
-  // Standalone from toggleCheckbox above — this isn't a filing-checklist step
-  // (doesn't count toward completedCount/isComplete), and checking it syncs
-  // Remarks to "FEE PETITION APPROVED" on Master Fees server-side (see
-  // upsertFeePetition). Unchecking only updates this column, not Remarks.
+  // This is what moves a petition to Completed Petitions now — independent
+  // of the filing checklist (toggleCheckbox above no longer does this).
+  // Checking it also syncs Remarks to "FEE PETITION APPROVED" on Master
+  // Fees server-side (see upsertFeePetition); unchecking only updates this
+  // column, not Remarks.
   const toggleFeePetitionApproved = async (id: number) => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
@@ -746,6 +736,11 @@ export const FeePetitions = () => {
       const today = new Date().toISOString().slice(0, 10);
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
       setLiveMessage(`Fee Petition Approved ${next ? "checked" : "unchecked"}`);
+      if (next) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setTotal((tot) => Math.max(0, tot - 1));
+        fetchCompletedCount();
+      }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, feePetitionApproved: !next } : r)));
       setLiveMessage("Save failed");
@@ -916,8 +911,8 @@ export const FeePetitions = () => {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
-          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fees received & filed" },
+          { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "not yet approved" },
+          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fee petition approved" },
           { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
           { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
         ].map((s) => (

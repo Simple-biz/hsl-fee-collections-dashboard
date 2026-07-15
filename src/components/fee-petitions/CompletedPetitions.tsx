@@ -37,6 +37,7 @@ interface CompletedRow {
   ltrToClmtWithSignature: boolean;
   ltrToAlj: boolean;
   faxConfFeePet: boolean;
+  feePetitionApproved: boolean;
   updateNote: string;
 }
 
@@ -220,6 +221,27 @@ export const CompletedPetitions = ({ dark }: Props) => {
     }
   };
 
+  // Fee Petition Approved is what put this row here (see route.ts's
+  // isApproved) — unchecking it moves the case back to Pending, so it's
+  // removed from this local list immediately rather than waiting on a
+  // refetch. The Pending table has its own refresh button to pick it back
+  // up; there's no live cross-component sync between the two tables.
+  const toggleApproved = async (row: CompletedRow) => {
+    const next = !row.feePetitionApproved;
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, feePetitionApproved: next } : r)));
+    try {
+      const result = await upsertFeePetition({ caseId: row.id, fields: { feePetitionApproved: next } });
+      if (!result.ok) throw new Error(result.error);
+      if (!next) {
+        setRows((prev) => prev.filter((r) => r.id !== row.id));
+        setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
+      }
+    } catch (err) {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, feePetitionApproved: !next } : r)));
+      setError((err as Error).message);
+    }
+  };
+
   const safeTotal = total ?? 0;
   const totalPages = Math.max(1, Math.ceil(safeTotal / pageSize));
   const rangeStart = safeTotal === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -235,7 +257,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
   // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + note
-  const colSpan = CHECKBOX_COLUMNS.length + 7;
+  const colSpan = CHECKBOX_COLUMNS.length + 8;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -412,6 +434,9 @@ export const CompletedPetitions = ({ dark }: Props) => {
                       {col.label}
                     </th>
                   ))}
+                  <th className={`${thBase} ${t.textSub} text-center border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>
+                    Fee Petition Approved
+                  </th>
                   <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
                     Update
                   </th>
@@ -483,12 +508,26 @@ export const CompletedPetitions = ({ dark }: Props) => {
                         <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo || "—"}</td>
                         {CHECKBOX_COLUMNS.map((col) => (
                           <td key={col.key} className={`${tdBase} text-center`}>
-                            <Check
-                              aria-hidden="true"
-                              className={`h-3.5 w-3.5 mx-auto ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                            />
+                            {row[col.key] ? (
+                              <Check
+                                aria-hidden="true"
+                                className={`h-3.5 w-3.5 mx-auto ${dark ? "text-emerald-400" : "text-emerald-600"}`}
+                              />
+                            ) : (
+                              <span className={t.textMuted}>—</span>
+                            )}
                           </td>
                         ))}
+                        <td className={`${tdBase} text-center border-l ${t.borderLight}`}>
+                          <input
+                            type="checkbox"
+                            checked={row.feePetitionApproved}
+                            onChange={() => toggleApproved(row)}
+                            aria-label={`Fee Petition Approved for ${row.claimant}`}
+                            title="Uncheck to move this case back to Pending"
+                            className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
+                          />
+                        </td>
                         <td className={`${tdBase}`}>
                           <NoteField
                             value={row.updateNote}
