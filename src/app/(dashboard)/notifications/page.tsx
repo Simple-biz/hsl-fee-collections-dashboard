@@ -20,7 +20,7 @@ import {
   Activity,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { AuditLogTab } from "@/components/notifications/AuditLogTab";
+import { PaymentsTab } from "@/components/notifications/PaymentsTab";
 import { RecentActivityTab } from "@/components/notifications/RecentActivityTab";
 import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 
@@ -42,7 +42,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "audit_logs" | "recent_activity" | "new_cases";
+type PageTab = "notifications" | "payments" | "recent_activity" | "new_cases";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -100,7 +100,7 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
 
 const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "notifications",   label: "Notifications",   icon: Bell },
-  { key: "audit_logs",      label: "Audit Logs",      icon: ClipboardList },
+  { key: "payments",        label: "Payments",        icon: DollarSign },
   { key: "recent_activity", label: "Recent Activity", icon: Activity },
   { key: "new_cases",       label: "New Cases",       icon: UserPlus },
 ];
@@ -279,8 +279,8 @@ export default function NotificationsPage() {
         ))}
       </div>
 
-      {/* Audit Logs tab */}
-      {pageTab === "audit_logs" && <AuditLogTab dark={dark} t={t} />}
+      {/* Payments tab */}
+      {pageTab === "payments" && <PaymentsTab dark={dark} t={t} />}
 
       {/* Recent Activity tab */}
       {pageTab === "recent_activity" && <RecentActivityTab dark={dark} t={t} />}
