@@ -10,7 +10,7 @@ import { feePetitions } from "@/lib/db/schema";
 // Notification types visible only to their assigned agent — nobody else,
 // including leads/admins, sees these (unlike the other types, which are
 // team-wide operational alerts visible to anyone with page access).
-const AGENT_ONLY_TYPES = new Set(["follow_up_due", "fee_payment"]);
+const AGENT_ONLY_TYPES = new Set(["follow_up_due"]);
 
 const postBodySchema = z.object({
   type: z.enum(["case_aging", "fee_payment", "call_target_missed", "case_assigned", "follow_up_due"]),
