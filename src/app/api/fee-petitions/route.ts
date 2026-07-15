@@ -181,23 +181,14 @@ export const GET = async (req: NextRequest) => {
     const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, rawLimit), 10000) : 50;
     const offset = (page - 1) * limit;
 
-    // All 6 checklist fields true (NULLs from LEFT JOIN coalesce to false).
-    // NOA dropped from the checklist — a petition can now be filed without it.
-    const allChecked = sql`(
-      COALESCE(${feePetitions.timeDelineation}, false)
-      AND COALESCE(${feePetitions.feePetitionDoc}, false)
-      AND COALESCE(${feePetitions.ltrToClmt}, false)
-      AND COALESCE(${feePetitions.ltrToClmtWithSignature}, false)
-      AND COALESCE(${feePetitions.ltrToAlj}, false)
-      AND COALESCE(${feePetitions.faxConfFeePet}, false)
-    )`;
-
-    // A petition only belongs in "Completed Petitions" once the checklist is
-    // done AND fees have actually been received — finishing the paperwork
-    // alone isn't enough to file it as complete. `allChecked` on its own
-    // still drives the per-row checklist progress badge (7/7) client-side,
-    // which intentionally stays independent of fee timing.
-    const isFullyComplete = sql`(${allChecked} AND COALESCE(${feeRecords.totalFeesPaid}, 0)::numeric > 0)`;
+    // A petition moves to "Completed Petitions" once staff check Fee
+    // Petition Approved — not tied to the filing checklist or fees received.
+    // Once approved, staff change the case's Level away from FEE_PETITION
+    // (removing it from this page entirely); Completed Petitions is the
+    // holding view of "approved, ready to move to Master Fee Records."
+    // The 6-item filing checklist still drives the per-row progress badge
+    // (via progressExpr below) but no longer gates section membership.
+    const isApproved = sql`COALESCE(${feePetitions.feePetitionApproved}, false)`;
 
     // Sum of checked boxes — used for progress sort
     const progressExpr = sql`(
@@ -211,9 +202,9 @@ export const GET = async (req: NextRequest) => {
 
     const statusClause =
       status === "complete"
-        ? sql`AND ${isFullyComplete}`
+        ? sql`AND ${isApproved}`
         : status === "incomplete"
-          ? sql`AND NOT ${isFullyComplete}`
+          ? sql`AND NOT ${isApproved}`
           : sql``;
 
     const searchClause = search
@@ -275,16 +266,14 @@ export const GET = async (req: NextRequest) => {
       .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
     const unassignedCount = assignedToRows.find((r) => r.assignedTo == null)?.caseCount ?? 0;
 
-    // Single aggregate for stats + count. Fee totals sum across the FULL
-    // filtered set (not just the current page), so they stay accurate
+    // Single aggregate for count and fee total. Sums across the FULL
+    // filtered set (not just the current page) so they stay accurate
     // regardless of pagination.
     const [agg] = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
-        completeCount: sql<number>`COUNT(*) FILTER (WHERE ${isFullyComplete})::int`,
-        neverTouchedCount: sql<number>`COUNT(*) FILTER (WHERE ${feePetitions.updatedAt} IS NULL)::int`,
+        completeCount: sql<number>`COUNT(*) FILTER (WHERE ${isApproved})::int`,
         totalFeeRequested: sql<number>`COALESCE(SUM(${feeRecords.totalFeesExpected}), 0)::numeric`,
-        totalFeesReceived: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}), 0)::numeric`,
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
@@ -293,10 +282,7 @@ export const GET = async (req: NextRequest) => {
 
     const total = agg?.total ?? 0;
     const completeCount = agg?.completeCount ?? 0;
-    const incompleteCount = total - completeCount;
-    const neverTouchedCount = agg?.neverTouchedCount ?? 0;
     const totalFeeRequested = Number(agg?.totalFeeRequested) || 0;
-    const totalFeesReceived = Number(agg?.totalFeesReceived) || 0;
 
     const orderClause =
       sort === "claimant"
@@ -325,10 +311,7 @@ export const GET = async (req: NextRequest) => {
       limit,
       total,
       completeCount,
-      incompleteCount,
-      neverTouchedCount,
       totalFeeRequested,
-      totalFeesReceived,
       assignees,
       unassignedCount,
     });

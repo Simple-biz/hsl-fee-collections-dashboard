@@ -28,7 +28,6 @@ interface CompletedRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
-  feesReceived: number | null;
   assignedTo: string | null;
   noa: boolean;
   timeDelineation: boolean;
@@ -37,6 +36,7 @@ interface CompletedRow {
   ltrToClmtWithSignature: boolean;
   ltrToAlj: boolean;
   faxConfFeePet: boolean;
+  feePetitionApproved: boolean;
   updateNote: string;
 }
 
@@ -73,7 +73,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<CompletedRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
-  const [totals, setTotals] = useState({ feeRequested: 0, feesReceived: 0 });
+  const [totals, setTotals] = useState({ feeRequested: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -158,7 +158,6 @@ export const CompletedPetitions = ({ dark }: Props) => {
       setTotal(typeof json.total === "number" ? json.total : 0);
       setTotals({
         feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-        feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
       });
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
@@ -216,6 +215,27 @@ export const CompletedPetitions = ({ dark }: Props) => {
       savedTimerRef.current.set(row.id, timer);
     } catch (err) {
       setNoteState((s) => ({ ...s, [row.id]: undefined }));
+      setError((err as Error).message);
+    }
+  };
+
+  // Fee Petition Approved is what put this row here (see route.ts's
+  // isApproved) — unchecking it moves the case back to Pending, so it's
+  // removed from this local list immediately rather than waiting on a
+  // refetch. The Pending table has its own refresh button to pick it back
+  // up; there's no live cross-component sync between the two tables.
+  const toggleApproved = async (row: CompletedRow) => {
+    const next = !row.feePetitionApproved;
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, feePetitionApproved: next } : r)));
+    try {
+      const result = await upsertFeePetition({ caseId: row.id, fields: { feePetitionApproved: next } });
+      if (!result.ok) throw new Error(result.error);
+      if (!next) {
+        setRows((prev) => prev.filter((r) => r.id !== row.id));
+        setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
+      }
+    } catch (err) {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, feePetitionApproved: !next } : r)));
       setError((err as Error).message);
     }
   };
@@ -289,7 +309,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
               </p>
               {safeTotal > 0 && (
                 <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-                  Fees Requested {fmt(totals.feeRequested)} · Fees Received {fmt(totals.feesReceived)}
+                  Fees Requested {fmt(totals.feeRequested)}
                 </p>
               )}
             </div>
@@ -374,9 +394,6 @@ export const CompletedPetitions = ({ dark }: Props) => {
                   <th className={`${thBase} w-24 min-w-24 max-w-24 ${t.textSub} text-right sticky left-40 top-0 z-30 ${stickyHeaderBg}`}>
                     Fee Requested
                   </th>
-                  <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    Fees Received
-                  </th>
                   <th
                     aria-sort={sortKey === "approvalDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                     className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -412,6 +429,9 @@ export const CompletedPetitions = ({ dark }: Props) => {
                       {col.label}
                     </th>
                   ))}
+                  <th className={`${thBase} ${t.textSub} text-center border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>
+                    Fee Petition Approved
+                  </th>
                   <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
                     Update
                   </th>
@@ -475,20 +495,31 @@ export const CompletedPetitions = ({ dark }: Props) => {
                         >
                           {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
                         </td>
-                        <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                          {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
-                        </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo || "—"}</td>
                         {CHECKBOX_COLUMNS.map((col) => (
                           <td key={col.key} className={`${tdBase} text-center`}>
-                            <Check
-                              aria-hidden="true"
-                              className={`h-3.5 w-3.5 mx-auto ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                            />
+                            {row[col.key] ? (
+                              <Check
+                                aria-hidden="true"
+                                className={`h-3.5 w-3.5 mx-auto ${dark ? "text-emerald-400" : "text-emerald-600"}`}
+                              />
+                            ) : (
+                              <span className={t.textMuted}>—</span>
+                            )}
                           </td>
                         ))}
+                        <td className={`${tdBase} text-center border-l ${t.borderLight}`}>
+                          <input
+                            type="checkbox"
+                            checked={row.feePetitionApproved}
+                            onChange={() => toggleApproved(row)}
+                            aria-label={`Fee Petition Approved for ${row.claimant}`}
+                            title="Uncheck to move this case back to Pending"
+                            className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
+                          />
+                        </td>
                         <td className={`${tdBase}`}>
                           <NoteField
                             value={row.updateNote}

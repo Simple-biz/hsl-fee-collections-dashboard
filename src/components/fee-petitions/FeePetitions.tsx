@@ -42,10 +42,9 @@ interface FeePetitionRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
-  feesReceived: number | null;
-  // Which fee_records benefit type Fee Requested/Fees Received edit —
-  // resolved server-side to whichever type actually has data (falling back
-  // to the case's registered claim type when nothing's entered yet).
+  // Which fee_records benefit type Fee Requested edits — resolved
+  // server-side to whichever type actually has data (falling back to the
+  // case's registered claim type when nothing's entered yet).
   activeFeeType: "t16" | "t2" | "aux";
   assignedTo: string | null;
   noa: boolean;
@@ -220,8 +219,8 @@ export const FeePetitions = () => {
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [bulkClearing, setBulkClearing] = useState(false);
-  const [bulkConfirming, setBulkConfirming] = useState(false);
+  const [bulkChecklistSaving, setBulkChecklistSaving] = useState(false);
+  const [bulkChecklistConfirming, setBulkChecklistConfirming] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{
     rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
@@ -342,14 +341,13 @@ export const FeePetitions = () => {
       .catch(() => {});
   }, []);
 
-  const [allTotals, setAllTotals] = useState<{ feeRequested: number; feesReceived: number } | null>(null);
+  const [allTotals, setAllTotals] = useState<{ feeRequested: number } | null>(null);
 
-  // Fees Requested/Received in the stats bar cover pending AND completed
-  // petitions together — fetched with no status filter (unlike fetchPetitions,
-  // which always scopes its own aggregate to incomplete for the row list).
-  // These only change when a payment is recorded on the case detail page, not
-  // from anything this page itself does — refreshed on window focus below
-  // rather than tied to any local action.
+  // Fees Requested in the stats bar covers pending AND completed petitions
+  // together — fetched with no status filter (unlike fetchPetitions, which
+  // always scopes its own aggregate to incomplete for the row list). Only
+  // changes when a payment is recorded on the case detail page, so refreshed
+  // on window focus below rather than tied to any local action.
   const fetchAllTotals = useCallback(() => {
     allTotalsAbortRef.current?.abort();
     const controller = new AbortController();
@@ -360,7 +358,6 @@ export const FeePetitions = () => {
         if (json != null && mountedRef.current) {
           setAllTotals({
             feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-            feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
           });
         }
       })
@@ -420,7 +417,7 @@ export const FeePetitions = () => {
       // would keep shadowing newer data for that row indefinitely.
       setRowOverrides({});
       setSelectedIds(new Set());
-      setBulkConfirming(false);
+      setBulkChecklistConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
       if (Array.isArray(json.assignees)) setAssignees(json.assignees);
       if (typeof json.unassignedCount === "number") setUnassignedCount(json.unassignedCount);
@@ -488,16 +485,14 @@ export const FeePetitions = () => {
   // (they're sums of t16/t2/aux Fee Due and Fee Received) — each cell edits
   // row.activeFeeType's column directly (resolved server-side to whichever
   // benefit type the case is actually using).
-  type FeeAmountField = "feeAmount" | "feesReceived";
   const [feeAmountEdit, setFeeAmountEdit] = useState<{
     rowId: number;
-    field: FeeAmountField;
     draft: string;
   } | null>(null);
   const [feeAmountSaving, setFeeAmountSaving] = useState(false);
   const [feeAmountError, setFeeAmountError] = useState<string | null>(null);
   const [feeAmountOverrides, setFeeAmountOverrides] = useState<
-    Record<number, Partial<Pick<FeePetitionRow, "feeAmount" | "feesReceived">>>
+    Record<number, Partial<Pick<FeePetitionRow, "feeAmount">>>
   >({});
   const feeAmountAbortRef = useRef<AbortController | null>(null);
 
@@ -520,10 +515,9 @@ export const FeePetitions = () => {
     }
     const row = rows.find((r) => r.id === feeAmountEdit.rowId);
     if (!row) return;
-    const dbField = feeAmountEdit.field === "feeAmount" ? "FeeDue" : "FeeReceived";
-    const patchField = `${row.activeFeeType}${dbField}`;
+    const patchField = `${row.activeFeeType}FeeDue`;
     const typeLabel = row.activeFeeType === "t16" ? "T16" : row.activeFeeType === "t2" ? "T2" : "AUX";
-    const label = `${typeLabel} ${feeAmountEdit.field === "feeAmount" ? "Fee Due" : "Received"}`;
+    const label = `${typeLabel} Fee Due`;
 
     feeAmountAbortRef.current?.abort();
     const controller = new AbortController();
@@ -546,7 +540,7 @@ export const FeePetitions = () => {
       }
       setFeeAmountOverrides((prev) => ({
         ...prev,
-        [row.id]: { ...prev[row.id], [feeAmountEdit.field]: amount },
+        [row.id]: { ...prev[row.id], feeAmount: amount },
       }));
       setFeeAmountEdit(null);
       fetchAllTotals();
@@ -587,7 +581,7 @@ export const FeePetitions = () => {
 
   const clearSelection = () => {
     setSelectedIds(new Set());
-    setBulkConfirming(false);
+    setBulkChecklistConfirming(false);
   };
 
   const toggleSelectAll = () => {
@@ -611,9 +605,9 @@ export const FeePetitions = () => {
     });
   };
 
-  const handleBulkMarkComplete = async () => {
-    if (selectedIds.size === 0 || bulkClearing) return;
-    setBulkClearing(true);
+  const handleBulkChecklistDone = async () => {
+    if (selectedIds.size === 0 || bulkChecklistSaving) return;
+    setBulkChecklistSaving(true);
     const ids = Array.from(selectedIds);
     const previouslyIncomplete = rows.filter(
       (r) => ids.includes(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
@@ -641,9 +635,6 @@ export const FeePetitions = () => {
             : r,
         ),
       );
-      setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
-      setTotal((tot) => Math.max(0, tot - ids.length));
-      fetchCompletedCount();
       clearSelection();
       if (snapshot.length > 0) {
         setUndoInfo({ rows: snapshot, expiresAt: Date.now() + 8000 });
@@ -651,7 +642,7 @@ export const FeePetitions = () => {
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBulkClearing(false);
+      setBulkChecklistSaving(false);
     }
   };
 
@@ -710,9 +701,6 @@ export const FeePetitions = () => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
     const next = !prevRow[key];
-    const isComplete = CHECKBOX_COLUMNS.every((c) =>
-      c.key === key ? next : prevRow[c.key],
-    );
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: next } : r)));
     try {
       await patchPetition(id, { [key]: next });
@@ -720,11 +708,6 @@ export const FeePetitions = () => {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
       const label = CHECKBOX_COLUMNS.find((c) => c.key === key)?.label ?? key;
       setLiveMessage(`${label} ${next ? "checked" : "unchecked"}`);
-      if (isComplete) {
-        setRows((prev) => prev.filter((r) => r.id !== id));
-        setTotal((tot) => Math.max(0, tot - 1));
-        fetchCompletedCount();
-      }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: !next } : r)));
       setLiveMessage("Save failed");
@@ -732,10 +715,11 @@ export const FeePetitions = () => {
     }
   };
 
-  // Standalone from toggleCheckbox above — this isn't a filing-checklist step
-  // (doesn't count toward completedCount/isComplete), and checking it syncs
-  // Remarks to "FEE PETITION APPROVED" on Master Fees server-side (see
-  // upsertFeePetition). Unchecking only updates this column, not Remarks.
+  // This is what moves a petition to Completed Petitions now — independent
+  // of the filing checklist (toggleCheckbox above no longer does this).
+  // Checking it also syncs Remarks to "FEE PETITION APPROVED" on Master
+  // Fees server-side (see upsertFeePetition); unchecking only updates this
+  // column, not Remarks.
   const toggleFeePetitionApproved = async (id: number) => {
     const prevRow = rows.find((r) => r.id === id);
     if (!prevRow) return;
@@ -746,6 +730,11 @@ export const FeePetitions = () => {
       const today = new Date().toISOString().slice(0, 10);
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, updatedAt: today } : r)));
       setLiveMessage(`Fee Petition Approved ${next ? "checked" : "unchecked"}`);
+      if (next) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setTotal((tot) => Math.max(0, tot - 1));
+        fetchCompletedCount();
+      }
     } catch (err) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, feePetitionApproved: !next } : r)));
       setLiveMessage("Save failed");
@@ -861,7 +850,7 @@ export const FeePetitions = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
-  const selectedIncompleteCount = rows.filter(
+  const selectedChecklistIncompleteCount = rows.filter(
     (r) => selectedIds.has(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
   ).length;
 
@@ -879,7 +868,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 11;
+  const colSpan = CHECKBOX_COLUMNS.length + 10;
 
   return (
     <div className="space-y-4">
@@ -914,12 +903,11 @@ export const FeePetitions = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "incomplete petitions" },
-          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fees received & filed" },
+          { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "not yet approved" },
+          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fee petitions filed & approved" },
           { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
-          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
@@ -947,7 +935,7 @@ export const FeePetitions = () => {
           className={`rounded-xl border p-3 flex items-center gap-3 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
         >
           <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
-          <span className="text-sm">Marked {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"} as complete.</span>
+          <span className="text-sm">Marked all checklist steps done for {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"}.</span>
           <button
             onClick={handleUndoBulk}
             disabled={undoing}
@@ -973,23 +961,23 @@ export const FeePetitions = () => {
           <div>
             {selectedIds.size > 0 ? (
               <div className="flex items-center gap-2 flex-wrap">
-                {bulkConfirming ? (
+                {bulkChecklistConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
-                      Mark {selectedIncompleteCount} case{selectedIncompleteCount !== 1 ? "s" : ""} as complete?
+                      Mark all steps done for {selectedChecklistIncompleteCount} case{selectedChecklistIncompleteCount !== 1 ? "s" : ""}?
                     </span>
                     <button
-                      onClick={handleBulkMarkComplete}
-                      disabled={bulkClearing || selectedIncompleteCount === 0}
+                      onClick={handleBulkChecklistDone}
+                      disabled={bulkChecklistSaving || selectedChecklistIncompleteCount === 0}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
-                      {bulkClearing
+                      {bulkChecklistSaving
                         ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
                         : <Check aria-hidden="true" className="h-3 w-3" />}
                       Confirm
                     </button>
                     <button
-                      onClick={() => setBulkConfirming(false)}
+                      onClick={() => setBulkChecklistConfirming(false)}
                       className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
                     >
                       Cancel
@@ -999,21 +987,21 @@ export const FeePetitions = () => {
                   <>
                     <span className={`text-sm font-bold ${t.text}`}>
                       {selectedIds.size} selected
-                      {selectedIncompleteCount < selectedIds.size && (
+                      {selectedChecklistIncompleteCount < selectedIds.size && (
                         <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-                          ({selectedIncompleteCount} to complete)
+                          ({selectedChecklistIncompleteCount} to check off)
                         </span>
                       )}
                     </span>
                     <button
-                      onClick={() => setBulkConfirming(true)}
-                      disabled={selectedIncompleteCount === 0}
-                      aria-label="Mark selected cases as complete"
-                      title={selectedIncompleteCount === 0 ? "All selected cases are already complete" : undefined}
+                      onClick={() => setBulkChecklistConfirming(true)}
+                      disabled={selectedChecklistIncompleteCount === 0}
+                      aria-label="Mark all checklist steps done for selected cases"
+                      title={selectedChecklistIncompleteCount === 0 ? "All selected cases already have all steps done" : undefined}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
-                      Mark Complete
+                      All Steps Done
                     </button>
                     <button
                       onClick={clearSelection}
@@ -1235,9 +1223,6 @@ export const FeePetitions = () => {
                 <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[256px] top-0 z-30 ${stickyHeaderBg}`}>
                   Fee Requested
                 </th>
-                <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
-                  Fees Received
-                </th>
                 <th
                   aria-sort={ariaSortFor("approvalDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -1381,7 +1366,7 @@ export const FeePetitions = () => {
                         className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[256px] z-10 ${stickyBg} ${stickyHover}`}
                       >
                         <FeeAmountCell
-                          active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feeAmount"}
+                          active={canEditFees && feeAmountEdit?.rowId === row.id}
                           value={row.feeAmount ?? 0}
                           draft={feeAmountEdit?.draft ?? ""}
                           saving={feeAmountSaving}
@@ -1392,28 +1377,7 @@ export const FeePetitions = () => {
                           hoverCls={t.hover}
                           textMuted={t.textMuted}
                           pencilRevealClass="opacity-0 group-hover/row:opacity-100"
-                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feeAmount", draft: String(row.feeAmount ?? 0) }); setFeeAmountError(null); }}
-                          onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                          onSave={saveFeeAmount}
-                          onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                        />
-                      </td>
-                      <td
-                        className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}
-                      >
-                        <FeeAmountCell
-                          active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feesReceived"}
-                          value={row.feesReceived ?? 0}
-                          draft={feeAmountEdit?.draft ?? ""}
-                          saving={feeAmountSaving}
-                          error={feeAmountError}
-                          canEdit={canEditFees}
-                          saveLabel="Fees Received"
-                          inputBg={t.inputBg}
-                          hoverCls={t.hover}
-                          textMuted={t.textMuted}
-                          pencilRevealClass="opacity-0 group-hover/row:opacity-100"
-                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feesReceived", draft: String(row.feesReceived ?? 0) }); setFeeAmountError(null); }}
+                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, draft: String(row.feeAmount ?? 0) }); setFeeAmountError(null); }}
                           onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                           onSave={saveFeeAmount}
                           onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
