@@ -28,7 +28,6 @@ interface CompletedRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
-  feesReceived: number | null;
   assignedTo: string | null;
   noa: boolean;
   timeDelineation: boolean;
@@ -74,7 +73,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<CompletedRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
-  const [totals, setTotals] = useState({ feeRequested: 0, feesReceived: 0 });
+  const [totals, setTotals] = useState({ feeRequested: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -159,7 +158,6 @@ export const CompletedPetitions = ({ dark }: Props) => {
       setTotal(typeof json.total === "number" ? json.total : 0);
       setTotals({
         feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-        feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
       });
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {

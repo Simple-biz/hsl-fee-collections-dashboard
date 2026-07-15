@@ -42,10 +42,9 @@ interface FeePetitionRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
-  feesReceived: number | null;
-  // Which fee_records benefit type Fee Requested/Fees Received edit —
-  // resolved server-side to whichever type actually has data (falling back
-  // to the case's registered claim type when nothing's entered yet).
+  // Which fee_records benefit type Fee Requested edits — resolved
+  // server-side to whichever type actually has data (falling back to the
+  // case's registered claim type when nothing's entered yet).
   activeFeeType: "t16" | "t2" | "aux";
   assignedTo: string | null;
   noa: boolean;
@@ -342,7 +341,7 @@ export const FeePetitions = () => {
       .catch(() => {});
   }, []);
 
-  const [allTotals, setAllTotals] = useState<{ feeRequested: number; feesReceived: number } | null>(null);
+  const [allTotals, setAllTotals] = useState<{ feeRequested: number } | null>(null);
 
   // Fees Requested/Received in the stats bar cover pending AND completed
   // petitions together — fetched with no status filter (unlike fetchPetitions,
@@ -360,7 +359,6 @@ export const FeePetitions = () => {
         if (json != null && mountedRef.current) {
           setAllTotals({
             feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
-            feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
           });
         }
       })
@@ -488,16 +486,14 @@ export const FeePetitions = () => {
   // (they're sums of t16/t2/aux Fee Due and Fee Received) — each cell edits
   // row.activeFeeType's column directly (resolved server-side to whichever
   // benefit type the case is actually using).
-  type FeeAmountField = "feeAmount" | "feesReceived";
   const [feeAmountEdit, setFeeAmountEdit] = useState<{
     rowId: number;
-    field: FeeAmountField;
     draft: string;
   } | null>(null);
   const [feeAmountSaving, setFeeAmountSaving] = useState(false);
   const [feeAmountError, setFeeAmountError] = useState<string | null>(null);
   const [feeAmountOverrides, setFeeAmountOverrides] = useState<
-    Record<number, Partial<Pick<FeePetitionRow, "feeAmount" | "feesReceived">>>
+    Record<number, Partial<Pick<FeePetitionRow, "feeAmount">>>
   >({});
   const feeAmountAbortRef = useRef<AbortController | null>(null);
 
@@ -520,10 +516,9 @@ export const FeePetitions = () => {
     }
     const row = rows.find((r) => r.id === feeAmountEdit.rowId);
     if (!row) return;
-    const dbField = feeAmountEdit.field === "feeAmount" ? "FeeDue" : "FeeReceived";
-    const patchField = `${row.activeFeeType}${dbField}`;
+    const patchField = `${row.activeFeeType}FeeDue`;
     const typeLabel = row.activeFeeType === "t16" ? "T16" : row.activeFeeType === "t2" ? "T2" : "AUX";
-    const label = `${typeLabel} ${feeAmountEdit.field === "feeAmount" ? "Fee Due" : "Received"}`;
+    const label = `${typeLabel} Fee Due`;
 
     feeAmountAbortRef.current?.abort();
     const controller = new AbortController();
@@ -546,7 +541,7 @@ export const FeePetitions = () => {
       }
       setFeeAmountOverrides((prev) => ({
         ...prev,
-        [row.id]: { ...prev[row.id], [feeAmountEdit.field]: amount },
+        [row.id]: { ...prev[row.id], feeAmount: amount },
       }));
       setFeeAmountEdit(null);
       fetchAllTotals();
@@ -1372,7 +1367,7 @@ export const FeePetitions = () => {
                         className={`${tdBase} w-24 ${t.text} text-right font-medium tabular-nums sticky left-[256px] z-10 ${stickyBg} ${stickyHover}`}
                       >
                         <FeeAmountCell
-                          active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feeAmount"}
+                          active={canEditFees && feeAmountEdit?.rowId === row.id}
                           value={row.feeAmount ?? 0}
                           draft={feeAmountEdit?.draft ?? ""}
                           saving={feeAmountSaving}
@@ -1383,7 +1378,7 @@ export const FeePetitions = () => {
                           hoverCls={t.hover}
                           textMuted={t.textMuted}
                           pencilRevealClass="opacity-0 group-hover/row:opacity-100"
-                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feeAmount", draft: String(row.feeAmount ?? 0) }); setFeeAmountError(null); }}
+                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, draft: String(row.feeAmount ?? 0) }); setFeeAmountError(null); }}
                           onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                           onSave={saveFeeAmount}
                           onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
