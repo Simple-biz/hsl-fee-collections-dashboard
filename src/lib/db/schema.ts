@@ -357,8 +357,11 @@ export const feePetitions = pgTable(
     // api/cases/[id]/route.ts for the two sync directions.
     feePetitionApproved: boolean("fee_petition_approved").notNull().default(false),
 
-    // Inline note
+    // Inline note (legacy — superseded by activity_log + feePetitionId)
     updateNote: text("update_note").notNull().default(""),
+
+    // Workflow
+    nextFollowUpDate: date("next_follow_up_date"),
 
     // Timestamps
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -385,6 +388,9 @@ export const activityLog = pgTable(
     feeRecordId: uuid("fee_record_id").references(() => feeRecords.id, {
       onDelete: "cascade",
     }),
+    feePetitionId: uuid("fee_petition_id").references(() => feePetitions.id, {
+      onDelete: "cascade",
+    }),
     message: text("message").notNull(),
     createdBy: varchar("created_by", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -395,6 +401,7 @@ export const activityLog = pgTable(
   (table) => [
     index("idx_activity_log_case_id").on(table.caseId),
     index("idx_activity_log_created_at").on(table.createdAt),
+    index("idx_activity_log_fee_petition_id").on(table.feePetitionId),
   ],
 );
 
@@ -880,11 +887,12 @@ export const userDetailsRelations = relations(userDetails, ({ one }) => ({
   }),
 }));
 
-export const feePetitionsRelations = relations(feePetitions, ({ one }) => ({
+export const feePetitionsRelations = relations(feePetitions, ({ one, many }) => ({
   case: one(cases, {
     fields: [feePetitions.caseId],
     references: [cases.clientId],
   }),
+  activityLogs: many(activityLog),
 }));
 
 export const feeRecordsRelations = relations(feeRecords, ({ one, many }) => ({
@@ -911,6 +919,10 @@ export const activityLogRelations = relations(activityLog, ({ one }) => ({
   feeRecord: one(feeRecords, {
     fields: [activityLog.feeRecordId],
     references: [feeRecords.id],
+  }),
+  feePetition: one(feePetitions, {
+    fields: [activityLog.feePetitionId],
+    references: [feePetitions.id],
   }),
 }));
 

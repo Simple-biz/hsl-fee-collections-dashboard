@@ -29,6 +29,9 @@ interface NotesModalProps {
   // posting, AND deleting (audience is already narrow, so any lead who can
   // post can also clean up their own entry).
   variant?: "notes" | "leader-notes";
+  // Override the full API base path (e.g. "/api/fee-petitions/123/notes").
+  // When set, variant is ignored for path construction.
+  apiPathOverride?: string;
 }
 
 export default function NotesModal({
@@ -38,12 +41,13 @@ export default function NotesModal({
   onClose,
   onChanged,
   variant = "notes",
+  apiPathOverride,
 }: NotesModalProps) {
   const t = themeClasses(dark);
   const { can } = useCapabilities();
   const { data: session } = useSession();
   const isLeader = variant === "leader-notes";
-  const apiPath = `/api/cases/${caseId}/${isLeader ? "leader-notes" : "notes"}`;
+  const apiPath = apiPathOverride ?? `/api/cases/${caseId}/${isLeader ? "leader-notes" : "notes"}`;
   // Leader notes keep their existing all-or-nothing gate. The general Case
   // Log instead lets a note's own author manage it, with case.delete as an
   // admin override — see canModifyNote below.

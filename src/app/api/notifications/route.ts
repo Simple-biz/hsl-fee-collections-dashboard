@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { eq, sql, desc, and, inArray } from "drizzle-orm";
 import { namesMatch } from "@/lib/formatters";
+import { feePetitions } from "@/lib/db/schema";
 
 // Notification types visible only to their assigned agent — nobody else,
 // including leads/admins, sees these (unlike the other types, which are
@@ -408,6 +409,38 @@ async function computeLiveAlerts() {
       severity: "warning",
       title: `Follow-up call due today — ${row.claimant}`,
       message: `A follow-up call is scheduled for today for ${row.claimant}.`,
+      caseId: row.client_id,
+      agentName: row.assigned_to || null,
+      isRead: false,
+      readAt: null,
+      createdAt: new Date(),
+    });
+  }
+
+  // 6. Fee petition follow-up calls due today (Jan / Racquel and other
+  // petition specialists who set next_follow_up_date on their cases)
+  const petitionFollowUpsDueToday = await db.execute(sql`
+    SELECT
+      c.client_id,
+      c.first_name || ' ' || c.last_name AS claimant,
+      fp.assigned_to
+    FROM ${feePetitions} fp
+    JOIN cases c ON c.client_id = fp.case_id
+    WHERE fp.next_follow_up_date = CURRENT_DATE
+    ORDER BY c.client_id
+  `);
+
+  for (const row of petitionFollowUpsDueToday as unknown as {
+    client_id: number;
+    claimant: string;
+    assigned_to: string | null;
+  }[]) {
+    alerts.push({
+      id: `live-petition-followup-${row.client_id}`,
+      type: "follow_up_due",
+      severity: "warning",
+      title: `Fee petition follow-up due today — ${row.claimant}`,
+      message: `A fee petition follow-up call is scheduled for today for ${row.claimant}.`,
       caseId: row.client_id,
       agentName: row.assigned_to || null,
       isRead: false,
