@@ -61,7 +61,7 @@ const TYPE_META: Record<
     darkColor: "text-emerald-400 bg-emerald-900/20 border-emerald-800/50",
   },
   call_target_missed: {
-    label: "Missed Calls",
+    label: "Calls Logged",
     icon: Phone,
     color: "text-amber-600 bg-amber-50 border-amber-200",
     darkColor: "text-amber-400 bg-amber-900/20 border-amber-800/50",
@@ -93,7 +93,7 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
   { key: "all", label: "All" },
   { key: "case_aging", label: "Case Aging" },
   { key: "fee_payment", label: "Payments" },
-  { key: "call_target_missed", label: "Missed Calls" },
+  { key: "call_target_missed", label: "Calls Logged" },
   { key: "case_assigned", label: "Assignments" },
   { key: "follow_up_due", label: "Follow-Ups" },
 ];

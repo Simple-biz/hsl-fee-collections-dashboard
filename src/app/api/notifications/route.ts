@@ -10,7 +10,7 @@ import { feePetitions } from "@/lib/db/schema";
 // Notification types visible only to their assigned agent — nobody else,
 // including leads/admins, sees these (unlike the other types, which are
 // team-wide operational alerts visible to anyone with page access).
-const AGENT_ONLY_TYPES = new Set(["follow_up_due"]);
+const AGENT_ONLY_TYPES = new Set(["follow_up_due", "fee_payment"]);
 
 const postBodySchema = z.object({
   type: z.enum(["case_aging", "fee_payment", "call_target_missed", "case_assigned", "follow_up_due"]),
@@ -324,6 +324,7 @@ async function computeLiveAlerts() {
       FROM team_members tm
       LEFT JOIN daily_metrics dm ON dm.agent_name = tm.name AND dm.metric_date = ${yesterdayStr}::date
       WHERE tm.is_active = TRUE
+        AND COALESCE(tm.role, '') != 'team_lead'
         AND (dm.id IS NULL OR (dm.ssa_calls = 0 AND dm.client_calls_ib = 0 AND dm.client_calls_ob = 0))
     `);
 
