@@ -50,20 +50,20 @@ interface OverpaidCaseRow {
 }
 
 type CheckboxKey = "checksCleared";
-type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo";
+type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo" | "createdAt";
 type SortDir = "asc" | "desc";
 type LtrFilter = "" | "none";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
-const SORT_KEYS: SortKey[] = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo"];
+const SORT_KEYS: SortKey[] = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo", "createdAt"];
 const DEFAULTS = {
   search: "",
   agent: "",
   ltr: "" as LtrFilter,
   minAmount: "",
   maxAmount: "",
-  sort: "overpaidAmount" as SortKey,
+  sort: "createdAt" as SortKey,
   dir: "desc" as SortDir,
   page: 1,
   pageSize: 50,
