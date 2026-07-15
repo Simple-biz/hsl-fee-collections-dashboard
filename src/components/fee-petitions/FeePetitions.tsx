@@ -219,8 +219,8 @@ export const FeePetitions = () => {
   const [sortDir, setSortDir] = useState<SortDir>(initialState.dir);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [bulkClearing, setBulkClearing] = useState(false);
-  const [bulkConfirming, setBulkConfirming] = useState(false);
+  const [bulkChecklistSaving, setBulkChecklistSaving] = useState(false);
+  const [bulkChecklistConfirming, setBulkChecklistConfirming] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{
     rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
@@ -417,7 +417,7 @@ export const FeePetitions = () => {
       // would keep shadowing newer data for that row indefinitely.
       setRowOverrides({});
       setSelectedIds(new Set());
-      setBulkConfirming(false);
+      setBulkChecklistConfirming(false);
       setTotal(typeof json.total === "number" ? json.total : data.length);
       if (Array.isArray(json.assignees)) setAssignees(json.assignees);
       if (typeof json.unassignedCount === "number") setUnassignedCount(json.unassignedCount);
@@ -581,7 +581,7 @@ export const FeePetitions = () => {
 
   const clearSelection = () => {
     setSelectedIds(new Set());
-    setBulkConfirming(false);
+    setBulkChecklistConfirming(false);
   };
 
   const toggleSelectAll = () => {
@@ -605,9 +605,9 @@ export const FeePetitions = () => {
     });
   };
 
-  const handleBulkMarkComplete = async () => {
-    if (selectedIds.size === 0 || bulkClearing) return;
-    setBulkClearing(true);
+  const handleBulkChecklistDone = async () => {
+    if (selectedIds.size === 0 || bulkChecklistSaving) return;
+    setBulkChecklistSaving(true);
     const ids = Array.from(selectedIds);
     const previouslyIncomplete = rows.filter(
       (r) => ids.includes(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
@@ -642,7 +642,7 @@ export const FeePetitions = () => {
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBulkClearing(false);
+      setBulkChecklistSaving(false);
     }
   };
 
@@ -850,7 +850,7 @@ export const FeePetitions = () => {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
-  const selectedIncompleteCount = rows.filter(
+  const selectedChecklistIncompleteCount = rows.filter(
     (r) => selectedIds.has(r.id) && !CHECKBOX_COLUMNS.every((c) => r[c.key]),
   ).length;
 
@@ -935,7 +935,7 @@ export const FeePetitions = () => {
           className={`rounded-xl border p-3 flex items-center gap-3 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
         >
           <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
-          <span className="text-sm">Marked {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"} as complete.</span>
+          <span className="text-sm">Marked all checklist steps done for {undoInfo.rows.length} case{undoInfo.rows.length === 1 ? "" : "s"}.</span>
           <button
             onClick={handleUndoBulk}
             disabled={undoing}
@@ -961,23 +961,23 @@ export const FeePetitions = () => {
           <div>
             {selectedIds.size > 0 ? (
               <div className="flex items-center gap-2 flex-wrap">
-                {bulkConfirming ? (
+                {bulkChecklistConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
-                      Mark {selectedIncompleteCount} case{selectedIncompleteCount !== 1 ? "s" : ""} as complete?
+                      Mark all steps done for {selectedChecklistIncompleteCount} case{selectedChecklistIncompleteCount !== 1 ? "s" : ""}?
                     </span>
                     <button
-                      onClick={handleBulkMarkComplete}
-                      disabled={bulkClearing || selectedIncompleteCount === 0}
+                      onClick={handleBulkChecklistDone}
+                      disabled={bulkChecklistSaving || selectedChecklistIncompleteCount === 0}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
-                      {bulkClearing
+                      {bulkChecklistSaving
                         ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
                         : <Check aria-hidden="true" className="h-3 w-3" />}
                       Confirm
                     </button>
                     <button
-                      onClick={() => setBulkConfirming(false)}
+                      onClick={() => setBulkChecklistConfirming(false)}
                       className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
                     >
                       Cancel
@@ -987,17 +987,17 @@ export const FeePetitions = () => {
                   <>
                     <span className={`text-sm font-bold ${t.text}`}>
                       {selectedIds.size} selected
-                      {selectedIncompleteCount < selectedIds.size && (
+                      {selectedChecklistIncompleteCount < selectedIds.size && (
                         <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-                          ({selectedIncompleteCount} to check off)
+                          ({selectedChecklistIncompleteCount} to check off)
                         </span>
                       )}
                     </span>
                     <button
-                      onClick={() => setBulkConfirming(true)}
-                      disabled={selectedIncompleteCount === 0}
+                      onClick={() => setBulkChecklistConfirming(true)}
+                      disabled={selectedChecklistIncompleteCount === 0}
                       aria-label="Mark all checklist steps done for selected cases"
-                      title={selectedIncompleteCount === 0 ? "All selected cases already have all steps done" : undefined}
+                      title={selectedChecklistIncompleteCount === 0 ? "All selected cases already have all steps done" : undefined}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
