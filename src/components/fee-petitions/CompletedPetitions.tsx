@@ -257,7 +257,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
   // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + note
-  const colSpan = CHECKBOX_COLUMNS.length + 8;
+  const colSpan = CHECKBOX_COLUMNS.length + 7;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -311,7 +311,7 @@ export const CompletedPetitions = ({ dark }: Props) => {
               </p>
               {safeTotal > 0 && (
                 <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-                  Fees Requested {fmt(totals.feeRequested)} · Fees Received {fmt(totals.feesReceived)}
+                  Fees Requested {fmt(totals.feeRequested)}
                 </p>
               )}
             </div>
@@ -395,9 +395,6 @@ export const CompletedPetitions = ({ dark }: Props) => {
                   </th>
                   <th className={`${thBase} w-24 min-w-24 max-w-24 ${t.textSub} text-right sticky left-40 top-0 z-30 ${stickyHeaderBg}`}>
                     Fee Requested
-                  </th>
-                  <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    Fees Received
                   </th>
                   <th
                     aria-sort={sortKey === "approvalDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
@@ -499,9 +496,6 @@ export const CompletedPetitions = ({ dark }: Props) => {
                           className={`${tdBase} w-24 min-w-24 max-w-24 ${t.text} text-right font-medium tabular-nums sticky left-40 z-10 ${stickyBg} ${stickyHover}`}
                         >
                           {row.feeAmount != null ? fmt(row.feeAmount) : "—"}
-                        </td>
-                        <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
-                          {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                         </td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.approvalDate)}</td>
                         <td className={`${tdBase} ${t.textMuted}`}>{fmtDate(row.updatedAt)}</td>

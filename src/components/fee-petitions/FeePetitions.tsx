@@ -874,7 +874,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 11;
+  const colSpan = CHECKBOX_COLUMNS.length + 10;
 
   return (
     <div className="space-y-4">
@@ -909,12 +909,11 @@ export const FeePetitions = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "not yet approved" },
-          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fee petition approved" },
+          { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fee petitions filed & approved" },
           { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
-          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
@@ -1230,9 +1229,6 @@ export const FeePetitions = () => {
                 <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[256px] top-0 z-30 ${stickyHeaderBg}`}>
                   Fee Requested
                 </th>
-                <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
-                  Fees Received
-                </th>
                 <th
                   aria-sort={ariaSortFor("approvalDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -1388,27 +1384,6 @@ export const FeePetitions = () => {
                           textMuted={t.textMuted}
                           pencilRevealClass="opacity-0 group-hover/row:opacity-100"
                           onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feeAmount", draft: String(row.feeAmount ?? 0) }); setFeeAmountError(null); }}
-                          onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                          onSave={saveFeeAmount}
-                          onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                        />
-                      </td>
-                      <td
-                        className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}
-                      >
-                        <FeeAmountCell
-                          active={canEditFees && feeAmountEdit?.rowId === row.id && feeAmountEdit.field === "feesReceived"}
-                          value={row.feesReceived ?? 0}
-                          draft={feeAmountEdit?.draft ?? ""}
-                          saving={feeAmountSaving}
-                          error={feeAmountError}
-                          canEdit={canEditFees}
-                          saveLabel="Fees Received"
-                          inputBg={t.inputBg}
-                          hoverCls={t.hover}
-                          textMuted={t.textMuted}
-                          pencilRevealClass="opacity-0 group-hover/row:opacity-100"
-                          onEdit={() => { setFeeAmountEdit({ rowId: row.id, field: "feesReceived", draft: String(row.feesReceived ?? 0) }); setFeeAmountError(null); }}
                           onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
                           onSave={saveFeeAmount}
                           onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
