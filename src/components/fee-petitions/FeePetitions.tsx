@@ -67,7 +67,7 @@ type CheckboxKey =
   | "ltrToClmtWithSignature"
   | "ltrToAlj"
   | "faxConfFeePet";
-type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress";
+type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress" | "createdAt";
 type SortDir = "asc" | "desc";
 type TouchedFilter = "" | "none";
 type MissingFilter = "" | CheckboxKey;
@@ -76,7 +76,7 @@ type Assignee = { name: string; count: number };
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
-const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress"];
+const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt"];
 const CHECKBOX_KEYS = ["timeDelineation", "feePetitionDoc", "ltrToClmt", "ltrToClmtWithSignature", "ltrToAlj", "faxConfFeePet"] as const;
 
 const daysSince = (dateStr: string | null): number | null => {
@@ -98,7 +98,7 @@ const DEFAULTS = {
   missing: "" as MissingFilter,
   aging: "" as AgingFilter,
   assignedTo: "",
-  sort: "approvalDate" as SortKey,
+  sort: "createdAt" as SortKey,
   dir: "desc" as SortDir,
   page: 1,
   pageSize: 50,
