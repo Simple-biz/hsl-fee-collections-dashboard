@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { teamMembers, feeRecords } from "@/lib/db/schema";
+import { teamMembers, feeRecords, feePetitions, notifications } from "@/lib/db/schema";
 import { eq, sql, count, sum, and } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
@@ -165,8 +165,16 @@ export const PATCH = async (req: NextRequest) => {
       );
     }
 
-    // If renaming, cascade to fee_records.assigned_to
-    if (updates.name) {
+    // If renaming, cascade to all tables that store agent name as a bare
+    // varchar (no FK). Columns with ON UPDATE CASCADE are handled by Postgres.
+    //
+    // Unguarded columns that need manual cascade here:
+    //   - fee_records.assigned_to         (no FK)
+    //   - fee_petitions.assigned_to        (no FK)
+    //   - notifications.agent_name         (no FK)
+    // Guarded by ON UPDATE CASCADE (Postgres handles automatically):
+    //   - daily_metrics.agent_name         (FK → team_members.name ON UPDATE CASCADE)
+    if (updates.name != null) {
       const [existing] = await db
         .select({ name: teamMembers.name })
         .from(teamMembers)
@@ -199,13 +207,33 @@ export const PATCH = async (req: NextRequest) => {
           );
         }
 
-        // Cascade rename to fee_records (string reference, no FK).
-        // daily_metrics.agent_name has ON UPDATE CASCADE on its FK to
-        // team_members.name, so Postgres cascades that automatically.
-        await db
-          .update(feeRecords)
-          .set({ assignedTo: updates.name as string })
-          .where(eq(feeRecords.assignedTo, existing.name));
+        // Wrap the entire rename in a transaction so a partial failure
+        // (e.g. teamMembers update succeeds but a cascade fails) rolls
+        // back all changes atomically.
+        const [updated] = await db.transaction(async (tx) => {
+          await tx
+            .update(feeRecords)
+            .set({ assignedTo: updates.name as string })
+            .where(eq(feeRecords.assignedTo, existing.name));
+          await tx
+            .update(feePetitions)
+            .set({ assignedTo: updates.name as string })
+            .where(eq(feePetitions.assignedTo, existing.name));
+          await tx
+            .update(notifications)
+            .set({ agentName: updates.name as string })
+            .where(eq(notifications.agentName, existing.name));
+          return tx
+            .update(teamMembers)
+            .set(updates)
+            .where(eq(teamMembers.id, id))
+            .returning();
+        });
+
+        if (!updated) {
+          return NextResponse.json({ error: "Team member not found" }, { status: 404 });
+        }
+        return NextResponse.json({ data: updated });
       }
     }
 
