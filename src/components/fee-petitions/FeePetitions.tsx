@@ -343,12 +343,11 @@ export const FeePetitions = () => {
 
   const [allTotals, setAllTotals] = useState<{ feeRequested: number } | null>(null);
 
-  // Fees Requested/Received in the stats bar cover pending AND completed
-  // petitions together — fetched with no status filter (unlike fetchPetitions,
-  // which always scopes its own aggregate to incomplete for the row list).
-  // These only change when a payment is recorded on the case detail page, not
-  // from anything this page itself does — refreshed on window focus below
-  // rather than tied to any local action.
+  // Fees Requested in the stats bar covers pending AND completed petitions
+  // together — fetched with no status filter (unlike fetchPetitions, which
+  // always scopes its own aggregate to incomplete for the row list). Only
+  // changes when a payment is recorded on the case detail page, so refreshed
+  // on window focus below rather than tied to any local action.
   const fetchAllTotals = useCallback(() => {
     allTotalsAbortRef.current?.abort();
     const controller = new AbortController();
@@ -990,19 +989,19 @@ export const FeePetitions = () => {
                       {selectedIds.size} selected
                       {selectedIncompleteCount < selectedIds.size && (
                         <span className={`ml-1.5 font-normal ${t.textMuted}`}>
-                          ({selectedIncompleteCount} to complete)
+                          ({selectedIncompleteCount} to check off)
                         </span>
                       )}
                     </span>
                     <button
                       onClick={() => setBulkConfirming(true)}
                       disabled={selectedIncompleteCount === 0}
-                      aria-label="Mark selected cases as complete"
-                      title={selectedIncompleteCount === 0 ? "All selected cases are already complete" : undefined}
+                      aria-label="Mark all checklist steps done for selected cases"
+                      title={selectedIncompleteCount === 0 ? "All selected cases already have all steps done" : undefined}
                       className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
-                      Mark Complete
+                      All Steps Done
                     </button>
                     <button
                       onClick={clearSelection}

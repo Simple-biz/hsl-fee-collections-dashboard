@@ -266,16 +266,14 @@ export const GET = async (req: NextRequest) => {
       .map((r) => ({ name: r.assignedTo, count: r.caseCount }));
     const unassignedCount = assignedToRows.find((r) => r.assignedTo == null)?.caseCount ?? 0;
 
-    // Single aggregate for stats + count. Fee totals sum across the FULL
-    // filtered set (not just the current page), so they stay accurate
+    // Single aggregate for count and fee total. Sums across the FULL
+    // filtered set (not just the current page) so they stay accurate
     // regardless of pagination.
     const [agg] = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
         completeCount: sql<number>`COUNT(*) FILTER (WHERE ${isApproved})::int`,
-        neverTouchedCount: sql<number>`COUNT(*) FILTER (WHERE ${feePetitions.updatedAt} IS NULL)::int`,
         totalFeeRequested: sql<number>`COALESCE(SUM(${feeRecords.totalFeesExpected}), 0)::numeric`,
-        totalFeesReceived: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}), 0)::numeric`,
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
@@ -284,10 +282,7 @@ export const GET = async (req: NextRequest) => {
 
     const total = agg?.total ?? 0;
     const completeCount = agg?.completeCount ?? 0;
-    const incompleteCount = total - completeCount;
-    const neverTouchedCount = agg?.neverTouchedCount ?? 0;
     const totalFeeRequested = Number(agg?.totalFeeRequested) || 0;
-    const totalFeesReceived = Number(agg?.totalFeesReceived) || 0;
 
     const orderClause =
       sort === "claimant"
@@ -316,10 +311,7 @@ export const GET = async (req: NextRequest) => {
       limit,
       total,
       completeCount,
-      incompleteCount,
-      neverTouchedCount,
       totalFeeRequested,
-      totalFeesReceived,
       assignees,
       unassignedCount,
     });
