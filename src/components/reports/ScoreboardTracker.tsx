@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Phone,
   Search,
-  AlertTriangle,
   AlertCircle,
   Pencil,
   Save,
@@ -49,7 +48,7 @@ interface AgentScore {
   unpaidT16Over90: number;
   unpaidConcOver90: number;
   totalCollected: number;
-  feesCollectedInWindow: number;
+  feesCollectedInWindow: number | null;
   casesFullFee: number;
   weekSsaCalls: number;
   weekClientCalls: number;
@@ -164,10 +163,6 @@ const fmtRangeDate = (iso: string): string =>
 const cellKey = (agent: string, date: string): CellKey => `${agent}|${date}`;
 const EMPTY_CELL: CellValues = { ssaCalls: "", clientCallsIb: "", clientCallsOb: "", winSheetsCreated: "", faxSent: "" };
 
-const hasOverdue = (a: AgentScore, t2d: 60 | 90, t16d: 60 | 90, concd: 60 | 90) =>
-  (t2d === 60 ? a.unpaidT2Over60 : a.unpaidT2Over90) +
-  (t16d === 60 ? a.unpaidT16Over60 : a.unpaidT16Over90) +
-  (concd === 60 ? a.unpaidConcOver60 : a.unpaidConcOver90) > 0;
 
 // ---------- component ----------
 
@@ -187,10 +182,6 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   // The T2/T16/Conc aging columns (and their 60d/90d toggle buttons) were
   // removed from the table, but "Needs attention" still checks these
   // thresholds under the hood — fixed at 60d since there's no UI to change it.
-  const t2Days: 60 | 90 = 60;
-  const t16Days: 60 | 90 = 60;
-  const concDays: 60 | 90 = 60;
-  const [needsAttention, setNeedsAttention] = useState(false);
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
 
   const [dateMode, setDateMode] = useState<DateMode>("week");
@@ -367,19 +358,21 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       .filter((a) => {
         if (q && !a.agent.toLowerCase().includes(q)) return false;
         if (teamFilter !== "all" && a.team !== teamFilter) return false;
-        if (needsAttention && !hasOverdue(a, t2Days, t16Days, concDays)) return false;
         return true;
       })
       // Alphabetical by name — the underlying query orders by team then
       // name, which left agents with no team (a handful of departed staff)
       // clustered at the very bottom instead of sorted in with everyone else.
       .sort((a, b) => a.agent.localeCompare(b.agent));
-  }, [data, agentSearch, teamFilter, t2Days, t16Days, concDays, needsAttention]);
+  }, [data, agentSearch, teamFilter]);
 
   const filteredTotals = useMemo(() => ({
     casesAssigned:      filteredAgents.reduce((s, a) => s + a.casesAssigned, 0),
-    openCases:          filteredAgents.reduce((s, a) => s + a.openCases, 0),
-    casesClosed:        filteredAgents.reduce((s, a) => s + a.casesClosed, 0),
+    // Fee Petition specialists' open/closed counts are excluded from totals —
+    // their cases are originally assigned from regular agents' pools, so
+    // including them would double-count against the team's actual case numbers.
+    openCases:          filteredAgents.reduce((s, a) => a.team === "Fee Petition" ? s : s + a.openCases, 0),
+    casesClosed:        filteredAgents.reduce((s, a) => a.team === "Fee Petition" ? s : s + a.casesClosed, 0),
     weekSsaCalls:       filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
     weekClientCalls:    filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
     weekFaxSent:        filteredAgents.reduce((s, a) => s + a.weekFaxSent, 0),
@@ -391,7 +384,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     unpaidT16Over90:    filteredAgents.reduce((s, a) => s + a.unpaidT16Over90, 0),
     unpaidConcOver90:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver90, 0),
     totalCollected:     filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
-    feesCollectedInWindow: filteredAgents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
+    feesCollectedInWindow: filteredAgents.reduce((s, a) => s + (a.feesCollectedInWindow ?? 0), 0),
     casesFullFee:       filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
     openNoFees:         filteredAgents.reduce((s, a) => s + a.openNoFees, 0),
     openPartial:        filteredAgents.reduce((s, a) => s + a.openPartial, 0),
@@ -832,6 +825,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <option value="T2">T2</option>
                 <option value="T16">T16</option>
                 <option value="Concurrent">Concurrent</option>
+                <option value="Fee Petition">Fee Petition</option>
               </select>
               <select
                 value={metricFocus}
@@ -843,20 +837,6 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
-              <button
-                onClick={() => setNeedsAttention((v) => !v)}
-                aria-pressed={needsAttention}
-                className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                  needsAttention
-                    ? dark
-                      ? "bg-red-900/30 border-red-700 text-red-300"
-                      : "bg-red-50 border-red-300 text-red-700"
-                    : `${t.outlineBtn} border`
-                }`}
-              >
-                <AlertTriangle aria-hidden="true" className="h-3 w-3" />
-                Needs attention
-              </button>
               <span className={`ml-auto text-[13px] ${t.textMuted}`}>
                 {filteredAgents.length} of {data.agents.length} agents
               </span>
@@ -896,11 +876,23 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         </span>
                       </td>
                       {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}
-                      {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
+                      {showCol("closedcases") && (
+                        <td className={`${tdBase} text-right ${t.textSub}`}>
+                          {a.casesClosed}
+                          {a.team === "Fee Petition" && a.casesClosed > 0 && (
+                            <span
+                              title="All-time total — no completion date available for fee petitions"
+                              className={`ml-1 text-[10px] ${t.textMuted}`}
+                            >
+                              *
+                            </span>
+                          )}
+                        </td>
+                      )}
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
                       {showCol("collected") && (
-                        <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
-                          {fmt(a.feesCollectedInWindow)}
+                        <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow != null && a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
+                          {a.feesCollectedInWindow != null ? fmt(a.feesCollectedInWindow) : "—"}
                         </td>
                       )}
                       {showCol("ssacalls")    && <td className={`${tdBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{a.weekSsaCalls}</td>}
@@ -916,7 +908,15 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.openCases}</td>}
                     {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
                     {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
-                    {showCol("collected")   && <td className={`${tdBase} text-right font-bold text-emerald-500`}>{fmt(filteredTotals.feesCollectedInWindow)}</td>}
+                    {showCol("collected")   && (() => {
+                      const allNull = filteredAgents.every(a => a.feesCollectedInWindow == null);
+                      const total = filteredTotals.feesCollectedInWindow;
+                      return (
+                        <td className={`${tdBase} text-right font-bold ${!allNull && total > 0 ? "text-emerald-500" : t.textMuted}`}>
+                          {allNull ? "—" : fmt(total)}
+                        </td>
+                      );
+                    })()}
                     {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{filteredTotals.weekSsaCalls}</td>}
                     {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
