@@ -32,9 +32,11 @@ const VISUALS: Record<
 // dropdown_options.case_level rows are free-text (admin-managed in Settings),
 // so normalize before matching — seed data uses "FEE PETITION" but the list
 // could just as easily contain "Fee_Petition" or "fee petition".
-function normalize(level: string): string {
+export function normalizeCaseLevel(level: string): string {
   return level.trim().toUpperCase().replace(/[_\s]+/g, " ");
 }
+// Internal alias kept for existing callers in this file
+const normalize = normalizeCaseLevel;
 
 // Returns null for anything unrecognized (a level an admin added that isn't
 // one of the seeded ones) — callers should render without an icon chip

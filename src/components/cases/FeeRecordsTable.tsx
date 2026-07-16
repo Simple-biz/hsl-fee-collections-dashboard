@@ -50,7 +50,7 @@ import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
 import { BulkFeesClosedConfirmDialog } from "./BulkFeesClosedConfirmDialog";
 import { Listbox } from "@/components/shared/Listbox";
-import { caseLevelVisual } from "@/lib/case-level-icons";
+import { caseLevelVisual, normalizeCaseLevel } from "@/lib/case-level-icons";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
@@ -287,6 +287,7 @@ export const FeeRecordsTable = ({
   const [feesConfFilter, setFeesConfFilter] = useState("all");
   const [claimFilter, setClaimFilter] = useState("all");
   const [caseStatusFilter, setCaseStatusFilter] = useState("all");
+  const [levelFilter, setLevelFilter] = useState("all");
   // Minimized T16/T2/AUX column groups — collapses a claim type's 5 editable
   // columns down to a single read-only Fee Due glance, so staff working a
   // single claim type can't mistakenly enter Retro/Fee Due on the wrong one.
@@ -535,6 +536,8 @@ export const FeeRecordsTable = ({
       d = d.filter((c) => c.claim === claimFilter);
     if (caseStatusFilter !== "all")
       d = d.filter((c) => c.caseStatus === caseStatusFilter);
+    if (levelFilter !== "all")
+      d = d.filter((c) => normalizeCaseLevel(c.level) === normalizeCaseLevel(levelFilter));
 
     d.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -595,6 +598,7 @@ export const FeeRecordsTable = ({
     feesConfFilter,
     claimFilter,
     caseStatusFilter,
+    levelFilter,
     sortKey,
     sortDir,
     dateRange,
@@ -1094,6 +1098,16 @@ export const FeeRecordsTable = ({
             <option value="T2">T2</option>
             <option value="T16">T16</option>
             <option value="CONC">CONC</option>
+          </select>
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+          >
+            <option value="all">All Levels</option>
+            {caseLevelOptions.map((o) => (
+              <option key={o.name} value={o.name}>{o.name}</option>
+            ))}
           </select>
           <select
             value={statusFilter}
