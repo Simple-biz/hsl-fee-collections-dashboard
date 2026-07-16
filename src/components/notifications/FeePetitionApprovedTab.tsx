@@ -165,7 +165,7 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
         {/* Daily table */}
         {!loading && !error && days.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-100">
+            <table className="w-full min-w-100 border-collapse">
               <thead>
                 <tr className={`border-b ${t.borderLight}`}>
                   <th className={`${thBase} ${t.textSub} text-left`}>Day</th>
@@ -188,7 +188,7 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
                       )}
                     </td>
                     <td className={`${tdBase} text-right font-semibold tabular-nums ${d.count > 0 ? t.text : t.textMuted}`}>
-                      {d.count || "—"}
+                      {d.count > 0 ? d.count : "—"}
                     </td>
                     <td className={`${tdBase} w-1/2`}>
                       <div className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
