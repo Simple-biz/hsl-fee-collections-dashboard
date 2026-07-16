@@ -659,6 +659,8 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         className={`${inputCls} cursor-pointer disabled:opacity-50 disabled:cursor-default`}
                       >
                         <option value="">— Assign —</option>
+                        {/* POC = Point of Contact — non-agent assignment for general inbound tracking */}
+                        <option value="POC">POC</option>
                         {teamMembers.map((name) => (
                           <option key={name} value={name}>{name}</option>
                         ))}
