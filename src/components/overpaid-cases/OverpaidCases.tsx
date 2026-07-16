@@ -1222,7 +1222,7 @@ export const OverpaidCases = () => {
                     Overpaid Amount {sortIcon("overpaidAmount")}
                   </button>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>PIF</th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg} min-w-28`}>PIF</th>
                 <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Notice Sent</th>
                 <th
                   aria-sort={ariaSortFor("opLtrDate")}
@@ -1356,7 +1356,7 @@ export const OverpaidCases = () => {
                           )}
                         </div>
                       </td>
-                      <td className={`${tdBase}`}>
+                      <td className={`${tdBase} min-w-28`}>
                         <div className="relative">
                           <input
                             type="text"
