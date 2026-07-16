@@ -436,7 +436,8 @@ export const GET = async (req: NextRequest) => {
         c.level_won AS level_won,
         c.claim_type_label AS claim_type_label,
         c.approval_date AS approval_date,
-        (CURRENT_DATE - c.approval_date)::int AS days_since_approval
+        (CURRENT_DATE - c.approval_date)::int AS days_since_approval,
+        (fr.case_status = 'FEE PETITION APPROVED') AS fee_petition_approved
       FROM fee_records fr
       JOIN cases c ON c.client_id = fr.case_id
       WHERE fr.is_closed = FALSE
@@ -454,6 +455,7 @@ export const GET = async (req: NextRequest) => {
       claim_type_label: string | null;
       approval_date: string | null;
       days_since_approval: number;
+      fee_petition_approved: boolean;
     }[];
 
     const noFeesCases = noFeesCaseRows.map((r) => ({
@@ -465,6 +467,7 @@ export const GET = async (req: NextRequest) => {
       claim: r.claim_type_label === "T2_T16" || r.claim_type_label === "CONCURRENT" ? "CONC" : r.claim_type_label || "—",
       approvalDate: r.approval_date,
       daysSinceApproval: Number(r.days_since_approval) || 0,
+      feePetitionApproved: Boolean(r.fee_petition_approved),
     }));
 
     // Mutually exclusive buckets — a case over 90 days counts only in the
