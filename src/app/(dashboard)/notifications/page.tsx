@@ -13,6 +13,7 @@ import {
   PhoneCall,
   UserPlus,
   CheckCheck,
+  CheckCircle2,
   RefreshCw,
   ChevronRight,
   Eye,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { PaymentsTab } from "@/components/notifications/PaymentsTab";
+import { FeePetitionApprovedTab } from "@/components/notifications/FeePetitionApprovedTab";
 import { RecentActivityTab } from "@/components/notifications/RecentActivityTab";
 import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 
@@ -41,7 +43,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "payments" | "recent_activity" | "new_cases";
+type PageTab = "notifications" | "payments" | "fee_petition_approved" | "recent_activity" | "new_cases";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -99,9 +101,10 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
 
 const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "notifications",   label: "Notifications",   icon: Bell },
-  { key: "payments",        label: "Payments",        icon: DollarSign },
-  { key: "recent_activity", label: "Recent Activity", icon: Activity },
-  { key: "new_cases",       label: "New Cases",       icon: UserPlus },
+  { key: "payments",              label: "Payments",              icon: DollarSign },
+  { key: "fee_petition_approved", label: "Fee Petition Approved", icon: CheckCircle2 },
+  { key: "recent_activity",       label: "Recent Activity",       icon: Activity },
+  { key: "new_cases",             label: "New Cases",             icon: UserPlus },
 ];
 
 // ============================================================================
@@ -280,6 +283,9 @@ export default function NotificationsPage() {
 
       {/* Payments tab */}
       {pageTab === "payments" && <PaymentsTab dark={dark} t={t} />}
+
+      {/* Fee Petition Approved tab */}
+      {pageTab === "fee_petition_approved" && <FeePetitionApprovedTab dark={dark} t={t} />}
 
       {/* Recent Activity tab */}
       {pageTab === "recent_activity" && <RecentActivityTab dark={dark} t={t} />}
