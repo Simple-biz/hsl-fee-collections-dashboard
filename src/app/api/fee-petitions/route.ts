@@ -291,8 +291,8 @@ export const GET = async (req: NextRequest) => {
 
     const total = agg?.total ?? 0;
     const completeCount = agg?.completeCount ?? 0;
-    const totalFeeRequested = Number(agg?.totalFeeRequested) ?? 0;
-    const totalFeesReceived = Number(agg?.totalFeesReceived) ?? 0;
+    const totalFeeRequested = Number(agg?.totalFeeRequested ?? 0);
+    const totalFeesReceived = Number(agg?.totalFeesReceived ?? 0);
 
     const orderClause =
       sort === "claimant"
