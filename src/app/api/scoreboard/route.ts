@@ -437,10 +437,9 @@ export const GET = async (req: NextRequest) => {
         c.claim_type_label AS claim_type_label,
         c.approval_date AS approval_date,
         (CURRENT_DATE - c.approval_date)::int AS days_since_approval,
-        COALESCE(fp.fee_petition_approved, false) AS fee_petition_approved
+        (fr.case_status = 'FEE PETITION APPROVED') AS fee_petition_approved
       FROM fee_records fr
       JOIN cases c ON c.client_id = fr.case_id
-      LEFT JOIN fee_petitions fp ON fp.case_id = c.client_id
       WHERE fr.is_closed = FALSE
         AND COALESCE(fr.total_fees_paid, 0) = 0
         AND c.approval_date IS NOT NULL
