@@ -50,7 +50,7 @@ import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
 import { BulkFeesClosedConfirmDialog } from "./BulkFeesClosedConfirmDialog";
 import { Listbox } from "@/components/shared/Listbox";
-import { caseLevelVisual } from "@/lib/case-level-icons";
+import { caseLevelVisual, normalizeCaseLevel } from "@/lib/case-level-icons";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
@@ -537,8 +537,7 @@ export const FeeRecordsTable = ({
     if (caseStatusFilter !== "all")
       d = d.filter((c) => c.caseStatus === caseStatusFilter);
     if (levelFilter !== "all")
-      // Normalize FEE PETITION / FEE_PETITION variants stored in older records
-      d = d.filter((c) => c.level === levelFilter || c.level === levelFilter.replace(/ /g, "_"));
+      d = d.filter((c) => normalizeCaseLevel(c.level) === normalizeCaseLevel(levelFilter));
 
     d.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -1106,10 +1105,9 @@ export const FeeRecordsTable = ({
             className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
           >
             <option value="all">All Levels</option>
-            <option value="HEARING">Hearing</option>
-            <option value="INITIAL">Initial</option>
-            <option value="RECON">Recon</option>
-            <option value="FEE PETITION">Fee Petition</option>
+            {caseLevelOptions.map((o) => (
+              <option key={o.name} value={o.name}>{o.name}</option>
+            ))}
           </select>
           <select
             value={statusFilter}
