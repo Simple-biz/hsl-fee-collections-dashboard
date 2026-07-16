@@ -336,8 +336,11 @@ export const GET = async (req: NextRequest) => {
     // Overall summary (all agents)
     const summary = {
       totalCasesAssigned: agents.reduce((s, a) => s + a.casesAssigned, 0),
-      totalOpenCases: agents.reduce((s, a) => s + a.openCases, 0),
-      totalCasesClosed: agents.reduce((s, a) => s + a.casesClosed, 0),
+      // Fee Petition agents excluded — their open/closed counts source from
+      // fee_petitions (not fee_records) and would double-count cases already
+      // owned by regular agents.
+      totalOpenCases: agents.reduce((s, a) => a.team === "Fee Petition" ? s : s + a.openCases, 0),
+      totalCasesClosed: agents.reduce((s, a) => a.team === "Fee Petition" ? s : s + a.casesClosed, 0),
       totalCompletedWinSheets: agents.reduce((s, a) => s + a.completedWinSheets, 0),
       totalWinSheetsCreated: agents.reduce((s, a) => s + a.winSheetsCreated, 0),
       totalUnpaidT2Over60: agents.reduce((s, a) => s + a.unpaidT2Over60, 0),

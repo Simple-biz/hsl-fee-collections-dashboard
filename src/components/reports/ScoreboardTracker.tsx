@@ -876,7 +876,19 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                         </span>
                       </td>
                       {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}
-                      {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
+                      {showCol("closedcases") && (
+                        <td className={`${tdBase} text-right ${t.textSub}`}>
+                          {a.casesClosed}
+                          {a.team === "Fee Petition" && a.casesClosed > 0 && (
+                            <span
+                              title="All-time total — no completion date available for fee petitions"
+                              className={`ml-1 text-[10px] ${t.textMuted}`}
+                            >
+                              *
+                            </span>
+                          )}
+                        </td>
+                      )}
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
                       {showCol("collected") && (
                         <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow != null && a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
@@ -896,7 +908,15 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.openCases}</td>}
                     {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
                     {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
-                    {showCol("collected")   && <td className={`${tdBase} text-right font-bold ${filteredTotals.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>{filteredAgents.every(a => a.feesCollectedInWindow == null) ? "—" : fmt(filteredTotals.feesCollectedInWindow)}</td>}
+                    {showCol("collected")   && (() => {
+                      const allNull = filteredAgents.every(a => a.feesCollectedInWindow == null);
+                      const total = filteredTotals.feesCollectedInWindow;
+                      return (
+                        <td className={`${tdBase} text-right font-bold ${!allNull && total > 0 ? "text-emerald-500" : t.textMuted}`}>
+                          {allNull ? "—" : fmt(total)}
+                        </td>
+                      );
+                    })()}
                     {showCol("ssacalls")    && <td className={`${tdBase} text-right font-bold border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{filteredTotals.weekSsaCalls}</td>}
                     {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
