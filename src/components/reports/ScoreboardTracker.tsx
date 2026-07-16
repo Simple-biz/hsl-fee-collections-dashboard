@@ -78,6 +78,7 @@ interface NoFeesCaseRow {
   claim: string;
   approvalDate: string | null;
   daysSinceApproval: number;
+  feePetitionApproved: boolean;
 }
 
 interface TrackerData {
@@ -596,6 +597,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       {(() => {
                         const level = c.level.replace(/_/g, " ");
                         const isFeePetition = level.trim().toUpperCase() === "FEE PETITION";
+                        const displayLevel = isFeePetition && c.feePetitionApproved
+                          ? "FEE PETITION (approved)"
+                          : level;
                         return (
                           <td
                             className={`${tdBase} ${
@@ -604,7 +608,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                                 : t.textSub
                             }`}
                           >
-                            {level}
+                            {displayLevel}
                           </td>
                         );
                       })()}
