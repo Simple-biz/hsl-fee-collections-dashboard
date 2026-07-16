@@ -913,7 +913,7 @@ export const FeePetitions = () => {
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "not yet approved" },
           { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fee petitions filed & approved" },
           { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
-          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "pending + completed petitions" },
+          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "fees collected across all petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
@@ -1394,6 +1394,7 @@ export const FeePetitions = () => {
                           onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
                         />
                       </td>
+                      {/* > 0 is intentional: only colour-code positive received amounts, not $0 */}
                       <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
                         {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                       </td>
