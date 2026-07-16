@@ -49,7 +49,7 @@ interface AgentScore {
   unpaidT16Over90: number;
   unpaidConcOver90: number;
   totalCollected: number;
-  feesCollectedInWindow: number;
+  feesCollectedInWindow: number | null;
   casesFullFee: number;
   weekSsaCalls: number;
   weekClientCalls: number;
@@ -391,7 +391,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     unpaidT16Over90:    filteredAgents.reduce((s, a) => s + a.unpaidT16Over90, 0),
     unpaidConcOver90:   filteredAgents.reduce((s, a) => s + a.unpaidConcOver90, 0),
     totalCollected:     filteredAgents.reduce((s, a) => s + a.totalCollected, 0),
-    feesCollectedInWindow: filteredAgents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
+    feesCollectedInWindow: filteredAgents.reduce((s, a) => s + (a.feesCollectedInWindow ?? 0), 0),
     casesFullFee:       filteredAgents.reduce((s, a) => s + a.casesFullFee, 0),
     openNoFees:         filteredAgents.reduce((s, a) => s + a.openNoFees, 0),
     openPartial:        filteredAgents.reduce((s, a) => s + a.openPartial, 0),
@@ -899,8 +899,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       {showCol("closedcases") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.casesClosed}</td>}
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
                       {showCol("collected") && (
-                        <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
-                          {fmt(a.feesCollectedInWindow)}
+                        <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow != null && a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
+                          {a.feesCollectedInWindow != null ? fmt(a.feesCollectedInWindow) : "—"}
                         </td>
                       )}
                       {showCol("ssacalls")    && <td className={`${tdBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>{a.weekSsaCalls}</td>}

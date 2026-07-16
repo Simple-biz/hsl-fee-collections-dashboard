@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Check,
   Upload,
+  ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
@@ -577,10 +578,10 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                 <tr className={`border-b ${dark ? "border-neutral-700/60" : "border-neutral-100"}`}>
                   <th className={thCls} style={{ width: 110 }}>Date</th>
                   <th className={thCls} style={{ width: 130 }}>Number</th>
-                  <th className={thCls}>Transcript</th>
+                  <th className={thCls}>Reason for Calling</th>
                   <th className={thCls} style={{ width: 160 }}>Case Link</th>
                   <th className={thCls} style={{ width: 180 }}>Collection Specialist</th>
-                  <th className={`${thCls} text-center`} style={{ width: 80 }}>Resolved</th>
+                  <th className={`${thCls} text-center`} style={{ width: 80 }}>CB done</th>
                   <th className={thCls} style={{ width: 40 }}></th>
                 </tr>
               </thead>
@@ -611,11 +612,11 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
                       />
                     </td>
-                    {/* Transcript */}
+                    {/* Reason for Calling */}
                     <td className={tdCls}>
                       <textarea
                         value={row.transcript}
-                        placeholder="Call notes"
+                        placeholder="Reason for calling"
                         rows={2}
                         onChange={(e) => handleFieldChange(row.id, "transcript", e.target.value)}
                         onBlur={(e) => updateRecord(row.id, "transcript", e.target.value || null)}
@@ -624,14 +625,28 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                     </td>
                     {/* Case Link */}
                     <td className={tdCls}>
-                      <input
-                        type="text"
-                        value={row.caseLink}
-                        placeholder="URL or case ID"
-                        onChange={(e) => handleFieldChange(row.id, "caseLink", e.target.value)}
-                        onBlur={(e) => updateRecord(row.id, "caseLink", e.target.value || null)}
-                        className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
-                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={row.caseLink}
+                          placeholder="URL or case ID"
+                          onChange={(e) => handleFieldChange(row.id, "caseLink", e.target.value)}
+                          onBlur={(e) => updateRecord(row.id, "caseLink", e.target.value || null)}
+                          className={`${inputCls} disabled:opacity-50 disabled:cursor-default flex-1 min-w-0`}
+                        />
+                        {row.caseLink && (
+                          <a
+                            href={row.caseLink.startsWith("http") ? row.caseLink : `https://rgdr.mycase.com/court_cases/${row.caseLink}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Open in MyCase"
+                            title="Open in MyCase"
+                            className={`shrink-0 p-1 rounded transition-colors ${dark ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-800"}`}
+                          >
+                            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     {/* Specialist */}
                     <td className={tdCls}>
@@ -657,7 +672,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           handleFieldChange(row.id, "calledBackResolved", next);
                           updateRecord(row.id, "calledBackResolved", next);
                         }}
-                        aria-label={row.calledBackResolved ? "Mark unresolved" : "Mark resolved"}
+                        aria-label={row.calledBackResolved ? "Mark CB undone" : "Mark CB done"}
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-colors ${
                           row.calledBackResolved
                             ? "bg-emerald-500 border-emerald-500"

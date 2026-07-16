@@ -133,15 +133,31 @@ export const GET = async (req: NextRequest) => {
         (SELECT COUNT(*) FROM fee_records fr WHERE fr.assigned_to = tm.name) AS cases_assigned,
 
         -- Open cases (current snapshot)
-        (SELECT COUNT(*) FROM fee_records fr
-         WHERE fr.assigned_to = tm.name
-         AND fr.is_closed = FALSE) AS open_cases,
+        -- Fee Petition specialists: count active (not-approved) fee petitions
+        -- All other agents: count open fee_records
+        CASE WHEN tm.team = 'Fee Petition' THEN
+          (SELECT COUNT(*) FROM fee_petitions fp
+           WHERE fp.assigned_to = tm.name
+           AND fp.fee_petition_approved = FALSE)
+        ELSE
+          (SELECT COUNT(*) FROM fee_records fr
+           WHERE fr.assigned_to = tm.name
+           AND fr.is_closed = FALSE)
+        END AS open_cases,
 
         -- Cases closed within the window
-        (SELECT COUNT(*) FROM fee_records fr
-         WHERE fr.assigned_to = tm.name
-         AND fr.closed_at >= ${startDate}::date
-         AND fr.closed_at < ${endExclusive}::date) AS cases_closed,
+        -- Fee Petition specialists: count approved petitions (completed petitions)
+        -- All other agents: count closed fee_records in the window
+        CASE WHEN tm.team = 'Fee Petition' THEN
+          (SELECT COUNT(*) FROM fee_petitions fp
+           WHERE fp.assigned_to = tm.name
+           AND fp.fee_petition_approved = TRUE)
+        ELSE
+          (SELECT COUNT(*) FROM fee_records fr
+           WHERE fr.assigned_to = tm.name
+           AND fr.closed_at >= ${startDate}::date
+           AND fr.closed_at < ${endExclusive}::date)
+        END AS cases_closed,
 
         -- Completed win sheets (status = paid_in_full or closed, current snapshot)
         (SELECT COUNT(*) FROM fee_records fr
@@ -206,9 +222,12 @@ export const GET = async (req: NextRequest) => {
         COALESCE((SELECT SUM(fr.total_fees_paid::numeric) FROM fee_records fr WHERE fr.assigned_to = tm.name), 0) AS total_collected,
 
         -- Fees collected within the window (see ledger_in_window above)
-        COALESCE((
+        -- Fee Petition specialists are not responsible for collecting money — NULL renders as "—"
+        CASE WHEN tm.team = 'Fee Petition' THEN NULL
+        ELSE COALESCE((
           SELECT SUM(l.amt) FROM ledger_in_window l WHERE l.agent = tm.name
-        ), 0) AS fees_collected_in_window,
+        ), 0)
+        END AS fees_collected_in_window,
 
         -- Cases with full fee collected (PIF)
         (SELECT COUNT(*) FROM fee_records fr
@@ -302,7 +321,7 @@ export const GET = async (req: NextRequest) => {
         unpaidT16Over90: Number(r.unpaid_t16_over_90),
         unpaidConcOver90: Number(r.unpaid_conc_over_90),
         totalCollected: Number(r.total_collected),
-        feesCollectedInWindow: Number(r.fees_collected_in_window),
+        feesCollectedInWindow: r.fees_collected_in_window != null ? Number(r.fees_collected_in_window) : null,
         casesFullFee: Number(r.cases_full_fee),
         weekSsaCalls: Number(r.week_ssa_calls),
         weekClientCalls: Number(r.week_client_calls),
@@ -327,7 +346,7 @@ export const GET = async (req: NextRequest) => {
       totalUnpaidT16Over90: agents.reduce((s, a) => s + a.unpaidT16Over90, 0),
       totalUnpaidConcOver90: agents.reduce((s, a) => s + a.unpaidConcOver90, 0),
       totalCollected: agents.reduce((s, a) => s + a.totalCollected, 0),
-      totalFeesCollectedInWindow: agents.reduce((s, a) => s + a.feesCollectedInWindow, 0),
+      totalFeesCollectedInWindow: agents.reduce((s, a) => s + (a.feesCollectedInWindow ?? 0), 0),
       totalCasesFullFee: agents.reduce((s, a) => s + a.casesFullFee, 0),
       totalSsaCalls: agents.reduce((s, a) => s + a.weekSsaCalls, 0),
       totalClientCalls: agents.reduce((s, a) => s + a.weekClientCalls, 0),
@@ -356,7 +375,7 @@ export const GET = async (req: NextRequest) => {
         unpaidT16Over60: members.reduce((s, a) => s + a.unpaidT16Over60, 0),
         unpaidConcOver60: members.reduce((s, a) => s + a.unpaidConcOver60, 0),
         totalCollected: members.reduce((s, a) => s + a.totalCollected, 0),
-        feesCollectedInWindow: members.reduce((s, a) => s + a.feesCollectedInWindow, 0),
+        feesCollectedInWindow: members.reduce((s, a) => s + (a.feesCollectedInWindow ?? 0), 0),
         casesFullFee: members.reduce((s, a) => s + a.casesFullFee, 0),
         ssaCalls: members.reduce((s, a) => s + a.weekSsaCalls, 0),
         clientCalls: members.reduce((s, a) => s + a.weekClientCalls, 0),
