@@ -146,8 +146,9 @@ export const GET = async (req: NextRequest) => {
         END AS open_cases,
 
         -- Cases closed within the window
-        -- Fee Petition specialists: count approved petitions (completed petitions)
-        -- All other agents: count closed fee_records in the window
+        -- Fee Petition specialists: all-time count of approved petitions —
+        -- no approved_at column exists so the count is not date-windowed.
+        -- All other agents: count closed fee_records in the window.
         CASE WHEN tm.team = 'Fee Petition' THEN
           (SELECT COUNT(*) FROM fee_petitions fp
            WHERE fp.assigned_to = tm.name

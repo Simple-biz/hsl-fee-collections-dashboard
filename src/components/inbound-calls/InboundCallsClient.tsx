@@ -634,9 +634,9 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           onBlur={(e) => updateRecord(row.id, "caseLink", e.target.value || null)}
                           className={`${inputCls} disabled:opacity-50 disabled:cursor-default flex-1 min-w-0`}
                         />
-                        {row.caseLink && (
+                        {row.caseLink.trim() && (
                           <a
-                            href={row.caseLink.startsWith("http") ? row.caseLink : `https://rgdr.mycase.com/court_cases/${row.caseLink}`}
+                            href={row.caseLink.trim().startsWith("http") ? row.caseLink.trim() : `https://rgdr.mycase.com/court_cases/${row.caseLink.trim()}`}
                             target="_blank"
                             rel="noreferrer"
                             aria-label="Open in MyCase"
