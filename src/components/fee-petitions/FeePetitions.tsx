@@ -44,6 +44,7 @@ interface FeePetitionRow {
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
+  feesReceived: number | null;
   // Which fee_records benefit type Fee Requested edits — resolved
   // server-side to whichever type actually has data (falling back to the
   // case's registered claim type when nothing's entered yet).
@@ -337,7 +338,7 @@ export const FeePetitions = () => {
       .catch(() => {});
   }, []);
 
-  const [allTotals, setAllTotals] = useState<{ feeRequested: number } | null>(null);
+  const [allTotals, setAllTotals] = useState<{ feeRequested: number; feesReceived: number } | null>(null);
 
   // Fees Requested in the stats bar covers pending AND completed petitions
   // together — fetched with no status filter (unlike fetchPetitions, which
@@ -354,6 +355,7 @@ export const FeePetitions = () => {
         if (json != null && mountedRef.current) {
           setAllTotals({
             feeRequested: typeof json.totalFeeRequested === "number" ? json.totalFeeRequested : 0,
+            feesReceived: typeof json.totalFeesReceived === "number" ? json.totalFeesReceived : 0,
           });
         }
       })
@@ -871,7 +873,7 @@ export const FeePetitions = () => {
     ? "bg-indigo-700 border-indigo-600 text-white"
     : "bg-indigo-100 border-indigo-400 text-indigo-800";
   const presetBase = `shrink-0 px-2.5 py-1 rounded-full text-[13px] font-medium border transition-colors`;
-  const colSpan = CHECKBOX_COLUMNS.length + 12;
+  const colSpan = CHECKBOX_COLUMNS.length + 13;
 
   return (
     <div className="space-y-4">
@@ -906,11 +908,12 @@ export const FeePetitions = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Pending", value: isInitialLoad ? "—" : String(total), sub: "not yet approved" },
           { label: "Completed", value: completedCount == null ? "—" : String(completedCount), sub: "fee petitions filed & approved" },
           { label: "Fees Requested", value: allTotals == null ? "—" : fmt(allTotals.feeRequested), sub: "pending + completed petitions" },
+          { label: "Fees Received", value: allTotals == null ? "—" : fmt(allTotals.feesReceived), sub: "fees collected across all petitions" },
         ].map((s) => (
           <div key={s.label} className={`${sectionCard} p-4`}>
             <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>{s.label}</p>
@@ -1226,6 +1229,9 @@ export const FeePetitions = () => {
                 <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[256px] top-0 z-30 ${stickyHeaderBg}`}>
                   Fee Requested
                 </th>
+                <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
+                  Fees Received
+                </th>
                 <th
                   aria-sort={ariaSortFor("approvalDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
@@ -1387,6 +1393,10 @@ export const FeePetitions = () => {
                           onSave={saveFeeAmount}
                           onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
                         />
+                      </td>
+                      {/* > 0 is intentional: only colour-code positive received amounts, not $0 */}
+                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
+                        {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
                         <div className="flex items-center gap-1.5">

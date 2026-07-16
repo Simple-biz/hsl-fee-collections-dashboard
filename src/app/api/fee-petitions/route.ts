@@ -282,6 +282,7 @@ export const GET = async (req: NextRequest) => {
         total: sql<number>`COUNT(*)::int`,
         completeCount: sql<number>`COUNT(*) FILTER (WHERE ${isApproved})::int`,
         totalFeeRequested: sql<number>`COALESCE(SUM(${feeRecords.totalFeesExpected}), 0)::numeric`,
+        totalFeesReceived: sql<number>`COALESCE(SUM(${feeRecords.totalFeesPaid}), 0)::numeric`,
       })
       .from(cases)
       .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
@@ -290,7 +291,8 @@ export const GET = async (req: NextRequest) => {
 
     const total = agg?.total ?? 0;
     const completeCount = agg?.completeCount ?? 0;
-    const totalFeeRequested = Number(agg?.totalFeeRequested) || 0;
+    const totalFeeRequested = Number(agg?.totalFeeRequested ?? 0);
+    const totalFeesReceived = Number(agg?.totalFeesReceived ?? 0);
 
     const orderClause =
       sort === "claimant"
@@ -368,6 +370,7 @@ export const GET = async (req: NextRequest) => {
       total,
       completeCount,
       totalFeeRequested,
+      totalFeesReceived,
       assignees,
       unassignedCount,
     });

@@ -133,12 +133,20 @@ export const GET = async (req: NextRequest) => {
         (SELECT COUNT(*) FROM fee_records fr WHERE fr.assigned_to = tm.name) AS cases_assigned,
 
         -- Open cases (current snapshot)
-        -- Fee Petition specialists: count active (not-approved) fee petitions
+        -- Fee Petition specialists: active (not-approved) petitions still at
+        -- FEE_PETITION level and not closed — mirrors the Fee Petitions page filter.
         -- All other agents: count open fee_records
         CASE WHEN tm.team = 'Fee Petition' THEN
-          (SELECT COUNT(*) FROM fee_petitions fp
+          (SELECT COUNT(DISTINCT fp.id) FROM fee_petitions fp
+           JOIN cases c ON c.client_id = fp.case_id
            WHERE fp.assigned_to = tm.name
-           AND fp.fee_petition_approved = FALSE)
+           AND fp.fee_petition_approved = FALSE
+           AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
+           AND EXISTS (
+             SELECT 1 FROM fee_records fr
+             WHERE fr.case_id = fp.case_id
+             AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
+           ))
         ELSE
           (SELECT COUNT(*) FROM fee_records fr
            WHERE fr.assigned_to = tm.name
