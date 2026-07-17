@@ -17,6 +17,7 @@ export const GET = async (req: NextRequest) => {
       return NextResponse.json({ error: "week param required (YYYY-MM-DD)" }, { status: 400 });
     }
     const sortParam = searchParams.get("sort");
+    // Unrecognised values fall back to createdAt (safe — Drizzle column ref, not SQL string).
     const sortField = sortParam === "callDate" ? inboundCallRecords.callDate : inboundCallRecords.createdAt;
 
     const rows = await db

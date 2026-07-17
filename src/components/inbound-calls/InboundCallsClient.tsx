@@ -203,20 +203,24 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     recordsControllerRef.current?.abort();
     const controller = new AbortController();
     recordsControllerRef.current = controller;
+    // Per-call flag isolates concurrent fetches (e.g. rapid sort changes) from
+    // the shared unmount ref, preventing stale responses overwriting newer state.
+    let cancelled = false;
     setRecordsLoading(true);
     setRecordsError(null);
     try {
       const res = await fetch(`/api/inbound-calls?week=${week}&sort=${sort}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to load call records (${res.status})`);
       const json = await res.json();
-      if (fetchCancelledRef.current) return;
+      if (cancelled || fetchCancelledRef.current) return;
       setRecords(json.data ?? []);
     } catch (e) {
-      if (fetchCancelledRef.current) return;
+      if (cancelled || fetchCancelledRef.current) return;
       if ((e as Error).name !== "AbortError") setRecordsError((e as Error).message);
     } finally {
-      if (!fetchCancelledRef.current) setRecordsLoading(false);
+      if (!cancelled && !fetchCancelledRef.current) setRecordsLoading(false);
     }
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -542,7 +546,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                 if (v === "createdAt" || v === "callDate") setSortField(v);
               }}
               aria-label="Sort records by"
-              className={`h-8 px-2 rounded-lg border text-[13px] outline-none cursor-pointer ${dark ? "bg-neutral-800 border-neutral-600 text-neutral-300" : "bg-white border-neutral-200 text-neutral-600"}`}
+              className={`h-8 px-2 rounded-lg border text-[13px] outline-none cursor-pointer transition-colors ${dark ? "border-neutral-600 text-neutral-300 bg-neutral-800 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 bg-white hover:border-neutral-400"}`}
             >
               <option value="createdAt">Date Added</option>
               <option value="callDate">Call Date</option>
