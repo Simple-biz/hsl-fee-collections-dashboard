@@ -339,12 +339,12 @@ export const Scoreboard = () => {
                                 >
                                   {i === 0 ? (
                                     <span
-                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold ${thisWeekCellColor(val, currentWeekMax)}`}
+                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold select-all cursor-text ${thisWeekCellColor(val, currentWeekMax)}`}
                                     >
                                       {val}
                                     </span>
                                   ) : (
-                                    <span className={`text-[14px] ${t.textSub}`}>{val}</span>
+                                    <span className={`text-[14px] select-all cursor-text ${t.textSub}`}>{val}</span>
                                   )}
                                   {isTopForColumn && (
                                     <Trophy aria-hidden="true" className="h-3 w-3 text-amber-500 shrink-0" />
