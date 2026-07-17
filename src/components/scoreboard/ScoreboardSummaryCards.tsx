@@ -117,7 +117,7 @@ export function ScoreboardSummaryCards({
                 <p className={`text-[12px] font-medium uppercase ${item.toggled ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
                   {item.label}
                 </p>
-                <p className={`text-lg font-bold mt-1 select-all cursor-text ${item.toggled ? (dark ? "text-violet-300" : "text-violet-700") : t.text}`} onClick={(e) => e.stopPropagation()}>
+                <p className={`text-lg font-bold mt-1 ${item.toggled ? (dark ? "text-violet-300" : "text-violet-700") : t.text}`}>
                   {item.value}
                 </p>
               </button>
