@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useReducer, useEffect } from "react";
+import { useState, useReducer, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -108,6 +108,11 @@ export const Scoreboard = () => {
   const [weekOffset, setWeekOffset] = useState(0);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
   const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
     weeks: [],
     loading: true,
@@ -361,7 +366,8 @@ export const Scoreboard = () => {
                                   const parts = [row.agent, ...row.weekValues.map((v, i) => `${weeks[i]?.label ?? `W${i+1}`}: ${v}`)];
                                   navigator.clipboard.writeText(parts.join(" | ")).then(() => {
                                     setCopiedRow(row.agent);
-                                    setTimeout(() => setCopiedRow(null), 1500);
+                                    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+                                    copyTimerRef.current = setTimeout(() => setCopiedRow(null), 1500);
                                   });
                                 }}
                                 aria-label={`Copy ${row.agent} row`}

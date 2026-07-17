@@ -186,6 +186,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   // thresholds under the hood — fixed at 60d since there's no UI to change it.
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
 
   const copyAgentRow = (a: AgentScore) => {
     const parts = [a.agent];
@@ -199,7 +204,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     if (showCol("winsheets"))   parts.push(`Win Sheets: ${a.completedWinSheets}`);
     navigator.clipboard.writeText(parts.join(" | ")).then(() => {
       setCopiedRow(a.agent);
-      setTimeout(() => setCopiedRow(null), 1500);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedRow(null), 1500);
     });
   };
 
@@ -927,7 +933,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           onClick={() => copyAgentRow(a)}
                           aria-label={`Copy ${a.agent} row`}
                           title="Copy row"
-                          className={`p-1 rounded transition-colors opacity-0 group-hover/row:opacity-100 ${copiedRow === a.agent ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted} hover:${dark ? "text-neutral-200" : "text-neutral-700"}`}
+                          className={`p-1 rounded transition-colors opacity-0 group-hover/row:opacity-100 ${copiedRow === a.agent ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted} ${dark ? "hover:text-neutral-200" : "hover:text-neutral-700"}`}
                         >
                           {copiedRow === a.agent
                             ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
