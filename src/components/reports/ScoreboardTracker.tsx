@@ -506,7 +506,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   };
 
   const thBase = `py-2.5 px-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap`;
-  const tdBase = `py-2.5 px-3 text-[14px] whitespace-nowrap tabular-nums`;
+  const tdBase = `py-2.5 px-3 text-[14px] whitespace-nowrap tabular-nums select-all cursor-text`;
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const agentGroupBorder = dark ? "border-neutral-600" : "border-neutral-300";
   const rowHover  = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
