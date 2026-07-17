@@ -1,30 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { auth } from "@/auth";
 import { z } from "zod";
 
-// GET /api/inbound-calls?week=YYYY-MM-DD
+// GET /api/inbound-calls?week=YYYY-MM-DD&sort=createdAt|callDate
 export const GET = async (req: NextRequest) => {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
-    const week = new URL(req.url).searchParams.get("week");
+    const { searchParams } = new URL(req.url);
+    const week = searchParams.get("week");
     if (!week || !/^\d{4}-\d{2}-\d{2}$/.test(week)) {
       return NextResponse.json({ error: "week param required (YYYY-MM-DD)" }, { status: 400 });
     }
+    const sortParam = searchParams.get("sort");
+    // Unrecognised values fall back to createdAt (safe — Drizzle column ref, not SQL string).
+    const sortField = sortParam === "callDate" ? inboundCallRecords.callDate : inboundCallRecords.createdAt;
 
     const rows = await db
       .select()
       .from(inboundCallRecords)
       .where(eq(inboundCallRecords.weekStart, week))
-      .orderBy(asc(inboundCallRecords.callDate), asc(inboundCallRecords.id));
+      .orderBy(desc(sortField), desc(inboundCallRecords.id));
 
     const data = rows.map((r) => ({
       id: r.id,
       callDate: r.callDate,
+      createdAt: r.createdAt.toISOString(),
       number: r.number ?? "",
       transcript: r.transcript ?? "",
       caseLink: r.caseLink ?? "",
@@ -79,6 +84,7 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({
       id: row.id,
       callDate: row.callDate,
+      createdAt: row.createdAt.toISOString(),
       number: row.number ?? "",
       transcript: row.transcript ?? "",
       caseLink: row.caseLink ?? "",
