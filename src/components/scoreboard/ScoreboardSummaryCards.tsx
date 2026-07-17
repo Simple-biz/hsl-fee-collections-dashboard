@@ -117,7 +117,7 @@ export function ScoreboardSummaryCards({
                 <p className={`text-[12px] font-medium uppercase ${item.toggled ? (dark ? "text-violet-400" : "text-violet-600") : t.textMuted}`}>
                   {item.label}
                 </p>
-                <p className={`text-lg font-bold mt-1 ${item.toggled ? (dark ? "text-violet-300" : "text-violet-700") : t.text}`}>
+                <p className={`text-lg font-bold mt-1 select-all cursor-text ${item.toggled ? (dark ? "text-violet-300" : "text-violet-700") : t.text}`} onClick={(e) => e.stopPropagation()}>
                   {item.value}
                 </p>
               </button>
@@ -137,7 +137,7 @@ export function ScoreboardSummaryCards({
                   )}
                   {item.label}
                 </p>
-                <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
+                <p className={`text-lg font-bold ${t.text} mt-1 select-all cursor-text`}>{item.value}</p>
               </div>
             )
           )}
@@ -177,7 +177,7 @@ export function ScoreboardSummaryCards({
                         <p className={`text-[11px] font-medium uppercase tracking-wide ${t.textMuted}`}>
                           {stat.label}
                         </p>
-                        <p className={`text-sm font-bold ${t.text} mt-0.5`}>
+                        <p className={`text-sm font-bold ${t.text} mt-0.5 select-all cursor-text`}>
                           {stat.value}
                         </p>
                       </div>
