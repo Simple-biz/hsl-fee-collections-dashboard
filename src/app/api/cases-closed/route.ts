@@ -17,12 +17,11 @@ export async function GET(req: NextRequest) {
     const rows = await db.execute(sql`
       SELECT
         fr.id::text AS id,
-        c.client_id AS case_id,
         c.first_name AS first_name,
         c.last_name AS last_name,
         c.external_id AS external_id,
         fr.assigned_to AS assigned_to,
-        fr.closed_at AS closed_at
+        fr.closed_at::date AS closed_date
       FROM fee_records fr
       JOIN cases c ON c.client_id = fr.case_id
       WHERE fr.is_closed = TRUE
@@ -32,27 +31,25 @@ export async function GET(req: NextRequest) {
       ORDER BY fr.closed_at ASC
     `) as unknown as {
       id: string;
-      case_id: number;
       first_name: string | null;
       last_name: string | null;
       external_id: string | null;
       assigned_to: string | null;
-      closed_at: string;
+      closed_date: string;
     }[];
 
     const closures = rows.map((r) => ({
       id: r.id,
-      caseId: r.case_id,
       caseName: `${r.last_name ?? ""}, ${r.first_name ?? ""}`,
       externalId: r.external_id,
       assignedTo: r.assigned_to,
-      closedAt: r.closed_at,
-      date: new Date(r.closed_at).toISOString().split("T")[0],
+      date: String(r.closed_date),
     }));
 
     const countByDate = new Map<string, number>();
-    for (const c of closures) {
-      countByDate.set(c.date, (countByDate.get(c.date) ?? 0) + 1);
+    for (const r of rows) {
+      const d = String(r.closed_date);
+      countByDate.set(d, (countByDate.get(d) ?? 0) + 1);
     }
 
     const monday = new Date(`${week}T00:00:00Z`);

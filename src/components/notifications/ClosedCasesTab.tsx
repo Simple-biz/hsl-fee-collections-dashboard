@@ -12,11 +12,9 @@ interface DayCount {
 
 interface ClosureRow {
   id: string;
-  caseId: number;
   caseName: string;
   externalId: string | null;
   assignedTo: string | null;
-  closedAt: string;
   date: string;
 }
 
