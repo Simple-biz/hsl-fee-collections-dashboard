@@ -194,7 +194,14 @@ const patchSingleField = async (
   }
 };
 
-const currency = (v: number) => (v > 0 ? fmtFull(v) : "—");
+const currency = (v: number) => (
+  <span
+    className="select-all cursor-text"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {v > 0 ? fmtFull(v) : "—"}
+  </span>
+);
 // Pending can go negative (overpaid) now that it's auto-calculated as Fee
 // Due minus Rec'd — unlike currency() above, a negative value here is real
 // signal (the PIF "Overpaid" badge is the primary flag, but the exact
