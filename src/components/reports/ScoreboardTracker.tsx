@@ -876,7 +876,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${teamBadgeClasses(a.team, dark)}`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />
-                          {a.agent}
+                          <span className="select-all cursor-text">{a.agent}</span>
                         </span>
                       </td>
                       {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}

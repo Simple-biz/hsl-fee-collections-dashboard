@@ -320,7 +320,7 @@ export const Scoreboard = () => {
                                 className="inline-flex items-center gap-1.5"
                                 title={isTopScorer ? "Top scorer this week" : undefined}
                               >
-                                {row.agent}
+                                <span className="select-all cursor-text">{row.agent}</span>
                                 {isTopScorer && (
                                   <Trophy aria-hidden="true" className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                 )}
