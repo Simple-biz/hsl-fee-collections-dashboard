@@ -137,7 +137,7 @@ export function ScoreboardSummaryCards({
                   )}
                   {item.label}
                 </p>
-                <p className={`text-lg font-bold ${t.text} mt-1`}>{item.value}</p>
+                <p className={`text-lg font-bold ${t.text} mt-1 select-all cursor-text`}>{item.value}</p>
               </div>
             )
           )}
@@ -177,7 +177,7 @@ export function ScoreboardSummaryCards({
                         <p className={`text-[11px] font-medium uppercase tracking-wide ${t.textMuted}`}>
                           {stat.label}
                         </p>
-                        <p className={`text-sm font-bold ${t.text} mt-0.5`}>
+                        <p className={`text-sm font-bold ${t.text} mt-0.5 select-all cursor-text`}>
                           {stat.value}
                         </p>
                       </div>
