@@ -53,6 +53,7 @@ export const PATCH = async (
     return NextResponse.json({
       id: row.id,
       callDate: row.callDate,
+      createdAt: row.createdAt.toISOString(),
       number: row.number ?? "",
       transcript: row.transcript ?? "",
       caseLink: row.caseLink ?? "",

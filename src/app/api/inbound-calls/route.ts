@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { auth } from "@/auth";
 import { z } from "zod";
 
-// GET /api/inbound-calls?week=YYYY-MM-DD&sort=createdAt|callDate&dir=asc|desc
+// GET /api/inbound-calls?week=YYYY-MM-DD&sort=createdAt|callDate
 export const GET = async (req: NextRequest) => {
   try {
     const session = await auth();
@@ -17,15 +17,13 @@ export const GET = async (req: NextRequest) => {
       return NextResponse.json({ error: "week param required (YYYY-MM-DD)" }, { status: 400 });
     }
     const sortParam = searchParams.get("sort");
-    const dirParam = searchParams.get("dir");
     const sortField = sortParam === "callDate" ? inboundCallRecords.callDate : inboundCallRecords.createdAt;
-    const sortDir = dirParam === "asc" ? asc : desc;
 
     const rows = await db
       .select()
       .from(inboundCallRecords)
       .where(eq(inboundCallRecords.weekStart, week))
-      .orderBy(sortDir(sortField), desc(inboundCallRecords.id));
+      .orderBy(desc(sortField), desc(inboundCallRecords.id));
 
     const data = rows.map((r) => ({
       id: r.id,
@@ -85,6 +83,7 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({
       id: row.id,
       callDate: row.callDate,
+      createdAt: row.createdAt.toISOString(),
       number: row.number ?? "",
       transcript: row.transcript ?? "",
       caseLink: row.caseLink ?? "",

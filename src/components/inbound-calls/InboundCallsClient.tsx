@@ -206,7 +206,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     setRecordsLoading(true);
     setRecordsError(null);
     try {
-      const res = await fetch(`/api/inbound-calls?week=${week}&sort=${sort}&dir=desc`, { signal: controller.signal });
+      const res = await fetch(`/api/inbound-calls?week=${week}&sort=${sort}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to load call records (${res.status})`);
       const json = await res.json();
       if (fetchCancelledRef.current) return;
@@ -537,7 +537,10 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           <div className="flex items-center gap-2">
             <select
               value={sortField}
-              onChange={(e) => setSortField(e.target.value as "createdAt" | "callDate")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "createdAt" || v === "callDate") setSortField(v);
+              }}
               aria-label="Sort records by"
               className={`h-8 px-2 rounded-lg border text-[13px] outline-none cursor-pointer ${dark ? "bg-neutral-800 border-neutral-600 text-neutral-300" : "bg-white border-neutral-200 text-neutral-600"}`}
             >
