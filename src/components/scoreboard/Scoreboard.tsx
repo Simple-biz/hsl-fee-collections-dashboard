@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useReducer, useEffect } from "react";
+import { useState, useReducer, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
@@ -107,6 +107,12 @@ export const Scoreboard = () => {
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [copiedRow, setCopiedRow] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
   const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
     weeks: [],
     loading: true,
@@ -299,6 +305,7 @@ export const Scoreboard = () => {
                               {w.label}
                             </th>
                           ))}
+                          <th className="w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -313,14 +320,14 @@ export const Scoreboard = () => {
                           return (
                           <tr
                             key={row.agent}
-                            className={`border-b ${t.borderLight} ${rowIdx % 2 !== 0 ? (dark ? "bg-neutral-800/20" : "bg-neutral-50/50") : ""}`}
+                            className={`group/row border-b ${t.borderLight} ${rowIdx % 2 !== 0 ? (dark ? "bg-neutral-800/20" : "bg-neutral-50/50") : ""}`}
                           >
                             <td className={`py-2.5 px-4 text-[14px] font-medium ${t.text}`}>
                               <span
                                 className="inline-flex items-center gap-1.5"
                                 title={isTopScorer ? "Top scorer this week" : undefined}
                               >
-                                {row.agent}
+                                <span className="select-all cursor-text">{row.agent}</span>
                                 {isTopScorer && (
                                   <Trophy aria-hidden="true" className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                 )}
@@ -339,12 +346,12 @@ export const Scoreboard = () => {
                                 >
                                   {i === 0 ? (
                                     <span
-                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold ${thisWeekCellColor(val, currentWeekMax)}`}
+                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold select-all cursor-text ${thisWeekCellColor(val, currentWeekMax)}`}
                                     >
                                       {val}
                                     </span>
                                   ) : (
-                                    <span className={`text-[14px] ${t.textSub}`}>{val}</span>
+                                    <span className={`text-[14px] select-all cursor-text ${t.textSub}`}>{val}</span>
                                   )}
                                   {isTopForColumn && (
                                     <Trophy aria-hidden="true" className="h-3 w-3 text-amber-500 shrink-0" />
@@ -353,6 +360,26 @@ export const Scoreboard = () => {
                               </td>
                               );
                             })}
+                            <td className="py-2.5 px-2 text-center">
+                              <button
+                                onClick={() => {
+                                  const parts = [row.agent, ...row.weekValues.map((v, i) => `${weeks[i]?.label ?? `W${i+1}`}: ${v}`)];
+                                  navigator.clipboard.writeText(parts.join(" | ")).then(() => {
+                                    setCopiedRow(row.agent);
+                                    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+                                    copyTimerRef.current = setTimeout(() => setCopiedRow(null), 1500);
+                                  });
+                                }}
+                                aria-label={`Copy ${row.agent} row`}
+                                title="Copy row"
+                                className={`p-1 rounded transition-colors opacity-0 group-hover/row:opacity-100 ${copiedRow === row.agent ? (dark ? "text-emerald-400" : "text-emerald-600") : (dark ? "text-neutral-500" : "text-neutral-400")} ${dark ? "hover:text-neutral-200" : "hover:text-neutral-700"}`}
+                              >
+                                {copiedRow === row.agent
+                                  ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                                  : <Clipboard aria-hidden="true" className="h-3.5 w-3.5" />
+                                }
+                              </button>
+                            </td>
                           </tr>
                           );
                         })}
