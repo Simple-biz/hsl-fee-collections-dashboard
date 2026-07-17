@@ -194,12 +194,12 @@ const patchSingleField = async (
   }
 };
 
-const currency = (v: number) => (
+const currency = (v: number | null) => (
   <span
     className="select-all cursor-text"
     onClick={(e) => e.stopPropagation()}
   >
-    {v > 0 ? fmtFull(v) : "—"}
+    {(v ?? 0) > 0 ? fmtFull(v as number) : "—"}
   </span>
 );
 // Pending can go negative (overpaid) now that it's auto-calculated as Fee
@@ -2247,7 +2247,7 @@ export const FeeRecordsTable = ({
                         className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
                         title="Minimized — expand T16 to edit"
                       >
-                        {c.t16FeeDue != null ? currency(c.t16FeeDue) : "—"}
+                        {currency(c.t16FeeDue)}
                       </td>
                     ) : (
                       <>
@@ -2321,7 +2321,7 @@ export const FeeRecordsTable = ({
                         className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
                         title="Minimized — expand T2 to edit"
                       >
-                        {c.t2FeeDue != null ? currency(c.t2FeeDue) : "—"}
+                        {currency(c.t2FeeDue)}
                       </td>
                     ) : (
                       <>
@@ -2395,7 +2395,7 @@ export const FeeRecordsTable = ({
                         className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
                         title="Minimized — expand AUX to edit"
                       >
-                        {c.auxFeeDue != null ? currency(c.auxFeeDue) : "—"}
+                        {currency(c.auxFeeDue)}
                       </td>
                     ) : (
                       <>
