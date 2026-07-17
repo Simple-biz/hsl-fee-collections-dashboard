@@ -79,7 +79,7 @@ export function FeeAmountCell({
   }
   return (
     <div className="flex items-center justify-end gap-1">
-      <span>{currency(value, allowExplicitZero)}</span>
+      <span className="select-all cursor-text" onClick={(e) => e.stopPropagation()}>{currency(value, allowExplicitZero)}</span>
       {canEdit && (
         <button type="button" onClick={onEdit} className={`${pencilRevealClass} transition-colors p-0.5 rounded ${hoverCls}`} aria-label={`Edit ${saveLabel}`}>
           <Pencil className={`h-3 w-3 ${textMuted}`} aria-hidden="true" />
