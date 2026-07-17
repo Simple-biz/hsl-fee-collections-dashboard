@@ -19,6 +19,7 @@ import {
   X,
   Check,
   ExternalLink,
+  Clipboard,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -184,6 +185,29 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   // removed from the table, but "Needs attention" still checks these
   // thresholds under the hood — fixed at 60d since there's no UI to change it.
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
+  const [copiedRow, setCopiedRow] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
+
+  const copyAgentRow = (a: AgentScore) => {
+    const parts = [a.agent];
+    if (showCol("cases"))       parts.push(`Open: ${a.openCases}`);
+    if (showCol("closedcases")) parts.push(`Closed: ${a.casesClosed}`);
+    if (showCol("opennofees"))  parts.push(`No Fees: ${a.openNoFees}`);
+    if (showCol("collected"))   parts.push(`Collected: ${a.feesCollectedInWindow != null ? fmt(a.feesCollectedInWindow) : "—"}`);
+    if (showCol("ssacalls"))    parts.push(`SSA: ${a.weekSsaCalls}`);
+    if (showCol("clientcalls")) parts.push(`CL Calls: ${a.weekClientCalls}`);
+    if (showCol("faxsent"))     parts.push(`Fax: ${a.weekFaxSent}`);
+    if (showCol("winsheets"))   parts.push(`Win Sheets: ${a.completedWinSheets}`);
+    navigator.clipboard.writeText(parts.join(" | ")).then(() => {
+      setCopiedRow(a.agent);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedRow(null), 1500);
+    });
+  };
 
   const [dateMode, setDateMode] = useState<DateMode>("week");
   const nowForInit = new Date();
@@ -860,6 +884,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("clientcalls") && <th className={`${thBase} text-right ${dark ? "text-indigo-400" : "text-indigo-600"}`}>Client Calls</th>}
                     {showCol("faxsent")     && <th className={`${thBase} ${t.textSub} text-right`}>Fax Sent</th>}
                     {showCol("winsheets")   && <th className={`${thBase} ${t.textSub} text-right`}>Win Sheets</th>}
+                    <th className={`${thBase} w-8`}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -870,13 +895,13 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       </td>
                     </tr>
                   ) : filteredAgents.map((a) => (
-                    <tr key={a.agent} className={`border-b ${rowBorder} ${rowHover} transition-colors`}>
+                    <tr key={a.agent} className={`group/row border-b ${rowBorder} ${rowHover} transition-colors`}>
                       <td className={`${tdBase} ${t.text} font-semibold`}>
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${teamBadgeClasses(a.team, dark)}`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />
-                          {a.agent}
+                          <span className="select-all cursor-text">{a.agent}</span>
                         </span>
                       </td>
                       {showCol("cases")       && <td className={`${tdBase} text-right ${t.text}`}>{a.openCases}</td>}
@@ -903,6 +928,19 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       {showCol("clientcalls") && <td className={`${tdBase} text-right ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{a.weekClientCalls}</td>}
                       {showCol("faxsent")     && <td className={`${tdBase} text-right ${t.textSub}`}>{a.weekFaxSent}</td>}
                       {showCol("winsheets")   && <td className={`${tdBase} text-right ${t.text}`}>{a.completedWinSheets}</td>}
+                      <td className={`${tdBase} text-center`}>
+                        <button
+                          onClick={() => copyAgentRow(a)}
+                          aria-label={`Copy ${a.agent} row`}
+                          title="Copy row"
+                          className={`p-1 rounded transition-colors opacity-0 group-hover/row:opacity-100 ${copiedRow === a.agent ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted} ${dark ? "hover:text-neutral-200" : "hover:text-neutral-700"}`}
+                        >
+                          {copiedRow === a.agent
+                            ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                            : <Clipboard aria-hidden="true" className="h-3.5 w-3.5" />
+                          }
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -925,6 +963,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     {showCol("clientcalls") && <td className={`${tdBase} text-right font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>{filteredTotals.weekClientCalls}</td>}
                     {showCol("faxsent")     && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.weekFaxSent}</td>}
                     {showCol("winsheets")   && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.completedWinSheets}</td>}
+                    <td className={tdBase}></td>
                   </tr>
                 </tfoot>
               </table>
