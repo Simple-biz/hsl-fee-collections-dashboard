@@ -203,24 +203,23 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     recordsControllerRef.current?.abort();
     const controller = new AbortController();
     recordsControllerRef.current = controller;
-    // Per-call flag isolates concurrent fetches (e.g. rapid sort changes) from
-    // the shared unmount ref, preventing stale responses overwriting newer state.
-    let cancelled = false;
+    // Stale-response protection: AbortController aborts the in-flight request
+    // (throws AbortError) when a newer call starts. fetchCancelledRef guards
+    // setState calls after unmount.
     setRecordsLoading(true);
     setRecordsError(null);
     try {
       const res = await fetch(`/api/inbound-calls?week=${week}&sort=${sort}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to load call records (${res.status})`);
       const json = await res.json();
-      if (cancelled || fetchCancelledRef.current) return;
+      if (fetchCancelledRef.current) return;
       setRecords(json.data ?? []);
     } catch (e) {
-      if (cancelled || fetchCancelledRef.current) return;
+      if (fetchCancelledRef.current) return;
       if ((e as Error).name !== "AbortError") setRecordsError((e as Error).message);
     } finally {
-      if (!cancelled && !fetchCancelledRef.current) setRecordsLoading(false);
+      if (!fetchCancelledRef.current) setRecordsLoading(false);
     }
-    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
