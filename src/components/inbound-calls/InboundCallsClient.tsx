@@ -86,6 +86,7 @@ const DAYS = [
 interface CallRecord {
   id: number;
   callDate: string;
+  createdAt: string;
   number: string;
   transcript: string;
   caseLink: string;
@@ -149,6 +150,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   const [pocError, setPocError] = useState<string | null>(null);
 
   // Records
+  const [sortField, setSortField] = useState<"createdAt" | "callDate">("createdAt");
   const [records, setRecords] = useState<CallRecord[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState<string | null>(null);
@@ -197,14 +199,17 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
 
   // ── fetch records ──────────────────────────────────────────────────────────
 
-  const fetchRecords = useCallback(async (week: string) => {
+  const fetchRecords = useCallback(async (week: string, sort: "createdAt" | "callDate" = "createdAt") => {
     recordsControllerRef.current?.abort();
     const controller = new AbortController();
     recordsControllerRef.current = controller;
+    // Stale-response protection: AbortController aborts the in-flight request
+    // (throws AbortError) when a newer call starts. fetchCancelledRef guards
+    // setState calls after unmount.
     setRecordsLoading(true);
     setRecordsError(null);
     try {
-      const res = await fetch(`/api/inbound-calls?week=${week}`, { signal: controller.signal });
+      const res = await fetch(`/api/inbound-calls?week=${week}&sort=${sort}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to load call records (${res.status})`);
       const json = await res.json();
       if (fetchCancelledRef.current) return;
@@ -221,7 +226,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     fetchCancelledRef.current = false;
     setPendingDelete(null);
     fetchPoc(selectedWeek);
-    fetchRecords(selectedWeek);
+    fetchRecords(selectedWeek, sortField);
     const patchAborts = patchAbortRef.current;
     return () => {
       fetchCancelledRef.current = true;
@@ -232,7 +237,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
       addRowAbortRef.current?.abort();
       deleteAbortRef.current?.abort();
     };
-  }, [selectedWeek, fetchPoc, fetchRecords]);
+  }, [selectedWeek, sortField, fetchPoc, fetchRecords]);
 
   // ── week menu close on outside click ───────────────────────────────────────
 
@@ -351,7 +356,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      if (!fetchCancelledRef.current) fetchRecords(selectedWeek);
+      if (!fetchCancelledRef.current) fetchRecords(selectedWeek, sortField);
     }
   };
 
@@ -377,7 +382,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
           validateRow={validateIcRow}
           onImport={bulkImportInboundCalls}
           onClose={() => setCsvImportOpen(false)}
-          onSuccess={() => void fetchRecords(selectedWeek)}
+          onSuccess={() => void fetchRecords(selectedWeek, sortField)}
           defaultHeaderRow={2}
         />
       )}
@@ -533,6 +538,18 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
             )}
           </span>
           <div className="flex items-center gap-2">
+            <select
+              value={sortField}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "createdAt" || v === "callDate") setSortField(v);
+              }}
+              aria-label="Sort records by"
+              className={`h-8 px-2 rounded-lg border text-[13px] outline-none cursor-pointer transition-colors ${dark ? "border-neutral-600 text-neutral-300 bg-neutral-800 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 bg-white hover:border-neutral-400"}`}
+            >
+              <option value="createdAt">Date Added</option>
+              <option value="callDate">Call Date</option>
+            </select>
             <button
               onClick={() => setCsvImportOpen(true)}
               className={`flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-lg border transition-colors ${dark ? "border-neutral-600 text-neutral-300 hover:border-neutral-400" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"}`}
