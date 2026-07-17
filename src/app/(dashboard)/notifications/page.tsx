@@ -14,6 +14,7 @@ import {
   UserPlus,
   CheckCheck,
   CheckCircle2,
+  CheckCircle,
   RefreshCw,
   ChevronRight,
   Eye,
@@ -22,6 +23,7 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { PaymentsTab } from "@/components/notifications/PaymentsTab";
 import { FeePetitionApprovedTab } from "@/components/notifications/FeePetitionApprovedTab";
+import { ClosedCasesTab } from "@/components/notifications/ClosedCasesTab";
 import { RecentActivityTab } from "@/components/notifications/RecentActivityTab";
 import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 
@@ -43,7 +45,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "payments" | "fee_petition_approved" | "recent_activity" | "new_cases";
+type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -103,6 +105,7 @@ const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "notifications",   label: "Notifications",   icon: Bell },
   { key: "payments",              label: "Payments",              icon: DollarSign },
   { key: "fee_petition_approved", label: "Fee Petition Approved", icon: CheckCircle2 },
+  { key: "closed_cases",          label: "Closed Cases",          icon: CheckCircle },
   { key: "recent_activity",       label: "Recent Activity",       icon: Activity },
   { key: "new_cases",             label: "New Cases",             icon: UserPlus },
 ];
@@ -286,6 +289,9 @@ export default function NotificationsPage() {
 
       {/* Fee Petition Approved tab */}
       {pageTab === "fee_petition_approved" && <FeePetitionApprovedTab dark={dark} t={t} />}
+
+      {/* Closed Cases tab */}
+      {pageTab === "closed_cases" && <ClosedCasesTab dark={dark} t={t} />}
 
       {/* Recent Activity tab */}
       {pageTab === "recent_activity" && <RecentActivityTab dark={dark} t={t} />}
