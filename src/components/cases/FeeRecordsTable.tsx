@@ -31,6 +31,7 @@ import {
   fmtFull,
   fmtDate,
   fmtClaimLong,
+  parseCurrencyInput,
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -763,7 +764,7 @@ export const FeeRecordsTable = ({
     // input, not a clear-to-null gesture.
     const isFeeDue = field.endsWith("FeeDue");
     const clearing = isFeeDue && feeAmountEdit.draft.trim() === "-";
-    const parsed = parseFloat(feeAmountEdit.draft);
+    const parsed = parseCurrencyInput(feeAmountEdit.draft);
     if (!clearing && (isNaN(parsed) || parsed < 0)) {
       setFeeAmountError(
         isFeeDue ? "Enter a valid amount (0 or more), or \"-\" to clear." : "Enter a valid amount (0 or more).",

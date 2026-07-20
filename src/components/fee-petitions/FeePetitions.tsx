@@ -22,7 +22,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate } from "@/lib/formatters";
+import { fmt, fmtDate, parseCurrencyInput } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { CompletedPetitions } from "./CompletedPetitions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
@@ -505,7 +505,7 @@ export const FeePetitions = () => {
 
   const saveFeeAmount = useCallback(async () => {
     if (!feeAmountEdit || feeAmountSaving) return;
-    const amount = parseFloat(feeAmountEdit.draft);
+    const amount = parseCurrencyInput(feeAmountEdit.draft);
     if (isNaN(amount) || amount < 0) {
       setFeeAmountError("Enter a valid amount (0 or more).");
       return;

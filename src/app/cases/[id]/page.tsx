@@ -36,6 +36,7 @@ import {
   fmtClaim,
   STATUS_LABELS_DETAIL,
   getStatusColor,
+  parseCurrencyInput,
 } from "@/lib/formatters";
 import type { WinSheetStatus, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -237,14 +238,14 @@ const FeeSection = memo(
         const feeFields: Record<string, number | string | null> = {};
         const changes: string[] = [];
 
-        const newRetro = parseFloat(fields.lr) || 0;
+        const newRetro = parseCurrencyInput(fields.lr) || 0;
         // An empty box means "didn't touch it" — treat as unchanged rather
         // than coercing to 0, which would wrongly turn an untouched (null)
         // Fee Due into an explicit $0.00 on every save. A literal "-" is the
         // deliberate gesture to clear an already-set Fee Due back to null.
         const dueTrimmed = fields.ld.trim();
-        const newDue = dueTrimmed === "" ? due : dueTrimmed === "-" ? null : parseFloat(fields.ld) || 0;
-        const newReceived = parseFloat(fields.lrcv) || 0;
+        const newDue = dueTrimmed === "" ? due : dueTrimmed === "-" ? null : parseCurrencyInput(fields.ld) || 0;
+        const newReceived = parseCurrencyInput(fields.lrcv) || 0;
 
         if (newRetro !== retro) {
           feeFields[`${prefix}Retro`] = newRetro;
@@ -337,8 +338,8 @@ const FeeSection = memo(
               <div>
                 <p className={lbl}>Retro Amount</p>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={fields.lr}
                   onChange={(e) => setField("lr", e.target.value)}
                   className={inpCls}
@@ -360,8 +361,8 @@ const FeeSection = memo(
               <div>
                 <p className={lbl}>Fee Received</p>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={fields.lrcv}
                   onChange={(e) => setField("lrcv", e.target.value)}
                   className={inpCls}
@@ -644,7 +645,7 @@ const CaseDetailPage = () => {
         changes.push(`Fee method → ${editFeeMethod.replace("_", " ")}`);
       }
       if (editFeeCap !== String(caseData.applicableFeeCap || 9200)) {
-        feeFields.applicableFeeCap = parseFloat(editFeeCap) || 9200;
+        feeFields.applicableFeeCap = parseCurrencyInput(editFeeCap) || 9200;
         changes.push(`Fee cap → $${editFeeCap}`);
       }
       if (editApprovedBy !== (caseData.approvedBy || "")) {
@@ -1183,8 +1184,8 @@ const CaseDetailPage = () => {
                     <p className={lbl}>Fee Cap</p>
                     {editing ? (
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={editFeeCap}
                         onChange={(e) => setEditFeeCap(e.target.value)}
                         className={inp}

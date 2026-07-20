@@ -26,6 +26,12 @@ export const fmtFull = (n: number) =>
     n,
   );
 
+// Drop-in replacement for parseFloat on user-typed fee fields. Strips a
+// leading "$" and thousands commas so staff can paste values like "$1,234.56"
+// copied from MyCase documents without retyping them.
+export const parseCurrencyInput = (raw: string): number =>
+  parseFloat(raw.trim().replace(/^\$/, "").replace(/,/g, ""));
+
 export const fmtDate = (d: string | null | undefined): string => {
   if (!d) return "—";
   const [y, m, day] = d.split("-");

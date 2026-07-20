@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { RefreshCw, Save, X } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { parseCurrencyInput } from "@/lib/formatters";
 
 const toStr = (v: number) => (v > 0 ? String(v) : "");
 // Fee Due can be null (never touched) as well as a real 0 — collapse both
@@ -81,7 +82,7 @@ export default function FeeEditModal({
         // A literal "-" is the deliberate gesture to clear an already-set
         // Fee Due back to null — distinct from leaving the box empty, which
         // means "didn't touch it."
-        const nv = trimmed === "" ? ov : trimmed === "-" ? null : parseFloat(rawStr) || 0;
+        const nv = trimmed === "" ? ov : trimmed === "-" ? null : parseCurrencyInput(rawStr) || 0;
         if (nv !== ov) {
           feeFields[key] = nv;
           changes.push(`${label}: ${ov == null ? "—" : `$${ov}`} → ${nv == null ? "—" : `$${nv}`}`);
@@ -99,19 +100,19 @@ export default function FeeEditModal({
         }
       };
 
-      chk(parseFloat(f.t16Retro) || 0, orig.t16Retro, "t16Retro", "T16 Retro");
+      chk(parseCurrencyInput(f.t16Retro) || 0, orig.t16Retro, "t16Retro", "T16 Retro");
       chkFeeDue(f.t16Due, orig.t16FeeDue, "t16FeeDue", "T16 Fee Due");
-      chk(parseFloat(f.t16Rcv) || 0, orig.t16FeeReceived, "t16FeeReceived", "T16 Received");
+      chk(parseCurrencyInput(f.t16Rcv) || 0, orig.t16FeeReceived, "t16FeeReceived", "T16 Received");
       chkDt(f.t16Dt, orig.t16FeeReceivedDate, "t16FeeReceivedDate", "T16 Date");
 
-      chk(parseFloat(f.t2Retro) || 0, orig.t2Retro, "t2Retro", "T2 Retro");
+      chk(parseCurrencyInput(f.t2Retro) || 0, orig.t2Retro, "t2Retro", "T2 Retro");
       chkFeeDue(f.t2Due, orig.t2FeeDue, "t2FeeDue", "T2 Fee Due");
-      chk(parseFloat(f.t2Rcv) || 0, orig.t2FeeReceived, "t2FeeReceived", "T2 Received");
+      chk(parseCurrencyInput(f.t2Rcv) || 0, orig.t2FeeReceived, "t2FeeReceived", "T2 Received");
       chkDt(f.t2Dt, orig.t2FeeReceivedDate, "t2FeeReceivedDate", "T2 Date");
 
-      chk(parseFloat(f.auxRetro) || 0, orig.auxRetro, "auxRetro", "AUX Retro");
+      chk(parseCurrencyInput(f.auxRetro) || 0, orig.auxRetro, "auxRetro", "AUX Retro");
       chkFeeDue(f.auxDue, orig.auxFeeDue, "auxFeeDue", "AUX Fee Due");
-      chk(parseFloat(f.auxRcv) || 0, orig.auxFeeReceived, "auxFeeReceived", "AUX Received");
+      chk(parseCurrencyInput(f.auxRcv) || 0, orig.auxFeeReceived, "auxFeeReceived", "AUX Received");
       chkDt(f.auxDt, orig.auxFeeReceivedDate, "auxFeeReceivedDate", "AUX Date");
 
       if (changes.length === 0) {
@@ -195,9 +196,9 @@ export default function FeeEditModal({
               T16 (SSI)
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {field("Retro Amount", f.t16Retro, set("t16Retro"))}
+              {field("Retro Amount", f.t16Retro, set("t16Retro"), "decimal")}
               {field("Fee Due", f.t16Due, set("t16Due"), "decimal", FEE_DUE_HINT)}
-              {field("Fee Received", f.t16Rcv, set("t16Rcv"))}
+              {field("Fee Received", f.t16Rcv, set("t16Rcv"), "decimal")}
               {field("Date Received", f.t16Dt, set("t16Dt"), "date")}
             </div>
           </div>
@@ -210,9 +211,9 @@ export default function FeeEditModal({
               T2 (SSDI)
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {field("Retro Amount", f.t2Retro, set("t2Retro"))}
+              {field("Retro Amount", f.t2Retro, set("t2Retro"), "decimal")}
               {field("Fee Due", f.t2Due, set("t2Due"), "decimal", FEE_DUE_HINT)}
-              {field("Fee Received", f.t2Rcv, set("t2Rcv"))}
+              {field("Fee Received", f.t2Rcv, set("t2Rcv"), "decimal")}
               {field("Date Received", f.t2Dt, set("t2Dt"), "date")}
             </div>
           </div>
@@ -225,9 +226,9 @@ export default function FeeEditModal({
               AUX (Auxiliary)
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {field("Retro Amount", f.auxRetro, set("auxRetro"))}
+              {field("Retro Amount", f.auxRetro, set("auxRetro"), "decimal")}
               {field("Fee Due", f.auxDue, set("auxDue"), "decimal", FEE_DUE_HINT)}
-              {field("Fee Received", f.auxRcv, set("auxRcv"))}
+              {field("Fee Received", f.auxRcv, set("auxRcv"), "decimal")}
               {field("Date Received", f.auxDt, set("auxDt"), "date")}
             </div>
           </div>
