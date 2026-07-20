@@ -205,6 +205,7 @@ export default function FeesClosedPage() {
         cases={filteredCases}
         dateRange={dateRange}
         mode="closed"
+        title="Closed Cases"
         onImported={fetchClosed}
         dropdownOptions={dropdownOptions}
         approvedByOptions={approvedByOptions}

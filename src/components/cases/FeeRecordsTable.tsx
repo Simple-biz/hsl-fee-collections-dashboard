@@ -135,6 +135,7 @@ interface FeeRecordsTableProps {
   // Active dashboard (default) shows the Approved By dropdown + close flow.
   // "closed" renders a read-only view for /fees-closed.
   mode?: "active" | "closed";
+  title?: string;
   approvedByOptions?: ApprovedByOption[];
   // Per-category option lists for the other inline dropdowns (Assigned,
   // Fees Confirmation, Case Status). Optional — an empty list just yields
@@ -232,6 +233,7 @@ export const FeeRecordsTable = ({
   dateRange,
   onImported,
   mode = "active",
+  title = "Master Fee Records",
   approvedByOptions = [],
   dropdownOptions = {},
   teamMembers = [],
@@ -1053,7 +1055,7 @@ export const FeeRecordsTable = ({
         className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight} sticky top-0 z-40 rounded-t-xl ${stickyBg}`}
       >
         <div>
-          <h3 className={`text-sm font-bold ${t.text}`}>Master Fee Records</h3>
+          <h3 className={`text-sm font-bold ${t.text}`}>{title}</h3>
           <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
             {filtered.length} of {cases.length} cases
           </p>
