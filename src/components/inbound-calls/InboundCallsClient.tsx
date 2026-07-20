@@ -331,7 +331,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
       if (!res.ok) throw new Error(`Failed to add row (${res.status})`);
       const row = await res.json();
       if (fetchCancelledRef.current) return;
-      setRecords((prev) => [...prev, row]);
+      setRecords((prev) => [row, ...prev]);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       // silently fail
