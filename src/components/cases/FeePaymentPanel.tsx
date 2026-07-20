@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, Loader2, ChevronDown } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmtFull, fmtDate } from "@/lib/formatters";
+import { fmtFull, fmtDate, parseCurrencyInput } from "@/lib/formatters";
 import type { FeePayment } from "@/types";
 
 interface FeePaymentPanelProps {
@@ -93,7 +93,7 @@ export function FeePaymentPanel({
   };
 
   const handleAdd = async () => {
-    const amount = parseFloat(newAmount);
+    const amount = parseCurrencyInput(newAmount);
     if (!newDate || isNaN(amount) || amount <= 0) {
       setAddError("Enter a valid date and positive amount.");
       return;
@@ -221,9 +221,8 @@ export function FeePaymentPanel({
                 aria-label="Payment date"
               />
               <input
-                type="number"
-                min="0.01"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={newAmount}
                 onChange={(e) => setNewAmount(e.target.value)}
                 placeholder="Amount"
