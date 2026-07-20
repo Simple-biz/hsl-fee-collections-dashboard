@@ -147,7 +147,7 @@ export default function FeesClosedPage() {
               />
             </div>
             <div>
-              <h3 className={`text-sm font-bold ${t.text}`}>Fees Closed</h3>
+              <h3 className={`text-sm font-bold ${t.text}`}>Closed Cases</h3>
               <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                 Cases acknowledged and marked closed from the dashboard
               </p>
