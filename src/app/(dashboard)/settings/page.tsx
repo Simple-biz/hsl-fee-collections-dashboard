@@ -322,6 +322,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <Settings
               className={`h-5 w-5 ${dark ? "text-indigo-400" : "text-indigo-500"}`}
+              aria-hidden="true"
             />
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>Settings</h3>
@@ -337,9 +338,9 @@ export default function SettingsPage() {
               className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-40`}
             >
               {saving ? (
-                <RefreshCw className="h-3 w-3 animate-spin" />
+                <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
               ) : (
-                <Save className="h-3 w-3" />
+                <Save className="h-3 w-3" aria-hidden="true" />
               )}
               Save Changes
             </button>
@@ -368,7 +369,7 @@ export default function SettingsPage() {
                       : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"
                 }`}
               >
-                <m.icon className="h-3 w-3" />
+                <m.icon className="h-3 w-3" aria-hidden="true" />
                 {m.label}
               </button>
             );
@@ -415,7 +416,7 @@ export default function SettingsPage() {
         <div
           className={`${sectionCard} flex items-center justify-center py-16`}
         >
-          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} />
+          <RefreshCw className={`h-5 w-5 animate-spin ${t.textMuted}`} aria-hidden="true" />
           <span className={`ml-2 text-sm ${t.textSub}`}>
             Loading settings...
           </span>
@@ -433,7 +434,7 @@ export default function SettingsPage() {
                   <h4
                     className={`text-xs font-bold ${t.text} flex items-center gap-2`}
                   >
-                    <DollarSign className="h-3.5 w-3.5" /> Fee Defaults
+                    <DollarSign className="h-3.5 w-3.5" aria-hidden="true" /> Fee Defaults
                   </h4>
                 </div>
                 <div className="p-4 space-y-4">
@@ -488,7 +489,7 @@ export default function SettingsPage() {
                   <h4
                     className={`text-xs font-bold ${t.text} flex items-center gap-2`}
                   >
-                    <Calendar className="h-3.5 w-3.5" /> SSA Fee Cap History
+                    <Calendar className="h-3.5 w-3.5" aria-hidden="true" /> SSA Fee Cap History
                   </h4>
                   <span className={`text-[12px] ${t.textMuted}`}>
                     {feeCaps.length} entries
@@ -551,9 +552,9 @@ export default function SettingsPage() {
                       className={`h-9 px-4 rounded-lg text-xs font-semibold flex items-center gap-1.5 shrink-0 ${t.ctaBtn} disabled:opacity-40`}
                     >
                       {addingCap ? (
-                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                       ) : (
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-3 w-3" aria-hidden="true" />
                       )}
                       Add
                     </button>
@@ -626,7 +627,7 @@ export default function SettingsPage() {
                   <h4
                     className={`text-xs font-bold ${t.text} flex items-center gap-2`}
                   >
-                    <Shield className="h-3.5 w-3.5" /> Service Connections
+                    <Shield className="h-3.5 w-3.5" aria-hidden="true" /> Service Connections
                   </h4>
                   <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                     API keys and URLs are managed via environment variables in
@@ -639,9 +640,9 @@ export default function SettingsPage() {
                   className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 border ${t.outlineBtn} disabled:opacity-40`}
                 >
                   {testing ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                   ) : (
-                    <Wifi className="h-3 w-3" />
+                    <Wifi className="h-3 w-3" aria-hidden="true" />
                   )}
                   Test Connections
                 </button>
@@ -664,7 +665,7 @@ export default function SettingsPage() {
                         <span
                           className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${colorClass}`}
                         >
-                          <StatusIcon className="h-2.5 w-2.5" />
+                          <StatusIcon className="h-2.5 w-2.5" aria-hidden="true" />
                           {conn.status === "connected"
                             ? "Connected"
                             : conn.status === "error"
@@ -680,7 +681,7 @@ export default function SettingsPage() {
 
                       <div className={`mt-2 flex flex-wrap items-center gap-3`}>
                         <div className="flex items-center gap-1.5">
-                          <Key className={`h-3 w-3 ${t.textMuted}`} />
+                          <Key className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
                           <span className={`text-[12px] ${t.textMuted}`}>
                             <code
                               className={`px-1 py-0.5 rounded ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}
@@ -704,7 +705,7 @@ export default function SettingsPage() {
                         </div>
                         {conn.baseUrl && (
                           <div className="flex items-center gap-1.5">
-                            <Link2 className={`h-3 w-3 ${t.textMuted}`} />
+                            <Link2 className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
                             <span className={`text-[12px] ${t.textMuted}`}>
                               {conn.baseUrl}
                             </span>
@@ -737,7 +738,7 @@ export default function SettingsPage() {
                 <h4
                   className={`text-xs font-bold ${t.text} flex items-center gap-2`}
                 >
-                  <Target className="h-3.5 w-3.5" /> Daily Call Targets
+                  <Target className="h-3.5 w-3.5" aria-hidden="true" /> Daily Call Targets
                 </h4>
                 <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
                   Agents below these thresholds trigger &qout;Missed Calls&qout;
@@ -778,7 +779,7 @@ export default function SettingsPage() {
                 <h4
                   className={`text-xs font-bold ${t.text} flex items-center gap-2`}
                 >
-                  <Bell className="h-3.5 w-3.5" /> Notification Settings
+                  <Bell className="h-3.5 w-3.5" aria-hidden="true" /> Notification Settings
                 </h4>
               </div>
               <div className="p-4 space-y-4">

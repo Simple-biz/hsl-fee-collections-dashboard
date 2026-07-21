@@ -280,7 +280,7 @@ export default function ImportCasesModal({
           {step === 1 && (
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Folder className={`h-4 w-4 ${t.textSub}`} />
+                <Folder className={`h-4 w-4 ${t.textSub}`} aria-hidden="true" />
                 <h4 className={`text-sm font-semibold ${t.text}`}>
                   Upload Spreadsheet
                 </h4>
@@ -325,7 +325,7 @@ export default function ImportCasesModal({
                     if (f) void acceptFile(f);
                   }}
                 />
-                <FileText className={`h-8 w-8 mx-auto mb-3 ${t.textMuted}`} />
+                <FileText className={`h-8 w-8 mx-auto mb-3 ${t.textMuted}`} aria-hidden="true" />
                 <p className={`text-sm font-semibold ${t.text}`}>
                   {file ? file.name : "Drag & drop your file here, or click to browse"}
                 </p>
@@ -337,6 +337,7 @@ export default function ImportCasesModal({
                 {busy === "preview" && (
                   <RefreshCw
                     className={`h-4 w-4 animate-spin mx-auto mt-3 ${t.textMuted}`}
+                    aria-hidden="true"
                   />
                 )}
               </div>
@@ -427,7 +428,7 @@ export default function ImportCasesModal({
                   className={`mt-4 rounded-md border p-3 text-[13px] ${dark ? "bg-amber-900/20 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}
                 >
                   <div className="flex items-center gap-1.5 font-semibold mb-1">
-                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                     {preview.summary.warnings.length} warning
                     {preview.summary.warnings.length === 1 ? "" : "s"}
                   </div>
@@ -568,7 +569,7 @@ export default function ImportCasesModal({
                 className={`max-w-md mx-auto rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
               >
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
                   <div className="text-[15px]">
                     <p className="font-bold">
                       Imported {result.inserted.toLocaleString()} case
@@ -599,7 +600,7 @@ export default function ImportCasesModal({
             }}
             className={`h-8 px-3 text-xs font-medium ${t.textSub} hover:underline flex items-center gap-1`}
           >
-            <ArrowLeft className="h-3 w-3" />
+            <ArrowLeft className="h-3 w-3" aria-hidden="true" />
             {step === 1 ? "Back to Import" : "Back"}
           </button>
 
@@ -610,7 +611,7 @@ export default function ImportCasesModal({
               className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
             >
               Next: {STEPS[step].subtitle}
-              <ArrowRight className="h-3 w-3" />
+              <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </button>
           ) : !result ? (
             <div className="flex items-center gap-2">
@@ -631,9 +632,9 @@ export default function ImportCasesModal({
                 className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
               >
                 {busy === "append" ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Upload className="h-3 w-3" />
+                  <Upload className="h-3 w-3" aria-hidden="true" />
                 )}
                 Import Selected ({selected.size.toLocaleString()})
               </button>
@@ -732,7 +733,7 @@ const PreviewTable = ({
                     onClick={(e) => e.stopPropagation()}
                     className={`ml-1 inline-flex ${t.textMuted} hover:${t.text}`}
                   >
-                    <ExternalLink className="h-3 w-3 inline" />
+                    <ExternalLink className="h-3 w-3 inline" aria-hidden="true" />
                   </a>
                 )}
               </td>
@@ -750,7 +751,7 @@ const PreviewTable = ({
                     className={`text-[13px] underline ${dark ? "text-blue-400" : "text-blue-600"} inline-flex items-center gap-1`}
                   >
                     {r.winSheetLinkText ?? "Open"}
-                    <ExternalLink className="h-3 w-3" />
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 ) : (
                   <span className={`text-[13px] ${t.textMuted}`}>

@@ -247,9 +247,9 @@ export default function FeeEditModal({
             className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
           >
             {saving ? (
-              <RefreshCw className="h-3 w-3 animate-spin" />
+              <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
             ) : (
-              <Save className="h-3 w-3" />
+              <Save className="h-3 w-3" aria-hidden="true" />
             )}{" "}
             Save All Fees
           </button>

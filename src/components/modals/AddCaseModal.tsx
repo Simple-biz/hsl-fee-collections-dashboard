@@ -228,7 +228,7 @@ export default function AddCaseModal({
               className={`rounded-lg border p-5 ${dark ? "bg-emerald-900/20 border-emerald-800 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}
             >
               <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+                <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" aria-hidden="true" />
                 <div className="text-[15px]">
                   <p className="font-bold">
                     Case created for {form.firstName} {form.lastName}.
@@ -277,7 +277,7 @@ export default function AddCaseModal({
                       className={`absolute right-2 top-1/2 -translate-y-1/2 ${t.textSub} hover:opacity-80`}
                       title="Open in MyCase"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
                     </a>
                   )}
                 </div>
@@ -297,7 +297,7 @@ export default function AddCaseModal({
                       className={`absolute right-2 top-1/2 -translate-y-1/2 ${t.textSub} hover:opacity-80`}
                       title="Open in Chronicle"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
                     </a>
                   )}
                 </div>
@@ -488,9 +488,9 @@ export default function AddCaseModal({
                 className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
               >
                 {busy ? (
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                 )}
                 Create Case
               </button>
