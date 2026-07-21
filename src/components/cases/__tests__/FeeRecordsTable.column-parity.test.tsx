@@ -20,6 +20,18 @@ import { render, fireEvent } from "@testing-library/react";
 
 // ── module mocks (must appear before component import) ────────────────────────
 
+vi.mock("next/navigation", () => ({
+  useSearchParams: vi.fn(() => new URLSearchParams()),
+  useRouter: vi.fn(() => ({
+    replace: vi.fn(),
+    push: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  })),
+}));
+
 vi.mock("next-auth/react", () => ({
   useSession: vi.fn(() => ({
     data: { user: { role: "admin", capabilities: [] } },
