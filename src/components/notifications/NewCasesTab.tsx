@@ -24,9 +24,6 @@ interface NewCasesTabProps {
   t: ReturnType<typeof themeClasses>;
 }
 
-// New cases land every day, not just weekdays, so this tab spans the full
-
-
 const fmtDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
     weekday: "short",
