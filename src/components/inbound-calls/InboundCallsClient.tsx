@@ -19,6 +19,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportInboundCalls } from "@/app/(dashboard)/inbound-calls/actions";
 import { parseBool, parseDate } from "@/lib/import/csv-parser";
+import { getMondayOfDate } from "@/lib/formatters";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,20 +40,8 @@ function partsToIso(y: number, m: number, d: number): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-function getMondayOf(dateStr: string): string {
-  // Construct via numeric parts so the Date is always local midnight —
-  // new Date("YYYY-MM-DDT00:00:00") does the same, but toISOString() then
-  // converts back to UTC and shifts the date for timezones ahead of UTC.
-  const [y, m, d] = isoToParts(dateStr);
-  const date = new Date(y, m - 1, d);
-  const dow = date.getDay();
-  const diff = dow === 0 ? -6 : 1 - dow;
-  date.setDate(date.getDate() + diff);
-  return partsToIso(date.getFullYear(), date.getMonth() + 1, date.getDate());
-}
-
 function currentWeekStart(): string {
-  return getMondayOf(todayEasternIso());
+  return getMondayOfDate(todayEasternIso());
 }
 
 function addWeeks(weekStart: string, delta: number): string {

@@ -185,10 +185,10 @@ const GROUP_LABEL: Record<GroupKey, string> = {
 
 function mockRole(role: Role) {
   vi.mocked(useSession).mockReturnValue({
-    data: { user: { role, capabilities: [] } },
+    data: { user: { role, capabilities: [] }, expires: "9999-12-31" },
     status: "authenticated",
     update: vi.fn(),
-  } as ReturnType<typeof useSession>);
+  } as unknown as ReturnType<typeof useSession>);
 }
 
 function renderTable(mode: Mode = "active") {
