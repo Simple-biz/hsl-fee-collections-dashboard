@@ -20,10 +20,12 @@ import {
   Check,
   ExternalLink,
   Clipboard,
+  Table2,
+  MessageSquare,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel } from "@/lib/formatters";
+import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel, toChatBlock } from "@/lib/formatters";
 import { teamBadgeClasses } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import {
@@ -187,9 +189,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copiedTable, setCopiedTable] = useState<string | null>(null);
+  const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
   }, []);
 
   const copyAgentRow = (a: AgentScore) => {
@@ -206,6 +211,77 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       setCopiedRow(a.agent);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedRow(null), 1500);
+    });
+  };
+
+  const copyNoFeesTable = (format: "sheets" | "chat") => {
+    const header = format === "sheets"
+      ? ["Case Name", "Assigned", "Level", "Claim", "Approval", "Days"]
+      : ["Case", "Agent", "Level", "Claim", "Approved", "Days"];
+    const rows = (data?.noFeesCases ?? []).map((c) => {
+      const level = c.level.replace(/_/g, " ");
+      const isFeePetition = level.trim().toUpperCase() === "FEE PETITION";
+      const fullLevel = isFeePetition && c.feePetitionApproved ? "FEE PETITION (approved)" : level;
+      const displayLevel = format === "chat" && isFeePetition && c.feePetitionApproved
+        ? "FP (approved)"
+        : fullLevel;
+      const caseName = format === "chat" && c.name.length > 20
+        ? c.name.slice(0, 19) + "…"
+        : c.name;
+      return [caseName, c.assigned, displayLevel, c.claim, fmtDate(c.approvalDate) ?? "—", c.daysSinceApproval];
+    });
+    const text = format === "sheets"
+      ? [header, ...rows].map((r) => r.join("\t")).join("\n")
+      : toChatBlock("No Fees Cases", header, rows);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedTable(`noFees-${format}`);
+      if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
+      tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+    });
+  };
+
+  const copyAgentTable = (format: "sheets" | "chat") => {
+    const chat = format === "chat";
+    const headers: string[] = ["Agent"];
+    if (showCol("cases"))       headers.push("Open");
+    if (showCol("closedcases")) headers.push("Closed");
+    if (showCol("opennofees"))  headers.push("No Fees");
+    if (showCol("collected"))   headers.push("Collected");
+    if (showCol("ssacalls"))    headers.push(chat ? "SSA" : "SSA Calls");
+    if (showCol("clientcalls")) headers.push(chat ? "CL Calls" : "Client Calls");
+    if (showCol("faxsent"))     headers.push(chat ? "Fax" : "Fax Sent");
+    if (showCol("winsheets"))   headers.push(chat ? "Wins" : "Win Sheets");
+    const dataRows = filteredAgents.map((a) => {
+      const cols: (string | number)[] = [a.agent];
+      if (showCol("cases"))       cols.push(a.openCases);
+      if (showCol("closedcases")) cols.push(a.casesClosed);
+      if (showCol("opennofees"))  cols.push(a.openNoFees);
+      if (showCol("collected"))   cols.push(a.feesCollectedInWindow != null ? fmt(a.feesCollectedInWindow) : "—");
+      if (showCol("ssacalls"))    cols.push(a.weekSsaCalls);
+      if (showCol("clientcalls")) cols.push(a.weekClientCalls);
+      if (showCol("faxsent"))     cols.push(a.weekFaxSent);
+      if (showCol("winsheets"))   cols.push(a.completedWinSheets);
+      return cols;
+    });
+    const totalsRow: (string | number)[] = ["TOTAL"];
+    if (showCol("cases"))       totalsRow.push(filteredTotals.openCases);
+    if (showCol("closedcases")) totalsRow.push(filteredTotals.casesClosed);
+    if (showCol("opennofees"))  totalsRow.push(filteredTotals.openNoFees);
+    if (showCol("collected")) {
+      const allNull = filteredAgents.every((a) => a.feesCollectedInWindow == null);
+      totalsRow.push(allNull ? "—" : fmt(filteredTotals.feesCollectedInWindow));
+    }
+    if (showCol("ssacalls"))    totalsRow.push(filteredTotals.weekSsaCalls);
+    if (showCol("clientcalls")) totalsRow.push(filteredTotals.weekClientCalls);
+    if (showCol("faxsent"))     totalsRow.push(filteredTotals.weekFaxSent);
+    if (showCol("winsheets"))   totalsRow.push(filteredTotals.completedWinSheets);
+    const text = format === "sheets"
+      ? [headers, ...dataRows, totalsRow].map((r) => r.join("\t")).join("\n")
+      : toChatBlock(`Agent Tracking — ${windowLabel}`, headers, [...dataRows, totalsRow]);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedTable(`agents-${format}`);
+      if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
+      tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     });
   };
 
@@ -578,11 +654,37 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         <div className={`rounded-xl border ${t.card} overflow-hidden`}>
           <div className={`px-4 py-2.5 flex items-center justify-between border-b ${t.borderLight}`}>
             <span className={`text-xs font-bold ${t.text}`}>No Fees Cases</span>
-            <span className="text-[13px] font-medium tabular-nums">
-              <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} 60–90 days</span>
-              <span className={t.textMuted}> · </span>
-              <span className={dark ? "text-red-400" : "text-red-600"}>{data.noFeesAging.over90} over 90 days</span>
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[13px] font-medium tabular-nums">
+                <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} 60–90 days</span>
+                <span className={t.textMuted}> · </span>
+                <span className={dark ? "text-red-400" : "text-red-600"}>{data.noFeesAging.over90} over 90 days</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => copyNoFeesTable("sheets")}
+                  aria-label="Copy No Fees Cases for Google Sheets"
+                  title="Copy for Google Sheets (tab-separated)"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "noFees-sheets" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
+                >
+                  {copiedTable === "noFees-sheets"
+                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+                    : <><Table2 aria-hidden="true" className="h-3 w-3" />Sheets</>
+                  }
+                </button>
+                <button
+                  onClick={() => copyNoFeesTable("chat")}
+                  aria-label="Copy No Fees Cases for Google Chat"
+                  title="Copy for Google Chat (monospace code block)"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "noFees-chat" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
+                >
+                  {copiedTable === "noFees-chat"
+                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+                    : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
+                  }
+                </button>
+              </div>
+            </div>
           </div>
           {data.noFeesCases.length === 0 ? (
             <div className={`py-6 text-center text-xs ${t.textMuted}`}>No aging no-fee cases.</div>
@@ -865,9 +967,33 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
-              <span className={`ml-auto text-[13px] ${t.textMuted}`}>
-                {filteredAgents.length} of {data.agents.length} agents
-              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <span className={`text-[13px] ${t.textMuted}`}>
+                  {filteredAgents.length} of {data.agents.length} agents
+                </span>
+                <button
+                  onClick={() => copyAgentTable("sheets")}
+                  aria-label="Copy Agent Tracking for Google Sheets"
+                  title="Copy for Google Sheets (tab-separated)"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "agents-sheets" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
+                >
+                  {copiedTable === "agents-sheets"
+                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+                    : <><Table2 aria-hidden="true" className="h-3 w-3" />Sheets</>
+                  }
+                </button>
+                <button
+                  onClick={() => copyAgentTable("chat")}
+                  aria-label="Copy Agent Tracking for Google Chat"
+                  title="Copy for Google Chat (monospace code block)"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "agents-chat" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
+                >
+                  {copiedTable === "agents-chat"
+                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+                    : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
+                  }
+                </button>
+              </div>
             </div>
 
             {/* Agent table */}
