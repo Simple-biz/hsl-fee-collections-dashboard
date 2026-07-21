@@ -5,17 +5,7 @@ import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
 import { parseBool, parseDate } from "@/lib/import/csv-parser";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
-
-function getMondayOf(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const dow = date.getDay();
-  const diff = dow === 0 ? -6 : 1 - dow;
-  date.setDate(date.getDate() + diff);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${mm}-${dd}`;
-}
+import { getMondayOfDate } from "@/lib/formatters";
 
 export async function bulkImportInboundCalls(
   rawRows: Record<string, string>[],
@@ -43,7 +33,7 @@ export async function bulkImportInboundCalls(
       continue;
     }
 
-    const weekStart = getMondayOf(callDate);
+    const weekStart = getMondayOfDate(callDate);
 
     let calledBackResolved = false;
     if (raw["called_back_resolved"] !== undefined && raw["called_back_resolved"].trim()) {
