@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Check, Table2, MessageSquare } from "lucide-react";
+import { Check, Table2, MessageSquare, LayoutGrid } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, toChatBlock } from "@/lib/formatters";
+import { fmt, toChatBlock, toTeamsHtml } from "@/lib/formatters";
 import { teamCardClasses, teamAccentText, teamLabel } from "@/lib/team-colors";
 
 export interface ScoreboardSummary {
@@ -63,14 +63,14 @@ export function ScoreboardSummaryCards({
   const [t2Days, setT2Days] = useState<60 | 90>(60);
   const [t16Days, setT16Days] = useState<60 | 90>(60);
   const [concDays, setConcDays] = useState<60 | 90>(60);
-  const [byTeamCopied, setByTeamCopied] = useState<"sheets" | "chat" | null>(null);
+  const [byTeamCopied, setByTeamCopied] = useState<"sheets" | "chat" | "teams" | null>(null);
   const byTeamCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (byTeamCopyTimerRef.current) clearTimeout(byTeamCopyTimerRef.current);
   }, []);
 
-  const copyByTeam = (format: "sheets" | "chat") => {
+  const copyByTeam = (format: "sheets" | "chat" | "teams") => {
     const header = format === "sheets"
       ? ["Team", "Agents", "Fees Collected", "SSA Calls", "CL Calls", "Win Sheets", "Cases Closed", "Open Cases"]
       : ["Team", "Agents", "Collected", "SSA", "CL Calls", "Wins", "Closed", "Open"];
@@ -84,14 +84,20 @@ export function ScoreboardSummaryCards({
       team.casesClosed,
       team.openCases,
     ]);
-    const text = format === "sheets"
-      ? [header, ...rows].map((r) => r.join("\t")).join("\n")
-      : toChatBlock(`By Team — ${label}`, header, rows);
-    navigator.clipboard.writeText(text).then(() => {
+    const done = () => {
       setByTeamCopied(format);
       if (byTeamCopyTimerRef.current) clearTimeout(byTeamCopyTimerRef.current);
       byTeamCopyTimerRef.current = setTimeout(() => setByTeamCopied(null), 1500);
-    });
+    };
+    if (format === "teams") {
+      const blob = new Blob([toTeamsHtml(`By Team — ${label}`, header, rows)], { type: "text/html" });
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done);
+    } else {
+      const text = format === "sheets"
+        ? [header, ...rows].map((r) => r.join("\t")).join("\n")
+        : toChatBlock(`By Team — ${label}`, header, rows);
+      navigator.clipboard.writeText(text).then(done);
+    }
   };
 
   // Quiet per-metric accent (border + tint) on the plain cards — not used on
@@ -203,6 +209,17 @@ export function ScoreboardSummaryCards({
                 {byTeamCopied === "chat"
                   ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
                   : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
+                }
+              </button>
+              <button
+                onClick={() => copyByTeam("teams")}
+                aria-label="Copy By Team for Microsoft Teams"
+                title="Copy for Microsoft Teams (HTML table)"
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${byTeamCopied === "teams" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
+              >
+                {byTeamCopied === "teams"
+                  ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+                  : <><LayoutGrid aria-hidden="true" className="h-3 w-3" />Teams</>
                 }
               </button>
             </div>
