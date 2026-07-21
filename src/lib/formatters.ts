@@ -111,6 +111,32 @@ export const fmtDateLong = (iso: string | null | undefined): string => {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
+// MS Teams pastes rich text from clipboard — an HTML table renders with visible borders and alignment.
+export const toTeamsHtml = (
+  title: string,
+  headers: string[],
+  rows: (string | number)[][],
+): string => {
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const th = `padding:4px 8px;border:1px solid #d0d0d0;background:#f5f5f5;font-weight:600;text-align:left`;
+  const td = `padding:4px 8px;border:1px solid #d0d0d0`;
+  const headRow = headers.map((h) => `<th style="${th}">${esc(h)}</th>`).join("");
+  const bodyRows = rows
+    .map(
+      (r) =>
+        `<tr>${headers.map((_, ci) => `<td style="${td}">${esc(String(r[ci] ?? ""))}</td>`).join("")}</tr>`,
+    )
+    .join("");
+  return (
+    `<p><strong>${esc(title)}</strong></p>` +
+    `<table style="border-collapse:collapse">` +
+    `<thead><tr>${headRow}</tr></thead>` +
+    `<tbody>${bodyRows}</tbody>` +
+    `</table>`
+  );
+};
+
 // Google Chat renders ``` blocks in a fixed-width font — padding aligns columns.
 export const toChatBlock = (
   title: string,
