@@ -572,6 +572,7 @@ export const FeeRecordsTable = ({
 
   const hasActiveFilters =
     !!search ||
+    !!dateRange ||
     statusFilter !== "all" ||
     assignedFilter !== "all" ||
     feesConfFilter !== "all" ||

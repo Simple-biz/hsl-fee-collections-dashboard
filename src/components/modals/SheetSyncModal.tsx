@@ -523,7 +523,7 @@ export default function SheetSyncModal({
             ) : i === activeIdx ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500 shrink-0" aria-hidden="true" />
             ) : (
-              <div className="h-3.5 w-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-600 shrink-0" />
+              <div aria-hidden="true" className="h-3.5 w-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-600 shrink-0" />
             )}
             <span className={`text-[12px] ${phase.done ? "text-emerald-600 dark:text-emerald-400" : i === activeIdx ? t.text : t.textMuted}`}>
               {phase.label}
