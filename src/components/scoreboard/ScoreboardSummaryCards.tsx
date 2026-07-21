@@ -91,7 +91,7 @@ export function ScoreboardSummaryCards({
     };
     if (format === "teams") {
       const blob = new Blob([toTeamsHtml(`By Team — ${label}`, header, rows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done);
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
     } else {
       const text = format === "sheets"
         ? [header, ...rows].map((r) => r.join("\t")).join("\n")

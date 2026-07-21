@@ -294,7 +294,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     };
     if (format === "teams") {
       const blob = new Blob([toTeamsHtml("No Fees Cases", header, rows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done);
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
     } else {
       const text = format === "sheets"
         ? [header, ...rows].map((r) => r.join("\t")).join("\n")
@@ -345,7 +345,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     };
     if (format === "teams") {
       const blob = new Blob([toTeamsHtml(`Agent Tracking — ${windowLabel}`, headers, [...dataRows, totalsRow])], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done);
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
     } else {
       const text = format === "sheets"
         ? [headers, ...dataRows, totalsRow].map((r) => r.join("\t")).join("\n")

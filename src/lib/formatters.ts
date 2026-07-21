@@ -117,17 +117,19 @@ export const toTeamsHtml = (
   headers: string[],
   rows: (string | number)[][],
 ): string => {
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const th = `padding:4px 8px;border:1px solid #d0d0d0;background:#f5f5f5;font-weight:600;text-align:left`;
   const td = `padding:4px 8px;border:1px solid #d0d0d0`;
-  const headRow = headers.map((h) => `<th style="${th}">${h}</th>`).join("");
+  const headRow = headers.map((h) => `<th style="${th}">${esc(h)}</th>`).join("");
   const bodyRows = rows
     .map(
       (r) =>
-        `<tr>${headers.map((_, ci) => `<td style="${td}">${r[ci] ?? ""}</td>`).join("")}</tr>`,
+        `<tr>${headers.map((_, ci) => `<td style="${td}">${esc(String(r[ci] ?? ""))}</td>`).join("")}</tr>`,
     )
     .join("");
   return (
-    `<p><strong>${title}</strong></p>` +
+    `<p><strong>${esc(title)}</strong></p>` +
     `<table style="border-collapse:collapse">` +
     `<thead><tr>${headRow}</tr></thead>` +
     `<tbody>${bodyRows}</tbody>` +

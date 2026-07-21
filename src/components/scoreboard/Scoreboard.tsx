@@ -194,7 +194,7 @@ export const Scoreboard = () => {
     if (format === "teams") {
       const html = teamBlocks.map(({ teamLabel, header, rows }) => toTeamsHtml(teamLabel, header, rows)).join("");
       const blob = new Blob([html], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done);
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
     } else if (format === "sheets") {
       const lines: string[] = [];
       for (const { teamLabel, header, rows } of teamBlocks) {
