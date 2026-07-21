@@ -111,6 +111,24 @@ export const fmtDateLong = (iso: string | null | undefined): string => {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
+// Google Chat renders ``` blocks in a fixed-width font — padding aligns columns.
+export const toChatBlock = (
+  title: string,
+  headers: string[],
+  rows: (string | number)[][],
+): string => {
+  const all: string[][] = [headers.map(String), ...rows.map((r) => r.map(String))];
+  const widths = headers.map((_, ci) =>
+    Math.max(...all.map((row) => (row[ci] ?? "").length)),
+  );
+  const table = all
+    .map((row) =>
+      widths.map((w, ci) => (row[ci] ?? "").padEnd(w)).join("  ").trimEnd(),
+    )
+    .join("\n");
+  return "```\n" + title + "\n" + table + "\n```";
+};
+
 // Claim type display: T2_T16 → CONC, T2/T16 → CONC, CONCURRENT → CONC.
 // CONCURRENT was a dropdown-option spelling briefly live in Settings that
 // wrote straight into claim_type_label — same "the dropdown drifted" class
