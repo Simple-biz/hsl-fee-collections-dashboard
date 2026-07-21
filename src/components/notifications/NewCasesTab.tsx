@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, RefreshCw, UserPlus, AlertCircle, ExternalLink } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabel as formatWeekLabelBase } from "@/lib/formatters";
+import { getMonday, formatWeekLabelShort as formatWeekLabel } from "@/lib/formatters";
 
 interface DayCount {
   date: string;
@@ -23,11 +23,6 @@ interface NewCasesTabProps {
   dark: boolean;
   t: ReturnType<typeof themeClasses>;
 }
-
-// New cases land every day, not just weekdays, so this tab spans the full
-// Mon-Sun week (6 days past Monday) rather than the Mon-Fri default used by
-// Audit Log / Recent Activity.
-const formatWeekLabel = (monday: string): string => formatWeekLabelBase(monday, 6);
 
 const fmtDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {

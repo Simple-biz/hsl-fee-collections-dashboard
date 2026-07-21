@@ -57,6 +57,19 @@ export const getMonday = (offset = 0): string => {
   return `${y}-${m}-${dd}`;
 };
 
+// Monday (YYYY-MM-DD) of the week that contains `dateStr`. Accepts an ISO
+// date string (YYYY-MM-DD). Uses numeric-part construction so the Date is
+// always local midnight — avoids UTC-shift issues for timezones east of UTC.
+export const getMondayOfDate = (dateStr: string): string => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  date.setDate(date.getDate() + (dow === 0 ? -6 : 1 - dow));
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
+};
+
 // "Jun 29 – Jul 3, 2026"-style label for the week starting at `monday`.
 // `spanDays` is the offset to the END of the displayed week — 4 for a
 // Mon-Fri business week (Audit Log, Recent Activity), 6 for a full Mon-Sun
@@ -68,6 +81,11 @@ export const formatWeekLabel = (monday: string, spanDays = 4): string => {
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
   return `${start.toLocaleDateString("en-US", opts)} – ${end.toLocaleDateString("en-US", { ...opts, year: "numeric" })}`;
 };
+
+// Mon-Sun (spanDays=6) variant — used by all notification tabs that count
+// events across a full calendar week rather than just the business week.
+export const formatWeekLabelShort = (monday: string): string =>
+  formatWeekLabel(monday, 6);
 
 // Timestamp for notes/activity — e.g. "May 3, 8:00 PM". Takes a full ISO
 // timestamp (with time), unlike fmtDate which takes a date-only string.

@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, DollarSign, AlertCircle, ExternalLink } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabel as formatWeekLabelBase } from "@/lib/formatters";
-import { fmt } from "@/lib/formatters";
+import { getMonday, formatWeekLabelShort as formatWeekLabel, fmt } from "@/lib/formatters";
 
 interface DayTotal {
   date: string;
@@ -30,7 +29,6 @@ interface PaymentsTabProps {
   t: ReturnType<typeof themeClasses>;
 }
 
-const formatWeekLabel = (monday: string): string => formatWeekLabelBase(monday, 6);
 
 const fmtDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
