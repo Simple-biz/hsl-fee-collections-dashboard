@@ -2,14 +2,14 @@
 
 import { useState, useReducer, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
-import { getMonday } from "@/lib/formatters";
+import { getMonday, toChatBlock } from "@/lib/formatters";
 
 // ---------- types ----------
 
@@ -109,9 +109,12 @@ export const Scoreboard = () => {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | null>(null);
+  const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
   }, []);
   const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
     weeks: [],
@@ -168,6 +171,41 @@ export const Scoreboard = () => {
     1
   );
 
+  const copyAllTeams = (format: "sheets" | "chat") => {
+    const weekLabels = weeks.map((w) => w.label);
+    const teamBlocks = TEAMS.flatMap(({ key, label: teamLabel }) => {
+      const currentAgents = (weeks[0]?.agents ?? []).filter((a) => a.team === key && a.role !== "team_lead");
+      const rows = currentAgents
+        .map((a) => ({
+          agent: a.agent,
+          weekValues: weeks.map((w) => w.agents.find((x) => x.agent === a.agent)?.casesClosed ?? 0),
+        }))
+        .sort((a, b) => b.weekValues[0] - a.weekValues[0]);
+      if (rows.length === 0) return [];
+      return [{ teamLabel, header: ["Agent", ...weekLabels], rows: rows.map((r) => [r.agent, ...r.weekValues]) }];
+    });
+
+    let text: string;
+    if (format === "sheets") {
+      const lines: string[] = [];
+      for (const { teamLabel, header, rows } of teamBlocks) {
+        lines.push(teamLabel);
+        lines.push(header.join("\t"));
+        for (const row of rows) lines.push(row.join("\t"));
+        lines.push("");
+      }
+      text = lines.join("\n");
+    } else {
+      text = teamBlocks.map(({ teamLabel, header, rows }) => toChatBlock(teamLabel, header, rows)).join("\n\n");
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedTable(format);
+      if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
+      tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+    });
+  };
+
   return (
     <>
     {csvImportOpen && (
@@ -206,6 +244,28 @@ export const Scoreboard = () => {
               Import
             </button>
           )}
+          <button
+            onClick={() => copyAllTeams("sheets")}
+            aria-label="Copy scoreboard for Google Sheets"
+            title="Copy for Google Sheets (tab-separated)"
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "sheets" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+          >
+            {copiedTable === "sheets"
+              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
+              : <><Table2 aria-hidden="true" className="h-3.5 w-3.5" />Sheets</>
+            }
+          </button>
+          <button
+            onClick={() => copyAllTeams("chat")}
+            aria-label="Copy scoreboard for Google Chat"
+            title="Copy for Google Chat (monospace code block)"
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "chat" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+          >
+            {copiedTable === "chat"
+              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
+              : <><MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />Chat</>
+            }
+          </button>
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
