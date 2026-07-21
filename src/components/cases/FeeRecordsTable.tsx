@@ -589,6 +589,8 @@ export const FeeRecordsTable = ({
     setCaseStatusFilter("all");
     setLevelFilter("all");
     setApproverFilter("all");
+    setSortKey(defaultSortKey);
+    setSortDir("desc");
     setPageIndex(0);
   };
 

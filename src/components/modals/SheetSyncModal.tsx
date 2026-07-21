@@ -505,6 +505,39 @@ export default function SheetSyncModal({
 
   const lblCls = `text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`;
 
+  const syncProgressStrip = (() => {
+    if (!syncing && !fcSyncing) return null;
+    const elapsed = syncing ? syncElapsed : fcSyncElapsed;
+    const phases = [
+      { label: "Fetching from Sheets", done: elapsed >= 20 },
+      { label: "Comparing with database", done: elapsed >= 42 },
+      { label: "Upserting records", done: false },
+    ];
+    const activeIdx = phases.findLastIndex((p) => !p.done);
+    return (
+      <div role="status" aria-live="polite" className={`px-5 py-2.5 border-t ${t.borderLight} flex items-center justify-center gap-3 flex-wrap`}>
+        {phases.map((phase, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            {phase.done ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" aria-hidden="true" />
+            ) : i === activeIdx ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500 shrink-0" aria-hidden="true" />
+            ) : (
+              <div className="h-3.5 w-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-600 shrink-0" />
+            )}
+            <span className={`text-[12px] ${phase.done ? "text-emerald-600 dark:text-emerald-400" : i === activeIdx ? t.text : t.textMuted}`}>
+              {phase.label}
+            </span>
+            {i < phases.length - 1 && (
+              <ArrowRight className={`h-3 w-3 ml-1.5 shrink-0 ${t.textMuted}`} aria-hidden="true" />
+            )}
+          </div>
+        ))}
+        <span className={`text-[12px] ${t.textMuted}`}>({elapsed}s)</span>
+      </div>
+    );
+  })();
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -1149,37 +1182,7 @@ export default function SheetSyncModal({
         </div>
 
         {/* Sync progress strip — visible while either sync is running */}
-        {(syncing || fcSyncing) && (() => {
-          const elapsed = syncing ? syncElapsed : fcSyncElapsed;
-          const phases = [
-            { label: "Fetching from Sheets", done: elapsed >= 20 },
-            { label: "Comparing with database", done: elapsed >= 42 },
-            { label: "Upserting records", done: false },
-          ];
-          const activeIdx = phases.findLastIndex((p) => !p.done);
-          return (
-            <div role="status" aria-live="polite" className={`px-5 py-2.5 border-t ${t.borderLight} flex items-center justify-center gap-3 flex-wrap`}>
-              {phases.map((phase, i) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  {phase.done ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" aria-hidden="true" />
-                  ) : i === activeIdx ? (
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500 shrink-0" aria-hidden="true" />
-                  ) : (
-                    <div className="h-3.5 w-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-600 shrink-0" />
-                  )}
-                  <span className={`text-[12px] ${phase.done ? "text-emerald-600 dark:text-emerald-400" : i === activeIdx ? t.text : t.textMuted}`}>
-                    {phase.label}
-                  </span>
-                  {i < phases.length - 1 && (
-                    <ArrowRight className={`h-3 w-3 ml-1.5 shrink-0 ${t.textMuted}`} aria-hidden="true" />
-                  )}
-                </div>
-              ))}
-              <span className={`text-[12px] ${t.textMuted}`}>({elapsed}s)</span>
-            </div>
-          );
-        })()}
+        {syncProgressStrip}
 
         {/* Footer */}
         <div className={`flex items-center justify-between px-5 py-3 border-t ${t.borderLight}`}>
