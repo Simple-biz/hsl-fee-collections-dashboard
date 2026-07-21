@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Pencil,
   Check,
+  Clipboard,
   Plus,
   X,
   Archive,
@@ -381,6 +382,8 @@ export const FeeRecordsTable = ({
   const [feeAmountSaving, setFeeAmountSaving] = useState(false);
   const [feeAmountError, setFeeAmountError] = useState<string | null>(null);
   const feeAmountAbortRef = useRef<AbortController | null>(null);
+  const [copiedDateId, setCopiedDateId] = useState<number | null>(null);
+  const copyDateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
   useEffect(() => {
@@ -1926,8 +1929,33 @@ export const FeeRecordsTable = ({
                         </button>
                       )}
                     </td>
-                    <td className={`${tdBase} ${t.textSub} tabular-nums`}>
-                      {dateStr(c.date)}
+                    <td
+                      className={`${tdBase} ${t.textSub} tabular-nums`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>{dateStr(c.date)}</span>
+                        {c.date && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(dateStr(c.date)).then(() => {
+                                setCopiedDateId(c.id);
+                                if (copyDateTimerRef.current) clearTimeout(copyDateTimerRef.current);
+                                copyDateTimerRef.current = setTimeout(() => setCopiedDateId(null), 1500);
+                              });
+                            }}
+                            aria-label="Copy approval date"
+                            className={`opacity-0 group-hover:opacity-100 transition-colors shrink-0 p-0.5 rounded ${t.hover}`}
+                          >
+                            {copiedDateId === c.id
+                              ? <Check className={`h-3 w-3 text-emerald-500`} aria-hidden="true" />
+                              : <Clipboard className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
+                            }
+                          </button>
+                        )}
+                      </div>
                     </td>
                     {/* Win-sheet Status — varchar; lives on fee_records. */}
                     <td
