@@ -2,14 +2,14 @@
 
 import { useState, useReducer, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare, LayoutGrid } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
-import { getMonday, toChatBlock } from "@/lib/formatters";
+import { getMonday, toChatBlock, toTeamsHtml } from "@/lib/formatters";
 
 // ---------- types ----------
 
@@ -109,7 +109,7 @@ export const Scoreboard = () => {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | null>(null);
+  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | "teams" | null>(null);
   const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -171,7 +171,7 @@ export const Scoreboard = () => {
     1
   );
 
-  const copyAllTeams = (format: "sheets" | "chat") => {
+  const copyAllTeams = (format: "sheets" | "chat" | "teams") => {
     const weekLabels = weeks.map((w) => w.label);
     const teamBlocks = TEAMS.flatMap(({ key, label: teamLabel }) => {
       const currentAgents = (weeks[0]?.agents ?? []).filter((a) => a.team === key && a.role !== "team_lead");
@@ -185,8 +185,17 @@ export const Scoreboard = () => {
       return [{ teamLabel, header: ["Agent", ...weekLabels], rows: rows.map((r) => [r.agent, ...r.weekValues]) }];
     });
 
-    let text: string;
-    if (format === "sheets") {
+    const done = () => {
+      setCopiedTable(format);
+      if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
+      tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+    };
+
+    if (format === "teams") {
+      const html = teamBlocks.map(({ teamLabel, header, rows }) => toTeamsHtml(teamLabel, header, rows)).join("");
+      const blob = new Blob([html], { type: "text/html" });
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
+    } else if (format === "sheets") {
       const lines: string[] = [];
       for (const { teamLabel, header, rows } of teamBlocks) {
         lines.push(teamLabel);
@@ -194,16 +203,11 @@ export const Scoreboard = () => {
         for (const row of rows) lines.push(row.join("\t"));
         lines.push("");
       }
-      text = lines.join("\n");
+      navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
-      text = teamBlocks.map(({ teamLabel, header, rows }) => toChatBlock(teamLabel, header, rows)).join("\n\n");
+      const text = teamBlocks.map(({ teamLabel, header, rows }) => toChatBlock(teamLabel, header, rows)).join("\n\n");
+      navigator.clipboard.writeText(text).then(done);
     }
-
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedTable(format);
-      if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
-      tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
-    });
   };
 
   return (
@@ -264,6 +268,17 @@ export const Scoreboard = () => {
             {copiedTable === "chat"
               ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
               : <><MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />Chat</>
+            }
+          </button>
+          <button
+            onClick={() => copyAllTeams("teams")}
+            aria-label="Copy scoreboard for Microsoft Teams"
+            title="Copy for Microsoft Teams (HTML table)"
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "teams" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+          >
+            {copiedTable === "teams"
+              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
+              : <><LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />Teams</>
             }
           </button>
           <button
