@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useTheme } from "next-themes";
 import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
@@ -201,16 +201,18 @@ export default function FeesClosedPage() {
         </div>
       </div>
 
-      <FeeRecordsTable
-        cases={filteredCases}
-        dateRange={dateRange}
-        mode="closed"
-        title="Closed Cases"
-        onImported={fetchClosed}
-        dropdownOptions={dropdownOptions}
-        approvedByOptions={approvedByOptions}
-        teamMembers={teamMembers}
-      />
+      <Suspense>
+        <FeeRecordsTable
+          cases={filteredCases}
+          dateRange={dateRange}
+          mode="closed"
+          title="Closed Cases"
+          onImported={fetchClosed}
+          dropdownOptions={dropdownOptions}
+          approvedByOptions={approvedByOptions}
+          teamMembers={teamMembers}
+        />
+      </Suspense>
     </div>
   );
 }
