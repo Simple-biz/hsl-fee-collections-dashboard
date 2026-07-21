@@ -213,6 +213,8 @@ const currency = (v: number | null) => (
 const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
+type FilterPreset = { id: string; name: string; params: string };
+
 const timeAgo = (date: Date): string => {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
   if (diff < 60) return "just now";
@@ -356,7 +358,6 @@ export const FeeRecordsTable = ({
   const [addOpen, setAddOpen] = useState(false);
 
   // ── Filter presets ────────────────────────────────────────────────────────
-  type FilterPreset = { id: string; name: string; params: string };
   const PRESET_KEY = `fee-records-presets-${mode}`;
   const [presets, setPresets] = useState<FilterPreset[]>(() => {
     if (typeof window === "undefined") return [];
