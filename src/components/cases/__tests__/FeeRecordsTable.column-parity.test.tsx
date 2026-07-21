@@ -44,9 +44,13 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),
 }));
 
-// Server action — imports DB client with "use server"; must be mocked in tests.
+// Server actions — import DB client with "use server"; must be mocked in tests.
 vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
   bulkMarkOverpaid: vi.fn(),
+}));
+
+vi.mock("@/app/(dashboard)/master-fees/actions", () => ({
+  bulkReassign: vi.fn(),
 }));
 
 // Modals/dialogs are conditionally rendered and have complex deps not relevant
