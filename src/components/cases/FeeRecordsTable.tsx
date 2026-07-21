@@ -25,6 +25,7 @@ import {
   Bookmark,
   BookmarkCheck,
   Trash2,
+  SearchX,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -567,6 +568,31 @@ export const FeeRecordsTable = ({
     } finally {
       setBulkReassignSaving(false);
     }
+  };
+
+  const hasActiveFilters =
+    !!search ||
+    !!dateRange ||
+    statusFilter !== "all" ||
+    assignedFilter !== "all" ||
+    feesConfFilter !== "all" ||
+    claimFilter !== "all" ||
+    caseStatusFilter !== "all" ||
+    levelFilter !== "all" ||
+    approverFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setAssignedFilter("all");
+    setFeesConfFilter("all");
+    setClaimFilter("all");
+    setCaseStatusFilter("all");
+    setLevelFilter("all");
+    setApproverFilter("all");
+    setSortKey(defaultSortKey);
+    setSortDir("desc");
+    setPageIndex(0);
   };
 
   const handleBatchArchive = () => {
@@ -2909,8 +2935,26 @@ export const FeeRecordsTable = ({
       )}
 
       {filtered.length === 0 && (
-        <div className={`py-12 text-center text-sm ${t.textMuted}`}>
-          No cases match your filters.
+        <div className="py-16 flex flex-col items-center gap-3">
+          <SearchX className={`h-9 w-9 opacity-25 ${t.textMuted}`} aria-hidden="true" />
+          {hasActiveFilters ? (
+            <>
+              <div className="text-center">
+                <p className={`text-sm font-semibold ${t.textSub}`}>No cases match your filters</p>
+                <p className={`text-[13px] mt-1 ${t.textMuted}`}>
+                  {cases.length} case{cases.length !== 1 ? "s" : ""} exist{cases.length === 1 ? "s" : ""} — try adjusting or clearing your filters.
+                </p>
+              </div>
+              <button
+                onClick={clearFilters}
+                className={`h-8 px-4 rounded-md text-xs font-semibold border ${t.outlineBtn}`}
+              >
+                Clear all filters
+              </button>
+            </>
+          ) : (
+            <p className={`text-sm ${t.textMuted}`}>No cases yet.</p>
+          )}
         </div>
       )}
 
