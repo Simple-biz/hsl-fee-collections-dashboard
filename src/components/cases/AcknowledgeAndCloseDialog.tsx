@@ -126,7 +126,7 @@ export function AcknowledgeAndCloseDialog({
             disabled={submitting !== null}
           >
             {submitting === "keep" && (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             )}
             No, keep on dashboard
           </Button>
@@ -136,9 +136,9 @@ export function AcknowledgeAndCloseDialog({
             disabled={submitting !== null}
           >
             {submitting === "close" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <CheckCircle2 className="h-4 w-4" />
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
             )}
             Yes, mark closed
           </Button>

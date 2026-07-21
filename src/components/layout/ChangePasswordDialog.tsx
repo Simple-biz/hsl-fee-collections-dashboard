@@ -91,7 +91,7 @@ export function ChangePasswordDialog({
 
         {done ? (
           <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             Password updated. Signing you out…
           </div>
         ) : (
@@ -156,7 +156,7 @@ export function ChangePasswordDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                 {submitting ? "Updating…" : "Update password"}
               </Button>
             </DialogFooter>
