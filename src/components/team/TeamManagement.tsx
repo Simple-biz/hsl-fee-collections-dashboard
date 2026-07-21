@@ -249,7 +249,7 @@ export const TeamManagement = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} />
+        <RefreshCw className={`h-6 w-6 animate-spin ${t.textMuted}`} aria-hidden="true" />
         <span className={`ml-3 text-sm ${t.textSub}`}>Loading team...</span>
       </div>
     );
@@ -260,7 +260,7 @@ export const TeamManagement = () => {
       <div
         className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
       >
-        <AlertCircle className="h-4 w-4 shrink-0" />
+        <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="text-sm">Failed to load team data: {error}</span>
         <button
           onClick={fetchMembers}
@@ -278,7 +278,7 @@ export const TeamManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className={`text-lg font-bold ${t.text} flex items-center gap-2`}>
-            <Users className="h-5 w-5 text-indigo-500" />
+            <Users className="h-5 w-5 text-indigo-500" aria-hidden="true" />
             Team Management
           </h2>
           <p className={`text-xs ${t.textMuted} mt-0.5`}>
@@ -289,7 +289,7 @@ export const TeamManagement = () => {
           onClick={openAddDialog}
           className={`h-8 px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 ${t.ctaBtn}`}
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           Add Member
         </button>
       </div>
@@ -339,6 +339,7 @@ export const TeamManagement = () => {
                 className={`h-4.5 w-4.5 ${
                   dark ? `text-${card.color}-400` : `text-${card.color}-600`
                 }`}
+                aria-hidden="true"
               />
             </div>
             <div>
@@ -352,7 +353,7 @@ export const TeamManagement = () => {
       {/* ---- Filters ---- */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
           <input
             type="text"
             placeholder="Search name or role..."
@@ -363,9 +364,10 @@ export const TeamManagement = () => {
           {search && (
             <button
               onClick={() => setSearch("")}
+              aria-label="Clear search"
               className="absolute right-2.5 top-1/2 -translate-y-1/2"
             >
-              <X className={`h-3 w-3 ${t.textMuted}`} />
+              <X className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -671,7 +673,7 @@ export const TeamManagement = () => {
                       : "bg-red-50 border border-red-200 text-red-700"
                   }`}
                 >
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   {formError}
                 </div>
               )}
@@ -689,7 +691,7 @@ export const TeamManagement = () => {
                 disabled={saving}
                 className={`h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 ${t.ctaBtn} disabled:opacity-50`}
               >
-                {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+                {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
                 {editingMember ? "Save Changes" : "Add Member"}
               </button>
             </div>
@@ -732,7 +734,7 @@ export const TeamManagement = () => {
                 disabled={deactivating}
                 className="h-8 px-4 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
-                {deactivating && <Loader2 className="h-3 w-3 animate-spin" />}
+                {deactivating && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
                 Deactivate
               </button>
             </div>

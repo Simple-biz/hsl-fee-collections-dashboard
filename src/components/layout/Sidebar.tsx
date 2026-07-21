@@ -472,7 +472,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 px-4 py-3">
-              <Search className={`h-4 w-4 shrink-0 ${t.textMuted}`} />
+              <Search className={`h-4 w-4 shrink-0 ${t.textMuted}`} aria-hidden="true" />
               <input
                 ref={searchInputRef}
                 value={searchQuery}
@@ -486,9 +486,10 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                     setSearchQuery("");
                     setSearchResults([]);
                   }}
+                  aria-label="Clear search"
                   className={t.textMuted}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
             </div>
