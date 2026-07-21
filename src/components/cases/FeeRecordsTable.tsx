@@ -209,6 +209,14 @@ const currency = (v: number | null) => (
 const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
+const timeAgo = (date: Date): string => {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
+
 const AGING_COLORS = (cat: string | null, dark: boolean) => {
   if (cat === ">60") return dark ? "text-red-400" : "text-red-600";
   if (cat === "≤60") return dark ? "text-emerald-400" : "text-emerald-600";
@@ -397,6 +405,19 @@ export const FeeRecordsTable = ({
   const copyDateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
+  const prevCasesRef = useRef(cases);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(() => new Date());
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (cases !== prevCasesRef.current) {
+      prevCasesRef.current = cases;
+      setLastUpdatedAt(new Date());
+    }
+  }, [cases]);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     const abortMap = patchAbortRef.current;
     const feeAmountRef = feeAmountAbortRef;
@@ -1098,7 +1119,7 @@ export const FeeRecordsTable = ({
         <div>
           <h3 className={`text-sm font-bold ${t.text}`}>{title}</h3>
           <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-            {filtered.length} of {cases.length} cases
+            {filtered.length} of {cases.length} cases · Last updated {timeAgo(lastUpdatedAt)}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
