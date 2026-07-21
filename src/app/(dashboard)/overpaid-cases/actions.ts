@@ -184,6 +184,30 @@ export async function bulkMarkOverpaid(input: {
   }
 }
 
+// Reverses bulkMarkOverpaid within the undo window — sets markedOverpaid back
+// to false. Does not touch overpaidDismissedAt since the case was never
+// committed to the Overpaid Cases view (the mark was immediately undone).
+export async function bulkUnmarkOverpaid(input: {
+  caseIds: number[];
+}): Promise<Result> {
+  try {
+    const guard = await requireCapability("case.finalize");
+    if (!guard.ok) return { ok: false, error: "You don't have permission." };
+    if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
+    if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
+    if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
+
+    await db
+      .update(feeRecords)
+      .set({ markedOverpaid: false, updatedAt: new Date() })
+      .where(inArray(feeRecords.caseId, input.caseIds));
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkUnmarkOverpaid error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
 // Marks a single case overpaid directly — for old cases that never came
 // through Master Fees and shouldn't be added there just to flag them here.
 // The normal path is bulkMarkOverpaid (the "Add to Overpaid Cases" batch

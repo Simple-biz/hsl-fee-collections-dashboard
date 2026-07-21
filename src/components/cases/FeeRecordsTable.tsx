@@ -57,7 +57,8 @@ import { caseLevelVisual, normalizeCaseLevel } from "@/lib/case-level-icons";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
-import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
+import { bulkMarkOverpaid, bulkUnmarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
+import { toast } from "sonner";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
@@ -503,6 +504,26 @@ export const FeeRecordsTable = ({
         return next;
       });
       setSelectedIds(new Set());
+      const label = ids.length === 1 ? "1 case" : `${ids.length} cases`;
+      toast.success(`${label} marked overpaid`, {
+        duration: 8000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            const undo = await bulkUnmarkOverpaid({ caseIds: ids });
+            if (undo.ok) {
+              setRowOverrides((prev) => {
+                const next = { ...prev };
+                for (const id of ids) next[id] = { ...next[id], markedOverpaid: false };
+                return next;
+              });
+              toast.success("Undone — cases unmarked");
+            } else {
+              toast.error("Could not undo. Please refresh the page.");
+            }
+          },
+        },
+      });
     } catch (err) {
       setBulkOverpaidError((err as Error).message);
     } finally {
