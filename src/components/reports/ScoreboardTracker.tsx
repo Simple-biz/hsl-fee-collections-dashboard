@@ -168,6 +168,49 @@ const cellKey = (agent: string, date: string): CellKey => `${agent}|${date}`;
 const EMPTY_CELL: CellValues = { ssaCalls: "", clientCallsIb: "", clientCallsOb: "", winSheetsCreated: "", faxSent: "" };
 
 
+// ---------- sub-components ----------
+
+interface CopyButtonsProps {
+  label: string;
+  sheetsActive: boolean;
+  chatActive: boolean;
+  onSheets: () => void;
+  onChat: () => void;
+  dark: boolean;
+}
+
+function CopyButtons({ label, sheetsActive, chatActive, onSheets, onChat, dark }: CopyButtonsProps) {
+  const base = `flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors`;
+  const active = dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600";
+  const idle = dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50";
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={onSheets}
+        aria-label={`Copy ${label} for Google Sheets`}
+        title="Copy for Google Sheets (tab-separated)"
+        className={`${base} ${sheetsActive ? active : idle}`}
+      >
+        {sheetsActive
+          ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+          : <><Table2 aria-hidden="true" className="h-3 w-3" />Sheets</>
+        }
+      </button>
+      <button
+        onClick={onChat}
+        aria-label={`Copy ${label} for Google Chat`}
+        title="Copy for Google Chat (monospace code block)"
+        className={`${base} ${chatActive ? active : idle}`}
+      >
+        {chatActive
+          ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+          : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
+        }
+      </button>
+    </div>
+  );
+}
+
 // ---------- component ----------
 
 interface ScoreboardTrackerProps {
@@ -189,7 +232,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [copiedTable, setCopiedTable] = useState<string | null>(null);
+  const [copiedTable, setCopiedTable] = useState<"noFees-sheets" | "noFees-chat" | "agents-sheets" | "agents-chat" | null>(null);
   const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -660,30 +703,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <span className={t.textMuted}> · </span>
                 <span className={dark ? "text-red-400" : "text-red-600"}>{data.noFeesAging.over90} over 90 days</span>
               </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => copyNoFeesTable("sheets")}
-                  aria-label="Copy No Fees Cases for Google Sheets"
-                  title="Copy for Google Sheets (tab-separated)"
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "noFees-sheets" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
-                >
-                  {copiedTable === "noFees-sheets"
-                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-                    : <><Table2 aria-hidden="true" className="h-3 w-3" />Sheets</>
-                  }
-                </button>
-                <button
-                  onClick={() => copyNoFeesTable("chat")}
-                  aria-label="Copy No Fees Cases for Google Chat"
-                  title="Copy for Google Chat (monospace code block)"
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "noFees-chat" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
-                >
-                  {copiedTable === "noFees-chat"
-                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-                    : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
-                  }
-                </button>
-              </div>
+              <CopyButtons
+                label="No Fees Cases"
+                sheetsActive={copiedTable === "noFees-sheets"}
+                chatActive={copiedTable === "noFees-chat"}
+                onSheets={() => copyNoFeesTable("sheets")}
+                onChat={() => copyNoFeesTable("chat")}
+                dark={dark}
+              />
             </div>
           </div>
           {data.noFeesCases.length === 0 ? (
@@ -971,28 +998,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <span className={`text-[13px] ${t.textMuted}`}>
                   {filteredAgents.length} of {data.agents.length} agents
                 </span>
-                <button
-                  onClick={() => copyAgentTable("sheets")}
-                  aria-label="Copy Agent Tracking for Google Sheets"
-                  title="Copy for Google Sheets (tab-separated)"
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "agents-sheets" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
-                >
-                  {copiedTable === "agents-sheets"
-                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-                    : <><Table2 aria-hidden="true" className="h-3 w-3" />Sheets</>
-                  }
-                </button>
-                <button
-                  onClick={() => copyAgentTable("chat")}
-                  aria-label="Copy Agent Tracking for Google Chat"
-                  title="Copy for Google Chat (monospace code block)"
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors ${copiedTable === "agents-chat" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50")}`}
-                >
-                  {copiedTable === "agents-chat"
-                    ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-                    : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
-                  }
-                </button>
+                <CopyButtons
+                  label="Agent Tracking"
+                  sheetsActive={copiedTable === "agents-sheets"}
+                  chatActive={copiedTable === "agents-chat"}
+                  onSheets={() => copyAgentTable("sheets")}
+                  onChat={() => copyAgentTable("chat")}
+                  dark={dark}
+                />
               </div>
             </div>
 

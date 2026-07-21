@@ -111,9 +111,7 @@ export const fmtDateLong = (iso: string | null | undefined): string => {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
-// Formats tabular data as a monospace code block for pasting into Google Chat.
-// Each column is padded to its widest cell so values align in a fixed-width font.
-// An optional title line is prepended before the header row.
+// Google Chat renders ``` blocks in a fixed-width font — padding aligns columns.
 export const toChatBlock = (
   title: string,
   headers: string[],
@@ -125,7 +123,7 @@ export const toChatBlock = (
   );
   const table = all
     .map((row) =>
-      row.map((cell, ci) => cell.padEnd(widths[ci])).join("  ").trimEnd(),
+      widths.map((w, ci) => (row[ci] ?? "").padEnd(w)).join("  ").trimEnd(),
     )
     .join("\n");
   return "```\n" + title + "\n" + table + "\n```";
