@@ -396,6 +396,7 @@ export const FeeRecordsTable = ({
       feeAmountRef.current?.abort();
       for (const ctrl of rowRefreshMap.values()) ctrl.abort();
       rowRefreshMap.clear();
+      if (copyDateTimerRef.current) clearTimeout(copyDateTimerRef.current);
     };
   }, []);
 
