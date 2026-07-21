@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useTransition } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Search,
   ArrowUpDown,
@@ -146,10 +147,6 @@ interface FeeRecordsTableProps {
   // team, and highlights team_lead members by team in the Approved By
   // dropdown so it's obvious who can actually sign off on closing a case.
   teamMembers?: { name: string; team: string | null; role: string }[];
-  // Optional approver filter rendered in the toolbar before the Sync button.
-  // Only the master-fees page passes this; fees-closed omits it.
-  approverFilter?: string;
-  onApproverFilterChange?: (value: string) => void;
 }
 
 // Whether a field lives on the `fee_records` row or the `cases` row.
@@ -212,6 +209,14 @@ const currency = (v: number | null) => (
 const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
+const timeAgo = (date: Date): string => {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
+
 const AGING_COLORS = (cat: string | null, dark: boolean) => {
   if (cat === ">60") return dark ? "text-red-400" : "text-red-600";
   if (cat === "≤60") return dark ? "text-emerald-400" : "text-emerald-600";
@@ -238,8 +243,6 @@ export const FeeRecordsTable = ({
   approvedByOptions = [],
   dropdownOptions = {},
   teamMembers = [],
-  approverFilter,
-  onApproverFilterChange,
 }: FeeRecordsTableProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
@@ -254,6 +257,9 @@ export const FeeRecordsTable = ({
   const canEditFees = can("fees.edit");
   const canSeeLeaderNotes = can("leaderNotes.access");
   const canEditFeesConf = can("feesConfirmation.edit");
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -292,13 +298,14 @@ export const FeeRecordsTable = ({
   const [winSheetError, setWinSheetError] = useState<string | null>(null);
   const winSheetAbortRef = useRef<AbortController | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [assignedFilter, setAssignedFilter] = useState("all");
-  const [feesConfFilter, setFeesConfFilter] = useState("all");
-  const [claimFilter, setClaimFilter] = useState("all");
-  const [caseStatusFilter, setCaseStatusFilter] = useState("all");
-  const [levelFilter, setLevelFilter] = useState("all");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "all");
+  const [assignedFilter, setAssignedFilter] = useState(() => searchParams.get("assigned") ?? "all");
+  const [feesConfFilter, setFeesConfFilter] = useState(() => searchParams.get("pif") ?? "all");
+  const [claimFilter, setClaimFilter] = useState(() => searchParams.get("claim") ?? "all");
+  const [caseStatusFilter, setCaseStatusFilter] = useState(() => searchParams.get("cs") ?? "all");
+  const [levelFilter, setLevelFilter] = useState(() => searchParams.get("level") ?? "all");
+  const [approverFilter, setApproverFilter] = useState(() => searchParams.get("approver") ?? "all");
   // Minimized T16/T2/AUX column groups — collapses a claim type's 5 editable
   // columns down to a single read-only Fee Due glance, so staff working a
   // single claim type can't mistakenly enter Retro/Fee Due on the wrong one.
@@ -314,11 +321,23 @@ export const FeeRecordsTable = ({
   };
   // Fees Closed defaults to most-recently-closed on top; Master Fees
   // defaults to most-recently-added on top (both requested by Ms. Jazz).
-  const [sortKey, setSortKey] = useState<SortKey>(mode === "closed" ? "closedAt" : "createdAt");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const defaultSortKey: SortKey = mode === "closed" ? "closedAt" : "createdAt";
+  const VALID_SORT_KEYS: SortKey[] = ["name", "assigned", "date", "expected", "paid", "daysAfterApproval", "closedAt", "createdAt"];
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const s = searchParams.get("sort") as SortKey | null;
+    return s && VALID_SORT_KEYS.includes(s) ? s : defaultSortKey;
+  });
+  const [sortDir, setSortDir] = useState<SortDir>(() =>
+    searchParams.get("dir") === "asc" ? "asc" : "desc",
+  );
   // Client-side pagination over the filtered+sorted set. Page size is
   // user-selectable; "all" renders the whole filtered set on one page.
-  const [pageSize, setPageSize] = useState<number | "all">(100);
+  const [pageSize, setPageSize] = useState<number | "all">(() => {
+    const s = searchParams.get("size");
+    if (s === "all") return "all";
+    const n = s ? parseInt(s, 10) : NaN;
+    return Number.isNaN(n) ? 100 : n;
+  });
   const [pageIndex, setPageIndex] = useState(0);
   // Switching to a large page size ("All") renders many rows at once. Marking
   // the change a transition keeps the click responsive (shows a pending state)
@@ -386,6 +405,19 @@ export const FeeRecordsTable = ({
   const copyDateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
+  const prevCasesRef = useRef(cases);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(() => new Date());
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (cases !== prevCasesRef.current) {
+      prevCasesRef.current = cases;
+      setLastUpdatedAt(new Date());
+    }
+  }, [cases]);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     const abortMap = patchAbortRef.current;
     const feeAmountRef = feeAmountAbortRef;
@@ -399,6 +431,29 @@ export const FeeRecordsTable = ({
       if (copyDateTimerRef.current) clearTimeout(copyDateTimerRef.current);
     };
   }, []);
+
+  // Persist filter/sort/pageSize in the URL so reloads and shared links
+  // restore the same view. State is the source of truth; URL is a debounced
+  // write-only sink. pageIndex is deliberately excluded — it always resets to 0.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (search) params.set("q", search);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (assignedFilter !== "all") params.set("assigned", assignedFilter);
+      if (feesConfFilter !== "all") params.set("pif", feesConfFilter);
+      if (claimFilter !== "all") params.set("claim", claimFilter);
+      if (caseStatusFilter !== "all") params.set("cs", caseStatusFilter);
+      if (levelFilter !== "all") params.set("level", levelFilter);
+      if (approverFilter !== "all") params.set("approver", approverFilter);
+      if (sortKey !== defaultSortKey) params.set("sort", sortKey);
+      if (sortDir !== "desc") params.set("dir", sortDir);
+      if (pageSize !== 100) params.set("size", String(pageSize));
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter, assignedFilter, feesConfFilter, claimFilter, caseStatusFilter, levelFilter, approverFilter, sortKey, sortDir, pageSize, defaultSortKey, router]);
 
   const toggleRowSelection = (id: number) => {
     setSelectedIds((prev) => {
@@ -552,6 +607,8 @@ export const FeeRecordsTable = ({
       d = d.filter((c) => c.caseStatus === caseStatusFilter);
     if (levelFilter !== "all")
       d = d.filter((c) => normalizeCaseLevel(c.level) === normalizeCaseLevel(levelFilter));
+    if (approverFilter !== "all")
+      d = d.filter((c) => c.approvedBy?.toLowerCase().includes(approverFilter));
 
     d.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -613,6 +670,7 @@ export const FeeRecordsTable = ({
     claimFilter,
     caseStatusFilter,
     levelFilter,
+    approverFilter,
     sortKey,
     sortDir,
     dateRange,
@@ -1061,7 +1119,7 @@ export const FeeRecordsTable = ({
         <div>
           <h3 className={`text-sm font-bold ${t.text}`}>{title}</h3>
           <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-            {filtered.length} of {cases.length} cases
+            {filtered.length} of {cases.length} cases · Last updated {timeAgo(lastUpdatedAt)}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1146,10 +1204,10 @@ export const FeeRecordsTable = ({
               </option>
             ))}
           </select>
-          {onApproverFilterChange && (
+          {approvedByOptions.length > 0 && (
             <select
-              value={approverFilter ?? "all"}
-              onChange={(e) => onApproverFilterChange(e.target.value)}
+              value={approverFilter}
+              onChange={(e) => { setApproverFilter(e.target.value); setPageIndex(0); }}
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
               <option value="all">Cases Approved</option>

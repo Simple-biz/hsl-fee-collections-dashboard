@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useTheme } from "next-themes";
 import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -38,7 +38,6 @@ export default function MasterFeesPage() {
   const t = themeClasses(dark);
 
   const [agingFilter, setAgingFilter] = useState<AgingFilter>("all");
-  const [approverFilter, setApproverFilter] = useState("all");
 
   if (error) {
     return (
@@ -81,13 +80,6 @@ export default function MasterFeesPage() {
             c.daysAfterApproval > (agingFilter === "unpaid_60" ? 60 : 90),
         );
 
-  const displayCases =
-    approverFilter === "all"
-      ? agingFiltered
-      : agingFiltered.filter((c) =>
-          c.approvedBy?.toLowerCase().includes(approverFilter),
-        );
-
   const presetBase = `px-3 py-1 rounded-full text-[13px] font-medium border transition-colors`;
   const presetActive = dark
     ? "bg-amber-700 border-amber-600 text-white"
@@ -112,22 +104,17 @@ export default function MasterFeesPage() {
             {label}
           </button>
         ))}
-        {agingFilter !== "all" && (
-          <span className={`ml-auto text-[13px] ${t.textMuted}`}>
-            {displayCases.length} case{displayCases.length !== 1 ? "s" : ""}
-          </span>
-        )}
       </div>
-      <FeeRecordsTable
-        cases={displayCases}
-        dateRange={dateRange}
-        onImported={refresh}
-        approvedByOptions={approvedByOptions}
-        dropdownOptions={dropdownOptions}
-        teamMembers={teamMembers}
-        approverFilter={approverFilter}
-        onApproverFilterChange={setApproverFilter}
-      />
+      <Suspense>
+        <FeeRecordsTable
+          cases={agingFiltered}
+          dateRange={dateRange}
+          onImported={refresh}
+          approvedByOptions={approvedByOptions}
+          dropdownOptions={dropdownOptions}
+          teamMembers={teamMembers}
+        />
+      </Suspense>
     </div>
   );
 }

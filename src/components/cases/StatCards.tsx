@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
   FolderOpen,
@@ -32,6 +33,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
     detail: string;
     detailTone: "up" | "down" | "warn" | "neutral";
     accent: string;
+    href?: string;
   };
 
   const cards: CardSpec[] = [
@@ -43,6 +45,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
       detail: `${stats.pif} marked PIF`,
       detailTone: "neutral",
       accent: "#7c3aed",
+      href: "/master-fees",
     },
     {
       icon: DollarSign,
@@ -61,6 +64,7 @@ export const StatCards = ({ stats }: StatCardsProps) => {
       detail: stats.casesClosedMTD > 0 ? "Closed this month" : "None yet this month",
       detailTone: stats.casesClosedMTD > 0 ? "up" : "neutral",
       accent: "#d97706",
+      href: "/fees-closed",
     },
     {
       icon: RefreshCw,
@@ -90,45 +94,43 @@ export const StatCards = ({ stats }: StatCardsProps) => {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-      {cards.map((s, i) => (
-        <div
-          key={i}
-          className={`rounded-xl border p-4 border-l-[3px] ${t.card}`}
-          style={{ borderLeftColor: s.accent }}
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <div
-                className={`flex items-center gap-1.5 text-xs ${t.textSub} font-medium`}
-              >
-                <s.icon className="h-3.5 w-3.5" style={{ color: s.accent }} aria-hidden="true" /> {s.label}
-              </div>
-              <div className={`text-2xl font-extrabold ${t.text} mt-1`}>
-                {s.value}
-              </div>
-              {s.sub && (
-                <div className={`text-[13px] ${t.textMuted} mt-0.5`}>
-                  {s.sub}
+      {cards.map((s, i) => {
+        const inner = (
+          <div
+            className={`rounded-xl border p-4 border-l-[3px] ${t.card} ${s.href ? `transition-colors ${dark ? "hover:bg-neutral-800/60" : "hover:bg-neutral-50"}` : ""}`}
+            style={{ borderLeftColor: s.accent }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <div className={`flex items-center gap-1.5 text-xs ${t.textSub} font-medium`}>
+                  <s.icon className="h-3.5 w-3.5" style={{ color: s.accent }} aria-hidden="true" /> {s.label}
                 </div>
-              )}
+                <div className={`text-2xl font-extrabold ${t.text} mt-1`}>
+                  {s.value}
+                </div>
+                {s.sub && (
+                  <div className={`text-[13px] ${t.textMuted} mt-0.5`}>{s.sub}</div>
+                )}
+              </div>
+            </div>
+            <div className={`mt-3 pt-2 border-t ${t.borderLight} flex items-center justify-between`}>
+              <span className={`text-[13px] ${t.textSub} font-medium`}>
+                {s.href ? "View →" : "Details"}
+              </span>
+              <span className={`text-[13px] font-semibold flex items-center gap-0.5 ${toneClass(s.detailTone)}`}>
+                {s.detail} <ToneIcon tone={s.detailTone} />
+              </span>
             </div>
           </div>
-          <div
-            className={`mt-3 pt-2 border-t ${t.borderLight} flex items-center justify-between`}
-          >
-            <span className={`text-[13px] ${t.textSub} font-medium`}>
-              Details
-            </span>
-            <span
-              className={`text-[13px] font-semibold flex items-center gap-0.5 ${toneClass(
-                s.detailTone,
-              )}`}
-            >
-              {s.detail} <ToneIcon tone={s.detailTone} />
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+        return s.href ? (
+          <Link key={i} href={s.href} aria-label={`View ${s.label}`}>
+            {inner}
+          </Link>
+        ) : (
+          <div key={i}>{inner}</div>
+        );
+      })}
     </div>
   );
 };
