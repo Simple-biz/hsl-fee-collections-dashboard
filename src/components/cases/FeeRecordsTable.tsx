@@ -22,6 +22,9 @@ import {
   RefreshCw,
   Minimize2,
   Maximize2,
+  Bookmark,
+  BookmarkCheck,
+  Trash2,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -58,6 +61,7 @@ import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
 import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
+import { bulkReassign } from "@/app/(dashboard)/master-fees/actions";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
@@ -209,6 +213,8 @@ const currency = (v: number | null) => (
 const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
+type FilterPreset = { id: string; name: string; params: string };
+
 const timeAgo = (date: Date): string => {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
   if (diff < 60) return "just now";
@@ -350,6 +356,74 @@ export const FeeRecordsTable = ({
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+
+  // ── Filter presets ────────────────────────────────────────────────────────
+  const PRESET_KEY = `fee-records-presets-${mode}`;
+  const [presets, setPresets] = useState<FilterPreset[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem(PRESET_KEY) ?? "[]"); }
+    catch { return []; }
+  });
+  const [presetName, setPresetName] = useState("");
+  const [presetsOpen, setPresetsOpen] = useState(false);
+  const presetsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!presetsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (presetsRef.current && !presetsRef.current.contains(e.target as Node))
+        setPresetsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [presetsOpen]);
+
+  const savePreset = () => {
+    const name = presetName.trim();
+    if (!name) return;
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (assignedFilter !== "all") params.set("assigned", assignedFilter);
+    if (feesConfFilter !== "all") params.set("pif", feesConfFilter);
+    if (claimFilter !== "all") params.set("claim", claimFilter);
+    if (caseStatusFilter !== "all") params.set("cs", caseStatusFilter);
+    if (levelFilter !== "all") params.set("level", levelFilter);
+    if (approverFilter !== "all") params.set("approver", approverFilter);
+    if (sortKey !== defaultSortKey) params.set("sort", sortKey);
+    if (sortDir !== "desc") params.set("dir", sortDir);
+    const next: FilterPreset[] = [
+      ...presets.filter((p) => p.name !== name),
+      { id: crypto.randomUUID(), name, params: params.toString() },
+    ];
+    setPresets(next);
+    localStorage.setItem(PRESET_KEY, JSON.stringify(next));
+    setPresetName("");
+    setPresetsOpen(false);
+  };
+
+  const applyPreset = (preset: FilterPreset) => {
+    const p = new URLSearchParams(preset.params);
+    setSearch(p.get("q") ?? "");
+    setStatusFilter(p.get("status") ?? "all");
+    setAssignedFilter(p.get("assigned") ?? "all");
+    setFeesConfFilter(p.get("pif") ?? "all");
+    setClaimFilter(p.get("claim") ?? "all");
+    setCaseStatusFilter(p.get("cs") ?? "all");
+    setLevelFilter(p.get("level") ?? "all");
+    setApproverFilter(p.get("approver") ?? "all");
+    const s = p.get("sort") as SortKey | null;
+    if (s && VALID_SORT_KEYS.includes(s)) setSortKey(s);
+    else setSortKey(defaultSortKey);
+    setSortDir(p.get("dir") === "asc" ? "asc" : "desc");
+    setPageIndex(0);
+    setPresetsOpen(false);
+  };
+
+  const deletePreset = (id: string) => {
+    const next = presets.filter((p) => p.id !== id);
+    setPresets(next);
+    localStorage.setItem(PRESET_KEY, JSON.stringify(next));
+  };
   const [syncOpen, setSyncOpen] = useState(false);
   const [myCaseSyncOpen, setMyCaseSyncOpen] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
@@ -366,6 +440,8 @@ export const FeeRecordsTable = ({
   >("active_sheet");
   const [bulkOverpaidSaving, setBulkOverpaidSaving] = useState(false);
   const [bulkOverpaidError, setBulkOverpaidError] = useState<string | null>(null);
+  const [bulkReassignSaving, setBulkReassignSaving] = useState(false);
+  const [bulkReassignError, setBulkReassignError] = useState<string | null>(null);
   const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
   const [bulkClosePendingIds, setBulkClosePendingIds] = useState<number[]>([]);
   // Optimistic overrides for fee payment totals after panel add/delete.
@@ -470,6 +546,27 @@ export const FeeRecordsTable = ({
     setSelectedIds(
       allSelected ? new Set() : new Set(filtered.map((c) => c.id)),
     );
+  };
+
+  const handleBulkReassign = async (assignedTo: string) => {
+    if (selectedIds.size === 0 || bulkReassignSaving) return;
+    setBulkReassignSaving(true);
+    setBulkReassignError(null);
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await bulkReassign({ caseIds: ids, assignedTo });
+      if (!result.ok) throw new Error(result.error);
+      setRowOverrides((prev) => {
+        const next = { ...prev };
+        for (const id of ids) next[id] = { ...next[id], assigned: assignedTo === "" ? "—" : assignedTo };
+        return next;
+      });
+      setSelectedIds(new Set());
+    } catch (err) {
+      setBulkReassignError((err as Error).message);
+    } finally {
+      setBulkReassignSaving(false);
+    }
   };
 
   const handleBatchArchive = () => {
@@ -1116,11 +1213,73 @@ export const FeeRecordsTable = ({
       <div
         className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight} sticky top-0 z-40 rounded-t-xl ${stickyBg}`}
       >
-        <div>
-          <h3 className={`text-sm font-bold ${t.text}`}>{title}</h3>
-          <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-            {filtered.length} of {cases.length} cases · Last updated {timeAgo(lastUpdatedAt)}
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h3 className={`text-sm font-bold ${t.text}`}>{title}</h3>
+            <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
+              {filtered.length} of {cases.length} cases · Last updated {timeAgo(lastUpdatedAt)}
+            </p>
+          </div>
+          {/* Filter presets */}
+          <div className="relative" ref={presetsRef}>
+            <button
+              onClick={() => setPresetsOpen((o) => !o)}
+              aria-label="Filter presets"
+              title="Filter presets"
+              className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${presetsOpen ? (dark ? "bg-indigo-700 text-white" : "bg-indigo-100 text-indigo-700") : `${t.hover} ${t.textMuted}`}`}
+            >
+              {presets.length > 0
+                ? <BookmarkCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                : <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
+              }
+            </button>
+            {presetsOpen && (
+              <div className={`absolute left-0 top-9 z-50 w-64 rounded-xl border shadow-xl ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}>
+                <div className={`p-3 border-b ${t.borderLight}`}>
+                  <p className={`text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}>Save current filters</p>
+                  <div className="flex gap-1.5">
+                    <input
+                      value={presetName}
+                      onChange={(e) => setPresetName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && savePreset()}
+                      placeholder="Preset name…"
+                      className={`flex-1 h-7 px-2 rounded-md border text-xs outline-none ${t.inputBg}`}
+                    />
+                    <button
+                      onClick={savePreset}
+                      disabled={!presetName.trim()}
+                      className={`h-7 px-2 rounded-md text-xs font-semibold ${t.ctaBtn} disabled:opacity-40`}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+                {presets.length > 0 ? (
+                  <ul className="py-1 max-h-48 overflow-y-auto">
+                    {presets.map((preset) => (
+                      <li key={preset.id} className={`flex items-center gap-1 px-2 py-1 ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}>
+                        <button
+                          onClick={() => applyPreset(preset)}
+                          className={`flex-1 text-left text-xs ${t.text} truncate`}
+                        >
+                          {preset.name}
+                        </button>
+                        <button
+                          onClick={() => deletePreset(preset.id)}
+                          aria-label={`Delete preset ${preset.name}`}
+                          className={`shrink-0 p-0.5 rounded ${dark ? "hover:bg-neutral-700 text-neutral-500" : "hover:bg-neutral-100 text-neutral-400"}`}
+                        >
+                          <Trash2 className="h-3 w-3" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={`text-[13px] ${t.textMuted} p-3`}>No saved presets yet.</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 sm:flex-none">
@@ -1254,16 +1413,16 @@ export const FeeRecordsTable = ({
       </div>
 
       {/* Floating batch action pill — fixed to the viewport bottom. Fees
-          Closed, Archive, and "Add to Overpaid Cases" (at will, independent
-          of the automatic PIF detection) are the batch actions. */}
+          Closed, Archive, "Add to Overpaid Cases", and Reassign are the
+          batch actions. */}
       {selectedIds.size > 0 && isAdmin && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
-          {bulkOverpaidError && (
+          {(bulkOverpaidError || bulkReassignError) && (
             <div
               role="alert"
               className="pointer-events-auto rounded-full bg-red-600 px-3 py-1 text-[12px] font-medium text-white shadow-lg"
             >
-              {bulkOverpaidError}
+              {bulkOverpaidError ?? bulkReassignError}
             </div>
           )}
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
@@ -1293,6 +1452,22 @@ export const FeeRecordsTable = ({
                 )}
                 Add to Overpaid Cases
               </button>
+            )}
+            {assignedOptions.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) void handleBulkReassign(e.target.value); }}
+                disabled={bulkReassignSaving}
+                aria-label="Reassign selected cases"
+                className="h-7 px-2 rounded-full text-[13px] font-semibold bg-blue-600 hover:bg-blue-500 text-white border-0 outline-none cursor-pointer disabled:opacity-50 transition-colors"
+              >
+                <option value="" disabled>
+                  {bulkReassignSaving ? "Reassigning…" : "Reassign to…"}
+                </option>
+                {assignedOptions.filter((o) => o.isActive).map((o) => (
+                  <option key={o.id} value={o.name}>{o.name}</option>
+                ))}
+              </select>
             )}
             <button
               onClick={handleBatchArchive}
