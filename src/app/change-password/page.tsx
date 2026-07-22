@@ -3,7 +3,7 @@ import { DollarSign } from "lucide-react";
 import { ChangePasswordForm } from "./change-password-form";
 
 export const metadata: Metadata = {
-  title: "Set new password · SSA Fee Collections",
+  title: "Set new password · Collections Dashboard",
 };
 
 export default function ChangePasswordPage() {
@@ -16,7 +16,7 @@ export default function ChangePasswordPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-neutral-900">
-              Fee Collections
+              Collections Dashboard
             </h1>
             <p className="text-xs text-neutral-500">Hogan Smith Law</p>
           </div>

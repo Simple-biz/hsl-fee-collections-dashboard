@@ -11,8 +11,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "SSA Fee Collections Dashboard",
-  description: "Fee collections management for Hogan Smith Law",
+  title: "Collections Dashboard",
+  description: "Collections management for Hogan Smith Law",
 };
 
 const RootLayout = async ({

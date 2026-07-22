@@ -29,6 +29,7 @@ import {
   Archive,
   TableProperties,
   PhoneIncoming,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { themeClasses } from "@/lib/theme-classes";
@@ -81,6 +82,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
       { path: "/reports", icon: FileText, label: "Reports" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
       { path: "/notifications", icon: Bell, label: "Notifications" },
+      { path: "/resources", icon: BookOpen, label: "Resources" },
     ],
   },
   {
@@ -277,7 +279,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               {open && (
                 <div className="leading-tight">
                   <div className={`text-[15px] font-bold ${t.text}`}>
-                    Fee Collections
+                    Collections Dashboard
                   </div>
                   <div className={`text-[12px] ${t.textMuted}`}>
                     Hogan Smith Law

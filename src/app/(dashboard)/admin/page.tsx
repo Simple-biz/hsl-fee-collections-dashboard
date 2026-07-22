@@ -15,7 +15,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Admin · SSA Fee Collections",
+  title: "Admin · Collections Dashboard",
 };
 
 export default async function AdminRoute() {
