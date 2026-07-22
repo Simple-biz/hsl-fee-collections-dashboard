@@ -6,7 +6,7 @@ import { ArchivePageClient } from "./ArchivePageClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Archive · SSA Fee Collections",
+  title: "Archive · Collections Dashboard",
 };
 
 export default async function ArchiveRoute() {

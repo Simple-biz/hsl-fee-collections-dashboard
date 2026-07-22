@@ -14,7 +14,7 @@ import {
 const SHOW_TEST_LOGINS = process.env.NEXT_PUBLIC_SHOW_TEST_LOGINS === "true";
 
 export const metadata: Metadata = {
-  title: "Sign in · SSA Fee Collections",
+  title: "Sign in · Collections Dashboard",
 };
 
 export default async function LoginPage({
@@ -45,7 +45,7 @@ export default async function LoginPage({
             />
           </div>
           <h1 className="text-sm font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
-            Fee Collections
+            Collections Dashboard
           </h1>
         </div>
 

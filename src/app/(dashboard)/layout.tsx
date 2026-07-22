@@ -74,7 +74,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <h1 className={`text-base font-bold ${t.text}`}>Fee Collections</h1>
+          <h1 className={`text-base font-bold ${t.text}`}>Collections Dashboard</h1>
         </div>
 
         <Header dateRange={dateRange} onDateRangeChange={setDateRange} />
