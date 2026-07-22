@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, ClipboardList, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, ClipboardList, AlertCircle, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabel } from "@/lib/formatters";
+import { getMonday, formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+
+type CopyFormat = "sheets" | "chat" | "teams";
+const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
+  { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
+  { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
+  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
+];
 
 interface DailyMetricRow {
   agent: string;
@@ -36,6 +43,10 @@ export function AuditLogTab({ dark, t }: AuditLogTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [copiedTable, setCopiedTable] = useState<CopyFormat | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
 
   const monday = getMonday(weekOffset);
 
@@ -80,6 +91,31 @@ export function AuditLogTab({ dark, t }: AuditLogTabProps) {
   const rowHover  = dark ? "hover:bg-neutral-800/30" : "hover:bg-neutral-50";
   const dateBg    = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
+  const copyTable = (format: CopyFormat) => {
+    const title = `Audit Log — ${formatWeekLabel(monday)}`;
+    const header = ["Date", "Agent", "SSA Calls", "Client IB", "Client OB", "Win Sheets", "Notes"];
+    const tableRows: (string | number)[][] = dates.flatMap((date) =>
+      byDate[date]
+        .slice()
+        .sort((a, b) => a.agent.localeCompare(b.agent))
+        .map((r) => [fmtDate(date), r.agent, r.ssaCalls, r.clientCallsIb, r.clientCallsOb, r.winSheetsCreated, r.notes ?? ""])
+    );
+    const done = () => {
+      setCopiedTable(format);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+    };
+    if (format === "teams") {
+      const blob = new Blob([toTeamsHtml(title, header, tableRows)], { type: "text/html" });
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
+    } else if (format === "sheets") {
+      const lines = [title, header.join("\t"), ...tableRows.map((r) => r.join("\t"))];
+      navigator.clipboard.writeText(lines.join("\n")).then(done);
+    } else {
+      navigator.clipboard.writeText(toChatBlock(title, header, tableRows)).then(done);
+    }
+  };
+
   return (
     <div className={`rounded-xl border ${t.card}`}>
       {/* Header */}
@@ -96,6 +132,17 @@ export function AuditLogTab({ dark, t }: AuditLogTabProps) {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {!loading && !error && dates.length > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
+            <button
+              key={format}
+              onClick={() => copyTable(format)}
+              aria-label={ariaLabel}
+              title={title}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === format ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+            >
+              {copiedTable === format ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</> : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
+            </button>
+          ))}
           <button
             onClick={() => setWeekOffset((v) => v - 1)}
             className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}

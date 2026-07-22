@@ -23,6 +23,7 @@ import {
   Table2,
   MessageSquare,
   LayoutGrid,
+  type LucideIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
@@ -186,41 +187,27 @@ function CopyButtons({ label, sheetsActive, chatActive, teamsActive, onSheets, o
   const base = `flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors`;
   const active = dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600";
   const idle = dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50";
+  const buttons: { Icon: LucideIcon; btnLabel: string; ariaLabel: string; title: string; isActive: boolean; onClick: () => void }[] = [
+    { Icon: Table2, btnLabel: "Sheets", ariaLabel: `Copy ${label} for Google Sheets`, title: "Copy for Google Sheets (tab-separated)", isActive: sheetsActive, onClick: onSheets },
+    { Icon: MessageSquare, btnLabel: "Chat", ariaLabel: `Copy ${label} for Google Chat`, title: "Copy for Google Chat (monospace code block)", isActive: chatActive, onClick: onChat },
+    { Icon: LayoutGrid, btnLabel: "Teams", ariaLabel: `Copy ${label} for Microsoft Teams`, title: "Copy for Microsoft Teams (HTML table)", isActive: teamsActive, onClick: onTeams },
+  ];
   return (
     <div className="flex items-center gap-1">
-      <button
-        onClick={onSheets}
-        aria-label={`Copy ${label} for Google Sheets`}
-        title="Copy for Google Sheets (tab-separated)"
-        className={`${base} ${sheetsActive ? active : idle}`}
-      >
-        {sheetsActive
-          ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-          : <><Table2 aria-hidden="true" className="h-3 w-3" />Sheets</>
-        }
-      </button>
-      <button
-        onClick={onChat}
-        aria-label={`Copy ${label} for Google Chat`}
-        title="Copy for Google Chat (monospace code block)"
-        className={`${base} ${chatActive ? active : idle}`}
-      >
-        {chatActive
-          ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-          : <><MessageSquare aria-hidden="true" className="h-3 w-3" />Chat</>
-        }
-      </button>
-      <button
-        onClick={onTeams}
-        aria-label={`Copy ${label} for Microsoft Teams`}
-        title="Copy for Microsoft Teams (HTML table)"
-        className={`${base} ${teamsActive ? active : idle}`}
-      >
-        {teamsActive
-          ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
-          : <><LayoutGrid aria-hidden="true" className="h-3 w-3" />Teams</>
-        }
-      </button>
+      {buttons.map(({ Icon, btnLabel, ariaLabel, title, isActive, onClick }) => (
+        <button
+          key={btnLabel}
+          onClick={onClick}
+          aria-label={ariaLabel}
+          title={title}
+          className={`${base} ${isActive ? active : idle}`}
+        >
+          {isActive
+            ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+            : <><Icon aria-hidden="true" className="h-3 w-3" />{btnLabel}</>
+          }
+        </button>
+      ))}
     </div>
   );
 }
