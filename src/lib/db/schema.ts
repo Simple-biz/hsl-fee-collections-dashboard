@@ -993,6 +993,26 @@ export const archivedSourceEnum = pgEnum("archived_source_enum", [
   "fees_closed_sheet",
 ]);
 
+// ============================================================================
+// RESOURCE_LINKS — team reference links (SSA tools, calculators, field office
+// locators, etc.) managed by admins and visible to all authenticated users.
+// ============================================================================
+export const resourceLinks = pgTable(
+  "resource_links",
+  {
+    id: serial("id").primaryKey(),
+    title: varchar("title", { length: 200 }).notNull(),
+    url: text("url").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdBy: varchar("created_by", { length: 100 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_resource_links_sort").on(table.sortOrder, table.id),
+  ],
+);
+
 export const caseArchive = pgTable(
   "case_archive",
   {
