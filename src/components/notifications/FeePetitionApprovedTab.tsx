@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabelShort as formatWeekLabel } from "@/lib/formatters";
+import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+
+type CopyFormat = "sheets" | "chat" | "teams";
+const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
+  { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
+  { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
+  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
+];
 
 interface DayCount {
   date: string;
@@ -46,6 +53,10 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [copiedTable, setCopiedTable] = useState<CopyFormat | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
 
   const monday = getMonday(weekOffset);
 
@@ -96,6 +107,43 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
   const barBg = dark ? "bg-emerald-500/30" : "bg-emerald-200";
   const dateBg = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
+  const copyTable = (format: CopyFormat) => {
+    const weekLabel = formatWeekLabel(monday);
+    const countTitle = `Fee Petitions Approved — ${weekLabel}`;
+    const countHeader = ["Day", "Approved"];
+    const countRows: (string | number)[][] = [
+      ...days.map((d) => [fmtDate(d.date), d.count || 0]),
+      ["Week Total", weekTotal],
+    ];
+    const listTitle = `Approved — ${weekLabel}`;
+    const listHeader = ["Date", "Case Name", "Assigned To"];
+    const listRows: (string | number)[][] = approvalDates.flatMap((date) =>
+      approvalsByDate[date].map((a) => [fmtDate(date), a.caseName, a.assignedTo ?? "—"])
+    );
+    const done = () => {
+      setCopiedTable(format);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+    };
+    if (format === "teams") {
+      const html = toTeamsHtml(countTitle, countHeader, countRows) +
+        (listRows.length ? toTeamsHtml(listTitle, listHeader, listRows) : "");
+      const blob = new Blob([html], { type: "text/html" });
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
+    } else if (format === "sheets") {
+      const lines = [
+        countTitle, countHeader.join("\t"), ...countRows.map((r) => r.join("\t")),
+        "",
+        ...(listRows.length ? [listTitle, listHeader.join("\t"), ...listRows.map((r) => r.join("\t"))] : []),
+      ];
+      navigator.clipboard.writeText(lines.join("\n")).then(done);
+    } else {
+      const parts = [toChatBlock(countTitle, countHeader, countRows)];
+      if (listRows.length) parts.push(toChatBlock(listTitle, listHeader, listRows));
+      navigator.clipboard.writeText(parts.join("\n\n")).then(done);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className={`rounded-xl border ${t.card}`}>
@@ -113,6 +161,17 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {!loading && !error && days.length > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
+              <button
+                key={format}
+                onClick={() => copyTable(format)}
+                aria-label={ariaLabel}
+                title={title}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === format ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+              >
+                {copiedTable === format ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</> : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
+              </button>
+            ))}
             <button
               onClick={() => setWeekOffset((v) => v - 1)}
               className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
