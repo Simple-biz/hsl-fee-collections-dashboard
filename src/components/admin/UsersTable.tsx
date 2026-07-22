@@ -54,6 +54,7 @@ export type AdminUser = {
   role: "admin" | "lead" | "member" | "system_admin";
   isActive: boolean;
   lastLoginAt: string | null;
+  lastActivityAt: string | null;
   createdAt: string;
 };
 
@@ -217,6 +218,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
               <th className={`${thBase} text-left`}>Role</th>
               <th className={`${thBase} text-center`}>Active</th>
               <th className={`${thBase} text-left`}>Last login</th>
+              <th className={`${thBase} text-left`}>Last activity</th>
               <th className={`${thBase} text-left`}>Created</th>
               <th className={`${thBase} text-right`}>Actions</th>
             </tr>
@@ -225,7 +227,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
             {users.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className={`${tdBase} text-center py-8 ${t.textMuted}`}
                 >
                   No users yet.
@@ -281,6 +283,9 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                     </td>
                     <td className={`${tdBase} ${t.textMuted}`}>
                       {formatRelative(user.lastLoginAt)}
+                    </td>
+                    <td className={`${tdBase} ${t.textMuted}`}>
+                      {formatRelative(user.lastActivityAt)}
                     </td>
                     <td className={`${tdBase} ${t.textMuted}`}>
                       {formatRelative(user.createdAt)}
