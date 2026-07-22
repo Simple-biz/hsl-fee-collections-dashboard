@@ -73,7 +73,7 @@ type CheckboxKey =
   | "ltrToClmtWithSignature"
   | "ltrToAlj"
   | "faxConfFeePet";
-type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress" | "createdAt";
+type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress" | "createdAt" | "feesReceived";
 type SortDir = "asc" | "desc";
 type TouchedFilter = "" | "none";
 type MissingFilter = "" | CheckboxKey;
@@ -82,7 +82,7 @@ type Assignee = { name: string; count: number };
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
-const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt"];
+const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt", "feesReceived"];
 const CHECKBOX_KEYS = ["timeDelineation", "feePetitionDoc", "ltrToClmt", "ltrToClmtWithSignature", "ltrToAlj", "faxConfFeePet"] as const;
 
 const daysSince = (dateStr: string | null): number | null => {
@@ -868,6 +868,8 @@ export const FeePetitions = () => {
   const rowBorder = dark ? "border-neutral-800/50" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/40" : "hover:bg-neutral-50/80";
   const stickyHeaderBg = dark ? "bg-neutral-900" : "bg-white";
+  const stickyBg = dark ? "bg-neutral-900" : "bg-white";
+  const stickyHover = dark ? "group-hover/row:bg-neutral-800" : "group-hover/row:bg-neutral-50";
   const chipBase = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] font-medium ${dark ? "bg-neutral-700 text-neutral-200" : "bg-neutral-100 text-neutral-700"}`;
   const presetActive = dark
     ? "bg-indigo-700 border-indigo-600 text-white"
@@ -1229,8 +1231,17 @@ export const FeePetitions = () => {
                 <th className={`${thBase} w-24 ${t.textSub} text-right sticky left-[256px] top-0 z-30 ${stickyHeaderBg}`}>
                   Fee Requested
                 </th>
-                <th className={`${thBase} w-24 ${t.textSub} text-right sticky top-0 z-20 ${stickyHeaderBg}`}>
-                  Fees Received
+                <th
+                  aria-sort={ariaSortFor("feesReceived")}
+                  className={`${thBase} w-24 ${t.textSub} text-right sticky left-[352px] top-0 z-30 ${stickyHeaderBg}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("feesReceived")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Fees Received {sortIcon("feesReceived")}
+                  </button>
                 </th>
                 <th
                   aria-sort={ariaSortFor("approvalDate")}
@@ -1316,19 +1327,10 @@ export const FeePetitions = () => {
                   const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (row[c.key] ? 1 : 0), 0);
                   const isComplete = completedCount === CHECKBOX_COLUMNS.length;
                   const isSelected = selectedIds.has(row.id);
-                  const completeBg = isComplete
-                    ? dark ? "bg-emerald-900/40" : "bg-emerald-100/80"
-                    : "";
-                  const stickyBg = isComplete
-                    ? dark ? "bg-emerald-900" : "bg-emerald-100"
-                    : dark ? "bg-neutral-900" : "bg-white";
-                  const stickyHover = isComplete
-                    ? dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200"
-                    : dark ? "group-hover/row:bg-neutral-800" : "group-hover/row:bg-neutral-50";
                   return (
                     <tr
                       key={row.id}
-                      className={`group/row border-b ${rowBorder} ${completeBg} ${rowHover} transition-colors`}
+                      className={`group/row border-b ${rowBorder} ${rowHover} transition-colors`}
                     >
                       <td className={`${tdBase} text-center sticky left-0 z-10 ${stickyBg} ${stickyHover}`}>
                         <input
@@ -1394,8 +1396,7 @@ export const FeePetitions = () => {
                           onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
                         />
                       </td>
-                      {/* > 0 is intentional: only colour-code positive received amounts, not $0 */}
-                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums ${row.feesReceived != null && row.feesReceived > 0 ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
+                      <td className={`${tdBase} w-24 text-right font-medium tabular-nums sticky left-[352px] z-10 ${stickyBg} ${stickyHover} ${row.feesReceived != null ? (dark ? "text-emerald-400" : "text-emerald-600") : t.textMuted}`}>
                         {row.feesReceived != null ? fmt(row.feesReceived) : "—"}
                       </td>
                       <td className={`${tdBase} ${t.textMuted}`}>
