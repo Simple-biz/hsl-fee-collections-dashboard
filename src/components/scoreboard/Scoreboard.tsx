@@ -267,6 +267,17 @@ export const Scoreboard = () => {
             </button>
           ))}
           <button
+            onClick={() => copyAllTeams("teams")}
+            aria-label="Copy scoreboard for Microsoft Teams"
+            title="Copy for Microsoft Teams (HTML table)"
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "teams" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+          >
+            {copiedTable === "teams"
+              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
+              : <><LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />Teams</>
+            }
+          </button>
+          <button
             onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
             aria-label="Previous 5 weeks"
