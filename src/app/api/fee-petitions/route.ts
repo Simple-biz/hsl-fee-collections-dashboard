@@ -4,7 +4,7 @@ import { cases, feePetitions, feeRecords, activityLog } from "@/lib/db/schema";
 import { eq, ilike, sql, inArray } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
-const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt"] as const;
+const SORT_KEYS = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt", "feesReceived"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 
 // Fee Requested/Received are sums across t16/t2/aux fee_records columns, but
@@ -303,7 +303,9 @@ export const GET = async (req: NextRequest) => {
             ? sql`${progressExpr} ${dir} NULLS LAST`
             : sort === "approvalDate"
               ? sql`${cases.approvalDate} ${dir} NULLS LAST`
-              : sql`${cases.createdAt} ${dir} NULLS LAST`;
+              : sort === "feesReceived"
+                ? sql`${feeRecords.totalFeesPaid} ${dir} NULLS LAST`
+                : sql`${cases.createdAt} ${dir} NULLS LAST`;
 
     const rows = await db
       .select(ROW_COLUMNS)
