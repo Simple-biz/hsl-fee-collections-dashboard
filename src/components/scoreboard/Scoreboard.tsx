@@ -2,7 +2,7 @@
 
 import { useState, useReducer, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare, LayoutGrid } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
@@ -10,6 +10,13 @@ import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { getMonday, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+
+type CopyFormat = "sheets" | "chat" | "teams";
+const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
+  { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy scoreboard for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
+  { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy scoreboard for Google Chat", title: "Copy for Google Chat (monospace code block)" },
+  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy scoreboard for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
+];
 
 // ---------- types ----------
 
@@ -248,28 +255,17 @@ export const Scoreboard = () => {
               Import
             </button>
           )}
-          <button
-            onClick={() => copyAllTeams("sheets")}
-            aria-label="Copy scoreboard for Google Sheets"
-            title="Copy for Google Sheets (tab-separated)"
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "sheets" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
-          >
-            {copiedTable === "sheets"
-              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
-              : <><Table2 aria-hidden="true" className="h-3.5 w-3.5" />Sheets</>
-            }
-          </button>
-          <button
-            onClick={() => copyAllTeams("chat")}
-            aria-label="Copy scoreboard for Google Chat"
-            title="Copy for Google Chat (monospace code block)"
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "chat" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
-          >
-            {copiedTable === "chat"
-              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
-              : <><MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />Chat</>
-            }
-          </button>
+          {COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
+            <button
+              key={format}
+              onClick={() => copyAllTeams(format)}
+              aria-label={ariaLabel}
+              title={title}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === format ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+            >
+              {copiedTable === format ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</> : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
+            </button>
+          ))}
           <button
             onClick={() => copyAllTeams("teams")}
             aria-label="Copy scoreboard for Microsoft Teams"

@@ -1,8 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { RefreshCw, PhoneMissed, AlertCircle, ExternalLink } from "lucide-react";
+import { RefreshCw, PhoneMissed, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { toChatBlock, toTeamsHtml } from "@/lib/formatters";
+
+type CopyFormat = "sheets" | "chat" | "teams";
+const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
+  { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
+  { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
+  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
+];
 import Link from "next/link";
 
 interface BacklogRow {
@@ -35,6 +43,10 @@ export function CallsBacklogTab({ dark, t }: CallsBacklogTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | "teams" | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
 
   const fetchBacklog = useCallback(async () => {
     abortRef.current?.abort();
@@ -64,6 +76,32 @@ export function CallsBacklogTab({ dark, t }: CallsBacklogTabProps) {
   const rowDivide = dark ? "border-neutral-800/40" : "border-neutral-100";
   const rowHover = dark ? "hover:bg-neutral-800/30" : "hover:bg-neutral-50";
 
+  const copyTable = (format: "sheets" | "chat" | "teams") => {
+    const title = "Calls Backlog";
+    const header = ["Call Date", "Number", "Reason", "Case Link", "Specialist"];
+    const tableRows: (string | number)[][] = rows.map((r) => [
+      fmtDate(r.callDate),
+      r.number || "—",
+      r.transcript || "—",
+      r.caseLink || "—",
+      r.specialistAssigned || "—",
+    ]);
+    const done = () => {
+      setCopiedTable(format);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+    };
+    if (format === "teams") {
+      const blob = new Blob([toTeamsHtml(title, header, tableRows)], { type: "text/html" });
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
+    } else if (format === "sheets") {
+      const lines = [title, header.join("\t"), ...tableRows.map((r) => r.join("\t"))];
+      navigator.clipboard.writeText(lines.join("\n")).then(done);
+    } else {
+      navigator.clipboard.writeText(toChatBlock(title, header, tableRows)).then(done);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className={`rounded-xl border ${t.card}`}>
@@ -80,7 +118,18 @@ export function CallsBacklogTab({ dark, t }: CallsBacklogTabProps) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 flex-wrap justify-end">
+            {!loading && !error && rows.length > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
+              <button
+                key={format}
+                onClick={() => copyTable(format)}
+                aria-label={ariaLabel}
+                title={title}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === format ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+              >
+                {copiedTable === format ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</> : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
+              </button>
+            ))}
             <button
               onClick={fetchBacklog}
               disabled={loading}
