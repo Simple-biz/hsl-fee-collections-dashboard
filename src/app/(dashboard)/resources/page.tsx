@@ -9,7 +9,7 @@ import { ResourcesClient } from "@/components/resources/ResourcesClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Resources · SSA Fee Collections",
+  title: "Resources · Collections Dashboard",
 };
 
 export default async function ResourcesPage() {

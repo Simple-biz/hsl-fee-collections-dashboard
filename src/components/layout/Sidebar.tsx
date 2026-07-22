@@ -279,7 +279,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
               {open && (
                 <div className="leading-tight">
                   <div className={`text-[15px] font-bold ${t.text}`}>
-                    Fee Collections
+                    Collections Dashboard
                   </div>
                   <div className={`text-[12px] ${t.textMuted}`}>
                     Hogan Smith Law
