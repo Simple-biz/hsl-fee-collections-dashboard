@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { users, adminActivityLog, activityLog, cases } from "@/lib/db/schema";
@@ -46,6 +46,19 @@ export default async function AdminRoute() {
     ? rows
     : rows.filter((r) => r.role !== "system_admin");
 
+  // Last activity_log entry per agent, matched by name (createdBy is the
+  // user's display name, not their ID).
+  const activityRows = await db.execute(sql`
+    SELECT created_by, MAX(created_at) AS last_activity_at
+    FROM activity_log
+    WHERE created_by IS NOT NULL
+    GROUP BY created_by
+  `) as unknown as { created_by: string; last_activity_at: string }[];
+
+  const lastActivityMap = new Map(
+    activityRows.map((r) => [r.created_by, r.last_activity_at]),
+  );
+
   const userList: AdminUser[] = visibleRows.map((r) => ({
     id: r.id,
     email: r.email,
@@ -54,6 +67,7 @@ export default async function AdminRoute() {
     isActive: r.isActive,
     lastLoginAt: r.lastLoginAt ? r.lastLoginAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
+    lastActivityAt: lastActivityMap.get(r.name ?? "") ?? null,
   }));
 
   // Most recent admin actions for the Activity Logs tab. Emails are snapshots
