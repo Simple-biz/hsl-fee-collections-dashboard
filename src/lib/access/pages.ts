@@ -16,6 +16,7 @@ export const PAGES = [
   { key: "overpaid_cases", label: "Overpaid Cases", path: "/overpaid-cases" },
   { key: "reports", label: "Reports", path: "/reports" },
   { key: "notifications", label: "Notifications", path: "/notifications" },
+  { key: "resources", label: "Resources", path: "/resources" },
   { key: "team", label: "Team", path: "/team" },
   { key: "admin", label: "Admin", path: "/admin" },
   { key: "settings", label: "Settings", path: "/settings" },
