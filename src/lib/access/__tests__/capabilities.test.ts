@@ -6,9 +6,19 @@ import {
 import { effectiveCapabilities, hasCapability } from "../resolve";
 
 describe("roleCapabilityDefaults", () => {
-  it("gives admin and system_admin every capability", () => {
-    expect(roleCapabilityDefaults("admin")).toEqual(CAPABILITY_KEYS);
+  it("gives system_admin every capability", () => {
     expect(roleCapabilityDefaults("system_admin")).toEqual(CAPABILITY_KEYS);
+  });
+
+  it("gives admin every capability except fees.edit", () => {
+    const caps = roleCapabilityDefaults("admin");
+    expect(caps).not.toContain("fees.edit");
+    expect(caps).toContain("case.create");
+    expect(caps).toContain("case.delete");
+    expect(caps).toContain("case.update");
+    expect(caps).toContain("case.finalize");
+    expect(caps).toContain("case.editPii");
+    expect(caps).toHaveLength(CAPABILITY_KEYS.length - 1);
   });
 
   it("gives lead update + finalize + PII, but not create/delete", () => {
@@ -57,6 +67,13 @@ describe("effectiveCapabilities (role default ⊕ overrides)", () => {
       pages: { admin: true },
     });
     expect(caps).toEqual(["case.update"]);
+  });
+
+  it("restores fees.edit for admin via per-user override", () => {
+    const caps = effectiveCapabilities("admin", {
+      capabilities: { "fees.edit": true },
+    });
+    expect(caps).toContain("fees.edit");
   });
 });
 
