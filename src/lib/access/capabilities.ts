@@ -72,8 +72,7 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 //
 // - system_admin: everything.
 // - admin: everything EXCEPT fees.edit. fees.edit is granted per-user only
-//   (currently Jazz, via userAccessOverrides) so she is the sole gatekeeper
-//   for recording fees received and received dates.
+//   (via userAccessOverrides) to keep fees received entry under a single owner.
 // - lead: full update incl. finalize + PII + logging calls for others +
 //   leader notes + Fees Confirmation, but NOT create, delete, editing fee
 //   amounts received, or Fees Closed (stays admin-only).
