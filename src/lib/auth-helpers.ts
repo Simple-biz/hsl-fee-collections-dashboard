@@ -53,10 +53,11 @@ export const sessionHasCapability = (
   if (!session?.user) return false;
   const role = session.user.role;
   const rawCaps = session.user.capabilities;
-  const isAdmin = role === "admin" || role === "system_admin";
-  const caps = isAdmin
-    ? roleCapabilityDefaults(role)
-    : rawCaps && rawCaps.length > 0
+  // Prefer the JWT's baked-in effective capabilities (role defaults ⊕ per-user
+  // overrides, resolved at sign-in). Fall back to role defaults only for tokens
+  // minted before the capabilities feature existed (empty array).
+  const caps =
+    rawCaps && rawCaps.length > 0
       ? rawCaps
       : roleCapabilityDefaults(role);
   return hasCapability(caps, capability);
