@@ -4,7 +4,7 @@ import { cases, feeRecords, overpaidCases } from "@/lib/db/schema";
 import { eq, ilike, sql } from "drizzle-orm";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 
-const SORT_KEYS = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo", "createdAt"] as const;
+const SORT_KEYS = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "noticeSent", "assignedTo", "createdAt"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 
 // GET /api/overpaid-cases?page=&limit=&search=&sort=&dir=&status=&agent=&ltr=&minAmount=&maxAmount=
@@ -120,7 +120,9 @@ export const GET = async (req: NextRequest) => {
           ? sql`${feeRecords.totalFeesPaid}::numeric ${dir} NULLS LAST`
           : sort === "opLtrDate"
             ? sql`${overpaidCases.opLtrReceived} ${dir} NULLS LAST`
-            : sort === "assignedTo"
+            : sort === "noticeSent"
+              ? sql`${overpaidCases.opLtrDate} ${dir} NULLS LAST`
+              : sort === "assignedTo"
               ? sql`${feeRecords.assignedTo} ${dir} NULLS LAST`
               : sort === "overpaidAmount"
                 ? sql`${overpaidCases.overpaidAmount} ${dir} NULLS LAST`
