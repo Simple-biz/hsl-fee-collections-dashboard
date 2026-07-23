@@ -8,6 +8,7 @@ import {
   Search,
   ArrowUpDown,
   Upload,
+  FileDown,
   MessageSquare,
   FileSpreadsheet,
   Database,
@@ -427,6 +428,7 @@ export const FeeRecordsTable = ({
   };
   const [syncOpen, setSyncOpen] = useState(false);
   const [myCaseSyncOpen, setMyCaseSyncOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [notesFor, setNotesFor] = useState<{ id: number; name: string } | null>(
     null,
   );
@@ -1221,6 +1223,58 @@ export const FeeRecordsTable = ({
   const stickyThClosedOn = `left-24 z-30 ${colClosedOnW}`;
   const stickyTdClosedOn = `sticky left-24 z-10 ${colClosedOnW} ${stickyBg} ${stickyHover}`;
 
+  const downloadCsv = () => {
+    setExporting(true);
+    try {
+      const escape = (v: string) => {
+        const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
+      const fmt = (n: number | null | undefined) => (n != null ? n.toFixed(2) : "");
+      const headers = [
+        "Case ID", "Name", "Claim", "Assigned", "Office", "Level", "Date Approved",
+        "T16 Retro", "T16 Fee Due", "T16 Fee Received", "T16 Received Date",
+        "T2 Retro", "T2 Fee Due", "T2 Fee Received", "T2 Received Date",
+        "AUX Retro", "AUX Fee Due", "AUX Fee Received", "AUX Received Date",
+        "Total Due", "Total Paid", "PIF", "Status", "Approved By",
+        "Case Remarks", "Days After Approval", "Next Follow-Up",
+      ];
+      const csvRows = [
+        headers.join(","),
+        ...filtered.map((r) =>
+          [
+            r.id,
+            escape(r.name),
+            escape(r.claim),
+            escape(r.assigned),
+            escape(r.office),
+            escape(r.level),
+            r.date ?? "",
+            fmt(r.t16Retro), fmt(r.t16FeeDue), fmt(r.t16FeeReceived), r.t16FeeReceivedDate ?? "",
+            fmt(r.t2Retro), fmt(r.t2FeeDue), fmt(r.t2FeeReceived), r.t2FeeReceivedDate ?? "",
+            fmt(r.auxRetro), fmt(r.auxFeeDue), fmt(r.auxFeeReceived), r.auxFeeReceivedDate ?? "",
+            fmt(r.expected), fmt(r.paid),
+            escape(r.pif ?? ""),
+            escape(r.status),
+            escape(r.approvedBy ?? ""),
+            escape(r.caseStatus ?? ""),
+            r.daysAfterApproval != null ? r.daysAfterApproval : "",
+            r.nextFollowUpDate ?? "",
+          ].join(","),
+        ),
+      ].join("\n");
+      const blob = new Blob([csvRows], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `open-cases-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className={`relative rounded-xl border ${t.card}`}>
       {/* Case Detail Side Panel */}
@@ -1427,6 +1481,18 @@ export const FeeRecordsTable = ({
               <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add Case
             </button>
           )}
+          <button
+            onClick={downloadCsv}
+            disabled={exporting || filtered.length === 0}
+            title="Export visible cases to CSV"
+            className={`h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.outlineBtn} disabled:opacity-40`}
+          >
+            {exporting
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              : <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
+            }
+            Export
+          </button>
           {isAdmin && (
             <button
               onClick={() => setImportOpen(true)}
