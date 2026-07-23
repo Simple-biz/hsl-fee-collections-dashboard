@@ -156,7 +156,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
       const data: ClearedRow[] = json.data || [];
       setRows(data);
       setTotal(typeof json.total === "number" ? json.total : 0);
-      setTotalOverpaid(typeof json.totalOverpaid === "number" ? json.totalOverpaid : 0);
+      setTotalOverpaid(typeof json.clearedTotalOverpaid === "number" ? json.clearedTotalOverpaid : 0);
       noteSnapshot.current = new Map(data.map((r) => [r.id, r.updateNote]));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;

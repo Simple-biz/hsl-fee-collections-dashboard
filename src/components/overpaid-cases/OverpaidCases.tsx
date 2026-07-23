@@ -820,7 +820,7 @@ export const OverpaidCases = () => {
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>Total Overpaid</p>
           <p className={`text-xl font-bold mt-1 ${dark ? "text-amber-400" : "text-amber-600"}`}>{isInitialLoad ? "—" : fmtFull(stats.totalOverpaid)}</p>
-          <p className={`text-[12px] ${t.textMuted} mt-0.5`}>across filtered cases</p>
+          <p className={`text-[12px] ${t.textMuted} mt-0.5`}>pending (excluding cleared)</p>
         </div>
         <div className={`${sectionCard} p-4`}>
           <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>LTR Received</p>
