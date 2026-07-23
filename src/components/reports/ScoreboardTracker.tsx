@@ -952,6 +952,16 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 />
               </>
             )}
+
+            <button
+              onClick={() => fetchScoreboard()}
+              disabled={loading}
+              aria-label="Refresh agent tracking"
+              title="Refresh"
+              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textMuted} disabled:opacity-40`}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+            </button>
           </div>
         </div>
 
