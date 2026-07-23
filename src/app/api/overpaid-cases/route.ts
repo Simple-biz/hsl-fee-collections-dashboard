@@ -99,8 +99,8 @@ export const GET = async (req: NextRequest) => {
     const [agg] = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
-        totalOverpaid: sql<number>`ROUND(SUM(${overpaidExpr}) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = false), 2)`,
-        clearedTotalOverpaid: sql<number>`ROUND(SUM(${overpaidExpr}) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = true), 2)`,
+        totalOverpaid: sql<number>`ROUND(SUM(${overpaidCases.overpaidAmount}::numeric) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = false), 2)`,
+        clearedTotalOverpaid: sql<number>`ROUND(SUM(${overpaidCases.overpaidAmount}::numeric) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = true), 2)`,
         clearedCount: sql<number>`COUNT(*) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = true)::int`,
         ltrCount: sql<number>`COUNT(*) FILTER (WHERE ${overpaidCases.opLtrReceived} IS NOT NULL)::int`,
       })
