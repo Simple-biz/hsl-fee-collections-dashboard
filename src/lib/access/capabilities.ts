@@ -70,7 +70,10 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 
 // Role → default capabilities.
 //
-// - admin / system_admin: everything.
+// - system_admin: everything.
+// - admin: everything EXCEPT fees.edit. fees.edit is granted per-user only
+//   (currently Jazz, via userAccessOverrides) so she is the sole gatekeeper
+//   for recording fees received and received dates.
 // - lead: full update incl. finalize + PII + logging calls for others +
 //   leader notes + Fees Confirmation, but NOT create, delete, editing fee
 //   amounts received, or Fees Closed (stays admin-only).
@@ -81,7 +84,7 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 //   overrides modal.
 export const ROLE_CAPABILITY_DEFAULTS: Record<Role, CapabilityKey[]> = {
   system_admin: ALL,
-  admin: ALL,
+  admin: ALL.filter((k) => k !== "fees.edit"),
   lead: ["case.update", "case.finalize", "case.editPii", "dailyMetrics.editOthers", "leaderNotes.access", "feesConfirmation.edit"],
   member: ["case.update"],
 };
