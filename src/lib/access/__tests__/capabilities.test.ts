@@ -27,6 +27,8 @@ describe("roleCapabilityDefaults", () => {
     expect(caps).toContain("case.update");
     expect(caps).toContain("case.finalize");
     expect(caps).toContain("case.editPii");
+    expect(caps).toContain("dailyMetrics.editOthers");
+    expect(caps).toContain("leaderNotes.access");
     expect(caps).not.toContain("case.create");
     expect(caps).not.toContain("case.delete");
     expect(caps).not.toContain("fees.edit");

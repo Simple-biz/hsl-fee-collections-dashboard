@@ -79,9 +79,8 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 //   PIF, or Fees Closed (stays admin-only).
 // - member: day-to-day collections — update (record payments, status, notes)
 //   only, and only their own daily call log. No create/delete, no finalize
-//   (close/overpaid/approvedBy), no PII, no leader notes, no Fees
-//   Confirmation. Admins can widen any of these per-user via the access
-//   overrides modal.
+//   (close/overpaid/approvedBy), no PII, no leader notes, no PIF. Admins
+//   can widen any of these per-user via the access overrides modal.
 export const ROLE_CAPABILITY_DEFAULTS: Record<Role, CapabilityKey[]> = {
   system_admin: ALL,
   admin: ALL.filter((k) => k !== "fees.edit" && k !== "feesConfirmation.edit"),
