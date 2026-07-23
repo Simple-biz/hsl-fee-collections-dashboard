@@ -71,11 +71,12 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 // Role → default capabilities.
 //
 // - system_admin: everything.
-// - admin: everything EXCEPT fees.edit. fees.edit is granted per-user only
-//   (via userAccessOverrides) to keep fees received entry under a single owner.
+// - admin: everything EXCEPT fees.edit and feesConfirmation.edit. Both are
+//   granted per-user only (via userAccessOverrides) to keep fees received and
+//   PIF entry under a single owner.
 // - lead: full update incl. finalize + PII + logging calls for others +
-//   leader notes + Fees Confirmation, but NOT create, delete, editing fee
-//   amounts received, or Fees Closed (stays admin-only).
+//   leader notes, but NOT create, delete, editing fee amounts received,
+//   PIF, or Fees Closed (stays admin-only).
 // - member: day-to-day collections — update (record payments, status, notes)
 //   only, and only their own daily call log. No create/delete, no finalize
 //   (close/overpaid/approvedBy), no PII, no leader notes, no Fees
@@ -83,8 +84,8 @@ const ALL: CapabilityKey[] = CAPABILITY_KEYS;
 //   overrides modal.
 export const ROLE_CAPABILITY_DEFAULTS: Record<Role, CapabilityKey[]> = {
   system_admin: ALL,
-  admin: ALL.filter((k) => k !== "fees.edit"),
-  lead: ["case.update", "case.finalize", "case.editPii", "dailyMetrics.editOthers", "leaderNotes.access", "feesConfirmation.edit"],
+  admin: ALL.filter((k) => k !== "fees.edit" && k !== "feesConfirmation.edit"),
+  lead: ["case.update", "case.finalize", "case.editPii", "dailyMetrics.editOthers", "leaderNotes.access"],
   member: ["case.update"],
 };
 

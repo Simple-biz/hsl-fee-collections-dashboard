@@ -10,24 +10,27 @@ describe("roleCapabilityDefaults", () => {
     expect(roleCapabilityDefaults("system_admin")).toEqual(CAPABILITY_KEYS);
   });
 
-  it("gives admin every capability except fees.edit", () => {
+  it("gives admin every capability except fees.edit and feesConfirmation.edit", () => {
     const caps = roleCapabilityDefaults("admin");
     expect(caps).not.toContain("fees.edit");
+    expect(caps).not.toContain("feesConfirmation.edit");
     expect(caps).toContain("case.create");
     expect(caps).toContain("case.delete");
     expect(caps).toContain("case.update");
     expect(caps).toContain("case.finalize");
     expect(caps).toContain("case.editPii");
-    expect(caps).toHaveLength(CAPABILITY_KEYS.length - 1);
+    expect(caps).toHaveLength(CAPABILITY_KEYS.length - 2);
   });
 
-  it("gives lead update + finalize + PII, but not create/delete", () => {
+  it("gives lead update + finalize + PII, but not create/delete/fees/PIF", () => {
     const caps = roleCapabilityDefaults("lead");
     expect(caps).toContain("case.update");
     expect(caps).toContain("case.finalize");
     expect(caps).toContain("case.editPii");
     expect(caps).not.toContain("case.create");
     expect(caps).not.toContain("case.delete");
+    expect(caps).not.toContain("fees.edit");
+    expect(caps).not.toContain("feesConfirmation.edit");
   });
 
   it("gives member update only (no create/delete/finalize/PII)", () => {
@@ -69,11 +72,12 @@ describe("effectiveCapabilities (role default ⊕ overrides)", () => {
     expect(caps).toEqual(["case.update"]);
   });
 
-  it("restores fees.edit for admin via per-user override", () => {
+  it("restores fees.edit and feesConfirmation.edit for admin via per-user override", () => {
     const caps = effectiveCapabilities("admin", {
-      capabilities: { "fees.edit": true },
+      capabilities: { "fees.edit": true, "feesConfirmation.edit": true },
     });
     expect(caps).toContain("fees.edit");
+    expect(caps).toContain("feesConfirmation.edit");
   });
 });
 
