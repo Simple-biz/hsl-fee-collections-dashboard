@@ -50,13 +50,13 @@ interface OverpaidCaseRow {
 }
 
 type CheckboxKey = "checksCleared";
-type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "assignedTo" | "createdAt";
+type SortKey = "claimant" | "feesReceived" | "overpaidAmount" | "opLtrDate" | "noticeSent" | "assignedTo" | "createdAt";
 type SortDir = "asc" | "desc";
 type LtrFilter = "" | "none";
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
-const SORT_KEYS: SortKey[] = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "assignedTo", "createdAt"];
+const SORT_KEYS: SortKey[] = ["claimant", "feesReceived", "overpaidAmount", "opLtrDate", "noticeSent", "assignedTo", "createdAt"];
 const DEFAULTS = {
   search: "",
   agent: "",
@@ -1223,7 +1223,18 @@ export const OverpaidCases = () => {
                   </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg} min-w-28`}>PIF</th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Notice Sent</th>
+                <th
+                  aria-sort={ariaSortFor("noticeSent")}
+                  className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("noticeSent")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Notice Sent {sortIcon("noticeSent")}
+                  </button>
+                </th>
                 <th
                   aria-sort={ariaSortFor("opLtrDate")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
