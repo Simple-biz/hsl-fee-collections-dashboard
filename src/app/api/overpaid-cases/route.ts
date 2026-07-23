@@ -100,6 +100,7 @@ export const GET = async (req: NextRequest) => {
       .select({
         total: sql<number>`COUNT(*)::int`,
         totalOverpaid: sql<number>`ROUND(SUM(${overpaidExpr}) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = false), 2)`,
+        clearedTotalOverpaid: sql<number>`ROUND(SUM(${overpaidExpr}) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = true), 2)`,
         clearedCount: sql<number>`COUNT(*) FILTER (WHERE COALESCE(${overpaidCases.checksCleared}, false) = true)::int`,
         ltrCount: sql<number>`COUNT(*) FILTER (WHERE ${overpaidCases.opLtrReceived} IS NOT NULL)::int`,
       })
@@ -110,6 +111,7 @@ export const GET = async (req: NextRequest) => {
 
     const total = agg?.total ?? 0;
     const totalOverpaid = Number(agg?.totalOverpaid ?? 0);
+    const clearedTotalOverpaid = Number(agg?.clearedTotalOverpaid ?? 0);
     const clearedCount = agg?.clearedCount ?? 0;
     const ltrCount = agg?.ltrCount ?? 0;
 
@@ -177,7 +179,7 @@ export const GET = async (req: NextRequest) => {
     const pageFeesReceived = pageFeesCents / 100;
     const pageOverpaid = pageOverpaidCents / 100;
 
-    return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedCount, ltrCount, agents, unassignedCount, pageFeesReceived, pageOverpaid });
+    return NextResponse.json({ data, page, limit, total, totalOverpaid, clearedTotalOverpaid, clearedCount, ltrCount, agents, unassignedCount, pageFeesReceived, pageOverpaid });
   } catch (error) {
     console.error("GET /api/overpaid-cases error:", error);
     return NextResponse.json(
