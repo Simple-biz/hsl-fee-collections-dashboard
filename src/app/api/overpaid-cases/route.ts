@@ -175,7 +175,7 @@ export const GET = async (req: NextRequest) => {
 
     // Sum as integer cents on the server so the footer never drifts from float math.
     const pageFeesCents = rows.reduce((s, r) => s + Math.round(parseFloat(r.feesReceived) * 100), 0);
-    const pageOverpaidCents = rows.reduce((s, r) => r.overpaidAmount != null ? s + Math.round(parseFloat(r.overpaidAmount) * 100) : s, 0);
+    const pageOverpaidCents = rows.reduce((s, r) => !r.checksCleared && r.overpaidAmount != null ? s + Math.round(parseFloat(r.overpaidAmount) * 100) : s, 0);
     const pageFeesReceived = pageFeesCents / 100;
     const pageOverpaid = pageOverpaidCents / 100;
 
