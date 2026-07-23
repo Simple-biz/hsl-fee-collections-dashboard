@@ -341,7 +341,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     }
   };
 
-  const [dateMode, setDateMode] = useState<DateMode>("week");
+  const [dateMode, setDateMode] = useState<DateMode>("day");
   const nowForInit = new Date();
   const [monthSel, setMonthSel] = useState(nowForInit.getMonth());
   const [yearSel, setYearSel] = useState(nowForInit.getFullYear());
