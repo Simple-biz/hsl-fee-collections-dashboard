@@ -369,8 +369,15 @@
     {
       "idx": 52,
       "version": "7",
-      "when": 1753487400000,
+      "when": 1784924400000,
       "tag": "0052_backfill_null_fee_received_dates",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1784924493589,
+      "tag": "0053_fix_corrupt_fee_received_dates",
       "breakpoints": true
     }
   ]
