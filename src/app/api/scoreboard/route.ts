@@ -153,9 +153,11 @@ export const GET = async (req: NextRequest) => {
       fixed_fees AS (
         SELECT
           agent,
-          COALESCE(SUM(amt) FILTER (WHERE d = CURRENT_DATE), 0)                                   AS fees_today,
-          COALESCE(SUM(amt) FILTER (WHERE d >= DATE_TRUNC('week',  CURRENT_DATE)::date), 0)        AS fees_this_week,
-          COALESCE(SUM(amt) FILTER (WHERE d >= DATE_TRUNC('month', CURRENT_DATE)::date), 0)        AS fees_this_month
+          COALESCE(SUM(amt) FILTER (WHERE d = CURRENT_DATE), 0)                                                                          AS fees_today,
+          -- Force Monday week-start: DATE_TRUNC('week') defaults to Sunday in
+          -- PostgreSQL; shifting +1 day before truncating and back gives Monday.
+          COALESCE(SUM(amt) FILTER (WHERE d >= (DATE_TRUNC('week', CURRENT_DATE + INTERVAL '1 day') - INTERVAL '1 day')::date), 0)  AS fees_this_week,
+          COALESCE(SUM(amt) FILTER (WHERE d >= DATE_TRUNC('month', CURRENT_DATE)::date), 0)                                         AS fees_this_month
         FROM fixed_all_fees
         GROUP BY agent
       )

@@ -75,19 +75,33 @@ export function ScoreboardSummaryCards({
   }, []);
 
   const copyByTeam = (format: "sheets" | "chat" | "teams") => {
+    const feeModeLabel: Record<typeof teamFeeMode, string> = {
+      today: "Fees Today",
+      week:  "Fees This Week",
+      month: "Fees This Month",
+      alltime: "Fees All Time",
+    };
+    const feeCol = format === "sheets" ? feeModeLabel[teamFeeMode] : "Collected";
     const header = format === "sheets"
-      ? ["Team", "Agents", "Fees Collected", "SSA Calls", "CL Calls", "Win Sheets", "Cases Closed", "Open Cases"]
-      : ["Team", "Agents", "Collected", "SSA", "CL Calls", "Wins", "Closed", "Open"];
-    const rows = teams.map((team) => [
-      teamLabel(team.team),
-      team.agentCount,
-      fmt(team.feesCollectedInWindow),
-      team.ssaCalls,
-      team.clientCalls,
-      team.winSheetsCreated,
-      team.casesClosed,
-      team.openCases,
-    ]);
+      ? ["Team", "Agents", feeCol, "SSA Calls", "CL Calls", "Win Sheets", "Cases Closed", "Open Cases"]
+      : ["Team", "Agents", feeCol, "SSA", "CL Calls", "Wins", "Closed", "Open"];
+    const rows = teams.map((team) => {
+      const feeValue =
+        teamFeeMode === "today"   ? team.feesToday :
+        teamFeeMode === "week"    ? team.feesThisWeek :
+        teamFeeMode === "month"   ? team.feesThisMonth :
+        team.totalCollected;
+      return [
+        teamLabel(team.team),
+        team.agentCount,
+        fmt(feeValue),
+        team.ssaCalls,
+        team.clientCalls,
+        team.winSheetsCreated,
+        team.casesClosed,
+        team.openCases,
+      ];
+    });
     const done = () => {
       setByTeamCopied(format);
       if (byTeamCopyTimerRef.current) clearTimeout(byTeamCopyTimerRef.current);
