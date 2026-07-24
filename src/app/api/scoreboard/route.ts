@@ -123,6 +123,41 @@ export const GET = async (req: NextRequest) => {
         SELECT assigned_to AS agent, aux_remainder AS amt FROM legacy_remainder
         WHERE aux_fee_received_date >= ${startDate}::date AND aux_fee_received_date < ${endExclusive}::date
           AND aux_remainder > 0.005
+      ),
+      -- Fixed-window fees always relative to CURRENT_DATE — used by the team
+      -- card "Fees Collected" toggle (Today / This Week / This Month / All Time)
+      -- independently of the scoreboard's selected date window.
+      fixed_all_fees AS (
+        SELECT fr.assigned_to AS agent, fp.amount::numeric AS amt, fp.received_date AS d
+        FROM fee_payments fp
+        JOIN fee_records fr ON fr.case_id = fp.case_id
+
+        UNION ALL
+
+        SELECT assigned_to AS agent, t16_remainder AS amt, t16_fee_received_date AS d
+        FROM legacy_remainder
+        WHERE t16_remainder > 0.005 AND t16_fee_received_date IS NOT NULL
+
+        UNION ALL
+
+        SELECT assigned_to AS agent, t2_remainder AS amt, t2_fee_received_date AS d
+        FROM legacy_remainder
+        WHERE t2_remainder > 0.005 AND t2_fee_received_date IS NOT NULL
+
+        UNION ALL
+
+        SELECT assigned_to AS agent, aux_remainder AS amt, aux_fee_received_date AS d
+        FROM legacy_remainder
+        WHERE aux_remainder > 0.005 AND aux_fee_received_date IS NOT NULL
+      ),
+      fixed_fees AS (
+        SELECT
+          agent,
+          COALESCE(SUM(amt) FILTER (WHERE d = CURRENT_DATE), 0)                                   AS fees_today,
+          COALESCE(SUM(amt) FILTER (WHERE d >= DATE_TRUNC('week',  CURRENT_DATE)::date), 0)        AS fees_this_week,
+          COALESCE(SUM(amt) FILTER (WHERE d >= DATE_TRUNC('month', CURRENT_DATE)::date), 0)        AS fees_this_month
+        FROM fixed_all_fees
+        GROUP BY agent
       )
       SELECT
         tm.name AS agent,
@@ -289,7 +324,12 @@ export const GET = async (req: NextRequest) => {
          WHERE fr.assigned_to = tm.name
          AND fr.is_closed = FALSE
          AND fr.fees_confirmation = 'Yes'
-        )::int AS open_pif
+        )::int AS open_pif,
+
+        -- Fixed-window fees for the team card toggle
+        COALESCE((SELECT ff.fees_today      FROM fixed_fees ff WHERE ff.agent = tm.name), 0) AS fees_today,
+        COALESCE((SELECT ff.fees_this_week  FROM fixed_fees ff WHERE ff.agent = tm.name), 0) AS fees_this_week,
+        COALESCE((SELECT ff.fees_this_month FROM fixed_fees ff WHERE ff.agent = tm.name), 0) AS fees_this_month
 
       FROM team_members tm
       WHERE tm.is_active = TRUE
@@ -338,6 +378,9 @@ export const GET = async (req: NextRequest) => {
         openNoFees: Number(r.open_no_fees),
         openPartial: Number(r.open_partial),
         openPif: Number(r.open_pif),
+        feesToday: Number(r.fees_today),
+        feesThisWeek: Number(r.fees_this_week),
+        feesThisMonth: Number(r.fees_this_month),
       }),
     );
 
@@ -388,6 +431,9 @@ export const GET = async (req: NextRequest) => {
         unpaidConcOver60: members.reduce((s, a) => s + a.unpaidConcOver60, 0),
         totalCollected: members.reduce((s, a) => s + a.totalCollected, 0),
         feesCollectedInWindow: members.reduce((s, a) => s + (a.feesCollectedInWindow ?? 0), 0),
+        feesToday: members.reduce((s, a) => s + a.feesToday, 0),
+        feesThisWeek: members.reduce((s, a) => s + a.feesThisWeek, 0),
+        feesThisMonth: members.reduce((s, a) => s + a.feesThisMonth, 0),
         casesFullFee: members.reduce((s, a) => s + a.casesFullFee, 0),
         ssaCalls: members.reduce((s, a) => s + a.weekSsaCalls, 0),
         clientCalls: members.reduce((s, a) => s + a.weekClientCalls, 0),

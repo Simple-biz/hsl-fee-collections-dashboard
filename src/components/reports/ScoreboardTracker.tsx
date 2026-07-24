@@ -54,6 +54,9 @@ interface AgentScore {
   unpaidConcOver90: number;
   totalCollected: number;
   feesCollectedInWindow: number | null;
+  feesToday: number;
+  feesThisWeek: number;
+  feesThisMonth: number;
   casesFullFee: number;
   weekSsaCalls: number;
   weekClientCalls: number;
@@ -464,6 +467,9 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
           openNoFees:       a.openNoFees       ?? 0,
           openPartial:      a.openPartial      ?? 0,
           openPif:          a.openPif          ?? 0,
+          feesToday:        a.feesToday        ?? 0,
+          feesThisWeek:     a.feesThisWeek     ?? 0,
+          feesThisMonth:    a.feesThisMonth    ?? 0,
         })),
         daily: json.daily ?? [],
         summary: json.summary ?? null,

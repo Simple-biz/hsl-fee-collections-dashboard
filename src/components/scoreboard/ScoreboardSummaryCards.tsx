@@ -38,6 +38,9 @@ export interface ScoreboardTeam {
   unpaidConcOver60: number;
   totalCollected: number;
   feesCollectedInWindow: number;
+  feesToday: number;
+  feesThisWeek: number;
+  feesThisMonth: number;
   casesFullFee: number;
   ssaCalls: number;
   clientCalls: number;
@@ -63,6 +66,7 @@ export function ScoreboardSummaryCards({
   const [t2Days, setT2Days] = useState<60 | 90>(60);
   const [t16Days, setT16Days] = useState<60 | 90>(60);
   const [concDays, setConcDays] = useState<60 | 90>(60);
+  const [teamFeeMode, setTeamFeeMode] = useState<"today" | "week" | "month" | "alltime">("week");
   const [byTeamCopied, setByTeamCopied] = useState<"sheets" | "chat" | "teams" | null>(null);
   const byTeamCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -186,9 +190,31 @@ export function ScoreboardSummaryCards({
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>
-              By Team — {label}
+              By Team
             </p>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {/* Fees Collected window toggle */}
+              <div className={`flex items-center rounded-md border overflow-hidden text-[11px] font-semibold ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
+                {(["today", "week", "month", "alltime"] as const).map((mode) => {
+                  const labels = { today: "Today", week: "Week", month: "Month", alltime: "All Time" };
+                  const active = teamFeeMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setTeamFeeMode(mode)}
+                      aria-pressed={active}
+                      className={`px-2.5 py-1 transition-colors ${
+                        active
+                          ? dark ? "bg-emerald-700 text-white" : "bg-emerald-600 text-white"
+                          : dark ? "text-neutral-400 hover:bg-neutral-800" : "text-neutral-500 hover:bg-neutral-50"
+                      }`}
+                    >
+                      {labels[mode]}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Copy buttons */}
               <button
                 onClick={() => copyByTeam("sheets")}
                 aria-label="Copy By Team for Google Sheets"
@@ -228,6 +254,16 @@ export function ScoreboardSummaryCards({
             {teams.map((team) => {
               const teamColor = teamCardClasses(team.team, dark);
               const accentText = teamAccentText(team.team, dark);
+              const feesValue =
+                teamFeeMode === "today"   ? team.feesToday :
+                teamFeeMode === "week"    ? team.feesThisWeek :
+                teamFeeMode === "month"   ? team.feesThisMonth :
+                team.totalCollected;
+              const feesLabel =
+                teamFeeMode === "today"   ? "Fees Today" :
+                teamFeeMode === "week"    ? "Fees This Week" :
+                teamFeeMode === "month"   ? "Fees This Month" :
+                "Fees All Time";
               return (
                 <div key={team.team} className={`rounded-lg border p-4 ${teamColor}`}>
                   <div className="flex items-center justify-between mb-3">
@@ -240,7 +276,7 @@ export function ScoreboardSummaryCards({
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: "Fees Collected", value: fmt(team.feesCollectedInWindow) },
+                      { label: feesLabel, value: fmt(feesValue) },
                       { label: "SSA Calls", value: team.ssaCalls },
                       { label: "CL Calls", value: team.clientCalls },
                       { label: "Win Sheets", value: team.winSheetsCreated },
