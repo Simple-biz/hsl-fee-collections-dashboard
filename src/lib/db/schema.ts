@@ -350,11 +350,11 @@ export const feePetitions = pgTable(
     faxConfFeePet: boolean("fax_conf_fee_pet").notNull().default(false),
 
     // Outcome flag, not a filing step — kept separate from the checklist
-    // above. Synced with fee_records.case_status ("Remarks" on Master Fees):
-    // setting Remarks to "FEE PETITION APPROVED" checks this, and checking
-    // this sets Remarks to "FEE PETITION APPROVED". See upsertFeePetition
-    // (fee-petitions/actions.ts) and the PATCH handler in
-    // api/cases/[id]/route.ts for the two sync directions.
+    // above. One-way link to fee_records.case_status ("Remarks" on Master
+    // Fees): checking this sets Remarks to "FEE PETITION APPROVED" via
+    // upsertFeePetition (fee-petitions/actions.ts). The reverse direction
+    // (Remarks → this flag) was intentionally removed so agents cannot
+    // self-approve by editing Remarks directly in Master Fees.
     feePetitionApproved: boolean("fee_petition_approved").notNull().default(false),
 
     // Inline note (legacy — superseded by activity_log + feePetitionId)

@@ -57,8 +57,8 @@ interface FeePetitionRow {
   ltrToClmtWithSignature: boolean;
   ltrToAlj: boolean;
   faxConfFeePet: boolean;
-  // Outcome flag, not part of the filing checklist above — synced with
-  // Remarks ("FEE PETITION APPROVED") on Master Fees in both directions.
+  // Outcome flag, not part of the filing checklist above. Checking this
+  // sets Remarks to "FEE PETITION APPROVED" on Master Fees (one-way only).
   feePetitionApproved: boolean;
   updateNote: string;
   nextFollowUpDate: string | null;
