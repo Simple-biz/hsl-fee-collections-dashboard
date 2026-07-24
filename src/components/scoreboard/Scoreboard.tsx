@@ -118,10 +118,13 @@ export const Scoreboard = () => {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | "teams" | null>(null);
   const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copiedTeam, setCopiedTeam] = useState<{ key: string; format: CopyFormat } | null>(null);
+  const teamCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
+    if (teamCopyTimerRef.current) clearTimeout(teamCopyTimerRef.current);
   }, []);
   const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
     weeks: [],
@@ -217,6 +220,36 @@ export const Scoreboard = () => {
     }
   };
 
+  const copyOneTeam = (teamKey: string, teamLabel: string, format: CopyFormat) => {
+    const weekLabels = weeks.map((w) => w.label);
+    const currentAgents = (weeks[0]?.agents ?? []).filter((a) => a.team === teamKey && a.role !== "team_lead");
+    const rows = currentAgents
+      .map((a) => ({
+        agent: a.agent,
+        weekValues: weeks.map((w) => w.agents.find((x) => x.agent === a.agent)?.casesClosed ?? 0),
+      }))
+      .sort((a, b) => b.weekValues[0] - a.weekValues[0]);
+
+    const header = ["Agent", ...weekLabels];
+    const dataRows = rows.map((r) => [r.agent, ...r.weekValues]);
+
+    const done = () => {
+      setCopiedTeam({ key: teamKey, format });
+      if (teamCopyTimerRef.current) clearTimeout(teamCopyTimerRef.current);
+      teamCopyTimerRef.current = setTimeout(() => setCopiedTeam(null), 1500);
+    };
+
+    if (format === "teams") {
+      const blob = new Blob([toTeamsHtml(teamLabel, header, dataRows)], { type: "text/html" });
+      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
+    } else if (format === "sheets") {
+      const lines = [teamLabel, header.join("\t"), ...dataRows.map((r) => r.join("\t"))];
+      navigator.clipboard.writeText(lines.join("\n")).then(done);
+    } else {
+      navigator.clipboard.writeText(toChatBlock(teamLabel, header, dataRows)).then(done);
+    }
+  };
+
   return (
     <>
     {csvImportOpen && (
@@ -266,17 +299,6 @@ export const Scoreboard = () => {
               {copiedTable === format ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</> : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
             </button>
           ))}
-          <button
-            onClick={() => copyAllTeams("teams")}
-            aria-label="Copy scoreboard for Microsoft Teams"
-            title="Copy for Microsoft Teams (HTML table)"
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${copiedTable === "teams" ? (dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
-          >
-            {copiedTable === "teams"
-              ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
-              : <><LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />Teams</>
-            }
-          </button>
           <button
             onClick={() => setWeekOffset(weekOffset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
@@ -351,9 +373,28 @@ export const Scoreboard = () => {
 
             return (
               <div key={key} className={`border-b last:border-b-0 ${t.borderLight}`}>
-                {/* Team header */}
-                <div className={`px-4 py-2.5 ${headerBg}`}>
+                {/* Team header with per-team copy buttons */}
+                <div className={`px-4 py-2 ${headerBg} flex items-center justify-between`}>
                   <span className="text-xs font-bold text-white">{label}</span>
+                  <div className="flex items-center gap-1">
+                    {COPY_FORMATS.map(({ format, Icon, label: fmtLabel, title }) => {
+                      const isActive = copiedTeam?.key === key && copiedTeam?.format === format;
+                      return (
+                        <button
+                          key={format}
+                          onClick={() => copyOneTeam(key, label, format)}
+                          aria-label={`Copy ${label} for ${fmtLabel}`}
+                          title={title}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+                        >
+                          {isActive
+                            ? <><Check aria-hidden="true" className="h-3 w-3" />Copied</>
+                            : <><Icon aria-hidden="true" className="h-3 w-3" />{fmtLabel}</>
+                          }
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {rows.length === 0 ? (
