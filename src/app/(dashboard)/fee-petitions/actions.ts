@@ -8,9 +8,11 @@ import { resolveCaseId } from "@/lib/import/resolve-case";
 import { requireCapability } from "@/lib/auth-helpers";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
 
-// Kept in sync with FeeRecordsTable.tsx's CASE_STATUS_COLORS — the literal
-// Remarks value that means the same thing as this page's "Fee Petition
-// Approved" column.
+// The Remarks value written to Master Fees when a lead approves a petition
+// via the checkbox. FeeRecordsTable.tsx's CASE_STATUS_COLORS uses the same
+// literal for badge styling. This is a one-way push: the checkbox sets this
+// value in Remarks, but Remarks being set to this string does NOT set the
+// checkbox (reverse sync intentionally removed — see route.ts PATCH handler).
 const FEE_PETITION_APPROVED_REMARKS = "FEE PETITION APPROVED";
 
 const FIELD_KEYS = [
@@ -72,11 +74,11 @@ export async function upsertFeePetition(input: {
     }
 
     // Checking "Fee Petition Approved" here also sets Remarks on Master Fees
-    // to match, so the two stay in sync regardless of which page someone
-    // edits from. Only syncs forward on check — unchecking doesn't touch
-    // Remarks, since Remarks has many other unrelated values and blanking it
-    // as a side effect of an unrelated checkbox would be a surprising, lossy
-    // side effect on a different page.
+    // to "FEE PETITION APPROVED" so the two stay visible together. This is
+    // intentionally one-way: only the checkbox here can approve a petition;
+    // editing Remarks directly in Master Fees no longer triggers this flag
+    // (the reverse sync was removed so that agents cannot self-approve by
+    // picking a Remarks value without a lead/Lori reviewing first).
     const row = await db.transaction(async (tx) => {
       const [r] = await tx
         .insert(feePetitions)
