@@ -679,6 +679,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             label={windowLabel}
             dark={dark}
             t={t}
+            showMiniCards={false}
           />
         </div>
       )}

@@ -124,7 +124,7 @@ export function ScoreboardSummaryCards({
       onClick: () => setConcDays((v) => v === 60 ? 90 : 60),
       toggled: concDays === 90,
     },
-    { label: "Collected (Period)", value: fmt(summary.totalFeesCollectedInWindow), accent: "#059669" },
+    { label: "Collected", value: fmt(summary.totalCollected), accent: "#059669" },
     { label: "Full Fee", value: summary.totalCasesFullFee, accent: "#d97706" },
     { label: "SSA Calls", value: summary.totalSsaCalls, accent: "#7c3aed" },
     { label: "Client Calls", value: summary.totalClientCalls, accent: "#0284c7" },
