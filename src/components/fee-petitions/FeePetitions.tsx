@@ -825,7 +825,7 @@ export const FeePetitions = () => {
           const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (r[c.key] ? 1 : 0), 0);
           return [
             escape(r.claimant),
-            escape(r.caseLink ?? ""),
+            escape(r.caseLink ?? r.externalId ?? buildMyCaseUrl(r.id)),
             r.approvalDate ?? "",
             r.updatedAt ?? "",
             `${completedCount}/${CHECKBOX_COLUMNS.length}`,

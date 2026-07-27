@@ -245,7 +245,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
         ...all.map((r) =>
           [
             escape(r.claimant),
-            escape(r.caseLink ?? ""),
+            escape(r.caseLink ?? r.externalId ?? buildMyCaseUrl(r.id)),
             escape(r.assignedTo ?? ""),
             escape(r.region ?? ""),
             r.feesReceived.toFixed(2),
