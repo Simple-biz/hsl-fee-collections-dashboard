@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { isAdminRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
 
@@ -10,6 +11,8 @@ export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = session.user?.role;
+    if (!isAdminRole(role) && role !== "lead") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { searchParams } = req.nextUrl;
     const week = searchParams.get("week") ?? new Date().toISOString().split("T")[0];
