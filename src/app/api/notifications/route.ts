@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { eq, sql, desc, and, inArray } from "drizzle-orm";
 import { namesMatch } from "@/lib/formatters";
+import { isAdminRole } from "@/lib/auth-helpers";
 import { feePetitions } from "@/lib/db/schema";
 
 // Notification types visible only to their assigned agent — nobody else,
@@ -38,11 +39,13 @@ export const GET = async (req: NextRequest) => {
   try {
     const session = await auth();
     const agentName = session?.user?.name;
+    const isAdmin = isAdminRole(session?.user?.role);
     // Agent-only types (e.g. follow_up_due) are stripped out unless they
     // belong to the requesting user — applied after the DB query since
     // namesMatch tolerates case/whitespace drift that SQL equality wouldn't.
+    // Admins see all agent-only notifications regardless of agentName.
     const visibleToSession = (row: { type: string; agentName: string | null }) =>
-      !AGENT_ONLY_TYPES.has(row.type) || namesMatch(row.agentName, agentName);
+      isAdmin || !AGENT_ONLY_TYPES.has(row.type) || namesMatch(row.agentName, agentName);
 
     const { searchParams } = new URL(req.url);
     const typeFilter = searchParams.get("type")?.split(",").filter(Boolean);
