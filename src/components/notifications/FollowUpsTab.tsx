@@ -46,9 +46,12 @@ const fmtDate = (iso: string): string =>
 const thBase = "px-3 py-2 text-[13px] font-semibold uppercase tracking-wide";
 const tdBase = "px-3 py-2 text-xs";
 
+const AGENT_ROLES = new Set(["member", "collections_specialist"]);
+
 export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
   const [dayOffset, setDayOffset] = useState(0);
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
+  const [allAgents, setAllAgents] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -56,6 +59,26 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
+
+  // Load full active agent roster once — used to compute who has no follow-ups today
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    fetch("/api/team-members", { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((json) => {
+        if (cancelled) return;
+        const names: string[] = (json.data ?? [])
+          .filter((m: { isActive: boolean; role: string }) =>
+            m.isActive && AGENT_ROLES.has(m.role)
+          )
+          .map((m: { name: string }) => m.name)
+          .sort((a: string, b: string) => a.localeCompare(b));
+        setAllAgents(names);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; controller.abort(); };
+  }, []);
 
   const selectedDate = (() => {
     const d = new Date();
@@ -122,6 +145,9 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
     (byAgent[agent] ??= []).push(f);
   }
   const agentNames = Object.keys(byAgent).sort();
+
+  const agentWithFollowUpSet = new Set(agentsToday.map((a) => a.name));
+  const agentsWithNone = allAgents.filter((name) => !agentWithFollowUpSet.has(name));
 
   const isToday = dayOffset === 0;
 
@@ -279,6 +305,20 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
                 </tr>
               </tfoot>
             </table>
+          </div>
+        )}
+
+        {/* Agents with no follow-ups today */}
+        {!loading && !error && agentsWithNone.length > 0 && (
+          <div className={`border-t ${t.borderLight}`}>
+            <div className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} ${agentBg}`}>
+              No Follow-Ups Today
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-2">
+              {agentsWithNone.map((name) => (
+                <span key={name} className={`text-xs ${t.textMuted}`}>{name}</span>
+              ))}
+            </div>
           </div>
         )}
       </div>
