@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
   Bell,
@@ -138,12 +139,20 @@ function timeAgo(dateStr: string): string {
 // Component
 // ============================================================================
 
+// Tabs hidden from member role — visible to lead, admin, system_admin only.
+const LEAD_ONLY_TABS = new Set<PageTab>(["calls_backlog", "follow_ups"]);
+
 export default function NotificationsPage() {
   const { resolvedTheme } = useTheme();
+  const { data: session } = useSession();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
+
+  const role = session?.user?.role;
+  const canSeeLeadTabs = role === "lead" || role === "admin" || role === "system_admin";
+  const visibleTabs = PAGE_TABS.filter((tab) => !LEAD_ONLY_TABS.has(tab.key) || canSeeLeadTabs);
 
   const [stored, setStored] = useState<Notification[]>([]);
   const [live, setLive] = useState<Notification[]>([]);
@@ -264,7 +273,7 @@ export default function NotificationsPage() {
     <div className="space-y-4">
       {/* Page-level tab switcher */}
       <div className={`flex gap-1 p-1 rounded-lg border w-fit ${dark ? "bg-neutral-900 border-neutral-800" : "bg-neutral-100/60 border-neutral-200"}`}>
-        {PAGE_TABS.map(({ key, label, icon: Icon }) => (
+        {visibleTabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setPageTab(key)}
