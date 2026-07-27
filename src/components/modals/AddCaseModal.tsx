@@ -21,8 +21,8 @@ interface AddCaseModalProps {
 }
 
 interface FormState {
-  // Worksheet-style entry: the visible CASE LINK text + the MyCase hyperlink.
-  // `caseLink` is a transient parse source (not sent to the API).
+  // Worksheet-style case title (e.g. "2026.07.06 Young, Jeannette v. ALJ …").
+  // Saved to cases.case_link so it appears in CSV exports.
   caseLink: string;
   clientId: string;
   firstName: string;
