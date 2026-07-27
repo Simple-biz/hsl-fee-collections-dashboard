@@ -149,6 +149,7 @@ const BASE_CASE: CaseRow = {
   office: "Test Office",
   notesCount: 0,
   leaderNotesCount: 0,
+  caseLink: null,
   winSheetLink: null,
   winSheetLinkText: null,
 };
