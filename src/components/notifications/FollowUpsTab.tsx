@@ -125,14 +125,18 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
       return agentCmp !== 0 ? agentCmp : a.caseName.localeCompare(b.caseName);
     });
 
-  // Per-agent counts for the selected day (A-Z)
+  // Per-agent counts for the selected day — all active agents, 0 when none
   const agentCountMap = new Map<string, number>();
   for (const f of todayRows) {
     const name = f.assignedTo ?? "Unassigned";
     agentCountMap.set(name, (agentCountMap.get(name) ?? 0) + 1);
   }
-  const agentsToday = Array.from(agentCountMap.entries())
-    .map(([name, count]) => ({ name, count }))
+  // Merge roster (A-Z) with today's counts; agents not in roster but with
+  // follow-ups still appear (e.g. recently added or renamed agents).
+  const rosterSet = new Set(allAgents);
+  const extraAgents = Array.from(agentCountMap.keys()).filter((n) => !rosterSet.has(n));
+  const agentsToday = [...allAgents, ...extraAgents]
+    .map((name) => ({ name, count: agentCountMap.get(name) ?? 0 }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const maxCount = Math.max(1, ...agentsToday.map((a) => a.count));
@@ -145,9 +149,6 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
     (byAgent[agent] ??= []).push(f);
   }
   const agentNames = Object.keys(byAgent).sort();
-
-  const agentWithFollowUpSet = new Set(agentsToday.map((a) => a.name));
-  const agentsWithNone = allAgents.filter((name) => !agentWithFollowUpSet.has(name));
 
   const isToday = dayOffset === 0;
 
@@ -265,14 +266,6 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
           </div>
         )}
 
-        {/* Empty */}
-        {!loading && !error && dayTotal === 0 && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <CalendarClock className={`h-8 w-8 ${t.textMuted} mb-3`} aria-hidden="true" />
-            <p className={`text-sm font-medium ${t.text}`}>No follow-ups scheduled for this day</p>
-          </div>
-        )}
-
         {/* Per-agent counts */}
         {!loading && !error && agentsToday.length > 0 && (
           <div className="overflow-x-auto">
@@ -288,7 +281,7 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
                 {agentsToday.map((a) => (
                   <tr key={a.name} className={`border-b ${rowDivide} ${rowHover} transition-colors`}>
                     <td className={`${tdBase} font-medium ${t.text} whitespace-nowrap`}>{a.name}</td>
-                    <td className={`${tdBase} text-right font-semibold tabular-nums ${t.text}`}>{a.count}</td>
+                    <td className={`${tdBase} text-right font-semibold tabular-nums ${a.count > 0 ? t.text : t.textMuted}`}>{a.count}</td>
                     <td className={`${tdBase} w-1/2`}>
                       <div className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
                         <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(a.count / maxCount) * 100}%` }} />
@@ -308,19 +301,6 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
           </div>
         )}
 
-        {/* Agents with no follow-ups today */}
-        {!loading && !error && agentsWithNone.length > 0 && (
-          <div className={`border-t ${t.borderLight}`}>
-            <div className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} ${agentBg}`}>
-              No Follow-Ups Today
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-2">
-              {agentsWithNone.map((name) => (
-                <span key={name} className={`text-xs ${t.textMuted}`}>{name}</span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Cases grouped by agent */}
