@@ -27,6 +27,7 @@ import { ClosedCasesTab } from "@/components/notifications/ClosedCasesTab";
 import { RecentActivityTab } from "@/components/notifications/RecentActivityTab";
 import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 import { CallsBacklogTab } from "@/components/notifications/CallsBacklogTab";
+import { FollowUpsTab } from "@/components/notifications/FollowUpsTab";
 
 // ============================================================================
 // Types
@@ -46,7 +47,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases" | "calls_backlog";
+type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases" | "calls_backlog" | "follow_ups";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -110,6 +111,7 @@ const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "recent_activity",       label: "Recent Activity",       icon: Activity },
   { key: "new_cases",             label: "New Cases",             icon: UserPlus },
   { key: "calls_backlog",         label: "Calls Backlog",         icon: PhoneCall },
+  { key: "follow_ups",            label: "Follow-Ups",            icon: PhoneCall },
 ];
 
 // ============================================================================
@@ -303,6 +305,9 @@ export default function NotificationsPage() {
 
       {/* Calls Backlog tab */}
       {pageTab === "calls_backlog" && <CallsBacklogTab dark={dark} t={t} />}
+
+      {/* Follow-Ups tab */}
+      {pageTab === "follow_ups" && <FollowUpsTab dark={dark} t={t} />}
 
       {/* Notifications tab */}
       {pageTab === "notifications" && <>
