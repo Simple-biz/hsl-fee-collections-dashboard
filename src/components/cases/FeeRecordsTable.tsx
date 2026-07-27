@@ -677,8 +677,10 @@ export const FeeRecordsTable = ({
 
   const filtered = useMemo(() => {
     let d = [...cases];
-    // Date range filter (approval date)
-    if (dateRange) {
+    // Date range filter (approval date) — skipped in closed mode because
+    // closed cases span all approval dates; the parent page has its own
+    // closedAt date filters instead.
+    if (dateRange && mode !== "closed") {
       d = d.filter((c) => {
         if (!c.date) return false;
         return c.date >= dateRange.from && c.date <= dateRange.to;
@@ -1444,7 +1446,7 @@ export const FeeRecordsTable = ({
               onChange={(e) => { setApproverFilter(e.target.value); setPageIndex(0); }}
               className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
             >
-              <option value="all">Cases Approved</option>
+              <option value="all">All Approvers</option>
               <option value="georgia">Georgia</option>
               <option value="lori">Lori</option>
               <option value="deanne">DeAnne</option>

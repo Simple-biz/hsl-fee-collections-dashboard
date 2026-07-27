@@ -115,7 +115,7 @@ export const GET = async (req: NextRequest) => {
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
       .leftJoin(userDetails, eq(userDetails.caseId, cases.clientId))
       .where(whereClause)
-      .orderBy(desc(cases.approvalDate))
+      .orderBy(isClosedParam === "true" ? desc(feeRecords.closedAt) : desc(cases.approvalDate))
       .limit(limit)
       .offset(offset);
 

@@ -42,7 +42,7 @@ export default function FeesClosedPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cases?isClosed=true&limit=2000", { signal: controller.signal });
+      const res = await fetch("/api/cases?isClosed=true&limit=10000", { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed to load closed fees (${res.status})`);
       const json = await res.json();
       setCases(json.data || []);
