@@ -41,6 +41,7 @@ interface FeePetitionRow {
   id: number;
   claimant: string;
   externalId: string | null;
+  caseLink: string | null;
   approvalDate: string | null;
   updatedAt: string | null;
   feeAmount: number | null;
@@ -810,7 +811,7 @@ export const FeePetitions = () => {
         all = json.data || [];
       }
       const headers = [
-        "Case", "Approval Date", "Last Updated", "Progress",
+        "Case", "MyCase Title", "Approval Date", "Last Updated", "Progress",
         "Time Delineation", "Fee Petition Doc", "Ltr to Clmt",
         "Ltr to Clmt w/ Signature", "Ltr to ALJ", "Fax Conf Fee Pet", "Notes",
       ];
@@ -824,6 +825,7 @@ export const FeePetitions = () => {
           const completedCount = CHECKBOX_COLUMNS.reduce((acc, c) => acc + (r[c.key] ? 1 : 0), 0);
           return [
             escape(r.claimant),
+            escape(r.caseLink ?? ""),
             r.approvalDate ?? "",
             r.updatedAt ?? "",
             `${completedCount}/${CHECKBOX_COLUMNS.length}`,

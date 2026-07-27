@@ -1229,7 +1229,7 @@ export const FeeRecordsTable = ({
     };
     const fmt = (n: number | null | undefined) => (n != null ? n.toFixed(2) : "");
     const headers = [
-      "Case ID", "Name", "Claim", "Assigned", "Office", "Level", "Date Approved",
+      "Case ID", "Name", "MyCase Title", "Claim", "Assigned", "Office", "Level", "Date Approved",
       "T16 Retro", "T16 Fee Due", "T16 Fee Received", "T16 Received Date",
       "T2 Retro", "T2 Fee Due", "T2 Fee Received", "T2 Received Date",
       "AUX Retro", "AUX Fee Due", "AUX Fee Received", "AUX Received Date",
@@ -1242,6 +1242,7 @@ export const FeeRecordsTable = ({
         [
           r.id,
           escape(r.name),
+          escape(r.caseLink ?? ""),
           escape(r.claim),
           escape(r.assigned),
           escape(r.office),
