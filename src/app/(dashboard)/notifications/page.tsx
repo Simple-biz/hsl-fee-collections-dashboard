@@ -11,6 +11,7 @@ import {
   DollarSign,
   Phone,
   PhoneCall,
+  CalendarClock,
   UserPlus,
   CheckCheck,
   CheckCircle2,
@@ -111,7 +112,7 @@ const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "recent_activity",       label: "Recent Activity",       icon: Activity },
   { key: "new_cases",             label: "New Cases",             icon: UserPlus },
   { key: "calls_backlog",         label: "Calls Backlog",         icon: PhoneCall },
-  { key: "follow_ups",            label: "Follow-Ups",            icon: PhoneCall },
+  { key: "follow_ups",            label: "Follow-Ups",            icon: CalendarClock },
 ];
 
 // ============================================================================
