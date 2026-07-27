@@ -1,27 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, PhoneCall, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { toChatBlock, toTeamsHtml } from "@/lib/formatters";
 
 type CopyFormat = "sheets" | "chat" | "teams";
-const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
-  { format: "sheets", Icon: Table2,       label: "Sheets", ariaLabel: "Copy for Google Sheets",    title: "Copy for Google Sheets (tab-separated)" },
-  { format: "chat",   Icon: MessageSquare, label: "Chat",   ariaLabel: "Copy for Google Chat",      title: "Copy for Google Chat (monospace code block)" },
-  { format: "teams",  Icon: LayoutGrid,    label: "Teams",  ariaLabel: "Copy for Microsoft Teams",  title: "Copy for Microsoft Teams (HTML table)" },
+const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string }[] = [
+  { format: "sheets", Icon: Table2,        label: "Sheets", ariaLabel: "Copy for Google Sheets" },
+  { format: "chat",   Icon: MessageSquare, label: "Chat",   ariaLabel: "Copy for Google Chat" },
+  { format: "teams",  Icon: LayoutGrid,    label: "Teams",  ariaLabel: "Copy for Microsoft Teams" },
 ];
-
-interface DayCount {
-  date: string;
-  count: number;
-}
-
-interface AgentCount {
-  name: string;
-  count: number;
-}
 
 interface FollowUpRow {
   id: string;
@@ -38,6 +28,14 @@ interface FollowUpsTabProps {
   t: ReturnType<typeof themeClasses>;
 }
 
+const getMondayOfWeek = (dateStr: string): string => {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
+};
+
 const fmtDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
     weekday: "short",
@@ -45,26 +43,27 @@ const fmtDate = (iso: string): string =>
     day: "numeric",
   });
 
-const isToday = (iso: string): boolean =>
-  iso === new Date().toISOString().split("T")[0];
-
 const thBase = "px-3 py-2 text-[13px] font-semibold uppercase tracking-wide";
 const tdBase = "px-3 py-2 text-xs";
 
 export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [days, setDays] = useState<DayCount[]>([]);
-  const [agents, setAgents] = useState<AgentCount[]>([]);
+  const [dayOffset, setDayOffset] = useState(0);
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [copiedTable, setCopiedTable] = useState<CopyFormat | null>(null);
+  const [copied, setCopied] = useState<CopyFormat | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
 
-  const monday = getMonday(weekOffset);
+  const selectedDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    return d.toISOString().split("T")[0];
+  })();
+
+  const monday = getMondayOfWeek(selectedDate);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,8 +80,6 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
       })
       .then((json) => {
         if (cancelled) return;
-        setDays(json.days ?? []);
-        setAgents(json.agents ?? []);
         setFollowUps(json.followUps ?? []);
       })
       .catch((err) => {
@@ -97,120 +94,129 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
     };
   }, [monday]);
 
-  const weekTotal = days.reduce((s, d) => s + d.count, 0);
-  const maxDayCount = Math.max(1, ...days.map((d) => d.count));
-  const maxAgentCount = Math.max(1, ...agents.map((a) => a.count));
+  // Filter to selected day, sort agent A-Z then case name A-Z
+  const todayRows = followUps
+    .filter((f) => f.date === selectedDate)
+    .sort((a, b) => {
+      const agentCmp = (a.assignedTo ?? "Unassigned").localeCompare(b.assignedTo ?? "Unassigned");
+      return agentCmp !== 0 ? agentCmp : a.caseName.localeCompare(b.caseName);
+    });
 
-  const byDate = followUps.reduce<Record<string, FollowUpRow[]>>((acc, f) => {
-    (acc[f.date] ??= []).push(f);
-    return acc;
-  }, {});
-  const dates = Object.keys(byDate).sort();
+  // Per-agent counts for the selected day (A-Z)
+  const agentCountMap = new Map<string, number>();
+  for (const f of todayRows) {
+    const name = f.assignedTo ?? "Unassigned";
+    agentCountMap.set(name, (agentCountMap.get(name) ?? 0) + 1);
+  }
+  const agentsToday = Array.from(agentCountMap.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const maxCount = Math.max(1, ...agentsToday.map((a) => a.count));
+  const dayTotal = todayRows.length;
+
+  // Case list grouped by agent (A-Z), cases already A-Z within each agent
+  const byAgent: Record<string, FollowUpRow[]> = {};
+  for (const f of todayRows) {
+    const agent = f.assignedTo ?? "Unassigned";
+    (byAgent[agent] ??= []).push(f);
+  }
+  const agentNames = Object.keys(byAgent).sort();
+
+  const isToday = dayOffset === 0;
 
   const rowDivide = dark ? "border-neutral-800/40" : "border-neutral-100";
   const rowHover  = dark ? "hover:bg-neutral-800/30" : "hover:bg-neutral-50";
-  const todayBg   = dark ? "bg-orange-900/20" : "bg-orange-50/60";
   const barBg     = dark ? "bg-orange-500/30" : "bg-orange-200";
-  const dateBg    = dark ? "bg-neutral-800/60" : "bg-neutral-50";
+  const agentBg   = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
-  const copyTable = (format: CopyFormat) => {
-    const weekLabel = formatWeekLabel(monday);
-    const dailyTitle  = `Follow-Ups Due — ${weekLabel}`;
-    const dailyHeader = ["Day", "Follow-Ups"];
-    const dailyRows: (string | number)[][] = [
-      ...days.map((d) => [fmtDate(d.date), d.count]),
-      ["Week Total", weekTotal],
-    ];
-    const agentTitle  = `By Agent — ${weekLabel}`;
+  const copyData = (format: CopyFormat) => {
+    const label = isToday ? `Today · ${fmtDate(selectedDate)}` : fmtDate(selectedDate);
+    const agentTitle  = `Follow-Ups — ${label}`;
     const agentHeader = ["Agent", "Follow-Ups"];
-    const agentRows: (string | number)[][] = agents.map((a) => [a.name, a.count]);
-    const listTitle   = `Follow-Up Cases — ${weekLabel}`;
-    const listHeader  = ["Date", "Case Name", "Agent", "Source"];
-    const listRows: (string | number)[][] = dates.flatMap((date) =>
-      byDate[date].map((f) => [
-        fmtDate(date),
+    const agentRows: (string | number)[][] = agentsToday.map((a) => [a.name, a.count]);
+    const listTitle   = `Follow-Up Cases — ${label}`;
+    const listHeader  = ["Agent", "Case Name", "Source"];
+    const listRows: (string | number)[][] = agentNames.flatMap((agent) =>
+      byAgent[agent].map((f) => [
+        agent,
         f.caseName,
-        f.assignedTo ?? "—",
         f.source === "fee_petition" ? "Fee Petition" : "Master Fees",
       ])
     );
     const done = () => {
-      setCopiedTable(format);
+      setCopied(format);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
+      copyTimerRef.current = setTimeout(() => setCopied(null), 1500);
     };
     if (format === "teams") {
-      const html = toTeamsHtml(dailyTitle, dailyHeader, dailyRows) +
-        (agentRows.length ? toTeamsHtml(agentTitle, agentHeader, agentRows) : "") +
-        (listRows.length  ? toTeamsHtml(listTitle,  listHeader,  listRows)  : "");
+      const html = toTeamsHtml(agentTitle, agentHeader, agentRows) +
+        (listRows.length ? toTeamsHtml(listTitle, listHeader, listRows) : "");
       const blob = new Blob([html], { type: "text/html" });
       navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
     } else if (format === "sheets") {
       const lines = [
-        dailyTitle, dailyHeader.join("\t"), ...dailyRows.map((r) => r.join("\t")),
-        "",
-        ...(agentRows.length ? [agentTitle, agentHeader.join("\t"), ...agentRows.map((r) => r.join("\t")), ""] : []),
-        ...(listRows.length  ? [listTitle,  listHeader.join("\t"),  ...listRows.map((r) => r.join("\t"))]  : []),
+        agentTitle, agentHeader.join("\t"), ...agentRows.map((r) => r.join("\t")),
+        ...(listRows.length ? ["", listTitle, listHeader.join("\t"), ...listRows.map((r) => r.join("\t"))] : []),
       ];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
-      const parts = [toChatBlock(dailyTitle, dailyHeader, dailyRows)];
-      if (agentRows.length) parts.push(toChatBlock(agentTitle, agentHeader, agentRows));
-      if (listRows.length)  parts.push(toChatBlock(listTitle,  listHeader,  listRows));
+      const parts = [toChatBlock(agentTitle, agentHeader, agentRows)];
+      if (listRows.length) parts.push(toChatBlock(listTitle, listHeader, listRows));
       navigator.clipboard.writeText(parts.join("\n\n")).then(done);
     }
   };
 
   return (
     <div className="space-y-4">
+      {/* Agent counts card */}
       <div className={`rounded-xl border ${t.card}`}>
         {/* Header */}
         <div className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ${t.borderLight}`}>
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${dark ? "bg-orange-900/40" : "bg-orange-50"}`}>
-              <PhoneCall className={`h-5 w-5 ${dark ? "text-orange-400" : "text-orange-600"}`} aria-hidden="true" />
+              <CalendarClock className={`h-5 w-5 ${dark ? "text-orange-400" : "text-orange-600"}`} aria-hidden="true" />
             </div>
             <div>
-              <h3 className={`text-sm font-bold ${t.text}`}>Follow-Ups Due</h3>
+              <h3 className={`text-sm font-bold ${t.text}`}>
+                Follow-Ups{isToday ? " Today" : ""} — {fmtDate(selectedDate)}
+              </h3>
               <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-                {weekTotal > 0 ? `${weekTotal} follow-up${weekTotal !== 1 ? "s" : ""} — ` : ""}
-                {formatWeekLabel(monday)}
+                {dayTotal > 0
+                  ? `${dayTotal} follow-up${dayTotal !== 1 ? "s" : ""} · ${agentsToday.length} agent${agentsToday.length !== 1 ? "s" : ""}`
+                  : "No follow-ups scheduled"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {!loading && !error && weekTotal > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
+            {!loading && !error && dayTotal > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel }) => (
               <button
                 key={format}
-                onClick={() => copyTable(format)}
+                onClick={() => copyData(format)}
                 aria-label={ariaLabel}
-                title={title}
                 className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${
-                  copiedTable === format
+                  copied === format
                     ? (dark ? "border-orange-700 text-orange-400" : "border-orange-300 text-orange-600")
                     : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")
                 }`}
               >
-                {copiedTable === format
+                {copied === format
                   ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</>
                   : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
               </button>
             ))}
             <button
-              onClick={() => setWeekOffset((v) => v - 1)}
+              onClick={() => setDayOffset((v) => v - 1)}
               className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
-              aria-label="Previous week"
+              aria-label="Previous day"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             </button>
-            <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-2`}>
-              {formatWeekLabel(monday)}
-            </span>
             <button
-              onClick={() => setWeekOffset((v) => v + 1)}
-              disabled={weekOffset >= 0}
+              onClick={() => setDayOffset((v) => v + 1)}
+              disabled={dayOffset >= 0}
               className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
-              aria-label="Next week"
+              aria-label="Next day"
             >
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -234,62 +240,15 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
         )}
 
         {/* Empty */}
-        {!loading && !error && weekTotal === 0 && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <PhoneCall className={`h-8 w-8 ${t.textMuted} mb-3`} aria-hidden="true" />
-            <p className={`text-sm font-medium ${t.text}`}>No follow-ups scheduled this week</p>
+        {!loading && !error && dayTotal === 0 && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <CalendarClock className={`h-8 w-8 ${t.textMuted} mb-3`} aria-hidden="true" />
+            <p className={`text-sm font-medium ${t.text}`}>No follow-ups scheduled for this day</p>
           </div>
         )}
 
-        {/* Daily summary table */}
-        {!loading && !error && days.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className={`border-b ${t.borderLight}`}>
-                  <th className={`${thBase} ${t.textMuted} text-left`}>Day</th>
-                  <th className={`${thBase} ${t.textMuted} text-right`}>Follow-Ups</th>
-                  <th className={`${thBase} ${t.textMuted} text-left w-1/2`}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {days.map((d) => (
-                  <tr key={d.date} className={`border-b ${rowDivide} ${isToday(d.date) ? todayBg : ""} ${rowHover} transition-colors`}>
-                    <td className={`${tdBase} font-medium ${t.text} whitespace-nowrap`}>
-                      {fmtDate(d.date)}
-                      {isToday(d.date) && (
-                        <span className={`ml-1.5 text-[11px] font-semibold ${dark ? "text-orange-400" : "text-orange-600"}`}>Today</span>
-                      )}
-                    </td>
-                    <td className={`${tdBase} text-right font-semibold tabular-nums ${d.count > 0 ? t.text : t.textMuted}`}>
-                      {d.count > 0 ? d.count : "—"}
-                    </td>
-                    <td className={`${tdBase} w-1/2`}>
-                      <div className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
-                        <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(d.count / maxDayCount) * 100}%` }} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
-                  <td className={`${tdBase} font-semibold ${t.text}`}>Week Total</td>
-                  <td className={`${tdBase} text-right font-bold tabular-nums ${t.text}`}>{weekTotal > 0 ? weekTotal : "—"}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Per-agent breakdown */}
-      {!loading && !error && agents.length > 0 && (
-        <div className={`rounded-xl border ${t.card}`}>
-          <div className={`p-4 border-b ${t.borderLight}`}>
-            <h4 className={`text-sm font-bold ${t.text}`}>By Agent — {formatWeekLabel(monday)}</h4>
-          </div>
+        {/* Per-agent counts */}
+        {!loading && !error && agentsToday.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
@@ -300,57 +259,58 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
                 </tr>
               </thead>
               <tbody>
-                {agents.map((a) => (
+                {agentsToday.map((a) => (
                   <tr key={a.name} className={`border-b ${rowDivide} ${rowHover} transition-colors`}>
                     <td className={`${tdBase} font-medium ${t.text} whitespace-nowrap`}>{a.name}</td>
                     <td className={`${tdBase} text-right font-semibold tabular-nums ${t.text}`}>{a.count}</td>
                     <td className={`${tdBase} w-1/2`}>
                       <div className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
-                        <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(a.count / maxAgentCount) * 100}%` }} />
+                        <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(a.count / maxCount) * 100}%` }} />
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
+                <tr className={agentBg}>
                   <td className={`${tdBase} font-semibold ${t.text}`}>Total</td>
-                  <td className={`${tdBase} text-right font-bold tabular-nums ${t.text}`}>{weekTotal}</td>
+                  <td className={`${tdBase} text-right font-bold tabular-nums ${t.text}`}>{dayTotal}</td>
                   <td />
                 </tr>
               </tfoot>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Per-date case list */}
-      {!loading && !error && dates.length > 0 && (
+      {/* Cases grouped by agent */}
+      {!loading && !error && agentNames.length > 0 && (
         <div className={`rounded-xl border ${t.card}`}>
           <div className={`p-4 border-b ${t.borderLight}`}>
-            <h4 className={`text-sm font-bold ${t.text}`}>Follow-Up Cases — {formatWeekLabel(monday)}</h4>
+            <h4 className={`text-sm font-bold ${t.text}`}>
+              Follow-Up Cases — {fmtDate(selectedDate)}
+            </h4>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className={`border-b ${t.borderLight}`}>
                   <th className={`${thBase} ${t.textMuted}`}>Case Name</th>
-                  <th className={`${thBase} ${t.textMuted}`}>Agent</th>
                   <th className={`${thBase} ${t.textMuted}`}>Source</th>
                 </tr>
               </thead>
               <tbody>
-                {dates.map((date) => (
-                  <Fragment key={date}>
-                    <tr className={`border-b ${rowDivide} ${isToday(date) ? todayBg : ""}`}>
-                      <td colSpan={3} className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} ${isToday(date) ? "" : dateBg}`}>
-                        {fmtDate(date)}
-                        {isToday(date) && (
-                          <span className={`ml-1.5 ${dark ? "text-orange-400" : "text-orange-600"}`}>· Today</span>
-                        )}
+                {agentNames.map((agent) => (
+                  <Fragment key={agent}>
+                    <tr className={`border-b ${rowDivide}`}>
+                      <td colSpan={2} className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} ${agentBg}`}>
+                        {agent}
+                        <span className={`ml-2 font-normal normal-case tracking-normal ${t.textMuted}`}>
+                          · {byAgent[agent].length} case{byAgent[agent].length !== 1 ? "s" : ""}
+                        </span>
                       </td>
                     </tr>
-                    {byDate[date].map((f) => (
+                    {byAgent[agent].map((f) => (
                       <tr key={f.id} className={`border-b ${rowDivide} ${rowHover} transition-colors`}>
                         <td className={`${tdBase} font-medium ${t.text}`}>
                           <a
@@ -363,7 +323,6 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
                             <ExternalLink className="h-3 w-3 opacity-50 shrink-0" aria-hidden="true" />
                           </a>
                         </td>
-                        <td className={`${tdBase} ${t.textMuted}`}>{f.assignedTo ?? "—"}</td>
                         <td className={`${tdBase}`}>
                           <span className={`text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
                             f.source === "fee_petition"
