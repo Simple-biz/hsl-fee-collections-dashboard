@@ -1242,7 +1242,7 @@ export const FeeRecordsTable = ({
         [
           r.id,
           escape(r.name),
-          escape(r.caseLink ?? ""),
+          escape(r.caseLink ?? r.externalId ?? buildMyCaseUrl(r.id)),
           escape(r.claim),
           escape(r.assigned),
           escape(r.office),
