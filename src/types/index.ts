@@ -100,6 +100,7 @@ export interface CaseRow {
   leaderNotesCount: number;
 
   // Win Sheet
+  caseLink: string | null;
   winSheetLink: string | null;
   winSheetLinkText: string | null;
 }

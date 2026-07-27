@@ -105,6 +105,8 @@ export const GET = async (req: NextRequest) => {
         winSheetLink: feeRecords.winSheetLink,
         winSheetLinkText: feeRecords.winSheetLinkText,
 
+        caseLink: cases.caseLink,
+
         // Chronicle id (from user_details) — powers the Chronicle link in the
         // name column. one-to-one join, so it can't multiply rows.
         udChronicleId: userDetails.chronicleId,
@@ -276,6 +278,7 @@ export const GET = async (req: NextRequest) => {
         // the real count — the field must never leak that leader notes
         // exist on a case to a member inspecting the response.
         leaderNotesCount: leaderNotesCountMap.get(r.clientId) ?? 0,
+        caseLink: r.caseLink ?? null,
         winSheetLink: r.winSheetLink ?? null,
         winSheetLinkText: r.winSheetLinkText ?? null,
       };
