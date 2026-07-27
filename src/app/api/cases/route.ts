@@ -320,6 +320,7 @@ const createCaseSchema = z.object({
   aljLastName: optionalText,
   assignedTo: optionalText,
   winSheetStatus: optionalText,
+  caseLink: optionalText,
   // Chronicle client id → persisted to user_details so the dashboard can deep
   // link to Chronicle. Blank/absent stays undefined.
   chronicleId: z.preprocess(
@@ -376,6 +377,7 @@ export const POST = async (req: NextRequest) => {
       officeWithJurisdiction: input.officeWithJurisdiction,
       aljFirstName: input.aljFirstName,
       aljLastName: input.aljLastName,
+      caseLink: input.caseLink,
     });
 
     await db.insert(feeRecords).values({
