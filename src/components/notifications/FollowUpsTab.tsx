@@ -13,6 +13,11 @@ const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaL
   { format: "teams",  Icon: LayoutGrid,    label: "Teams",  ariaLabel: "Copy for Microsoft Teams",  title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
+interface DayCount {
+  date: string;
+  count: number;
+}
+
 interface AgentCount {
   name: string;
   count: number;
@@ -48,6 +53,7 @@ const tdBase = "px-3 py-2 text-xs";
 
 export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [days, setDays] = useState<DayCount[]>([]);
   const [agents, setAgents] = useState<AgentCount[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +81,7 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
       })
       .then((json) => {
         if (cancelled) return;
+        setDays(json.days ?? []);
         setAgents(json.agents ?? []);
         setFollowUps(json.followUps ?? []);
       })
@@ -90,8 +97,9 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
     };
   }, [monday]);
 
-  const weekTotal = agents.reduce((s, a) => s + a.count, 0);
-  const maxCount = Math.max(1, ...agents.map((a) => a.count));
+  const weekTotal = days.reduce((s, d) => s + d.count, 0);
+  const maxDayCount = Math.max(1, ...days.map((d) => d.count));
+  const maxAgentCount = Math.max(1, ...agents.map((a) => a.count));
 
   const byDate = followUps.reduce<Record<string, FollowUpRow[]>>((acc, f) => {
     (acc[f.date] ??= []).push(f);
@@ -107,14 +115,17 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
 
   const copyTable = (format: CopyFormat) => {
     const weekLabel = formatWeekLabel(monday);
-    const summaryTitle  = `Follow-Ups Due — ${weekLabel}`;
-    const summaryHeader = ["Agent", "Follow-Ups"];
-    const summaryRows: (string | number)[][] = [
-      ...agents.map((a) => [a.name, a.count]),
-      ["Total", weekTotal],
+    const dailyTitle  = `Follow-Ups Due — ${weekLabel}`;
+    const dailyHeader = ["Day", "Follow-Ups"];
+    const dailyRows: (string | number)[][] = [
+      ...days.map((d) => [fmtDate(d.date), d.count]),
+      ["Week Total", weekTotal],
     ];
-    const listTitle  = `Follow-Up Cases — ${weekLabel}`;
-    const listHeader = ["Date", "Case Name", "Agent", "Source"];
+    const agentTitle  = `By Agent — ${weekLabel}`;
+    const agentHeader = ["Agent", "Follow-Ups"];
+    const agentRows: (string | number)[][] = agents.map((a) => [a.name, a.count]);
+    const listTitle   = `Follow-Up Cases — ${weekLabel}`;
+    const listHeader  = ["Date", "Case Name", "Agent", "Source"];
     const listRows: (string | number)[][] = dates.flatMap((date) =>
       byDate[date].map((f) => [
         fmtDate(date),
@@ -129,20 +140,23 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
       copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
     if (format === "teams") {
-      const html = toTeamsHtml(summaryTitle, summaryHeader, summaryRows) +
-        (listRows.length ? toTeamsHtml(listTitle, listHeader, listRows) : "");
+      const html = toTeamsHtml(dailyTitle, dailyHeader, dailyRows) +
+        (agentRows.length ? toTeamsHtml(agentTitle, agentHeader, agentRows) : "") +
+        (listRows.length  ? toTeamsHtml(listTitle,  listHeader,  listRows)  : "");
       const blob = new Blob([html], { type: "text/html" });
       navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
     } else if (format === "sheets") {
       const lines = [
-        summaryTitle, summaryHeader.join("\t"), ...summaryRows.map((r) => r.join("\t")),
+        dailyTitle, dailyHeader.join("\t"), ...dailyRows.map((r) => r.join("\t")),
         "",
-        ...(listRows.length ? [listTitle, listHeader.join("\t"), ...listRows.map((r) => r.join("\t"))] : []),
+        ...(agentRows.length ? [agentTitle, agentHeader.join("\t"), ...agentRows.map((r) => r.join("\t")), ""] : []),
+        ...(listRows.length  ? [listTitle,  listHeader.join("\t"),  ...listRows.map((r) => r.join("\t"))]  : []),
       ];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
-      const parts = [toChatBlock(summaryTitle, summaryHeader, summaryRows)];
-      if (listRows.length) parts.push(toChatBlock(listTitle, listHeader, listRows));
+      const parts = [toChatBlock(dailyTitle, dailyHeader, dailyRows)];
+      if (agentRows.length) parts.push(toChatBlock(agentTitle, agentHeader, agentRows));
+      if (listRows.length)  parts.push(toChatBlock(listTitle,  listHeader,  listRows));
       navigator.clipboard.writeText(parts.join("\n\n")).then(done);
     }
   };
@@ -159,13 +173,13 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
             <div>
               <h3 className={`text-sm font-bold ${t.text}`}>Follow-Ups Due</h3>
               <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-                {weekTotal > 0 ? `${weekTotal} follow-up${weekTotal !== 1 ? "s" : ""} · ${agents.length} agent${agents.length !== 1 ? "s" : ""} — ` : ""}
+                {weekTotal > 0 ? `${weekTotal} follow-up${weekTotal !== 1 ? "s" : ""} — ` : ""}
                 {formatWeekLabel(monday)}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {!loading && !error && agents.length > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
+            {!loading && !error && weekTotal > 0 && COPY_FORMATS.map(({ format, Icon, label, ariaLabel, title }) => (
               <button
                 key={format}
                 onClick={() => copyTable(format)}
@@ -227,8 +241,55 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
           </div>
         )}
 
-        {/* Per-agent summary table */}
-        {!loading && !error && agents.length > 0 && (
+        {/* Daily summary table */}
+        {!loading && !error && days.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className={`border-b ${t.borderLight}`}>
+                  <th className={`${thBase} ${t.textMuted} text-left`}>Day</th>
+                  <th className={`${thBase} ${t.textMuted} text-right`}>Follow-Ups</th>
+                  <th className={`${thBase} ${t.textMuted} text-left w-1/2`}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {days.map((d) => (
+                  <tr key={d.date} className={`border-b ${rowDivide} ${isToday(d.date) ? todayBg : ""} ${rowHover} transition-colors`}>
+                    <td className={`${tdBase} font-medium ${t.text} whitespace-nowrap`}>
+                      {fmtDate(d.date)}
+                      {isToday(d.date) && (
+                        <span className={`ml-1.5 text-[11px] font-semibold ${dark ? "text-orange-400" : "text-orange-600"}`}>Today</span>
+                      )}
+                    </td>
+                    <td className={`${tdBase} text-right font-semibold tabular-nums ${d.count > 0 ? t.text : t.textMuted}`}>
+                      {d.count > 0 ? d.count : "—"}
+                    </td>
+                    <td className={`${tdBase} w-1/2`}>
+                      <div className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
+                        <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(d.count / maxDayCount) * 100}%` }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
+                  <td className={`${tdBase} font-semibold ${t.text}`}>Week Total</td>
+                  <td className={`${tdBase} text-right font-bold tabular-nums ${t.text}`}>{weekTotal > 0 ? weekTotal : "—"}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Per-agent breakdown */}
+      {!loading && !error && agents.length > 0 && (
+        <div className={`rounded-xl border ${t.card}`}>
+          <div className={`p-4 border-b ${t.borderLight}`}>
+            <h4 className={`text-sm font-bold ${t.text}`}>By Agent — {formatWeekLabel(monday)}</h4>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
@@ -245,7 +306,7 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
                     <td className={`${tdBase} text-right font-semibold tabular-nums ${t.text}`}>{a.count}</td>
                     <td className={`${tdBase} w-1/2`}>
                       <div className={`h-2 rounded-full ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
-                        <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(a.count / maxCount) * 100}%` }} />
+                        <div className={`h-2 rounded-full ${barBg}`} style={{ width: `${(a.count / maxAgentCount) * 100}%` }} />
                       </div>
                     </td>
                   </tr>
@@ -260,8 +321,8 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
               </tfoot>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Per-date case list */}
       {!loading && !error && dates.length > 0 && (

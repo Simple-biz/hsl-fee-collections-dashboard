@@ -68,6 +68,18 @@ export async function GET(req: NextRequest) {
       source: r.source as "master_fees" | "fee_petition",
     }));
 
+    // Per-day counts (Mon–Sun of the requested week)
+    const countByDate = new Map<string, number>();
+    for (const r of rows) countByDate.set(r.follow_up_date, (countByDate.get(r.follow_up_date) ?? 0) + 1);
+    const monday = new Date(`${week}T00:00:00Z`);
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setUTCDate(d.getUTCDate() + i);
+      const date = d.toISOString().split("T")[0];
+      return { date, count: countByDate.get(date) ?? 0 };
+    });
+
+    // Per-agent counts (kept for the detail list)
     const agentMap = new Map<string, number>();
     for (const r of rows) {
       const name = r.assigned_to ?? "Unassigned";
@@ -77,7 +89,7 @@ export async function GET(req: NextRequest) {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
-    return NextResponse.json({ agents, followUps });
+    return NextResponse.json({ days, agents, followUps });
   } catch (error) {
     console.error("GET /api/follow-ups error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
