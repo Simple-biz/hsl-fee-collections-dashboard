@@ -800,6 +800,7 @@ export const FeeRecordsTable = ({
     sortKey,
     sortDir,
     dateRange,
+    mode,
   ]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
