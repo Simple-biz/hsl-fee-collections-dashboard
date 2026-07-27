@@ -36,6 +36,7 @@ interface OverpaidCaseRow {
   id: number;
   claimant: string;
   externalId: string | null;
+  caseLink: string | null;
   assignedTo: string | null;
   region: string | null;
   feesReceived: number;
@@ -718,7 +719,7 @@ export const OverpaidCases = () => {
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = ["Case", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "PIF", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
+      const headers = ["Case", "MyCase Title", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "PIF", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
@@ -728,6 +729,7 @@ export const OverpaidCases = () => {
         ...all.map((r) =>
           [
             escape(r.claimant),
+            escape(r.caseLink ?? ""),
             escape(r.assignedTo ?? ""),
             escape(r.region ?? ""),
             r.feesReceived.toFixed(2),

@@ -40,6 +40,7 @@ const ROW_COLUMNS = {
   firstName: cases.firstName,
   lastName: cases.lastName,
   externalId: cases.externalId,
+  caseLink: cases.caseLink,
   approvalDate: cases.approvalDate,
   claimTypeLabel: cases.claimTypeLabel,
   totalFeesExpected: feeRecords.totalFeesExpected,
@@ -67,6 +68,7 @@ type FeePetitionQueryRow = {
   firstName: string | null;
   lastName: string | null;
   externalId: string | null;
+  caseLink: string | null;
   approvalDate: string | null;
   claimTypeLabel: string | null;
   totalFeesExpected: string | number | null;
@@ -93,6 +95,7 @@ const toFeePetitionRow = (r: FeePetitionQueryRow) => ({
   id: r.clientId,
   claimant: `${r.lastName}, ${r.firstName}`,
   externalId: r.externalId ?? null,
+  caseLink: r.caseLink ?? null,
   approvalDate: r.approvalDate ?? null,
   updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : null,
   feeAmount: r.totalFeesExpected != null ? Number(r.totalFeesExpected) : null,
