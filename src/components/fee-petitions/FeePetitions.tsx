@@ -74,7 +74,7 @@ type CheckboxKey =
   | "ltrToClmtWithSignature"
   | "ltrToAlj"
   | "faxConfFeePet";
-type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress" | "createdAt" | "feesReceived";
+type SortKey = "claimant" | "approvalDate" | "updatedAt" | "progress" | "createdAt" | "feesReceived" | "nextFollowUpDate";
 type SortDir = "asc" | "desc";
 type TouchedFilter = "" | "none";
 type MissingFilter = "" | CheckboxKey;
@@ -83,7 +83,7 @@ type Assignee = { name: string; count: number };
 
 // ---------- helpers ----------
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
-const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt", "feesReceived"];
+const SORT_KEYS: SortKey[] = ["claimant", "approvalDate", "updatedAt", "progress", "createdAt", "feesReceived", "nextFollowUpDate"];
 const CHECKBOX_KEYS = ["timeDelineation", "feePetitionDoc", "ltrToClmt", "ltrToClmtWithSignature", "ltrToAlj", "faxConfFeePet"] as const;
 
 const daysSince = (dateStr: string | null): number | null => {
@@ -1292,7 +1292,18 @@ export const FeePetitions = () => {
                 <th className={`${thBase} ${t.textSub} text-center border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>
                   Fee Petition Approved
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}>Next Follow-Up</th>
+                <th
+                  aria-sort={ariaSortFor("nextFollowUpDate")}
+                  className={`${thBase} ${t.textSub} text-left border-l ${t.borderLight} sticky top-0 z-20 ${stickyHeaderBg}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("nextFollowUpDate")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Next Follow-Up {sortIcon("nextFollowUpDate")}
+                  </button>
+                </th>
                 <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>Recent Update</th>
                 <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>Logs</th>
               </tr>
