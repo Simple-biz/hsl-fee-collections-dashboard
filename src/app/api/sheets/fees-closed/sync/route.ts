@@ -124,18 +124,31 @@ export const POST = async (req: NextRequest) => {
     const { rows: parsed, warnings } = mapFeesClosedRows(rawRows);
 
     // Resolve IDs: prefer CASE NAME_url; fall back to mirror DB by name.
-    // Normalize whitespace so minor formatting differences don't cause silent misses.
-    const normName = (s: string) => s.trim().replace(/\s+/g, " ");
-    const noUrlNames = parsed.filter((r) => r.myCaseId == null).map((r) => r.caseName);
-    const mirrorRows = noUrlNames.length > 0
+    // The sheet's CASE NAME and the mirror's `name` column are both raw case
+    // captions ("YYYY.MM.DD Lastname, Firstname v. ALJ ..."), so a raw string
+    // equality check breaks on any date/annotation drift between the two. Parse
+    // both sides down to {lastName, firstName} and match on that instead.
+    const nameKey = (s: string) => {
+      const { firstName, lastName } = parseCaseLink(s);
+      return `${lastName.trim().toLowerCase()}|${firstName.trim().toLowerCase()}`;
+    };
+    const noUrlLastNames = Array.from(
+      new Set(
+        parsed
+          .filter((r) => r.myCaseId == null)
+          .map((r) => parseCaseLink(r.caseName).lastName)
+          .filter((n) => n.length > 0),
+      ),
+    );
+    const mirrorRows = noUrlLastNames.length > 0
       ? await myCaseDb<{ id: string | number; name: string }[]>`
-          SELECT id, TRIM(name) AS name FROM cases WHERE TRIM(name) = ANY(${noUrlNames.map(normName)})
+          SELECT id, name FROM cases WHERE name ILIKE ANY(${noUrlLastNames.map((n) => `%${n}%`)})
         `.catch(() => [] as { id: string | number; name: string }[])
       : [];
-    const mirrorMap = new Map(mirrorRows.map((r) => [normName(r.name), Number(r.id)]));
+    const mirrorMap = new Map(mirrorRows.map((r) => [nameKey(r.name), Number(r.id)]));
 
     const resolveId = (r: ParsedFeesClosedRow): number | null =>
-      r.myCaseId ?? mirrorMap.get(normName(r.caseName)) ?? null;
+      r.myCaseId ?? mirrorMap.get(nameKey(r.caseName)) ?? null;
 
     // matchedInDb = already has a closed feeRecord in the local DB.
     const resolvedIds = parsed.map(resolveId).filter((id): id is number => id !== null);
