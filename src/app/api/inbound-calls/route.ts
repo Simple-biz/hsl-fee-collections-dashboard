@@ -4,6 +4,7 @@ import { inboundCallRecords } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { auth } from "@/auth";
 import { z } from "zod";
+import { getMondayOfDate } from "@/lib/formatters";
 
 // GET /api/inbound-calls?week=YYYY-MM-DD&sort=createdAt|callDate
 export const GET = async (req: NextRequest) => {
@@ -28,6 +29,7 @@ export const GET = async (req: NextRequest) => {
 
     const data = rows.map((r) => ({
       id: r.id,
+      weekStart: r.weekStart,
       callDate: r.callDate,
       createdAt: r.createdAt.toISOString(),
       number: r.number ?? "",
@@ -44,8 +46,10 @@ export const GET = async (req: NextRequest) => {
   }
 };
 
+// weekStart is intentionally absent — it is always derived from callDate so a
+// record can never be filed under a week its date doesn't fall in. Extra keys
+// are stripped by Zod, so callers still sending weekStart are unaffected.
 const createSchema = z.object({
-  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   callDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   number: z.string().max(50).optional(),
   transcript: z.string().optional(),
@@ -66,12 +70,12 @@ export const POST = async (req: NextRequest) => {
       return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
     }
 
-    const { weekStart, callDate, number, transcript, caseLink, specialistAssigned, calledBackResolved } = parsed.data;
+    const { callDate, number, transcript, caseLink, specialistAssigned, calledBackResolved } = parsed.data;
 
     const [row] = await db
       .insert(inboundCallRecords)
       .values({
-        weekStart,
+        weekStart: getMondayOfDate(callDate),
         callDate,
         number: number ?? null,
         transcript: transcript ?? null,
@@ -83,6 +87,7 @@ export const POST = async (req: NextRequest) => {
 
     return NextResponse.json({
       id: row.id,
+      weekStart: row.weekStart,
       callDate: row.callDate,
       createdAt: row.createdAt.toISOString(),
       number: row.number ?? "",
