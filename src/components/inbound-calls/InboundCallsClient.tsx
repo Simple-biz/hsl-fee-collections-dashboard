@@ -348,6 +348,17 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     const pendingTick = savedTimerRef.current.get(key);
     if (pendingTick) clearTimeout(pendingTick);
     setFieldState((s) => ({ ...s, [key]: "saving" }));
+
+    // The target week is `getMondayOfDate(callDate)` — the same rule the server
+    // applies — so it can be resolved here and the row moved immediately rather
+    // than after a round trip. The catch below refetches if the write fails.
+    const movedTo =
+      field === "callDate" && typeof value === "string" ? getMondayOfDate(value) : null;
+    if (movedTo && movedTo !== selectedWeek) {
+      setRecords((prev) => prev.filter((r) => r.id !== id));
+      toast.success(`Call moved to ${weekLabel(movedTo)}`);
+    }
+
     try {
       const res = await fetch(`/api/inbound-calls/${id}`, {
         method: "PATCH",
@@ -356,10 +367,6 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
-      // The server re-files a record into the week its call date falls in, so a
-      // date edit can move the row out of the week on screen.
-      const movedTo =
-        field === "callDate" ? ((await res.json()) as CallRecord).weekStart : null;
 
       setFieldState((s) => ({ ...s, [key]: "saved" }));
       setLiveMessage("Change saved");
@@ -368,11 +375,6 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
         savedTimerRef.current.delete(key);
       }, SAVED_TICK_MS);
       savedTimerRef.current.set(key, timer);
-
-      if (movedTo && movedTo !== selectedWeek && !fetchCancelledRef.current) {
-        setRecords((prev) => prev.filter((r) => r.id !== id));
-        toast.success(`Call moved to ${weekLabel(movedTo)}`);
-      }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setFieldState((s) => ({ ...s, [key]: undefined }));
@@ -446,6 +448,20 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   const inputCls = `w-full text-xs bg-transparent border-0 outline-none focus:ring-1 focus:ring-blue-500 rounded px-1.5 py-1 ${t.text} placeholder:${t.textMuted}`;
   const thCls = `px-3 py-2.5 text-left text-[13px] font-semibold uppercase tracking-wider ${t.textMuted} whitespace-nowrap`;
   const tdCls = `px-2 py-1.5 align-top`;
+
+  // Ring the field that is being saved, then flash it green. A 12px icon beside
+  // a narrow column is too easy to miss — outlining the field the user just
+  // touched puts the feedback where they are already looking.
+  const fieldCls = (id: number, field: string) => {
+    const state = fieldState[fieldKey(id, field)];
+    const ring =
+      state === "saving"
+        ? "ring-1 ring-blue-400"
+        : state === "saved"
+          ? "ring-1 ring-emerald-400"
+          : "";
+    return `${inputCls} disabled:opacity-50 disabled:cursor-default ${ring}`;
+  };
 
   // ── render ─────────────────────────────────────────────────────────────────
 
@@ -705,7 +721,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           value={row.callDate}
                           onChange={(e) => handleFieldChange(row.id, "callDate", e.target.value)}
                           onBlur={(e) => updateRecord(row.id, "callDate", e.target.value)}
-                          className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
+                          className={fieldCls(row.id, "callDate")}
                         />
                         <SaveStatus state={fieldState[fieldKey(row.id, "callDate")]} />
                       </div>
@@ -719,7 +735,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           placeholder="Phone number"
                           onChange={(e) => handleFieldChange(row.id, "number", e.target.value)}
                           onBlur={(e) => updateRecord(row.id, "number", e.target.value || null)}
-                          className={`${inputCls} disabled:opacity-50 disabled:cursor-default`}
+                          className={fieldCls(row.id, "number")}
                         />
                         <SaveStatus state={fieldState[fieldKey(row.id, "number")]} />
                       </div>
@@ -733,7 +749,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           rows={2}
                           onChange={(e) => handleFieldChange(row.id, "transcript", e.target.value)}
                           onBlur={(e) => updateRecord(row.id, "transcript", e.target.value || null)}
-                          className={`${inputCls} resize-none disabled:opacity-50 disabled:cursor-default`}
+                          className={`${fieldCls(row.id, "transcript")} resize-none`}
                         />
                         <span className="mt-1.5">
                           <SaveStatus state={fieldState[fieldKey(row.id, "transcript")]} />
@@ -749,7 +765,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                           placeholder="URL or case ID"
                           onChange={(e) => handleFieldChange(row.id, "caseLink", e.target.value)}
                           onBlur={(e) => updateRecord(row.id, "caseLink", e.target.value || null)}
-                          className={`${inputCls} disabled:opacity-50 disabled:cursor-default flex-1 min-w-0`}
+                          className={`${fieldCls(row.id, "caseLink")} flex-1 min-w-0`}
                         />
                         {row.caseLink.trim() && (
                           <a
@@ -775,7 +791,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                             handleFieldChange(row.id, "specialistAssigned", e.target.value);
                             updateRecord(row.id, "specialistAssigned", e.target.value || null);
                           }}
-                          className={`${inputCls} cursor-pointer disabled:opacity-50 disabled:cursor-default`}
+                          className={`${fieldCls(row.id, "specialistAssigned")} cursor-pointer`}
                         >
                           <option value="">— Assign —</option>
                           {/* POC = Point of Contact — non-agent assignment for general inbound tracking */}
