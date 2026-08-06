@@ -29,6 +29,17 @@ const nextWeek = () => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 };
 
+/** A weekday in the current week that is not the record's own call date. */
+const sameWeekOtherDay = () => {
+  const [y, m, d] = thisWeek().split("-").map(Number);
+  for (let offset = 1; offset <= 4; offset++) {
+    const dt = new Date(y, m - 1, d + offset);
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    if (iso !== todayIso()) return iso;
+  }
+  throw new Error("no alternative weekday found in the current week");
+};
+
 const RECORD = () => ({
   id: 1,
   weekStart: thisWeek(),
@@ -140,21 +151,39 @@ describe("InboundCallsClient inline save feedback", () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("moves the row out of view as soon as its date lands in another week", async () => {
+  it("saves a picked date immediately, without waiting for the field to lose focus", async () => {
     const { container } = render(<InboundCallsClient teamMembers={["Hunter"]} />);
     await screen.findByDisplayValue("555-0100");
 
     const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
     const moved = nextWeek();
 
+    // change only — no blur, mirroring picking a date and not clicking away
     fireEvent.change(dateInput, { target: { value: moved } });
-    fireEvent.blur(dateInput);
 
+    await waitFor(() => expect(patchStarted).toEqual([JSON.stringify({ callDate: moved })]));
     // optimistic: gone before the round trip resolves
-    await waitFor(() => expect(screen.queryByDisplayValue("555-0100")).toBeNull());
+    expect(screen.queryByDisplayValue("555-0100")).toBeNull();
     expect(toastSuccess).toHaveBeenCalledWith(expect.stringContaining("moved to"));
 
     releasePatch();
+  });
+
+  it("does not write twice when a blur follows a change that already saved", async () => {
+    const { container } = render(<InboundCallsClient teamMembers={["Hunter"]} />);
+    await screen.findByDisplayValue("555-0100");
+
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    // A day inside the current week, so the row stays mounted and its blur
+    // handler still runs — otherwise the optimistic removal hides the duplicate.
+    const sameWeek = sameWeekOtherDay();
+
+    fireEvent.change(dateInput, { target: { value: sameWeek } });
+    fireEvent.blur(dateInput);
+    releasePatch();
+
+    await waitFor(() => expect(patchStarted).toHaveLength(1));
+    expect(patchStarted).toEqual([JSON.stringify({ callDate: sameWeek })]);
   });
 
   it("refuses a part-typed date instead of sending one the server will reject", async () => {

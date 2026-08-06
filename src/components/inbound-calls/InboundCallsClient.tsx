@@ -185,6 +185,9 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   const pocSaveControllerRef = useRef<AbortController | null>(null);
   const patchAbortRef = useRef<Map<string, AbortController>>(new Map());
   const savedTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Last value sent for each field, so a blur straight after a change-triggered
+  // save doesn't fire a second, identical write.
+  const lastSentRef = useRef<Map<string, string | boolean | null>>(new Map());
   const fetchCancelledRef = useRef(false);
 
   // ── fetch available weeks ───────────────────────────────────────────────────
@@ -339,6 +342,11 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
     }
 
     const key = fieldKey(id, field);
+    // Nothing changed since the last write for this field — most often a blur
+    // arriving right behind a change that already saved.
+    if (lastSentRef.current.get(key) === value) return;
+    lastSentRef.current.set(key, value);
+
     // Abort only a previous save of the SAME field. Keying by row id alone made
     // tabbing to the next field cancel the one before it, and the row kept the
     // typed value locally — so a lost edit still looked saved.
@@ -377,6 +385,8 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
       savedTimerRef.current.set(key, timer);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
+      // Failed, so this value is not what the server holds — let a retry through.
+      lastSentRef.current.delete(key);
       setFieldState((s) => ({ ...s, [key]: undefined }));
       setLiveMessage("Save failed");
       toast.error((err as Error).message);
@@ -719,7 +729,15 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                         <input
                           type="date"
                           value={row.callDate}
-                          onChange={(e) => handleFieldChange(row.id, "callDate", e.target.value)}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            handleFieldChange(row.id, "callDate", next);
+                            // A date picker emits a complete value on selection, so
+                            // save straight away. Waiting for blur left the user
+                            // looking at an unsaved date with nothing happening.
+                            // Part-typed values are ignored here and caught on blur.
+                            if (ISO_DATE.test(next)) updateRecord(row.id, "callDate", next);
+                          }}
                           onBlur={(e) => updateRecord(row.id, "callDate", e.target.value)}
                           className={fieldCls(row.id, "callDate")}
                         />
