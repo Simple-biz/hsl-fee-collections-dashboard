@@ -4,6 +4,7 @@ import { inboundCallRecords } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { z } from "zod";
+import { getMondayOfDate } from "@/lib/formatters";
 
 const resolveId = async (context: {
   params: { id: string } | Promise<{ id: string }>;
@@ -40,6 +41,12 @@ export const PATCH = async (
     }
 
     const updates: Record<string, unknown> = { ...parsed.data };
+    // A record belongs to the week of its call date. Keep week_start in sync so
+    // editing the date re-files the row into that week's table — same rule the
+    // CSV importer already applies on insert.
+    if (parsed.data.callDate) {
+      updates.weekStart = getMondayOfDate(parsed.data.callDate);
+    }
     updates.updatedAt = sql`now()`;
 
     const [row] = await db
@@ -52,6 +59,7 @@ export const PATCH = async (
 
     return NextResponse.json({
       id: row.id,
+      weekStart: row.weekStart,
       callDate: row.callDate,
       createdAt: row.createdAt.toISOString(),
       number: row.number ?? "",

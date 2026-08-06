@@ -20,6 +20,7 @@ import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportMod
 import { bulkImportInboundCalls } from "@/app/(dashboard)/inbound-calls/actions";
 import { parseBool, parseDate } from "@/lib/import/csv-parser";
 import { getMondayOfDate } from "@/lib/formatters";
+import { toast } from "sonner";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,17 @@ function isCurrentWeek(weekStart: string): boolean {
   return weekStart === currentWeekStart();
 }
 
+function isFutureWeek(weekStart: string): boolean {
+  return weekStart > currentWeekStart();
+}
+
+// Weeks offered in the picker. Upcoming weeks are included so the POC schedule
+// can be set ahead of time.
+const UPCOMING_WEEKS = 4;
+const PAST_WEEKS = 7;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 const DAYS = [
   { num: 1, label: "Monday" },
   { num: 2, label: "Tuesday" },
@@ -74,6 +86,7 @@ const DAYS = [
 
 interface CallRecord {
   id: number;
+  weekStart: string;
   callDate: string;
   createdAt: string;
   number: string;
@@ -161,8 +174,8 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   useEffect(() => {
     const cur = currentWeekStart();
     const weeks: string[] = [];
-    for (let i = 0; i < 8; i++) {
-      weeks.push(addWeeks(cur, -i));
+    for (let i = UPCOMING_WEEKS; i >= -PAST_WEEKS; i--) {
+      weeks.push(addWeeks(cur, i));
     }
     setAvailableWeeks(weeks);
   }, []);
@@ -214,6 +227,11 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   useEffect(() => {
     fetchCancelledRef.current = false;
     setPendingDelete(null);
+    // Leave POC edit mode on week change — the draft belongs to the week it was
+    // opened from, and saving it against a different week would wipe that week's
+    // roster (the PUT replaces all assignments for the week).
+    setPocEditMode(false);
+    setPocError(null);
     fetchPoc(selectedWeek);
     fetchRecords(selectedWeek, sortField);
     const patchAborts = patchAbortRef.current;
@@ -271,6 +289,14 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
   // ── record field update ────────────────────────────────────────────────────
 
   const updateRecord = async (id: number, field: string, value: string | boolean | null) => {
+    // A part-typed date input blurs as "" — sending it would 400 and leave the
+    // row displaying a value the server never accepted.
+    if (field === "callDate" && (typeof value !== "string" || !ISO_DATE.test(value))) {
+      toast.error("Enter a complete date before leaving the field");
+      void fetchRecords(selectedWeek, sortField);
+      return;
+    }
+
     patchAbortRef.current.get(id)?.abort();
     const controller = new AbortController();
     patchAbortRef.current.set(id, controller);
@@ -283,8 +309,24 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      // The server re-files a record into the week its call date falls in, so a
+      // date edit can move the row out of the week on screen.
+      if (field === "callDate") {
+        const saved: CallRecord = await res.json();
+        if (fetchCancelledRef.current) return;
+        if (saved.weekStart !== selectedWeek) {
+          setRecords((prev) => prev.filter((r) => r.id !== id));
+          toast.success(`Call moved to ${weekLabel(saved.weekStart)}`);
+        }
+      }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
+      if (field === "callDate") {
+        // Don't leave a date on screen that isn't in the database.
+        toast.error((err as Error).message);
+        void fetchRecords(selectedWeek, sortField);
+        return;
+      }
       // silently fail — row stays with local edit
     } finally {
       if (patchAbortRef.current.get(id) === controller) {
@@ -312,8 +354,9 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          weekStart: selectedWeek,
-          callDate: todayEasternIso(),
+          // The week is derived from this date server-side. Only "today" belongs
+          // in the current week — any other week gets its own Monday.
+          callDate: isCurrentWeek(selectedWeek) ? todayEasternIso() : selectedWeek,
         }),
         signal: controller.signal,
       });
@@ -399,10 +442,15 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                 This week
               </span>
             )}
+            {isFutureWeek(selectedWeek) && (
+              <span className={`text-[12px] px-1.5 py-0.5 rounded-full ${dark ? "bg-amber-900/50 text-amber-300" : "bg-amber-100 text-amber-700"}`}>
+                Upcoming
+              </span>
+            )}
             <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 opacity-60" />
           </button>
           {weekMenuOpen && (
-            <div className={`absolute right-0 mt-1 z-20 w-52 rounded-xl border shadow-lg overflow-hidden ${dark ? "bg-neutral-800 border-neutral-700" : "bg-white border-neutral-200"}`}>
+            <div className={`absolute right-0 mt-1 z-20 w-52 max-h-72 overflow-y-auto rounded-xl border shadow-lg ${dark ? "bg-neutral-800 border-neutral-700" : "bg-white border-neutral-200"}`}>
               {availableWeeks.map((w) => (
                 <button
                   key={w}
@@ -415,6 +463,7 @@ export function InboundCallsClient({ teamMembers }: { teamMembers: string[] }) {
                 >
                   <span>{weekLabel(w)}</span>
                   {isCurrentWeek(w) && <span className={`text-[12px] ${dark ? "text-blue-400" : "text-blue-500"}`}>Now</span>}
+                  {isFutureWeek(w) && <span className={`text-[12px] ${dark ? "text-amber-400" : "text-amber-600"}`}>Upcoming</span>}
                 </button>
               ))}
             </div>
