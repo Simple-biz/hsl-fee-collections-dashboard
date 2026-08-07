@@ -34,7 +34,11 @@ import {
   ScoreboardSummaryCards,
   ScoreboardSummary,
   ScoreboardTeam,
+  type TeamWindowMode,
 } from "@/components/scoreboard/ScoreboardSummaryCards";
+
+// Start of the "All Time" window — earlier than any record in the system.
+const ALL_TIME_START = "2000-01-01";
 
 // ---------- types ----------
 
@@ -424,6 +428,38 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     return { query: `week=${monday}`, ready: true };
   })();
 
+  // The By Team toggle drives the page window rather than a separate fees-only
+  // period, so its highlight has to be derived from the window actually in
+  // effect — null when that window is something no preset describes.
+  const teamWindowMode: TeamWindowMode | null =
+    dateMode === "day" && daySel === todayEt
+      ? "today"
+      : dateMode === "week" && weekOffset === 0
+        ? "week"
+        : dateMode === "month" && monthSel === nowForInit.getMonth() && yearSel === nowForInit.getFullYear()
+          ? "month"
+          : dateMode === "range" && rangeFrom === ALL_TIME_START && rangeTo === todayEt
+            ? "alltime"
+            : null;
+
+  const changeTeamWindow = (mode: TeamWindowMode) => {
+    if (mode === "today") {
+      setDaySel(todayEt);
+      changeDateMode("day");
+    } else if (mode === "week") {
+      setWeekOffset(0);
+      changeDateMode("week");
+    } else if (mode === "month") {
+      setMonthSel(nowForInit.getMonth());
+      setYearSel(nowForInit.getFullYear());
+      changeDateMode("month");
+    } else {
+      setRangeFrom(ALL_TIME_START);
+      setRangeTo(todayEt);
+      changeDateMode("range");
+    }
+  };
+
   const windowLabel =
     dateMode === "day"
       ? daySel
@@ -686,6 +722,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             dark={dark}
             t={t}
             showMiniCards={false}
+            windowMode={teamWindowMode}
+            onWindowChange={changeTeamWindow}
           />
         </div>
       )}

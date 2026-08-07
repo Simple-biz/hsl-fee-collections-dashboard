@@ -46,6 +46,17 @@ export interface ScoreboardTeam {
   clientCalls: number;
 }
 
+// Presets offered by the By Team window toggle. They map onto the page's own
+// date window — the toggle scopes every tile on the card, not just the fees.
+export type TeamWindowMode = "today" | "week" | "month" | "alltime";
+
+const TEAM_WINDOW_LABELS: Record<TeamWindowMode, string> = {
+  today: "Today",
+  week: "Week",
+  month: "Month",
+  alltime: "All Time",
+};
+
 interface ScoreboardSummaryCardsProps {
   summary: ScoreboardSummary;
   teams: ScoreboardTeam[];
@@ -53,6 +64,10 @@ interface ScoreboardSummaryCardsProps {
   dark: boolean;
   t: ReturnType<typeof themeClasses>;
   showMiniCards?: boolean;
+  /** Which preset the page's current window matches, or null for a custom one
+   *  (an arbitrary range, or any week/month other than the current). */
+  windowMode: TeamWindowMode | null;
+  onWindowChange: (mode: TeamWindowMode) => void;
 }
 
 export function ScoreboardSummaryCards({
@@ -62,11 +77,12 @@ export function ScoreboardSummaryCards({
   dark,
   t,
   showMiniCards = true,
+  windowMode,
+  onWindowChange,
 }: ScoreboardSummaryCardsProps) {
   const [t2Days, setT2Days] = useState<60 | 90>(60);
   const [t16Days, setT16Days] = useState<60 | 90>(60);
   const [concDays, setConcDays] = useState<60 | 90>(60);
-  const [teamFeeMode, setTeamFeeMode] = useState<"today" | "week" | "month" | "alltime">("week");
   const [byTeamCopied, setByTeamCopied] = useState<"sheets" | "chat" | "teams" | null>(null);
   const byTeamCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,23 +90,19 @@ export function ScoreboardSummaryCards({
     if (byTeamCopyTimerRef.current) clearTimeout(byTeamCopyTimerRef.current);
   }, []);
 
+  // Every tile on the card covers the page window, so the fees figure is the
+  // window-scoped total rather than a separately chosen period.
+  const feesLabel = windowMode
+    ? { today: "Fees Today", week: "Fees This Week", month: "Fees This Month", alltime: "Fees All Time" }[windowMode]
+    : "Fees";
+
   const copyByTeam = (format: "sheets" | "chat" | "teams") => {
-    const feeModeLabel: Record<typeof teamFeeMode, string> = {
-      today: "Fees Today",
-      week:  "Fees This Week",
-      month: "Fees This Month",
-      alltime: "Fees All Time",
-    };
-    const feeCol = format === "sheets" ? feeModeLabel[teamFeeMode] : "Collected";
+    const feeCol = format === "sheets" ? feesLabel : "Collected";
     const header = format === "sheets"
       ? ["Team", "Agents", feeCol, "SSA Calls", "CL Calls", "Win Sheets", "Cases Closed", "Open Cases"]
       : ["Team", "Agents", feeCol, "SSA", "CL Calls", "Wins", "Closed", "Open"];
     const rows = teams.map((team) => {
-      const feeValue =
-        teamFeeMode === "today"   ? team.feesToday :
-        teamFeeMode === "week"    ? team.feesThisWeek :
-        teamFeeMode === "month"   ? team.feesThisMonth :
-        team.totalCollected;
+      const feeValue = team.feesCollectedInWindow;
       return [
         teamLabel(team.team),
         team.agentCount,
@@ -204,18 +216,17 @@ export function ScoreboardSummaryCards({
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className={`text-[12px] font-semibold uppercase tracking-wider ${t.textMuted}`}>
-              By Team
+              By Team — <span className="normal-case">{label}</span>
             </p>
             <div className="flex items-center gap-2">
-              {/* Fees Collected window toggle */}
+              {/* Window toggle — scopes every tile on the card, not just fees */}
               <div className={`flex items-center rounded-md border overflow-hidden text-[11px] font-semibold ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
                 {(["today", "week", "month", "alltime"] as const).map((mode) => {
-                  const labels = { today: "Today", week: "Week", month: "Month", alltime: "All Time" };
-                  const active = teamFeeMode === mode;
+                  const active = windowMode === mode;
                   return (
                     <button
                       key={mode}
-                      onClick={() => setTeamFeeMode(mode)}
+                      onClick={() => onWindowChange(mode)}
                       aria-pressed={active}
                       className={`px-2.5 py-1 transition-colors ${
                         active
@@ -223,7 +234,7 @@ export function ScoreboardSummaryCards({
                           : dark ? "text-neutral-400 hover:bg-neutral-800" : "text-neutral-500 hover:bg-neutral-50"
                       }`}
                     >
-                      {labels[mode]}
+                      {TEAM_WINDOW_LABELS[mode]}
                     </button>
                   );
                 })}
@@ -268,16 +279,7 @@ export function ScoreboardSummaryCards({
             {teams.map((team) => {
               const teamColor = teamCardClasses(team.team, dark);
               const accentText = teamAccentText(team.team, dark);
-              const feesValue =
-                teamFeeMode === "today"   ? team.feesToday :
-                teamFeeMode === "week"    ? team.feesThisWeek :
-                teamFeeMode === "month"   ? team.feesThisMonth :
-                team.totalCollected;
-              const feesLabel =
-                teamFeeMode === "today"   ? "Fees Today" :
-                teamFeeMode === "week"    ? "Fees This Week" :
-                teamFeeMode === "month"   ? "Fees This Month" :
-                "Fees All Time";
+              const feesValue = team.feesCollectedInWindow;
               return (
                 <div key={team.team} className={`rounded-lg border p-4 ${teamColor}`}>
                   <div className="flex items-center justify-between mb-3">
