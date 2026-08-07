@@ -724,6 +724,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             showMiniCards={false}
             windowMode={teamWindowMode}
             onWindowChange={changeTeamWindow}
+            loading={loading}
           />
         </div>
       )}

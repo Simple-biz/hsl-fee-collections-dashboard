@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Check, Table2, MessageSquare, LayoutGrid } from "lucide-react";
+import { Check, Table2, MessageSquare, LayoutGrid, RefreshCw } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, toChatBlock, toTeamsHtml } from "@/lib/formatters";
 import { teamCardClasses, teamAccentText, teamLabel } from "@/lib/team-colors";
@@ -68,6 +68,8 @@ interface ScoreboardSummaryCardsProps {
    *  (an arbitrary range, or any week/month other than the current). */
   windowMode: TeamWindowMode | null;
   onWindowChange: (mode: TeamWindowMode) => void;
+  /** A refetch is in flight — the figures on screen are the previous window's. */
+  loading?: boolean;
 }
 
 export function ScoreboardSummaryCards({
@@ -79,6 +81,7 @@ export function ScoreboardSummaryCards({
   showMiniCards = true,
   windowMode,
   onWindowChange,
+  loading = false,
 }: ScoreboardSummaryCardsProps) {
   const [t2Days, setT2Days] = useState<60 | 90>(60);
   const [t16Days, setT16Days] = useState<60 | 90>(60);
@@ -219,6 +222,13 @@ export function ScoreboardSummaryCards({
               By Team — <span className="normal-case">{label}</span>
             </p>
             <div className="flex items-center gap-2">
+              {/* Sits beside the toggle so the feedback lands where the click did */}
+              {loading && (
+                <span className={`flex items-center gap-1.5 text-[11px] ${t.textMuted}`}>
+                  <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />
+                  Updating…
+                </span>
+              )}
               {/* Window toggle — scopes every tile on the card, not just fees */}
               <div className={`flex items-center rounded-md border overflow-hidden text-[11px] font-semibold ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
                 {(["today", "week", "month", "alltime"] as const).map((mode) => {
@@ -275,7 +285,12 @@ export function ScoreboardSummaryCards({
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Figures stay on screen while a new window loads, dimmed so it is
+              clear they are the previous window's rather than the new one's. */}
+          <div
+            aria-busy={loading}
+            className={`grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity ${loading ? "opacity-50" : ""}`}
+          >
             {teams.map((team) => {
               const teamColor = teamCardClasses(team.team, dark);
               const accentText = teamAccentText(team.team, dark);

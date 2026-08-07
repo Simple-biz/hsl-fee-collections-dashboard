@@ -92,3 +92,44 @@ describe("ScoreboardSummaryCards — By Team window", () => {
     expect(screen.getByText(/By Team/).textContent).toContain("Fri Aug 7");
   });
 });
+
+describe("ScoreboardSummaryCards — refetch feedback", () => {
+  afterEach(cleanup);
+
+  it("says it is updating and marks the figures busy while a window loads", () => {
+    render(
+      <ScoreboardSummaryCards
+        summary={SUMMARY} teams={[T2]} label="Week" dark={false}
+        t={themeClasses(false)} showMiniCards={false}
+        windowMode="week" onWindowChange={vi.fn()} loading
+      />,
+    );
+    expect(screen.getByText(/Updating/)).toBeTruthy();
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  });
+
+  it("keeps the previous figures on screen rather than blanking them", () => {
+    render(
+      <ScoreboardSummaryCards
+        summary={SUMMARY} teams={[T2]} label="Week" dark={false}
+        t={themeClasses(false)} showMiniCards={false}
+        windowMode="week" onWindowChange={vi.fn()} loading
+      />,
+    );
+    // 174 open cases is still readable mid-refetch — a spinner replacing the
+    // cards would make them jump on every toggle click.
+    expect(screen.getByText("174")).toBeTruthy();
+  });
+
+  it("shows no updating hint when idle", () => {
+    render(
+      <ScoreboardSummaryCards
+        summary={SUMMARY} teams={[T2]} label="Week" dark={false}
+        t={themeClasses(false)} showMiniCards={false}
+        windowMode="week" onWindowChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText(/Updating/)).toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+});

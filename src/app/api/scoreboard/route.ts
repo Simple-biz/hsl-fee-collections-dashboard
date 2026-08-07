@@ -79,7 +79,11 @@ export const GET = async (req: NextRequest) => {
     // per-payment row at all, so it's treated as a single "legacy" payment
     // dated by the fee_records received-date column, sized as whatever part
     // of the lifetime total isn't already accounted for by real ledger rows.
-    const teamTotals = await db.execute(sql`
+    // The four queries below are mutually independent — none reads another's
+    // result — so they are started together and awaited as one batch. Run in
+    // series they cost four network round trips to the database, which
+    // dominated the response time far more than the SQL itself did.
+    const teamTotalsPromise = db.execute(sql`
       WITH payment_sums AS (
         SELECT case_id, fee_type, SUM(amount::numeric) AS paid_sum
         FROM fee_payments
@@ -339,7 +343,7 @@ export const GET = async (req: NextRequest) => {
     `);
 
     // Daily breakdown for the window (from daily_metrics)
-    const dailyBreakdown = await db.execute(sql`
+    const dailyBreakdownPromise = db.execute(sql`
       SELECT
         dm.agent_name AS agent,
         dm.metric_date AS date,
@@ -354,6 +358,49 @@ export const GET = async (req: NextRequest) => {
         AND dm.metric_date < ${endExclusive}::date
       ORDER BY dm.agent_name, dm.metric_date
     `);
+
+    // "No fees" = zero dollars received — same predicate as the "Unpaid
+    // >60d/>90d" aging filter on the Master Fees page, which the team
+    // validated as the accurate definition. Kept identical to the aging
+    // query below so this card and the aging buckets can never disagree
+    // (the buckets are always a subset of this total).
+    const feesStatusPromise = db.execute(sql`
+      SELECT COUNT(*) FILTER (
+        WHERE COALESCE(total_fees_paid, 0) = 0
+      )::int AS no_fees_count
+      FROM fee_records
+      WHERE is_closed = false
+    `);
+
+    // No Fees Cases aging — same predicate as openCasesFeesStatus.noFees
+    // above (zero dollars received), aged over 60 days by approval_date.
+    const noFeesCasesPromise = db.execute(sql`
+      SELECT
+        c.client_id AS id,
+        c.first_name AS first_name,
+        c.last_name AS last_name,
+        c.external_id AS external_id,
+        fr.assigned_to AS assigned,
+        c.level_won AS level_won,
+        c.claim_type_label AS claim_type_label,
+        c.approval_date AS approval_date,
+        (CURRENT_DATE - c.approval_date)::int AS days_since_approval,
+        (fr.case_status = 'FEE PETITION APPROVED') AS fee_petition_approved
+      FROM fee_records fr
+      JOIN cases c ON c.client_id = fr.case_id
+      WHERE fr.is_closed = FALSE
+        AND COALESCE(fr.total_fees_paid, 0) = 0
+        AND c.approval_date IS NOT NULL
+        AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
+      ORDER BY c.approval_date ASC
+    `);
+
+    const [teamTotals, dailyBreakdown, feesStatusRows, noFeesCaseRows] = await Promise.all([
+      teamTotalsPromise,
+      dailyBreakdownPromise,
+      feesStatusPromise,
+      noFeesCasesPromise,
+    ]);
 
     const agents = (teamTotals as Record<string, string | number | null>[]).map(
       (r) => ({
@@ -455,18 +502,7 @@ export const GET = async (req: NextRequest) => {
       }),
     );
 
-    // "No fees" = zero dollars received — same predicate as the "Unpaid
-    // >60d/>90d" aging filter on the Master Fees page, which the team
-    // validated as the accurate definition. Kept identical to the aging
-    // query below so this card and the aging buckets can never disagree
-    // (the buckets are always a subset of this total).
-    const [feesStatus] = await db.execute(sql`
-      SELECT COUNT(*) FILTER (
-        WHERE COALESCE(total_fees_paid, 0) = 0
-      )::int AS no_fees_count
-      FROM fee_records
-      WHERE is_closed = false
-    `) as unknown as [{ no_fees_count: number }];
+    const [feesStatus] = feesStatusRows as unknown as [{ no_fees_count: number }];
 
     const openCasesFeesStatus = {
       noFees: Number(feesStatus?.no_fees_count) || 0,
@@ -474,26 +510,7 @@ export const GET = async (req: NextRequest) => {
 
     // No Fees Cases aging — same predicate as openCasesFeesStatus.noFees
     // above (zero dollars received), aged over 60 days by approval_date.
-    const noFeesCaseRows = await db.execute(sql`
-      SELECT
-        c.client_id AS id,
-        c.first_name AS first_name,
-        c.last_name AS last_name,
-        c.external_id AS external_id,
-        fr.assigned_to AS assigned,
-        c.level_won AS level_won,
-        c.claim_type_label AS claim_type_label,
-        c.approval_date AS approval_date,
-        (CURRENT_DATE - c.approval_date)::int AS days_since_approval,
-        (fr.case_status = 'FEE PETITION APPROVED') AS fee_petition_approved
-      FROM fee_records fr
-      JOIN cases c ON c.client_id = fr.case_id
-      WHERE fr.is_closed = FALSE
-        AND COALESCE(fr.total_fees_paid, 0) = 0
-        AND c.approval_date IS NOT NULL
-        AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
-      ORDER BY c.approval_date ASC
-    `) as unknown as {
+    const noFeesRows = noFeesCaseRows as unknown as {
       id: number;
       first_name: string | null;
       last_name: string | null;
@@ -506,7 +523,7 @@ export const GET = async (req: NextRequest) => {
       fee_petition_approved: boolean;
     }[];
 
-    const noFeesCases = noFeesCaseRows.map((r) => ({
+    const noFeesCases = noFeesRows.map((r) => ({
       id: r.id,
       name: `${r.last_name ?? ""}, ${r.first_name ?? ""}`,
       externalId: r.external_id,
