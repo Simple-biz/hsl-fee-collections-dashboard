@@ -209,6 +209,26 @@ export const GET = async (req: NextRequest) => {
            AND fr.closed_at < ${endExclusive}::date)
         END AS cases_closed,
 
+        -- Pending fee petition cases (all-time snapshot; non-zero only for
+        -- Fee Petition specialists) — mirrors the open_cases FP branch above
+        -- so this can be surfaced as its own column alongside Closed.
+        (SELECT COUNT(DISTINCT fp.id) FROM fee_petitions fp
+         JOIN cases c ON c.client_id = fp.case_id
+         WHERE fp.assigned_to = tm.name
+         AND fp.fee_petition_approved = FALSE
+         AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
+         AND EXISTS (
+           SELECT 1 FROM fee_records fr
+           WHERE fr.case_id = fp.case_id
+           AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
+         )) AS pending_fee_petitions,
+
+        -- Approved fee petition cases (all-time; non-zero only for Fee
+        -- Petition specialists) — mirrors the cases_closed FP branch above.
+        (SELECT COUNT(*) FROM fee_petitions fp
+         WHERE fp.assigned_to = tm.name
+         AND fp.fee_petition_approved = TRUE) AS approved_fee_petitions,
+
         -- Completed win sheets (status = paid_in_full or closed, current snapshot)
         (SELECT COUNT(*) FROM fee_records fr
          WHERE fr.assigned_to = tm.name
@@ -410,6 +430,8 @@ export const GET = async (req: NextRequest) => {
         casesAssigned: Number(r.cases_assigned),
         openCases: Number(r.open_cases),
         casesClosed: Number(r.cases_closed),
+        pendingFeePetitions: Number(r.pending_fee_petitions),
+        approvedFeePetitions: Number(r.approved_fee_petitions),
         completedWinSheets: Number(r.completed_win_sheets),
         winSheetsCreated: Number(r.week_win_sheets_created),
         unpaidT2Over60: Number(r.unpaid_t2_over_60),
