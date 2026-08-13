@@ -379,6 +379,13 @@
       "when": 1784924493589,
       "tag": "0053_fix_corrupt_fee_received_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1786646263667,
+      "tag": "0054_pending_recompute_when_closed",
+      "breakpoints": true
     }
   ]
 }

@@ -48,6 +48,8 @@ interface AgentScore {
   casesAssigned: number;
   openCases: number;
   casesClosed: number;
+  pendingFeePetitions: number;
+  approvedFeePetitions: number;
   completedWinSheets: number;
   winSheetsCreated: number;
   unpaidT2Over60: number;
@@ -123,6 +125,8 @@ const FOCUS_OPTIONS: { value: MetricFocus; label: string }[] = [
 const COL_FOCUS: Record<string, MetricFocus[]> = {
   cases:        ["aging", "fees"],
   closedcases:  ["aging", "fees"],
+  pendingfeepetitions:  ["aging", "fees"],
+  approvedfeepetitions: ["aging", "fees"],
   ssacalls:    [],
   clientcalls: [],
   faxsent:     [],
@@ -252,6 +256,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     const parts = [a.agent];
     if (showCol("cases"))       parts.push(`Open: ${a.openCases}`);
     if (showCol("closedcases")) parts.push(`Closed: ${a.casesClosed}`);
+    if (showCol("pendingfeepetitions"))  parts.push(`FP Pending: ${a.pendingFeePetitions}`);
+    if (showCol("approvedfeepetitions")) parts.push(`FP Approved: ${a.approvedFeePetitions}`);
     if (showCol("opennofees"))  parts.push(`No Fees: ${a.openNoFees}`);
     if (showCol("collected"))   parts.push(`Collected: ${a.feesCollectedInWindow != null ? fmt(a.feesCollectedInWindow) : "—"}`);
     if (showCol("ssacalls"))    parts.push(`SSA: ${a.weekSsaCalls}`);
@@ -302,6 +308,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     const headers: string[] = ["Agent"];
     if (showCol("cases"))       headers.push("Open");
     if (showCol("closedcases")) headers.push("Closed");
+    if (showCol("pendingfeepetitions"))  headers.push(chat ? "FP Pending" : "Pending Fee Petition");
+    if (showCol("approvedfeepetitions")) headers.push(chat ? "FP Approved" : "Approved Fee Petition");
     if (showCol("opennofees"))  headers.push("No Fees");
     if (showCol("collected"))   headers.push("Collected");
     if (showCol("ssacalls"))    headers.push(chat ? "SSA" : "SSA Calls");
@@ -312,6 +320,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       const cols: (string | number)[] = [a.agent];
       if (showCol("cases"))       cols.push(a.openCases);
       if (showCol("closedcases")) cols.push(a.casesClosed);
+      if (showCol("pendingfeepetitions"))  cols.push(a.pendingFeePetitions);
+      if (showCol("approvedfeepetitions")) cols.push(a.approvedFeePetitions);
       if (showCol("opennofees"))  cols.push(a.openNoFees);
       if (showCol("collected"))   cols.push(a.feesCollectedInWindow != null ? fmt(a.feesCollectedInWindow) : "—");
       if (showCol("ssacalls"))    cols.push(a.weekSsaCalls);
@@ -323,6 +333,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     const totalsRow: (string | number)[] = ["TOTAL"];
     if (showCol("cases"))       totalsRow.push(filteredTotals.openCases);
     if (showCol("closedcases")) totalsRow.push(filteredTotals.casesClosed);
+    if (showCol("pendingfeepetitions"))  totalsRow.push(filteredTotals.pendingFeePetitions);
+    if (showCol("approvedfeepetitions")) totalsRow.push(filteredTotals.approvedFeePetitions);
     if (showCol("opennofees"))  totalsRow.push(filteredTotals.openNoFees);
     if (showCol("collected")) {
       const allNull = filteredAgents.every((a) => a.feesCollectedInWindow == null);
@@ -572,6 +584,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     // including them would double-count against the team's actual case numbers.
     openCases:          filteredAgents.reduce((s, a) => a.team === "Fee Petition" ? s : s + a.openCases, 0),
     casesClosed:        filteredAgents.reduce((s, a) => a.team === "Fee Petition" ? s : s + a.casesClosed, 0),
+    pendingFeePetitions:  filteredAgents.reduce((s, a) => s + a.pendingFeePetitions, 0),
+    approvedFeePetitions: filteredAgents.reduce((s, a) => s + a.approvedFeePetitions, 0),
     weekSsaCalls:       filteredAgents.reduce((s, a) => s + a.weekSsaCalls, 0),
     weekClientCalls:    filteredAgents.reduce((s, a) => s + a.weekClientCalls, 0),
     weekFaxSent:        filteredAgents.reduce((s, a) => s + a.weekFaxSent, 0),
@@ -1089,6 +1103,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <th className={`${thBase} ${t.textSub} text-left`}>Agent</th>
                     {showCol("cases")       && <th className={`${thBase} ${t.textSub} text-right`}>Open</th>}
                     {showCol("closedcases") && <th className={`${thBase} ${t.textSub} text-right`}>Closed</th>}
+                    {showCol("pendingfeepetitions")  && <th className={`${thBase} ${t.textSub} text-right`} title="Pending Fee Petition Cases">FP Pending</th>}
+                    {showCol("approvedfeepetitions") && <th className={`${thBase} ${t.textSub} text-right`} title="Approved Fee Petition Cases">FP Approved</th>}
                     {showCol("opennofees")  && <th className={`${thBase} text-right ${dark ? "text-amber-400" : "text-amber-600"}`}>No Fees</th>}
                     {showCol("collected")   && <th className={`${thBase} ${t.textSub} text-right`}>Collected</th>}
                     {showCol("ssacalls")    && <th className={`${thBase} text-right border-l ${t.borderLight} ${dark ? "text-sky-400" : "text-sky-600"}`}>SSA Calls</th>}
@@ -1101,7 +1117,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 <tbody>
                   {filteredAgents.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className={`${tdBase} text-center ${t.textMuted} py-8`}>
+                      <td colSpan={11} className={`${tdBase} text-center ${t.textMuted} py-8`}>
                         No agents match the current filters.
                       </td>
                     </tr>
@@ -1129,6 +1145,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                           )}
                         </td>
                       )}
+                      {showCol("pendingfeepetitions")  && <td className={`${tdBase} text-right ${t.textSub}`}>{a.pendingFeePetitions}</td>}
+                      {showCol("approvedfeepetitions") && <td className={`${tdBase} text-right ${t.textSub}`}>{a.approvedFeePetitions}</td>}
                       {showCol("opennofees")  && <td className={`${tdBase} text-right ${a.openNoFees  > 0 ? (dark ? "text-amber-400"   : "text-amber-600")   : t.textMuted}`}>{a.openNoFees}</td>}
                       {showCol("collected") && (
                         <td className={`${tdBase} text-right font-semibold ${a.feesCollectedInWindow != null && a.feesCollectedInWindow > 0 ? "text-emerald-500" : t.textMuted}`}>
@@ -1160,6 +1178,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                     <td className={`${tdBase} font-bold ${t.text}`}>TOTAL</td>
                     {showCol("cases")       && <td className={`${tdBase} text-right font-bold ${t.text}`}>{filteredTotals.openCases}</td>}
                     {showCol("closedcases") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.casesClosed}</td>}
+                    {showCol("pendingfeepetitions")  && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.pendingFeePetitions}</td>}
+                    {showCol("approvedfeepetitions") && <td className={`${tdBase} text-right font-bold ${t.textSub}`}>{filteredTotals.approvedFeePetitions}</td>}
                     {showCol("opennofees")  && <td className={`${tdBase} text-right font-bold ${dark ? "text-amber-400"   : "text-amber-600"}`}>{filteredTotals.openNoFees}</td>}
                     {showCol("collected")   && (() => {
                       const allNull = filteredAgents.every(a => a.feesCollectedInWindow == null);
