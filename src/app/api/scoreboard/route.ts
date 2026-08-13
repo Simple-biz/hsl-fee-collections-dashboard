@@ -209,25 +209,30 @@ export const GET = async (req: NextRequest) => {
            AND fr.closed_at < ${endExclusive}::date)
         END AS cases_closed,
 
-        -- Pending fee petition cases (all-time snapshot; non-zero only for
-        -- Fee Petition specialists) — mirrors the open_cases FP branch above
-        -- so this can be surfaced as its own column alongside Closed.
-        (SELECT COUNT(DISTINCT fp.id) FROM fee_petitions fp
-         JOIN cases c ON c.client_id = fp.case_id
-         WHERE fp.assigned_to = tm.name
-         AND fp.fee_petition_approved = FALSE
+        -- Pending fee petition cases — any agent with a case at Fee Petition
+        -- level that isn't yet marked case_status = 'FEE PETITION APPROVED'
+        -- and is still open. Matches what Master Fee Records shows under
+        -- LEVEL = FEE_PETITION; NOT the narrow fee_petitions table, which
+        -- only covers cases formally routed to the Fee Petition specialist
+        -- workflow (Jan/Racquel) and misses cases where the original agent
+        -- (or an import) set case_status directly.
+        (SELECT COUNT(*) FROM fee_records fr
+         JOIN cases c ON c.client_id = fr.case_id
+         WHERE fr.assigned_to = tm.name
          AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
-         AND EXISTS (
-           SELECT 1 FROM fee_records fr
-           WHERE fr.case_id = fp.case_id
-           AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
-         )) AS pending_fee_petitions,
+         AND fr.case_status IS DISTINCT FROM 'FEE PETITION APPROVED'
+         AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
+        ) AS pending_fee_petitions,
 
-        -- Approved fee petition cases (all-time; non-zero only for Fee
-        -- Petition specialists) — mirrors the cases_closed FP branch above.
-        (SELECT COUNT(*) FROM fee_petitions fp
-         WHERE fp.assigned_to = tm.name
-         AND fp.fee_petition_approved = TRUE) AS approved_fee_petitions,
+        -- Approved fee petition cases — case_status explicitly marked 'FEE
+        -- PETITION APPROVED' (all-time, any agent), same source as the
+        -- Master Fee Records REMARKS badge.
+        (SELECT COUNT(*) FROM fee_records fr
+         JOIN cases c ON c.client_id = fr.case_id
+         WHERE fr.assigned_to = tm.name
+         AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
+         AND fr.case_status = 'FEE PETITION APPROVED'
+        ) AS approved_fee_petitions,
 
         -- Completed win sheets (status = paid_in_full or closed, current snapshot)
         (SELECT COUNT(*) FROM fee_records fr
