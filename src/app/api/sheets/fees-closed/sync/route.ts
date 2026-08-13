@@ -227,6 +227,11 @@ export const POST = async (req: NextRequest) => {
     let updated = 0;
 
     await db.transaction(async (tx) => {
+      // This sync supplies its own Pending figure straight from the sheet
+      // (toFeeRecordValues below) — tell compute_fee_totals() to trust it
+      // rather than overwrite it with Fee Due minus Fee Received.
+      await tx.execute(sql`SET LOCAL app.preserve_synced_pending = 'true'`);
+
       let syntheticRows: (ParsedFeesClosedRow & { clientId: number; firstName: string; lastName: string })[] = [];
 
       if (withoutRealId.length > 0) {
