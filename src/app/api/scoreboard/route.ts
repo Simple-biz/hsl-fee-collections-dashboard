@@ -225,13 +225,15 @@ export const GET = async (req: NextRequest) => {
         ) AS pending_fee_petitions,
 
         -- Approved fee petition cases — case_status explicitly marked 'FEE
-        -- PETITION APPROVED' (all-time, any agent), same source as the
-        -- Master Fee Records REMARKS badge.
+        -- PETITION APPROVED' and still open. Same active-only scope as
+        -- Pending above: once a case is closed it's done, and shouldn't
+        -- keep counting toward an agent's active FP workload.
         (SELECT COUNT(*) FROM fee_records fr
          JOIN cases c ON c.client_id = fr.case_id
          WHERE fr.assigned_to = tm.name
          AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
          AND fr.case_status = 'FEE PETITION APPROVED'
+         AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
         ) AS approved_fee_petitions,
 
         -- Completed win sheets (status = paid_in_full or closed, current snapshot)
