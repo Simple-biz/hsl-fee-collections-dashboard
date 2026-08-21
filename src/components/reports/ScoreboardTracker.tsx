@@ -412,6 +412,11 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const weekDays = getWeekDays(monday);
 
   const todayEt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  const yesterdayEt = (() => {
+    const [y, m, d] = todayEt.split("-").map(Number);
+    const date = new Date(y, m - 1, d - 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  })();
 
   // Days shown in the entry panel — 5 weekdays in week mode, one day in day mode.
   const entryDays =
@@ -446,17 +451,22 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const teamWindowMode: TeamWindowMode | null =
     dateMode === "day" && daySel === todayEt
       ? "today"
-      : dateMode === "week" && weekOffset === 0
-        ? "week"
-        : dateMode === "month" && monthSel === nowForInit.getMonth() && yearSel === nowForInit.getFullYear()
-          ? "month"
-          : dateMode === "range" && rangeFrom === ALL_TIME_START && rangeTo === todayEt
-            ? "alltime"
-            : null;
+      : dateMode === "day" && daySel === yesterdayEt
+        ? "yesterday"
+        : dateMode === "week" && weekOffset === 0
+          ? "week"
+          : dateMode === "month" && monthSel === nowForInit.getMonth() && yearSel === nowForInit.getFullYear()
+            ? "month"
+            : dateMode === "range" && rangeFrom === ALL_TIME_START && rangeTo === todayEt
+              ? "alltime"
+              : null;
 
   const changeTeamWindow = (mode: TeamWindowMode) => {
     if (mode === "today") {
       setDaySel(todayEt);
+      changeDateMode("day");
+    } else if (mode === "yesterday") {
+      setDaySel(yesterdayEt);
       changeDateMode("day");
     } else if (mode === "week") {
       setWeekOffset(0);
@@ -475,7 +485,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const windowLabel =
     dateMode === "day"
       ? daySel
-        ? fmtRangeDate(daySel) + (daySel === todayEt ? " (Today)" : "")
+        ? fmtRangeDate(daySel) + (daySel === todayEt ? " (Today)" : daySel === yesterdayEt ? " (Yesterday)" : "")
         : "Select a date"
       : dateMode === "month"
         ? `${MONTH_NAMES[monthSel]} ${yearSel}`
@@ -738,6 +748,12 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
             showMiniCards={false}
             windowMode={teamWindowMode}
             onWindowChange={changeTeamWindow}
+            selectedDate={daySel}
+            onDateSelect={(date) => {
+              setDaySel(date);
+              changeDateMode("day");
+            }}
+            maxDate={todayEt}
             loading={loading}
           />
         </div>
