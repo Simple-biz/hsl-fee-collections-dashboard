@@ -79,6 +79,14 @@ export const GET = async (req: NextRequest) => {
     // per-payment row at all, so it's treated as a single "legacy" payment
     // dated by the fee_records received-date column, sized as whatever part
     // of the lifetime total isn't already accounted for by real ledger rows.
+    //
+    // Real ledger rows are windowed by fee_payments.created_at — the day the
+    // payment was actually entered — to match Notifications' Payments tab
+    // (see /api/fees-received), not received_date (the business date typed
+    // into "Date Received", which can predate entry by any amount of time).
+    // Legacy remainder rows have no per-payment entry timestamp at all, so
+    // they stay windowed by their existing received-date columns — the best
+    // date available for money that arrived before the ledger existed.
     // The four queries below are mutually independent — none reads another's
     // result — so they are started together and awaited as one batch. Run in
     // series they cost four network round trips to the database, which
@@ -108,7 +116,7 @@ export const GET = async (req: NextRequest) => {
         SELECT fr.assigned_to AS agent, fp.amount::numeric AS amt
         FROM fee_payments fp
         JOIN fee_records fr ON fr.case_id = fp.case_id
-        WHERE fp.received_date >= ${startDate}::date AND fp.received_date < ${endExclusive}::date
+        WHERE fp.created_at >= ${startDate}::date AND fp.created_at < ${endExclusive}::date
 
         UNION ALL
 
@@ -130,9 +138,11 @@ export const GET = async (req: NextRequest) => {
       ),
       -- Fixed-window fees always relative to CURRENT_DATE — used by the team
       -- card "Fees Collected" toggle (Today / This Week / This Month / All Time)
-      -- independently of the scoreboard's selected date window.
+      -- independently of the scoreboard's selected date window. Ledger rows
+      -- are dated by created_at (cast to a date, same as the legacy
+      -- columns below) for the same reason as ledger_in_window above.
       fixed_all_fees AS (
-        SELECT fr.assigned_to AS agent, fp.amount::numeric AS amt, fp.received_date AS d
+        SELECT fr.assigned_to AS agent, fp.amount::numeric AS amt, fp.created_at::date AS d
         FROM fee_payments fp
         JOIN fee_records fr ON fr.case_id = fp.case_id
 
