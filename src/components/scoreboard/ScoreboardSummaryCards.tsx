@@ -48,10 +48,11 @@ export interface ScoreboardTeam {
 
 // Presets offered by the By Team window toggle. They map onto the page's own
 // date window — the toggle scopes every tile on the card, not just the fees.
-export type TeamWindowMode = "today" | "week" | "month" | "alltime";
+export type TeamWindowMode = "today" | "yesterday" | "week" | "month" | "alltime";
 
 const TEAM_WINDOW_LABELS: Record<TeamWindowMode, string> = {
   today: "Today",
+  yesterday: "Yesterday",
   week: "Week",
   month: "Month",
   alltime: "All Time",
@@ -68,6 +69,12 @@ interface ScoreboardSummaryCardsProps {
    *  (an arbitrary range, or any week/month other than the current). */
   windowMode: TeamWindowMode | null;
   onWindowChange: (mode: TeamWindowMode) => void;
+  /** The single day the "pick a date" control is showing — always the page's
+   *  `daySel`, regardless of whether day mode is the active window. */
+  selectedDate: string;
+  onDateSelect: (date: string) => void;
+  /** Latest date selectable — the picker mirrors the page's own day-nav cap. */
+  maxDate: string;
   /** A refetch is in flight — the figures on screen are the previous window's. */
   loading?: boolean;
 }
@@ -81,6 +88,9 @@ export function ScoreboardSummaryCards({
   showMiniCards = true,
   windowMode,
   onWindowChange,
+  selectedDate,
+  onDateSelect,
+  maxDate,
   loading = false,
 }: ScoreboardSummaryCardsProps) {
   const [t2Days, setT2Days] = useState<60 | 90>(60);
@@ -96,7 +106,13 @@ export function ScoreboardSummaryCards({
   // Every tile on the card covers the page window, so the fees figure is the
   // window-scoped total rather than a separately chosen period.
   const feesLabel = windowMode
-    ? { today: "Fees Today", week: "Fees This Week", month: "Fees This Month", alltime: "Fees All Time" }[windowMode]
+    ? {
+        today: "Fees Today",
+        yesterday: "Fees Yesterday",
+        week: "Fees This Week",
+        month: "Fees This Month",
+        alltime: "Fees All Time",
+      }[windowMode]
     : "Fees";
 
   const copyByTeam = (format: "sheets" | "chat" | "teams") => {
@@ -231,7 +247,7 @@ export function ScoreboardSummaryCards({
               )}
               {/* Window toggle — scopes every tile on the card, not just fees */}
               <div className={`flex items-center rounded-md border overflow-hidden text-[11px] font-semibold ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
-                {(["today", "week", "month", "alltime"] as const).map((mode) => {
+                {(["today", "yesterday", "week", "month", "alltime"] as const).map((mode) => {
                   const active = windowMode === mode;
                   return (
                     <button
@@ -249,6 +265,17 @@ export function ScoreboardSummaryCards({
                   );
                 })}
               </div>
+              {/* Pick any specific day — sets the window to that day regardless
+                  of which preset (if any) is currently active. */}
+              <input
+                type="date"
+                value={selectedDate}
+                max={maxDate}
+                onChange={(e) => e.target.value && onDateSelect(e.target.value)}
+                aria-label="By Team — pick a specific date"
+                title="Pick a specific date"
+                className={`h-[26px] px-2 rounded-md border text-[11px] outline-none cursor-pointer ${dark ? "bg-neutral-900 border-neutral-700 text-neutral-300" : "bg-white border-neutral-200 text-neutral-600"}`}
+              />
               {/* Copy buttons */}
               <button
                 onClick={() => copyByTeam("sheets")}

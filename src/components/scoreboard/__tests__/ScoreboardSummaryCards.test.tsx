@@ -39,8 +39,9 @@ const T2: ScoreboardTeam = {
 };
 
 const renderCards = (
-  windowMode: "today" | "week" | "month" | "alltime" | null,
+  windowMode: "today" | "yesterday" | "week" | "month" | "alltime" | null,
   onWindowChange = vi.fn(),
+  onDateSelect = vi.fn(),
 ) => {
   const utils = render(
     <ScoreboardSummaryCards
@@ -52,9 +53,12 @@ const renderCards = (
       showMiniCards={false}
       windowMode={windowMode}
       onWindowChange={onWindowChange}
+      selectedDate="2026-08-07"
+      onDateSelect={onDateSelect}
+      maxDate="2026-08-07"
     />,
   );
-  return { ...utils, onWindowChange };
+  return { ...utils, onWindowChange, onDateSelect };
 };
 
 describe("ScoreboardSummaryCards — By Team window", () => {
@@ -76,7 +80,7 @@ describe("ScoreboardSummaryCards — By Team window", () => {
 
   it("highlights nothing when the window matches no preset", () => {
     renderCards(null);
-    for (const name of ["Today", "Week", "Month", "All Time"]) {
+    for (const name of ["Today", "Yesterday", "Week", "Month", "All Time"]) {
       expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("false");
     }
   });
@@ -87,9 +91,23 @@ describe("ScoreboardSummaryCards — By Team window", () => {
     expect(onWindowChange).toHaveBeenCalledWith("month");
   });
 
+  it("offers a Yesterday preset so team leads can compare it against Today", () => {
+    const { onWindowChange } = renderCards("today");
+    expect(screen.getByRole("button", { name: "Yesterday" }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "Yesterday" }));
+    expect(onWindowChange).toHaveBeenCalledWith("yesterday");
+  });
+
   it("states the window it is showing, so the period is never implicit", () => {
     renderCards("today");
     expect(screen.getByText(/By Team/).textContent).toContain("Fri Aug 7");
+  });
+
+  it("lets a team lead pick an arbitrary date outside the presets", () => {
+    const { onDateSelect } = renderCards("today");
+    const picker = screen.getByLabelText("By Team — pick a specific date");
+    fireEvent.change(picker, { target: { value: "2026-07-30" } });
+    expect(onDateSelect).toHaveBeenCalledWith("2026-07-30");
   });
 });
 
@@ -101,7 +119,8 @@ describe("ScoreboardSummaryCards — refetch feedback", () => {
       <ScoreboardSummaryCards
         summary={SUMMARY} teams={[T2]} label="Week" dark={false}
         t={themeClasses(false)} showMiniCards={false}
-        windowMode="week" onWindowChange={vi.fn()} loading
+        windowMode="week" onWindowChange={vi.fn()}
+        selectedDate="2026-08-07" onDateSelect={vi.fn()} maxDate="2026-08-07" loading
       />,
     );
     expect(screen.getByText(/Updating/)).toBeTruthy();
@@ -113,7 +132,8 @@ describe("ScoreboardSummaryCards — refetch feedback", () => {
       <ScoreboardSummaryCards
         summary={SUMMARY} teams={[T2]} label="Week" dark={false}
         t={themeClasses(false)} showMiniCards={false}
-        windowMode="week" onWindowChange={vi.fn()} loading
+        windowMode="week" onWindowChange={vi.fn()}
+        selectedDate="2026-08-07" onDateSelect={vi.fn()} maxDate="2026-08-07" loading
       />,
     );
     // 174 open cases is still readable mid-refetch — a spinner replacing the
@@ -127,6 +147,7 @@ describe("ScoreboardSummaryCards — refetch feedback", () => {
         summary={SUMMARY} teams={[T2]} label="Week" dark={false}
         t={themeClasses(false)} showMiniCards={false}
         windowMode="week" onWindowChange={vi.fn()}
+        selectedDate="2026-08-07" onDateSelect={vi.fn()} maxDate="2026-08-07"
       />,
     );
     expect(screen.queryByText(/Updating/)).toBeNull();
