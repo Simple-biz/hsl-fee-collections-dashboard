@@ -1502,7 +1502,10 @@ export const FeeRecordsTable = ({
 
       {/* Floating batch action pill — fixed to the viewport bottom. Fees
           Closed, Archive, "Add to Overpaid Cases", and Reassign are the
-          batch actions. */}
+          batch actions. "Add to Overpaid Cases" is also available in closed
+          mode — marking overpaid has no is_closed guard server-side, and
+          the alternative (unchecking Reopen) would also clear PIF status
+          just to flag a case Overpaid. */}
       {selectedIds.size > 0 && isAdmin && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
           {(bulkOverpaidError || bulkReassignError) && (
@@ -1527,7 +1530,7 @@ export const FeeRecordsTable = ({
                 Fees Closed
               </button>
             )}
-            {mode !== "closed" && canFinalize && (
+            {canFinalize && (
               <button
                 onClick={handleBatchMarkOverpaid}
                 disabled={bulkOverpaidSaving}
