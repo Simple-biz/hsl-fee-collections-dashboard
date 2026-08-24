@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import { ClaimTypeBarChart } from "@/components/charts/ClaimTypeBarChart";
+import { TeamRevenueStats, type TeamRevenueBar } from "@/components/cases/TeamRevenueStats";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtFull } from "@/lib/formatters";
-import type { CaseRow, DashboardSummary } from "@/types";
+import type { CaseRow, DashboardSummary, TeamMember } from "@/types";
 
 export type RevenueWindowMode = "today" | "week" | "month" | "alltime";
 
@@ -16,31 +16,42 @@ const WINDOW_LABELS: Record<RevenueWindowMode, string> = {
   alltime: "All Time",
 };
 
+// Same restriction as Reports' TEAM_ORDER in /api/scoreboard — only these
+// three are real collections teams; Fee Petition and unassigned agents don't
+// belong on a revenue-by-team chart.
+const TEAM_ORDER = ["T2", "T16", "Concurrent"];
+
 interface RevenuePanelProps {
   stats: DashboardSummary;
   cases: CaseRow[];
+  team: TeamMember[];
 }
 
-export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
+export const RevenuePanel = ({ stats, cases, team }: RevenuePanelProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
 
   const [windowMode, setWindowMode] = useState<RevenueWindowMode>("alltime");
-  const [windowedClaims, setWindowedClaims] = useState<{ claim: string; collected: number }[] | null>(null);
+  const [windowedTeams, setWindowedTeams] = useState<{ team: string; collected: number }[] | null>(null);
   const [windowLoading, setWindowLoading] = useState(false);
   const [windowError, setWindowError] = useState<string | null>(null);
 
-  const fetchWindowedClaims = useCallback(
+  const fetchWindowedTeams = useCallback(
     async (mode: RevenueWindowMode, signal: AbortSignal, cancelledRef: { current: boolean }) => {
       setWindowLoading(true);
       setWindowError(null);
       try {
-        const res = await fetch(`/api/revenue-by-claim-type?window=${mode}`, { signal });
-        if (!res.ok) throw new Error(`Failed to load revenue by claim type (${res.status})`);
+        const res = await fetch(`/api/revenue-by-team?window=${mode}`, { signal });
+        if (!res.ok) throw new Error(`Failed to load revenue by team (${res.status})`);
         const json = await res.json();
         if (cancelledRef.current) return;
-        setWindowedClaims(json.claims ?? []);
+        // SQL's GROUP BY gives no ordering guarantee — sort to the same
+        // TEAM_ORDER as the "All Time" bars so the row order doesn't jump
+        // around between windows.
+        const teams: { team: string; collected: number }[] = json.teams ?? [];
+        teams.sort((a, b) => TEAM_ORDER.indexOf(a.team) - TEAM_ORDER.indexOf(b.team));
+        setWindowedTeams(teams);
       } catch (err) {
         if (cancelledRef.current || (err as Error).name === "AbortError") return;
         setWindowError((err as Error).message);
@@ -51,20 +62,49 @@ export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
     [],
   );
 
-  // "All Time" is derived entirely from the `cases` prop (no fetch, matches
-  // the original always-cumulative view). Any narrower window has no local
-  // data to derive from — fees collected in a day/week/month live only in
-  // the payment ledger, not on the case rows this page already has.
+  // "All Time" is derived entirely from the `cases`/`team` props (no fetch,
+  // matches the original always-cumulative view). Any narrower window has no
+  // local data to derive from — fees collected in a day/week/month live only
+  // in the payment ledger, not on the case rows this page already has.
   useEffect(() => {
     if (windowMode === "alltime") return;
     const controller = new AbortController();
     const cancelledRef = { current: false };
-    fetchWindowedClaims(windowMode, controller.signal, cancelledRef);
+    fetchWindowedTeams(windowMode, controller.signal, cancelledRef);
     return () => {
       cancelledRef.current = true;
       controller.abort();
     };
-  }, [windowMode, fetchWindowedClaims]);
+  }, [windowMode, fetchWindowedTeams]);
+
+  // Expected/Collected per team, for "All Time" — a case's team comes from
+  // its assigned agent's roster entry, not a field on the case itself. Team
+  // leads stay included (they aren't filtered here), matching Reports' own
+  // team rollup in /api/scoreboard, which only excludes them from the
+  // per-agent table, not the team totals.
+  const teamByAgent = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of team) {
+      if (m.team) map.set(m.name, m.team);
+    }
+    return map;
+  }, [team]);
+
+  const bars = useMemo<TeamRevenueBar[]>(() => {
+    const totals = new Map<string, { expected: number; paid: number }>();
+    for (const c of cases) {
+      const teamName = teamByAgent.get(c.assigned);
+      if (!teamName || !TEAM_ORDER.includes(teamName)) continue;
+      const cur = totals.get(teamName) ?? { expected: 0, paid: 0 };
+      cur.expected += c.expected;
+      cur.paid += c.paid;
+      totals.set(teamName, cur);
+    }
+    return TEAM_ORDER.filter((name) => totals.has(name)).map((name) => ({
+      team: name,
+      ...totals.get(name)!,
+    }));
+  }, [cases, teamByAgent]);
 
   // Collection rate = paid / expected. It's a standing ratio (not a delta),
   // so no "+" prefix; color reflects how much of the expected fees are in.
@@ -86,12 +126,12 @@ export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
           ? "text-red-400"
           : "text-red-500";
 
-  const windowedTotal = windowedClaims?.reduce((sum, c) => sum + c.collected, 0) ?? 0;
+  const windowedTotal = windowedTeams?.reduce((sum, c) => sum + c.collected, 0) ?? 0;
 
   return (
     <div className={`rounded-xl border p-4 md:p-5 ${t.card}`}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className={`text-sm font-bold ${t.text}`}>Revenue by Claim Type</h3>
+        <h3 className={`text-sm font-bold ${t.text}`}>Revenue by Team</h3>
         <div className={`flex items-center rounded-md border overflow-hidden text-[11px] font-semibold shrink-0 ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
           {(["today", "week", "month", "alltime"] as const).map((mode) => {
             const active = windowMode === mode;
@@ -144,18 +184,11 @@ export const RevenuePanel = ({ stats, cases }: RevenuePanelProps) => {
       )}
 
       <div className="mt-4" aria-busy={windowLoading}>
-        <ClaimTypeBarChart cases={cases} windowedClaims={windowMode === "alltime" ? null : windowedClaims} />
-      </div>
-      <div className="mt-3 flex items-center gap-4 justify-center">
-        {windowMode === "alltime" && (
-          <span className={`flex items-center gap-1.5 text-[12px] ${t.textSub}`}>
-            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-400 opacity-30" />{" "}
-            Expected
-          </span>
-        )}
-        <span className={`flex items-center gap-1.5 text-[12px] ${t.textSub}`}>
-          <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Collected
-        </span>
+        <TeamRevenueStats
+          dark={dark}
+          bars={bars}
+          windowedTeams={windowMode === "alltime" ? null : windowedTeams}
+        />
       </div>
     </div>
   );
