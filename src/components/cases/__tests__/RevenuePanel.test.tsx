@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { RevenuePanel } from "../RevenuePanel";
-import type { CaseRow, DashboardSummary } from "@/types";
+import type { CaseRow, DashboardSummary, TeamMember } from "@/types";
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),
@@ -20,23 +20,28 @@ const SUMMARY: DashboardSummary = {
   casesClosedMTD: 0,
 };
 
-const CASE: CaseRow = {
-  id: 1,
-  name: "Watson, Katrina",
+const TEAM: TeamMember[] = [
+  { name: "Cora", role: "collections_specialist", team: "T2", cases: 1, collected: "0" },
+  { name: "Bree", role: "collections_specialist", team: "T16", cases: 1, collected: "0" },
+];
+
+const caseWith = (id: number, assigned: string, expected: number, paid: number): CaseRow => ({
+  id,
+  name: `Case ${id}`,
   externalId: null,
   chronicleId: null,
-  assigned: "Test Agent",
+  assigned,
   level: "HEARING",
   claim: "T16",
   date: "2026-01-15",
   status: "not_started",
   createdAt: "2026-01-15T00:00:00.000Z",
-  t16Retro: 10000, t16FeeDue: 2500, t16FeeReceived: 0, t16Pending: 2500, t16FeeReceivedDate: null,
+  t16Retro: 10000, t16FeeDue: expected, t16FeeReceived: paid, t16Pending: 0, t16FeeReceivedDate: null,
   t2Retro: 0,    t2FeeDue: null,   t2FeeReceived: 0,  t2Pending: 0,    t2FeeReceivedDate: null,
   auxRetro: 0,   auxFeeDue: null,  auxFeeReceived: 0, auxPending: 0,   auxFeeReceivedDate: null,
   totalRetroDue: 10000,
-  expected: 2500,
-  paid: 0,
+  expected,
+  paid,
   pif: null,
   approvedBy: null,
   feesConfirmation: null,
@@ -59,9 +64,15 @@ const CASE: CaseRow = {
   caseLink: null,
   winSheetLink: null,
   winSheetLinkText: null,
-};
+});
 
-describe("RevenuePanel — window toggle", () => {
+const CASES: CaseRow[] = [
+  caseWith(1, "Cora", 792_636, 499_500),   // T2 team
+  caseWith(2, "Bree", 300_656, 656),        // T16 team
+  caseWith(3, "Nobody", 50_000, 10_000),    // not in team roster — excluded
+];
+
+describe("RevenuePanel — groups by team, not claim type", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
   });
@@ -70,33 +81,58 @@ describe("RevenuePanel — window toggle", () => {
     vi.unstubAllGlobals();
   });
 
-  it("defaults to All Time: lifetime paid total, collection rate, no fetch", () => {
-    render(<RevenuePanel stats={SUMMARY} cases={[CASE]} />);
-    expect(screen.getByRole("button", { name: "All Time" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText(/44\.6%/)).toBeTruthy();
-    expect(screen.getByText("Expected")).toBeTruthy();
+  it("defaults to All Time: aggregates Expected/Collected by each case's assigned agent's team", () => {
+    render(<RevenuePanel stats={SUMMARY} cases={CASES} team={TEAM} />);
+    expect(screen.getByText("Revenue by Team")).toBeTruthy();
+    expect(screen.getByText("T2 Team")).toBeTruthy();
+    expect(screen.getByText("T16 Team")).toBeTruthy();
+    // Case 1 (Cora → T2) contributes $792,636 expected to the T2 bar.
+    expect(screen.getByText(/792,636/)).toBeTruthy();
+    // Case 3's agent isn't on the roster — excluded, not folded into any team.
+    expect(screen.queryByText(/50,000/)).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("fetches the windowed total when a narrower preset is clicked", async () => {
+  it("fetches the windowed team totals when a narrower preset is clicked", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ window: "month", claims: [{ claim: "T2", collected: 12_400 }, { claim: "T16", collected: 3_100 }] }),
+      json: async () => ({ window: "month", teams: [{ team: "T2", collected: 12_400 }, { team: "T16", collected: 3_100 }] }),
     });
-    render(<RevenuePanel stats={SUMMARY} cases={[CASE]} />);
+    render(<RevenuePanel stats={SUMMARY} cases={CASES} team={TEAM} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Month" }));
 
-    expect(fetch).toHaveBeenCalledWith("/api/revenue-by-claim-type?window=month", expect.anything());
+    expect(fetch).toHaveBeenCalledWith("/api/revenue-by-team?window=month", expect.anything());
     await waitFor(() => expect(screen.getByText(/Collected — Month/)).toBeTruthy());
-    expect(screen.getByText(/15,500/)).toBeTruthy(); // windowed total = 12,400 + 3,100
-    // "Expected" legend disappears — there's nothing windowed to pair it with.
+    expect(screen.getByText(/15,500/)).toBeTruthy(); // 12,400 + 3,100
     expect(screen.queryByText("Expected")).toBeNull();
   });
 
-  it("shows an alert and keeps the toggle usable when the fetch fails", async () => {
+  it("re-sorts a windowed response into TEAM_ORDER regardless of the API's own row order", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      // Deliberately out of order — SQL's GROUP BY gives no ordering guarantee.
+      json: async () => ({
+        window: "month",
+        teams: [
+          { team: "Concurrent", collected: 1 },
+          { team: "T16", collected: 2 },
+          { team: "T2", collected: 3 },
+        ],
+      }),
+    });
+    render(<RevenuePanel stats={SUMMARY} cases={CASES} team={TEAM} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+    await waitFor(() => expect(screen.getByText(/Collected — Month/)).toBeTruthy());
+
+    const labels = screen.getAllByText(/^(T2|T16|Concurrent) Team$/).map((el) => el.textContent);
+    expect(labels).toEqual(["T2 Team", "T16 Team", "Concurrent Team"]);
+  });
+
+  it("shows an alert when the windowed fetch fails", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 500 });
-    render(<RevenuePanel stats={SUMMARY} cases={[CASE]} />);
+    render(<RevenuePanel stats={SUMMARY} cases={CASES} team={TEAM} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Week" }));
 
@@ -107,9 +143,9 @@ describe("RevenuePanel — window toggle", () => {
   it("switching back to All Time drops the fetched window without refetching", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ window: "today", claims: [{ claim: "T2", collected: 900 }] }),
+      json: async () => ({ window: "today", teams: [{ team: "T2", collected: 900 }] }),
     });
-    render(<RevenuePanel stats={SUMMARY} cases={[CASE]} />);
+    render(<RevenuePanel stats={SUMMARY} cases={CASES} team={TEAM} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Today" }));
     await waitFor(() => expect(screen.getByText(/Collected — Today/)).toBeTruthy());
