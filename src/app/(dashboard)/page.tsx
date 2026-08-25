@@ -14,10 +14,8 @@ const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function OverviewPage() {
   const {
-    cases,
     summary,
     monthlyData,
-    team,
     loading,
     error,
     refresh,
@@ -86,7 +84,7 @@ export default function OverviewPage() {
       <StatCards stats={summary} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         <CollectionsPanel data={monthlyData} />
-        <RevenuePanel stats={summary} cases={cases} team={team} />
+        <RevenuePanel />
       </div>
       {recentActivities.length > 0 && (
         <RecentActivityFeed

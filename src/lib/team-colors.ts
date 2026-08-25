@@ -58,6 +58,17 @@ export function teamRowTint(team: string | null | undefined, dark: boolean): str
   }
 }
 
+// Solid bar fill — Overview's Revenue by Team graph (per-team columns and
+// the All Time self-scaled progress bar). Fixed shade regardless of theme,
+// same as teamHeaderBg — it sits on a neutral track, not page background.
+export function teamFillBg(team: string | null | undefined): string {
+  switch (toneFor(team)) {
+    case "blue": return "bg-blue-500";
+    case "red": return "bg-red-500";
+    default: return "bg-emerald-500";
+  }
+}
+
 // Pill badge — agent names in Reports rows and the Team Management roster.
 export function teamBadgeClasses(team: string | null | undefined, dark: boolean): string {
   switch (toneFor(team)) {
