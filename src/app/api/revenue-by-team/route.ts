@@ -3,23 +3,28 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
 
-const WINDOWS = ["today", "week", "month"] as const;
+const WINDOWS = ["today", "week", "month", "alltime"] as const;
 type Window = (typeof WINDOWS)[number];
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-// GET /api/revenue-by-team?window=today|week|month
-// Fees collected per staff team within the given window — the windowed
-// counterpart to Overview's "Revenue by Team" chart, which otherwise only
-// shows an all-time Expected/Collected total (see /api/cases + /api/team-members,
-// computed client-side). Only Collected has a window here: "Expected" (the
-// total fee owed) has no time dimension, so callers drop it outside "All
-// Time" rather than divide a day's collections by the full lifetime total owed.
+// GET /api/revenue-by-team?window=today|week|month|alltime
+// Fees collected per staff team, for Overview's "Revenue by Team" chart.
 //
 // Grouped by staff team (T2/T16/Concurrent — same restriction as Reports'
 // TEAM_ORDER in /api/scoreboard), not by case claim type, so this matches
 // Reports' By Team card exactly rather than the case-level claim taxonomy.
+//
+// "alltime" sums the DB-trigger-maintained total_fees_expected/total_fees_paid
+// across every case assigned to the team, open or closed — the same lifetime
+// total Reports' team card shows (scoreboard's total_collected). Overview
+// previously computed its "All Time" bars client-side from the open-cases-only
+// /api/cases list, which silently dropped every closed case's collected fees
+// and read lower than Reports for any team with real closed-case history.
+// today/week/month only have Collected — "Expected" (the total fee owed) has
+// no time dimension, so a windowed rate would divide a day's collections by
+// the full lifetime total owed rather than anything actionable.
 export const GET = async (req: NextRequest) => {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,6 +37,27 @@ export const GET = async (req: NextRequest) => {
   const w = windowParam as Window;
 
   try {
+    if (w === "alltime") {
+      const rows = (await db.execute(sql`
+        SELECT
+          tm.team AS team,
+          COALESCE(SUM(fr.total_fees_paid::numeric), 0) AS collected,
+          COALESCE(SUM(fr.total_fees_expected::numeric), 0) AS expected
+        FROM fee_records fr
+        LEFT JOIN team_members tm ON tm.name = fr.assigned_to
+        WHERE tm.team IN ('T2', 'T16', 'Concurrent')
+        GROUP BY tm.team
+      `)) as unknown as { team: string; collected: string; expected: string }[];
+
+      const teams = rows.map((r) => ({
+        team: r.team,
+        collected: Number(r.collected),
+        expected: Number(r.expected),
+      }));
+
+      return NextResponse.json({ window: w, teams });
+    }
+
     // Local getters, not toISOString() — matches the convention in
     // /api/scoreboard so "today"/"this week"/"this month" agree with the
     // Reports page regardless of the server's own timezone.

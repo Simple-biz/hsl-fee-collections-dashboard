@@ -1,7 +1,7 @@
 "use client";
 
 import { fmt } from "@/lib/formatters";
-import { teamCardClasses, teamAccentText, teamLabel } from "@/lib/team-colors";
+import { teamCardClasses, teamAccentText, teamLabel, teamFillBg } from "@/lib/team-colors";
 
 export interface TeamRevenueBar {
   team: string;
@@ -24,14 +24,38 @@ interface TeamRevenueStatsProps {
 const statLabelClass = "text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400";
 const statValueClass = "text-sm font-bold text-neutral-900 dark:text-neutral-100 mt-0.5";
 
-// Plain-text stat rows rather than a bar chart — a bar chart made T2/CONC's
-// larger dollar totals visually dwarf T16's smaller one on the same scale,
-// reading as "T16 is underperforming" even when its own collection rate was
-// fine. Numbers side by side, with no shared height to compare against,
-// don't carry that same implication. Stacked full-width rows (not a 3-column
-// grid) — this panel is already one of three columns on the dashboard, so a
-// nested 3-up grid squeezes each team's Expected/Collected into too little
-// width to read.
+// Windowed (Today/Week/Month) has only Collected — a plain vertical bar
+// chart per team, shared dollar scale, same shape as Reports' own "Fees
+// This Month" team cards. Comparing raw Collected across teams for the same
+// period is an apples-to-apples read (unlike Expected-vs-Collected below),
+// so a shared scale doesn't carry the "T16 is underperforming" implication.
+const WindowedBars = ({ dark, teams }: { dark: boolean; teams: { team: string; collected: number }[] }) => {
+  const maxVal = Math.max(...teams.map((t) => t.collected), 1);
+  return (
+    <div className="flex items-end gap-6 justify-center h-32 px-2">
+      {teams.map((t) => (
+        <div key={t.team} className="flex flex-col items-center gap-1.5 flex-1">
+          <span className={`text-[12px] font-semibold ${teamAccentText(t.team, dark)}`}>{fmt(t.collected)}</span>
+          <div className="w-full flex items-end justify-center h-20">
+            <div
+              className={`w-10 rounded-t ${teamFillBg(t.team)}`}
+              style={{ height: `${Math.max((t.collected / maxVal) * 100, 2)}%` }}
+            />
+          </div>
+          <span className={`text-[11px] font-medium ${dark ? "text-neutral-400" : "text-neutral-500"}`}>
+            {teamLabel(t.team)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// All Time pairs Expected with Collected, so each team's progress bar is
+// scaled to its OWN Expected (% collected), not a shared dollar axis across
+// teams — a shared axis made T2/CONC's larger dollar totals visually dwarf
+// T16's smaller one, reading as "T16 is underperforming" even when its own
+// collection rate was fine.
 export const TeamRevenueStats = ({ dark, bars, windowedTeams }: TeamRevenueStatsProps) => {
   if (windowedTeams) {
     if (windowedTeams.length === 0) {
@@ -42,22 +66,7 @@ export const TeamRevenueStats = ({ dark, bars, windowedTeams }: TeamRevenueStats
       );
     }
 
-    return (
-      <div className="space-y-2">
-        {windowedTeams.map((b) => (
-          <div
-            key={b.team}
-            className={`rounded-lg border p-3 flex items-center justify-between gap-3 ${teamCardClasses(b.team, dark)}`}
-          >
-            <p className={`text-xs font-bold ${teamAccentText(b.team, dark)}`}>{teamLabel(b.team)}</p>
-            <div className="text-right">
-              <p className={statLabelClass}>Collected</p>
-              <p className={statValueClass}>{fmt(b.collected)}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <WindowedBars dark={dark} teams={windowedTeams} />;
   }
 
   if (bars.length === 0) {
@@ -70,24 +79,39 @@ export const TeamRevenueStats = ({ dark, bars, windowedTeams }: TeamRevenueStats
 
   return (
     <div className="space-y-2">
-      {bars.map((b) => (
-        <div
-          key={b.team}
-          className={`rounded-lg border p-3 flex items-center justify-between gap-3 ${teamCardClasses(b.team, dark)}`}
-        >
-          <p className={`text-xs font-bold ${teamAccentText(b.team, dark)}`}>{teamLabel(b.team)}</p>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className={statLabelClass}>Expected</p>
-              <p className={statValueClass}>{fmt(b.expected)}</p>
+      {bars.map((b) => {
+        const pct = b.expected > 0 ? Math.min(100, (b.paid / b.expected) * 100) : 0;
+        return (
+          <div
+            key={b.team}
+            className={`rounded-lg border p-3 ${teamCardClasses(b.team, dark)}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className={`text-xs font-bold ${teamAccentText(b.team, dark)}`}>{teamLabel(b.team)}</p>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className={statLabelClass}>Expected</p>
+                  <p className={statValueClass}>{fmt(b.expected)}</p>
+                </div>
+                <div className="text-right">
+                  <p className={statLabelClass}>Collected</p>
+                  <p className={statValueClass}>{fmt(b.paid)}</p>
+                </div>
+              </div>
             </div>
-            <div className="text-right">
-              <p className={statLabelClass}>Collected</p>
-              <p className={statValueClass}>{fmt(b.paid)}</p>
+            <div
+              className={`mt-2 h-1.5 rounded-full overflow-hidden ${dark ? "bg-neutral-800" : "bg-neutral-200"}`}
+              role="progressbar"
+              aria-valuenow={Math.round(pct)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${teamLabel(b.team)} collection progress`}
+            >
+              <div className={`h-full rounded-full ${teamFillBg(b.team)}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
