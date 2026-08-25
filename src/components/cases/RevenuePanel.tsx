@@ -69,6 +69,10 @@ export const RevenuePanel = () => {
   );
 
   useEffect(() => {
+    // Drop the previous window's data immediately on switch — otherwise the
+    // old team figures stay on screen (under the new window's label) until
+    // the new fetch resolves, which reads as real data for the wrong window.
+    setTeamsData(null);
     const controller = new AbortController();
     const cancelledRef = { current: false };
     fetchTeams(windowMode, controller.signal, cancelledRef);
@@ -162,19 +166,21 @@ export const RevenuePanel = () => {
         </>
       )}
 
-      <div className="mt-4" aria-busy={windowLoading}>
-        {!windowError && windowLoading && !teamsData ? (
-          <div className="flex items-center justify-center h-24 text-[13px] text-neutral-400 dark:text-neutral-500">
-            Loading…
-          </div>
-        ) : (
-          <TeamRevenueStats
-            dark={dark}
-            bars={bars}
-            windowedTeams={windowMode === "alltime" ? null : teamsData}
-          />
-        )}
-      </div>
+      {!windowError && (
+        <div className="mt-4" aria-busy={windowLoading}>
+          {windowLoading && !teamsData ? (
+            <div className="flex items-center justify-center h-24 text-[13px] text-neutral-400 dark:text-neutral-500">
+              Loading…
+            </div>
+          ) : (
+            <TeamRevenueStats
+              dark={dark}
+              bars={bars}
+              windowedTeams={windowMode === "alltime" ? null : teamsData}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };

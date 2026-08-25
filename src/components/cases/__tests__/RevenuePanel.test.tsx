@@ -92,6 +92,39 @@ describe("RevenuePanel — every window, including All Time, comes from /api/rev
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByRole("alert").textContent).toContain("500");
+    // The error banner replaces the team breakdown entirely — no redundant
+    // "no data" state rendered underneath it.
+    expect(screen.queryByText(/No team data yet/)).toBeNull();
+    expect(screen.queryByText(/No fees collected/)).toBeNull();
+  });
+
+  it("clears the previous window's figures immediately on switch, instead of showing them under the new label", async () => {
+    let resolveMonth!: (value: unknown) => void;
+    const monthPromise = new Promise((resolve) => {
+      resolveMonth = resolve;
+    });
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ window: "alltime", teams: [{ team: "T2", collected: 499_500, expected: 792_636 }] }),
+      })
+      .mockReturnValueOnce(monthPromise);
+    render(<RevenuePanel />);
+    await waitFor(() => expect(screen.getByText(/792,636/)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+
+    // Old All Time figure must be gone before Month's data has even arrived —
+    // otherwise it would sit on screen under the (already-updated) "Month" label.
+    await waitFor(() => expect(screen.getByText(/Loading/)).toBeTruthy());
+    expect(screen.queryByText(/792,636/)).toBeNull();
+
+    resolveMonth({
+      ok: true,
+      json: async () => ({ window: "month", teams: [{ team: "T2", collected: 12_400 }] }),
+    });
+    // Matches both the headline ($12,400.00) and the bar label ($12,400).
+    await waitFor(() => expect(screen.getAllByText(/12,400/).length).toBeGreaterThan(0));
   });
 
   it("switching back to All Time re-fetches the lifetime totals", async () => {
