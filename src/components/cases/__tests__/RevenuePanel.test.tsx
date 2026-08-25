@@ -1,13 +1,13 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import { RevenuePanel } from "../RevenuePanel";
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),
 }));
 
-describe("RevenuePanel — every window, including All Time, comes from /api/revenue-by-team", () => {
+describe("RevenuePanel — always shows this month's Collected per team as a bar chart", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
   });
@@ -16,140 +16,86 @@ describe("RevenuePanel — every window, including All Time, comes from /api/rev
     vi.unstubAllGlobals();
   });
 
-  it("defaults to All Time: fetches the lifetime Expected/Collected per team (open + closed cases)", async () => {
+  it("fetches window=month on mount and renders the team totals", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        window: "alltime",
+        window: "month",
         teams: [
-          { team: "T2", collected: 499_500, expected: 792_636 },
-          { team: "T16", collected: 656, expected: 300_656 },
+          { team: "T2", collected: 414_557 },
+          { team: "T16", collected: 325_569 },
+          { team: "Concurrent", collected: 392_826 },
         ],
       }),
     });
     render(<RevenuePanel />);
 
-    expect(fetch).toHaveBeenCalledWith("/api/revenue-by-team?window=alltime", expect.anything());
+    expect(fetch).toHaveBeenCalledWith("/api/revenue-by-team?window=month", expect.anything());
     await waitFor(() => expect(screen.getByText("T2 Team")).toBeTruthy());
     expect(screen.getByText("T16 Team")).toBeTruthy();
-    expect(screen.getByText(/792,636/)).toBeTruthy();
-  });
-
-  it("fetches the windowed team totals when a narrower preset is clicked", async () => {
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ window: "alltime", teams: [] }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          window: "month",
-          teams: [{ team: "T2", collected: 12_400 }, { team: "T16", collected: 3_100 }],
-        }),
-      });
-    render(<RevenuePanel />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-
-    fireEvent.click(screen.getByRole("button", { name: "Month" }));
-
-    expect(fetch).toHaveBeenCalledWith("/api/revenue-by-team?window=month", expect.anything());
-    await waitFor(() => expect(screen.getByText(/Collected — Month/)).toBeTruthy());
-    expect(screen.getByText(/15,500/)).toBeTruthy(); // 12,400 + 3,100
+    expect(screen.getByText("Concurrent Team")).toBeTruthy();
+    expect(screen.getByText(/Collected — Month/)).toBeTruthy();
+    // Headline is the sum of all three teams.
+    expect(screen.getByText("$1,132,952.00")).toBeTruthy();
+    // No tab switcher and no Expected figure — removed at Jazz/Lori's request.
+    expect(screen.queryByRole("button", { name: "All Time" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Today" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Week" })).toBeNull();
     expect(screen.queryByText("Expected")).toBeNull();
   });
 
-  it("re-sorts a windowed response into TEAM_ORDER regardless of the API's own row order", async () => {
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ window: "alltime", teams: [] }) })
-      .mockResolvedValueOnce({
-        ok: true,
-        // Deliberately out of order — SQL's GROUP BY gives no ordering guarantee.
-        json: async () => ({
-          window: "month",
-          teams: [
-            { team: "Concurrent", collected: 1 },
-            { team: "T16", collected: 2 },
-            { team: "T2", collected: 3 },
-          ],
-        }),
-      });
+  it("re-sorts the response into a fixed display order regardless of the API's own row order", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      // Deliberately out of order — SQL's GROUP BY gives no ordering guarantee.
+      json: async () => ({
+        window: "month",
+        teams: [
+          { team: "Concurrent", collected: 1 },
+          { team: "T16", collected: 2 },
+          { team: "T2", collected: 3 },
+        ],
+      }),
+    });
     render(<RevenuePanel />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-
-    fireEvent.click(screen.getByRole("button", { name: "Month" }));
-    await waitFor(() => expect(screen.getByText(/Collected — Month/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("T2 Team")).toBeTruthy());
 
     const labels = screen.getAllByText(/^(T2|T16|Concurrent) Team$/).map((el) => el.textContent);
     expect(labels).toEqual(["T2 Team", "T16 Team", "Concurrent Team"]);
   });
 
-  it("shows an alert when the windowed fetch fails", async () => {
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ window: "alltime", teams: [] }) })
-      .mockResolvedValueOnce({ ok: false, status: 500 });
+  it("shows an alert when the fetch fails, without a redundant empty state underneath", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 500 });
     render(<RevenuePanel />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-
-    fireEvent.click(screen.getByRole("button", { name: "Week" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByRole("alert").textContent).toContain("500");
-    // The error banner replaces the team breakdown entirely — no redundant
-    // "no data" state rendered underneath it.
-    expect(screen.queryByText(/No team data yet/)).toBeNull();
     expect(screen.queryByText(/No fees collected/)).toBeNull();
   });
 
-  it("clears the previous window's figures immediately on switch, instead of showing them under the new label", async () => {
-    let resolveMonth!: (value: unknown) => void;
-    const monthPromise = new Promise((resolve) => {
-      resolveMonth = resolve;
+  it("shows a loading state before the fetch resolves", async () => {
+    let resolveFetch!: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      resolveFetch = resolve;
     });
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ window: "alltime", teams: [{ team: "T2", collected: 499_500, expected: 792_636 }] }),
-      })
-      .mockReturnValueOnce(monthPromise);
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValueOnce(pending);
     render(<RevenuePanel />);
-    await waitFor(() => expect(screen.getByText(/792,636/)).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+    expect(screen.getByText(/Loading/)).toBeTruthy();
 
-    // Old All Time figure must be gone before Month's data has even arrived —
-    // otherwise it would sit on screen under the (already-updated) "Month" label.
-    await waitFor(() => expect(screen.getByText(/Loading/)).toBeTruthy());
-    expect(screen.queryByText(/792,636/)).toBeNull();
-
-    resolveMonth({
+    resolveFetch({
       ok: true,
-      json: async () => ({ window: "month", teams: [{ team: "T2", collected: 12_400 }] }),
+      json: async () => ({ window: "month", teams: [{ team: "T2", collected: 900 }] }),
     });
-    // Matches both the headline ($12,400.00) and the bar label ($12,400).
-    await waitFor(() => expect(screen.getAllByText(/12,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByText("T2 Team")).toBeTruthy());
   });
 
-  it("switching back to All Time re-fetches the lifetime totals", async () => {
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ window: "alltime", teams: [{ team: "T2", collected: 499_500, expected: 792_636 }] }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ window: "today", teams: [{ team: "T2", collected: 900 }] }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ window: "alltime", teams: [{ team: "T2", collected: 499_500, expected: 792_636 }] }),
-      });
+  it("shows an empty state when nothing was collected this month", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ window: "month", teams: [] }),
+    });
     render(<RevenuePanel />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-
-    fireEvent.click(screen.getByRole("button", { name: "Today" }));
-    await waitFor(() => expect(screen.getByText(/Collected — Today/)).toBeTruthy());
-
-    fireEvent.click(screen.getByRole("button", { name: "All Time" }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
-    // 499,500 / 792,636 = 63.0%
-    await waitFor(() => expect(screen.getByText(/63\.0%/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/No fees collected this month yet/)).toBeTruthy());
   });
 });
