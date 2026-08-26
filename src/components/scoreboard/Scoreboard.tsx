@@ -18,19 +18,21 @@ const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaL
   { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy scoreboard for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
+type PeriodMode = "week" | "month";
+
 // ---------- types ----------
 
-interface AgentWeekData {
+interface AgentPeriodData {
   agent: string;
   team: string;
   role: string | null;
   casesClosed: number;
 }
 
-interface WeekSlot {
-  monday: string;
+interface PeriodSlot {
+  key: string;
   label: string;
-  agents: AgentWeekData[];
+  agents: AgentPeriodData[];
 }
 
 // ---------- helpers ----------
@@ -43,7 +45,23 @@ const weekRangeLabel = (monday: string): string => {
   return `${start.toLocaleDateString("en-US", mo)} – ${end.toLocaleDateString("en-US", { day: "numeric" })}`;
 };
 
-const thisWeekCellColor = (value: number, max: number): string => {
+// First/last day (YYYY-MM-DD) of the calendar month `offset` months from the
+// current one, plus a short display label — e.g. offset -1 from August gives
+// July ("Jul 2026").
+const getMonthRange = (offset: number): { from: string; to: string; shortLabel: string } => {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return {
+    from: iso(first),
+    to: iso(lastDay),
+    shortLabel: first.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+  };
+};
+
+const thisPeriodCellColor = (value: number, max: number): string => {
   if (value === 0) return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
   const ratio = max > 0 ? value / max : 0;
   if (ratio >= 0.75) return "bg-green-500 text-white";
@@ -60,16 +78,16 @@ const TEAMS = [
 
 // ---------- state ----------
 
-type FetchState = { weeks: WeekSlot[]; loading: boolean; error: string | null };
+type FetchState = { periods: PeriodSlot[]; loading: boolean; error: string | null };
 type FetchAction =
   | { type: "start" }
-  | { type: "success"; weeks: WeekSlot[] }
+  | { type: "success"; periods: PeriodSlot[] }
   | { type: "error"; message: string };
 
 function fetchReducer(state: FetchState, action: FetchAction): FetchState {
   switch (action.type) {
     case "start":   return { ...state, loading: true, error: null };
-    case "success": return { weeks: action.weeks, loading: false, error: null };
+    case "success": return { periods: action.periods, loading: false, error: null };
     case "error":   return { ...state, loading: false, error: action.message };
   }
 }
@@ -112,7 +130,9 @@ export const Scoreboard = () => {
   const { can } = useCapabilities();
   const canImport = can("dailyMetrics.editOthers");
 
+  const [mode, setMode] = useState<PeriodMode>("week");
   const [weekOffset, setWeekOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,29 +146,51 @@ export const Scoreboard = () => {
     if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
     if (teamCopyTimerRef.current) clearTimeout(teamCopyTimerRef.current);
   }, []);
-  const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, {
-    weeks: [],
+  const [{ periods, loading, error }, dispatch] = useReducer(fetchReducer, {
+    periods: [],
     loading: true,
     error: null,
   });
 
+  const offset = mode === "week" ? weekOffset : monthOffset;
+
   useEffect(() => {
     let cancelled = false;
     dispatch({ type: "start" });
-    const mondays = Array.from({ length: 5 }, (_, i) => getMonday(weekOffset - i));
-    const controllers = mondays.map(() => new AbortController());
+
+    // 5 periods: the currently selected one plus 4 before it — same shape
+    // for week and month, just a different unit and a different API query
+    // (?week= for a 7-day window, ?from=&to= for a calendar month).
+    const slots = Array.from({ length: 5 }, (_, i) => {
+      const o = offset - i;
+      if (mode === "week") {
+        const monday = getMonday(o);
+        return {
+          url: `/api/scoreboard?week=${monday}`,
+          key: monday,
+          label: i === 0 && offset === 0 ? "This week" : weekRangeLabel(monday),
+        };
+      }
+      const { from, to, shortLabel } = getMonthRange(o);
+      return {
+        url: `/api/scoreboard?from=${from}&to=${to}`,
+        key: from,
+        label: i === 0 && offset === 0 ? "This month" : shortLabel,
+      };
+    });
+    const controllers = slots.map(() => new AbortController());
 
     Promise.all(
-      mondays.map((monday, i) =>
-        fetch(`/api/scoreboard?week=${monday}`, { signal: controllers[i].signal })
+      slots.map((slot, i) =>
+        fetch(slot.url, { signal: controllers[i].signal })
           .then((res) => {
             if (!res.ok) throw new Error(`Failed to load scoreboard (${res.status})`);
             return res.json();
           })
-          .then((json): WeekSlot => ({
-            monday,
-            label: i === 0 && weekOffset === 0 ? "This week" : weekRangeLabel(monday),
-            agents: (json.agents ?? []).map((a: AgentWeekData) => ({
+          .then((json): PeriodSlot => ({
+            key: slot.key,
+            label: slot.label,
+            agents: (json.agents ?? []).map((a: AgentPeriodData) => ({
               agent: a.agent,
               team: a.team ?? "",
               role: a.role ?? null,
@@ -159,7 +201,7 @@ export const Scoreboard = () => {
     )
       .then((results) => {
         if (cancelled) return;
-        dispatch({ type: "success", weeks: results });
+        dispatch({ type: "success", periods: results });
       })
       .catch((err: Error) => {
         if (err.name === "AbortError" || cancelled) return;
@@ -170,29 +212,49 @@ export const Scoreboard = () => {
       cancelled = true;
       controllers.forEach((c) => c.abort());
     };
-  }, [weekOffset]);
+  }, [mode, offset]);
 
-  const currentWeekMax = Math.max(
+  const currentPeriodMax = Math.max(
     ...TEAMS.flatMap(({ key }) =>
-      (weeks[0]?.agents ?? [])
+      (periods[0]?.agents ?? [])
         .filter((a) => a.team === key && a.role !== "team_lead")
         .map((a) => a.casesClosed)
     ),
     1
   );
 
-  const copyAllTeams = (format: "sheets" | "chat" | "teams") => {
-    const weekLabels = weeks.map((w) => w.label);
+  const teamRows = (teamKey: string) => {
+    // Team leads (e.g. supervisors) are excluded from the per-agent ranking
+    // rows — they're still counted in team-level financial totals elsewhere
+    // (Reports), just not scored individually here. They're also excluded
+    // from the Team Total row below, for the same reason.
+    const currentAgents = (periods[0]?.agents ?? []).filter(
+      (a) => a.team === teamKey && a.role !== "team_lead",
+    );
+    return currentAgents
+      .map((a) => ({
+        agent: a.agent,
+        periodValues: periods.map(
+          (p) => p.agents.find((x) => x.agent === a.agent)?.casesClosed ?? 0
+        ),
+      }))
+      .sort((a, b) => b.periodValues[0] - a.periodValues[0]);
+  };
+
+  const teamTotalRow = (rows: { periodValues: number[] }[]): number[] =>
+    periods.map((_, i) => rows.reduce((sum, r) => sum + r.periodValues[i], 0));
+
+  const copyAllTeams = (format: CopyFormat) => {
+    const periodLabels = periods.map((p) => p.label);
     const teamBlocks = TEAMS.flatMap(({ key, label: teamLabel }) => {
-      const currentAgents = (weeks[0]?.agents ?? []).filter((a) => a.team === key && a.role !== "team_lead");
-      const rows = currentAgents
-        .map((a) => ({
-          agent: a.agent,
-          weekValues: weeks.map((w) => w.agents.find((x) => x.agent === a.agent)?.casesClosed ?? 0),
-        }))
-        .sort((a, b) => b.weekValues[0] - a.weekValues[0]);
+      const rows = teamRows(key);
       if (rows.length === 0) return [];
-      return [{ teamLabel, header: ["Agent", ...weekLabels], rows: rows.map((r) => [r.agent, ...r.weekValues]) }];
+      const totals = teamTotalRow(rows);
+      return [{
+        teamLabel,
+        header: ["Agent", ...periodLabels],
+        rows: [...rows.map((r) => [r.agent, ...r.periodValues]), ["Team Total", ...totals]],
+      }];
     });
 
     const done = () => {
@@ -221,17 +283,12 @@ export const Scoreboard = () => {
   };
 
   const copyOneTeam = (teamKey: string, teamLabel: string, format: CopyFormat) => {
-    const weekLabels = weeks.map((w) => w.label);
-    const currentAgents = (weeks[0]?.agents ?? []).filter((a) => a.team === teamKey && a.role !== "team_lead");
-    const rows = currentAgents
-      .map((a) => ({
-        agent: a.agent,
-        weekValues: weeks.map((w) => w.agents.find((x) => x.agent === a.agent)?.casesClosed ?? 0),
-      }))
-      .sort((a, b) => b.weekValues[0] - a.weekValues[0]);
+    const periodLabels = periods.map((p) => p.label);
+    const rows = teamRows(teamKey);
+    const totals = teamTotalRow(rows);
 
-    const header = ["Agent", ...weekLabels];
-    const dataRows = rows.map((r) => [r.agent, ...r.weekValues]);
+    const header = ["Agent", ...periodLabels];
+    const dataRows = [...rows.map((r) => [r.agent, ...r.periodValues]), ["Team Total", ...totals]];
 
     const done = () => {
       setCopiedTeam({ key: teamKey, format });
@@ -248,6 +305,11 @@ export const Scoreboard = () => {
     } else {
       navigator.clipboard.writeText(toChatBlock(teamLabel, header, dataRows)).then(done);
     }
+  };
+
+  const setOffset = (next: number) => {
+    if (mode === "week") setWeekOffset(next);
+    else setMonthOffset(next);
   };
 
   return (
@@ -268,16 +330,20 @@ export const Scoreboard = () => {
     )}
     <div className={`rounded-xl border ${t.card} overflow-hidden`}>
       {/* Header */}
-      <div className={`px-5 py-4 border-b ${t.borderLight} flex items-center justify-between gap-4`}>
+      <div className={`px-5 py-4 border-b ${t.borderLight} flex items-center justify-between gap-4 flex-wrap`}>
         <div>
           <h2 className={`text-sm font-bold ${t.text}`}>Total Number of Closed Cases</h2>
           <p className={`text-[13px] ${t.textMuted} mt-0.5`}>
-            {weekOffset === 0
-              ? "Current week + 4 previous weeks"
-              : `5 weeks ending ${weekRangeLabel(getMonday(weekOffset)).split("–")[0].trim()}`}
+            {mode === "week"
+              ? offset === 0
+                ? "Current week + 4 previous weeks"
+                : `5 weeks ending ${weekRangeLabel(getMonday(offset)).split("–")[0].trim()}`
+              : offset === 0
+                ? "Current month + 4 previous months"
+                : `5 months ending ${getMonthRange(offset).shortLabel}`}
           </p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 flex-wrap">
           {canImport && (
             <button
               onClick={() => setCsvImportOpen(true)}
@@ -299,28 +365,48 @@ export const Scoreboard = () => {
               {copiedTable === format ? <><Check aria-hidden="true" className="h-3.5 w-3.5" />Copied</> : <><Icon aria-hidden="true" className="h-3.5 w-3.5" />{label}</>}
             </button>
           ))}
+          <div className={`flex items-center rounded-md border overflow-hidden text-[13px] font-medium shrink-0 ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
+            {(["week", "month"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                aria-pressed={mode === m}
+                className={`px-2.5 py-1 transition-colors ${
+                  mode === m
+                    ? dark
+                      ? "bg-emerald-700 text-white"
+                      : "bg-emerald-600 text-white"
+                    : dark
+                      ? "text-neutral-400 hover:bg-neutral-800"
+                      : "text-neutral-500 hover:bg-neutral-50"
+                }`}
+              >
+                {m === "week" ? "Week" : "Month"}
+              </button>
+            ))}
+          </div>
           <button
-            onClick={() => setWeekOffset(weekOffset - 1)}
+            onClick={() => setOffset(offset - 1)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
-            aria-label="Previous 5 weeks"
+            aria-label={`Previous 5 ${mode}s`}
           >
             <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" />
             Prev
           </button>
-          {weekOffset < 0 && (
+          {offset < 0 && (
             <button
-              onClick={() => setWeekOffset(0)}
+              onClick={() => setOffset(0)}
               className={`px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${dark ? "border-amber-700 text-amber-400 hover:bg-amber-900/20" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
             >
-              This week
+              {mode === "week" ? "This week" : "This month"}
             </button>
           )}
           <button
-            onClick={() => setWeekOffset(weekOffset + 1)}
-            disabled={weekOffset >= 0}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${weekOffset >= 0 ? (dark ? "border-neutral-800 text-neutral-600 cursor-not-allowed" : "border-neutral-100 text-neutral-300 cursor-not-allowed") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
-            aria-label="Next 5 weeks"
-            aria-disabled={weekOffset >= 0}
+            onClick={() => setOffset(offset + 1)}
+            disabled={offset >= 0}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[13px] font-medium border transition-colors ${offset >= 0 ? (dark ? "border-neutral-800 text-neutral-600 cursor-not-allowed" : "border-neutral-100 text-neutral-300 cursor-not-allowed") : (dark ? "border-neutral-700 text-neutral-300 hover:bg-neutral-800" : "border-neutral-200 text-neutral-600 hover:bg-neutral-50")}`}
+            aria-label={`Next 5 ${mode}s`}
+            aria-disabled={offset >= 0}
           >
             Next
             <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
@@ -344,32 +430,20 @@ export const Scoreboard = () => {
         </div>
       )}
 
-      {!loading && !error && weeks.length > 0 && (
+      {!loading && !error && periods.length > 0 && (
         <div>
           {TEAMS.map(({ key, label, headerBg }) => {
-            // Team leads (e.g. supervisors) are excluded from the per-agent
-            // ranking rows — they're still counted in team-level financial
-            // totals elsewhere (Reports), just not scored individually here.
-            const currentAgents = (weeks[0]?.agents ?? []).filter(
-              (a) => a.team === key && a.role !== "team_lead",
-            );
-            const rows = currentAgents
-              .map((a) => ({
-                agent: a.agent,
-                weekValues: weeks.map(
-                  (w) => w.agents.find((x) => x.agent === a.agent)?.casesClosed ?? 0
-                ),
-              }))
-              .sort((a, b) => b.weekValues[0] - a.weekValues[0]);
+            const rows = teamRows(key);
 
-            // Per-column (per-week) max, so each previous week's top scorer
-            // can get its own trophy next to that week's number — not just
-            // the currently-selected week. Same zero-exclusion as the
-            // by-name trophy: a week with no closures for the whole team
-            // awards nothing.
-            const maxPerColumn = weeks.map((_, i) =>
-              Math.max(...rows.map((r) => r.weekValues[i]), 0),
+            // Per-column (per-period) max, so each previous period's top
+            // scorer can get its own trophy next to that period's number —
+            // not just the currently selected one. Same zero-exclusion as
+            // the by-name trophy: a period with no closures for the whole
+            // team awards nothing.
+            const maxPerColumn = periods.map((_, i) =>
+              Math.max(...rows.map((r) => r.periodValues[i]), 0),
             );
+            const totals = teamTotalRow(rows);
 
             return (
               <div key={key} className={`border-b last:border-b-0 ${t.borderLight}`}>
@@ -398,7 +472,7 @@ export const Scoreboard = () => {
                 </div>
 
                 {rows.length === 0 ? (
-                  <p className={`text-xs ${t.textMuted} px-4 py-4`}>No agents this week.</p>
+                  <p className={`text-xs ${t.textMuted} px-4 py-4`}>No agents this {mode}.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-120">
@@ -409,12 +483,12 @@ export const Scoreboard = () => {
                           >
                             Agent
                           </th>
-                          {weeks.map((w, i) => (
+                          {periods.map((p, i) => (
                             <th
                               key={i}
                               className={`py-2 px-3 text-center text-[12px] font-semibold uppercase tracking-wider ${i === 0 ? t.text : t.textMuted}`}
                             >
-                              {w.label}
+                              {p.label}
                             </th>
                           ))}
                           <th className="w-8"></th>
@@ -423,12 +497,12 @@ export const Scoreboard = () => {
                       <tbody>
                         {rows.map((row, rowIdx) => {
                           // Trophy marks whoever topped this team for the
-                          // currently displayed week (rows are already sorted
-                          // by that week's value) — ties all get one, and a
-                          // week with zero closures for the whole team awards
-                          // none rather than crowning a 0.
+                          // currently displayed period (rows are already
+                          // sorted by that period's value) — ties all get
+                          // one, and a period with zero closures for the
+                          // whole team awards none rather than crowning a 0.
                           const isTopScorer =
-                            row.weekValues[0] > 0 && row.weekValues[0] === rows[0].weekValues[0];
+                            row.periodValues[0] > 0 && row.periodValues[0] === rows[0].periodValues[0];
                           return (
                           <tr
                             key={row.agent}
@@ -437,7 +511,7 @@ export const Scoreboard = () => {
                             <td className={`py-2.5 px-4 text-[14px] font-medium ${t.text}`}>
                               <span
                                 className="inline-flex items-center gap-1.5"
-                                title={isTopScorer ? "Top scorer this week" : undefined}
+                                title={isTopScorer ? `Top scorer this ${mode}` : undefined}
                               >
                                 <span className="select-all cursor-text">{row.agent}</span>
                                 {isTopScorer && (
@@ -445,20 +519,20 @@ export const Scoreboard = () => {
                                 )}
                               </span>
                             </td>
-                            {row.weekValues.map((val, i) => {
-                              // Excludes i === 0 — the current week already
+                            {row.periodValues.map((val, i) => {
+                              // Excludes i === 0 — the current period already
                               // gets its own trophy next to the agent's name
-                              // above, so this only covers previous weeks.
+                              // above, so this only covers previous periods.
                               const isTopForColumn = i > 0 && val > 0 && val === maxPerColumn[i];
                               return (
                               <td key={i} className="py-2.5 px-3 text-center">
                                 <span
                                   className="inline-flex items-center justify-center gap-1"
-                                  title={isTopForColumn ? "Top scorer that week" : undefined}
+                                  title={isTopForColumn ? `Top scorer that ${mode}` : undefined}
                                 >
                                   {i === 0 ? (
                                     <span
-                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold select-all cursor-text ${thisWeekCellColor(val, currentWeekMax)}`}
+                                      className={`inline-block min-w-8 rounded px-2 py-0.5 text-[14px] font-semibold select-all cursor-text ${thisPeriodCellColor(val, currentPeriodMax)}`}
                                     >
                                       {val}
                                     </span>
@@ -475,7 +549,7 @@ export const Scoreboard = () => {
                             <td className="py-2.5 px-2 text-center">
                               <button
                                 onClick={() => {
-                                  const parts = [row.agent, ...row.weekValues.map((v, i) => `${weeks[i]?.label ?? `W${i+1}`}: ${v}`)];
+                                  const parts = [row.agent, ...row.periodValues.map((v, i) => `${periods[i]?.label ?? `P${i+1}`}: ${v}`)];
                                   navigator.clipboard.writeText(parts.join(" | ")).then(() => {
                                     setCopiedRow(row.agent);
                                     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
@@ -496,6 +570,17 @@ export const Scoreboard = () => {
                           );
                         })}
                       </tbody>
+                      <tfoot>
+                        <tr className={dark ? "bg-neutral-800/60" : "bg-neutral-50"}>
+                          <td className={`py-2.5 px-4 text-[14px] font-bold ${t.text}`}>Team Total</td>
+                          {totals.map((val, i) => (
+                            <td key={i} className={`py-2.5 px-3 text-center text-[14px] font-bold ${i === 0 ? t.text : t.textSub}`}>
+                              {val}
+                            </td>
+                          ))}
+                          <td></td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 )}
