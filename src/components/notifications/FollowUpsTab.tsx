@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, ExternalLink, Check, Table2, MessageSquare, type LucideIcon } from "lucide-react";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { themeClasses } from "@/lib/theme-classes";
-import { toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { toChatBlock } from "@/lib/formatters";
 
-type CopyFormat = "sheets" | "chat" | "teams";
+type CopyFormat = "sheets" | "chat";
 const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string }[] = [
   { format: "sheets", Icon: Table2,        label: "Sheets", ariaLabel: "Copy for Google Sheets" },
   { format: "chat",   Icon: MessageSquare, label: "Chat",   ariaLabel: "Copy for Google Chat" },
-  { format: "teams",  Icon: LayoutGrid,    label: "Teams",  ariaLabel: "Copy for Microsoft Teams" },
 ];
 
 interface FollowUpRow {
@@ -157,40 +156,24 @@ export function FollowUpsTab({ dark, t }: FollowUpsTabProps) {
   const barBg     = dark ? "bg-orange-500/30" : "bg-orange-200";
   const agentBg   = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
+  // Copies only the agent figures — not the case-level detail list rendered
+  // below, which staff paste into Sheets/Chat as a scoreboard-style summary,
+  // not a case export.
   const copyData = (format: CopyFormat) => {
     const label = isToday ? `Today · ${fmtDate(selectedDate)}` : fmtDate(selectedDate);
     const agentTitle  = `Follow-Ups — ${label}`;
     const agentHeader = ["Agent", "Follow-Ups"];
     const agentRows: (string | number)[][] = agentsToday.map((a) => [a.name, a.count]);
-    const listTitle   = `Follow-Up Cases — ${label}`;
-    const listHeader  = ["Agent", "Case Name", "Source"];
-    const listRows: (string | number)[][] = agentNames.flatMap((agent) =>
-      byAgent[agent].map((f) => [
-        agent,
-        f.caseName,
-        f.source === "fee_petition" ? "Fee Petition" : "Master Fees",
-      ])
-    );
     const done = () => {
       setCopied(format);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopied(null), 1500);
     };
-    if (format === "teams") {
-      const html = toTeamsHtml(agentTitle, agentHeader, agentRows) +
-        (listRows.length ? toTeamsHtml(listTitle, listHeader, listRows) : "");
-      const blob = new Blob([html], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
-      const lines = [
-        agentTitle, agentHeader.join("\t"), ...agentRows.map((r) => r.join("\t")),
-        ...(listRows.length ? ["", listTitle, listHeader.join("\t"), ...listRows.map((r) => r.join("\t"))] : []),
-      ];
+    if (format === "sheets") {
+      const lines = [agentTitle, agentHeader.join("\t"), ...agentRows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
-      const parts = [toChatBlock(agentTitle, agentHeader, agentRows)];
-      if (listRows.length) parts.push(toChatBlock(listTitle, listHeader, listRows));
-      navigator.clipboard.writeText(parts.join("\n\n")).then(done);
+      navigator.clipboard.writeText(toChatBlock(agentTitle, agentHeader, agentRows)).then(done);
     }
   };
 

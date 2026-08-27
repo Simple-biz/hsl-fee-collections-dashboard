@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Clock, AlertCircle, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Clock, AlertCircle, Check, Table2, MessageSquare, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { getMonday, formatWeekLabel, toChatBlock } from "@/lib/formatters";
 
-type CopyFormat = "sheets" | "chat" | "teams";
+type CopyFormat = "sheets" | "chat";
 const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
   { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
   { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
-  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
 interface ActivityEntry {
@@ -45,7 +44,7 @@ export function RecentActivityTab({ dark, t }: RecentActivityTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | "teams" | null>(null);
+  const [copiedTable, setCopiedTable] = useState<CopyFormat | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
@@ -94,7 +93,7 @@ export function RecentActivityTab({ dark, t }: RecentActivityTabProps) {
   const rowHover  = dark ? "hover:bg-neutral-800/30" : "hover:bg-neutral-50";
   const dateBg    = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
-  const copyTable = (format: "sheets" | "chat" | "teams") => {
+  const copyTable = (format: CopyFormat) => {
     const title = `Recent Activity — ${formatWeekLabel(monday)}`;
     const header = ["Date", "Time", "Agent", "Case", "Activity"];
     const rows = dates.flatMap((date) =>
@@ -111,10 +110,7 @@ export function RecentActivityTab({ dark, t }: RecentActivityTabProps) {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
-    if (format === "teams") {
-      const blob = new Blob([toTeamsHtml(title, header, rows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
+    if (format === "sheets") {
       const lines = [title, header.join("\t"), ...rows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {

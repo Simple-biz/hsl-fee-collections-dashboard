@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Check, Table2, MessageSquare, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock } from "@/lib/formatters";
 
-type CopyFormat = "sheets" | "chat" | "teams";
+type CopyFormat = "sheets" | "chat";
 const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
   { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
   { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
-  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
 interface DayCount {
@@ -107,6 +106,9 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
   const barBg = dark ? "bg-emerald-500/30" : "bg-emerald-200";
   const dateBg = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
+  // Copies only the daily count summary — not the per-case list rendered
+  // below, which staff paste into Sheets/Chat as a scoreboard-style summary,
+  // not a case export.
   const copyTable = (format: CopyFormat) => {
     const weekLabel = formatWeekLabel(monday);
     const countTitle = `Fee Petitions Approved — ${weekLabel}`;
@@ -115,32 +117,16 @@ export function FeePetitionApprovedTab({ dark, t }: FeePetitionApprovedTabProps)
       ...days.map((d) => [fmtDate(d.date), d.count || 0]),
       ["Week Total", weekTotal],
     ];
-    const listTitle = `Approved — ${weekLabel}`;
-    const listHeader = ["Date", "Case Name", "Assigned To"];
-    const listRows: (string | number)[][] = approvalDates.flatMap((date) =>
-      approvalsByDate[date].map((a) => [fmtDate(date), a.caseName, a.assignedTo ?? "—"])
-    );
     const done = () => {
       setCopiedTable(format);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
-    if (format === "teams") {
-      const html = toTeamsHtml(countTitle, countHeader, countRows) +
-        (listRows.length ? toTeamsHtml(listTitle, listHeader, listRows) : "");
-      const blob = new Blob([html], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
-      const lines = [
-        countTitle, countHeader.join("\t"), ...countRows.map((r) => r.join("\t")),
-        "",
-        ...(listRows.length ? [listTitle, listHeader.join("\t"), ...listRows.map((r) => r.join("\t"))] : []),
-      ];
+    if (format === "sheets") {
+      const lines = [countTitle, countHeader.join("\t"), ...countRows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
-      const parts = [toChatBlock(countTitle, countHeader, countRows)];
-      if (listRows.length) parts.push(toChatBlock(listTitle, listHeader, listRows));
-      navigator.clipboard.writeText(parts.join("\n\n")).then(done);
+      navigator.clipboard.writeText(toChatBlock(countTitle, countHeader, countRows)).then(done);
     }
   };
 
