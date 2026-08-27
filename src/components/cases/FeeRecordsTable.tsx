@@ -238,6 +238,7 @@ type SortKey =
   | "expected"
   | "paid"
   | "daysAfterApproval"
+  | "nextFollowUpDate"
   | "closedAt"
   | "createdAt";
 type SortDir = "asc" | "desc";
@@ -314,6 +315,17 @@ export const FeeRecordsTable = ({
   const [caseStatusFilter, setCaseStatusFilter] = useState(() => searchParams.get("cs") ?? "all");
   const [levelFilter, setLevelFilter] = useState(() => searchParams.get("level") ?? "all");
   const [approverFilter, setApproverFilter] = useState(() => searchParams.get("approver") ?? "all");
+  // Follow-up date filter — "day" narrows to one specific date, "range" to a
+  // from/to window; both are no-ops until a date is actually picked, so
+  // switching modes alone doesn't suddenly hide every case with no follow-up
+  // scheduled (see the `filtered` useMemo below).
+  const [followUpMode, setFollowUpMode] = useState<"all" | "day" | "range">(() => {
+    const m = searchParams.get("fuMode");
+    return m === "day" || m === "range" ? m : "all";
+  });
+  const [followUpDay, setFollowUpDay] = useState(() => searchParams.get("fuDay") ?? "");
+  const [followUpFrom, setFollowUpFrom] = useState(() => searchParams.get("fuFrom") ?? "");
+  const [followUpTo, setFollowUpTo] = useState(() => searchParams.get("fuTo") ?? "");
   // Minimized T16/T2/AUX column groups — collapses a claim type's 5 editable
   // columns down to a single read-only Fee Due glance, so staff working a
   // single claim type can't mistakenly enter Retro/Fee Due on the wrong one.
@@ -330,7 +342,7 @@ export const FeeRecordsTable = ({
   // Fees Closed defaults to most-recently-closed on top; Master Fees
   // defaults to most-recently-added on top (both requested by Ms. Jazz).
   const defaultSortKey: SortKey = mode === "closed" ? "closedAt" : "createdAt";
-  const VALID_SORT_KEYS: SortKey[] = ["name", "assigned", "date", "expected", "paid", "daysAfterApproval", "closedAt", "createdAt"];
+  const VALID_SORT_KEYS: SortKey[] = ["name", "assigned", "date", "expected", "paid", "daysAfterApproval", "nextFollowUpDate", "closedAt", "createdAt"];
   const [sortKey, setSortKey] = useState<SortKey>(() => {
     const s = searchParams.get("sort") as SortKey | null;
     return s && VALID_SORT_KEYS.includes(s) ? s : defaultSortKey;
@@ -391,6 +403,10 @@ export const FeeRecordsTable = ({
     if (caseStatusFilter !== "all") params.set("cs", caseStatusFilter);
     if (levelFilter !== "all") params.set("level", levelFilter);
     if (approverFilter !== "all") params.set("approver", approverFilter);
+    if (followUpMode !== "all") params.set("fuMode", followUpMode);
+    if (followUpDay) params.set("fuDay", followUpDay);
+    if (followUpFrom) params.set("fuFrom", followUpFrom);
+    if (followUpTo) params.set("fuTo", followUpTo);
     if (sortKey !== defaultSortKey) params.set("sort", sortKey);
     if (sortDir !== "desc") params.set("dir", sortDir);
     const next: FilterPreset[] = [
@@ -413,6 +429,11 @@ export const FeeRecordsTable = ({
     setCaseStatusFilter(p.get("cs") ?? "all");
     setLevelFilter(p.get("level") ?? "all");
     setApproverFilter(p.get("approver") ?? "all");
+    const fuMode = p.get("fuMode");
+    setFollowUpMode(fuMode === "day" || fuMode === "range" ? fuMode : "all");
+    setFollowUpDay(p.get("fuDay") ?? "");
+    setFollowUpFrom(p.get("fuFrom") ?? "");
+    setFollowUpTo(p.get("fuTo") ?? "");
     const s = p.get("sort") as SortKey | null;
     if (s && VALID_SORT_KEYS.includes(s)) setSortKey(s);
     else setSortKey(defaultSortKey);
@@ -524,6 +545,10 @@ export const FeeRecordsTable = ({
       if (caseStatusFilter !== "all") params.set("cs", caseStatusFilter);
       if (levelFilter !== "all") params.set("level", levelFilter);
       if (approverFilter !== "all") params.set("approver", approverFilter);
+      if (followUpMode !== "all") params.set("fuMode", followUpMode);
+      if (followUpDay) params.set("fuDay", followUpDay);
+      if (followUpFrom) params.set("fuFrom", followUpFrom);
+      if (followUpTo) params.set("fuTo", followUpTo);
       if (sortKey !== defaultSortKey) params.set("sort", sortKey);
       if (sortDir !== "desc") params.set("dir", sortDir);
       if (pageSize !== 100) params.set("size", String(pageSize));
@@ -531,7 +556,7 @@ export const FeeRecordsTable = ({
       router.replace(qs ? `?${qs}` : "?", { scroll: false });
     }, 300);
     return () => clearTimeout(timer);
-  }, [search, statusFilter, assignedFilter, feesConfFilter, claimFilter, caseStatusFilter, levelFilter, approverFilter, sortKey, sortDir, pageSize, defaultSortKey, router]);
+  }, [search, statusFilter, assignedFilter, feesConfFilter, claimFilter, caseStatusFilter, levelFilter, approverFilter, followUpMode, followUpDay, followUpFrom, followUpTo, sortKey, sortDir, pageSize, defaultSortKey, router]);
 
   const toggleRowSelection = (id: number) => {
     setSelectedIds((prev) => {
@@ -580,7 +605,8 @@ export const FeeRecordsTable = ({
     claimFilter !== "all" ||
     caseStatusFilter !== "all" ||
     levelFilter !== "all" ||
-    approverFilter !== "all";
+    approverFilter !== "all" ||
+    followUpMode !== "all";
 
   const clearFilters = () => {
     setSearch("");
@@ -591,6 +617,10 @@ export const FeeRecordsTable = ({
     setCaseStatusFilter("all");
     setLevelFilter("all");
     setApproverFilter("all");
+    setFollowUpMode("all");
+    setFollowUpDay("");
+    setFollowUpFrom("");
+    setFollowUpTo("");
     setSortKey(defaultSortKey);
     setSortDir("desc");
     setPageIndex(0);
@@ -735,6 +765,25 @@ export const FeeRecordsTable = ({
       d = d.filter((c) => normalizeCaseLevel(c.level) === normalizeCaseLevel(levelFilter));
     if (approverFilter !== "all")
       d = d.filter((c) => c.approvedBy?.toLowerCase().includes(approverFilter));
+    // No-ops until a date is actually picked (see the state comment above) —
+    // only exclude no-follow-up-scheduled cases once there's something real
+    // to compare against.
+    if (followUpMode === "day" && followUpDay) {
+      d = d.filter((c) => {
+        const ov = pending[c.id]?.nextFollowUpDate;
+        const val = ov !== undefined ? ov : c.nextFollowUpDate;
+        return val === followUpDay;
+      });
+    } else if (followUpMode === "range" && (followUpFrom || followUpTo)) {
+      d = d.filter((c) => {
+        const ov = pending[c.id]?.nextFollowUpDate;
+        const val = ov !== undefined ? ov : c.nextFollowUpDate;
+        if (!val) return false;
+        if (followUpFrom && val < followUpFrom) return false;
+        if (followUpTo && val > followUpTo) return false;
+        return true;
+      });
+    }
 
     d.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -771,6 +820,25 @@ export const FeeRecordsTable = ({
           av = a.daysAfterApproval ?? 0;
           bv = b.daysAfterApproval ?? 0;
           break;
+        case "nextFollowUpDate": {
+          // Use pending override when present (same logic as "assigned"
+          // above) so an unsaved edit reorders the row immediately.
+          const ova = pending[a.id]?.nextFollowUpDate;
+          const ovb = pending[b.id]?.nextFollowUpDate;
+          const da = (ova !== undefined ? ova : a.nextFollowUpDate) || "";
+          const db = (ovb !== undefined ? ovb : b.nextFollowUpDate) || "";
+          // No date scheduled always sorts to the end, regardless of
+          // ascending/descending — an unscheduled follow-up isn't
+          // "earliest" or "latest," so it shouldn't jump to the top when
+          // the direction is reversed. Real dates fall through to the
+          // generic comparison below so sortDir still applies to them.
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          av = da;
+          bv = db;
+          break;
+        }
         case "closedAt":
           av = a.closedAt || "";
           bv = b.closedAt || "";
@@ -797,6 +865,10 @@ export const FeeRecordsTable = ({
     caseStatusFilter,
     levelFilter,
     approverFilter,
+    followUpMode,
+    followUpDay,
+    followUpFrom,
+    followUpTo,
     sortKey,
     sortDir,
     dateRange,
@@ -827,6 +899,10 @@ export const FeeRecordsTable = ({
     feesConfFilter,
     claimFilter,
     caseStatusFilter,
+    followUpMode,
+    followUpDay,
+    followUpFrom,
+    followUpTo,
     sortKey,
     sortDir,
     pageSize,
@@ -846,8 +922,11 @@ export const FeeRecordsTable = ({
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else {
       setSortKey(key);
-      // Text columns default to A→Z; numeric/date columns default to newest/highest.
-      setSortDir(key === "name" || key === "assigned" ? "asc" : "desc");
+      // Text columns default to A→Z; numeric/date columns default to
+      // newest/highest — except Next Follow-Up, a scheduling date rather
+      // than a "when did this happen" date, where soonest-due-first (asc)
+      // is what staff scanning for upcoming calls actually want.
+      setSortDir(key === "name" || key === "assigned" || key === "nextFollowUpDate" ? "asc" : "desc");
     }
   };
 
@@ -1441,6 +1520,44 @@ export const FeeRecordsTable = ({
               </option>
             ))}
           </select>
+          <select
+            value={followUpMode}
+            onChange={(e) => setFollowUpMode(e.target.value as "all" | "day" | "range")}
+            className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+            aria-label="Follow-up date filter mode"
+          >
+            <option value="all">All Follow-Ups</option>
+            <option value="day">Specific Day</option>
+            <option value="range">Date Range</option>
+          </select>
+          {followUpMode === "day" && (
+            <input
+              type="date"
+              value={followUpDay}
+              onChange={(e) => setFollowUpDay(e.target.value)}
+              aria-label="Follow-up day"
+              className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+            />
+          )}
+          {followUpMode === "range" && (
+            <>
+              <input
+                type="date"
+                value={followUpFrom}
+                onChange={(e) => setFollowUpFrom(e.target.value)}
+                aria-label="Follow-up from date"
+                className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+              />
+              <span className={`text-xs ${t.textMuted}`}>to</span>
+              <input
+                type="date"
+                value={followUpTo}
+                onChange={(e) => setFollowUpTo(e.target.value)}
+                aria-label="Follow-up to date"
+                className={`h-8 px-2 rounded-md border text-xs outline-none cursor-pointer ${t.inputBg}`}
+              />
+            </>
+          )}
           {approvedByOptions.length > 0 && (
             <select
               value={approverFilter}
@@ -1911,8 +2028,17 @@ export const FeeRecordsTable = ({
                 </th>
 
                 {/* Workflow */}
-                <th className={`${thBase} ${t.textSub} text-left ${groupBorder}`}>
-                  Next Follow-Up
+                <th
+                  aria-sort={ariaSortFor("nextFollowUpDate")}
+                  className={`${thBase} ${t.textSub} text-left ${groupBorder}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("nextFollowUpDate")}
+                    className="inline-flex items-center gap-1 cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-neutral-300 dark:focus:ring-neutral-600"
+                  >
+                    Next Follow-Up <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+                  </button>
                 </th>
                 <th className={`${thBase} ${t.textSub} text-left`}>
                   Recent Update
