@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { RefreshCw, PhoneMissed, Phone, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import { RefreshCw, PhoneMissed, Phone, AlertCircle, ExternalLink, Check, Table2, MessageSquare, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock } from "@/lib/formatters";
 import Link from "next/link";
 
-type CopyFormat = "sheets" | "chat" | "teams";
+type CopyFormat = "sheets" | "chat";
 const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
   { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
   { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
-  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
 interface DayCallCount {
@@ -155,10 +154,7 @@ export function CallsBacklogTab({ dark, t }: CallsBacklogTabProps) {
       if (countsTimerRef.current) clearTimeout(countsTimerRef.current);
       countsTimerRef.current = setTimeout(() => setCopiedCounts(null), 1500);
     };
-    if (format === "teams") {
-      const blob = new Blob([toTeamsHtml(title, header, countRows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
+    if (format === "sheets") {
       const lines = [title, header.join("\t"), ...countRows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
@@ -181,10 +177,7 @@ export function CallsBacklogTab({ dark, t }: CallsBacklogTabProps) {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
-    if (format === "teams") {
-      const blob = new Blob([toTeamsHtml(title, header, tableRows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
+    if (format === "sheets") {
       const lines = [title, header.join("\t"), ...tableRows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
