@@ -2,15 +2,14 @@
 
 import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, RefreshCw, UserPlus, AlertCircle, ExternalLink, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, UserPlus, AlertCircle, ExternalLink, Check, Table2, MessageSquare, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { getMonday, formatWeekLabelShort as formatWeekLabel, toChatBlock } from "@/lib/formatters";
 
-type CopyFormat = "sheets" | "chat" | "teams";
+type CopyFormat = "sheets" | "chat";
 const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
   { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
   { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy for Google Chat", title: "Copy for Google Chat (monospace code block)" },
-  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
 interface DayCount {
@@ -54,7 +53,7 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | "teams" | null>(null);
+  const [copiedTable, setCopiedTable] = useState<CopyFormat | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
@@ -108,7 +107,10 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
   const barBg = dark ? "bg-indigo-500/30" : "bg-indigo-200";
   const dateBg = dark ? "bg-neutral-800/60" : "bg-neutral-50";
 
-  const copyTable = (format: "sheets" | "chat" | "teams") => {
+  // Copies only the daily count summary — not the per-case list rendered
+  // below, which staff paste into Sheets/Chat as a scoreboard-style summary,
+  // not a case export.
+  const copyTable = (format: "sheets" | "chat") => {
     const weekLabel = formatWeekLabel(monday);
     const countTitle = `New Cases — ${weekLabel}`;
     const countHeader = ["Day", "New Cases"];
@@ -116,11 +118,6 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
       ...days.map((d) => [fmtDate(d.date), d.count || 0]),
       ["Week Total", weekTotal],
     ];
-    const caseTitle = `Cases Added — ${weekLabel}`;
-    const caseHeader = ["Date", "Case Name", "Added"];
-    const caseRows: (string | number)[][] = caseDates.flatMap((date) =>
-      casesByDate[date].map((c) => [fmtDate(date), c.name, fmtTime(c.createdAt)])
-    );
 
     const done = () => {
       setCopiedTable(format);
@@ -128,22 +125,11 @@ export function NewCasesTab({ dark, t }: NewCasesTabProps) {
       copyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
 
-    if (format === "teams") {
-      const html = toTeamsHtml(countTitle, countHeader, countRows) +
-        (caseRows.length ? toTeamsHtml(caseTitle, caseHeader, caseRows) : "");
-      const blob = new Blob([html], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
-      const lines = [
-        countTitle, countHeader.join("\t"), ...countRows.map((r) => r.join("\t")),
-        "",
-        ...(caseRows.length ? [caseTitle, caseHeader.join("\t"), ...caseRows.map((r) => r.join("\t"))] : []),
-      ];
+    if (format === "sheets") {
+      const lines = [countTitle, countHeader.join("\t"), ...countRows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
-      const parts = [toChatBlock(countTitle, countHeader, countRows)];
-      if (caseRows.length) parts.push(toChatBlock(caseTitle, caseHeader, caseRows));
-      navigator.clipboard.writeText(parts.join("\n\n")).then(done);
+      navigator.clipboard.writeText(toChatBlock(countTitle, countHeader, countRows)).then(done);
     }
   };
 

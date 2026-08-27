@@ -22,12 +22,11 @@ import {
   Clipboard,
   Table2,
   MessageSquare,
-  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel, toChatBlock } from "@/lib/formatters";
 import { teamBadgeClasses } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import {
@@ -187,21 +186,18 @@ interface CopyButtonsProps {
   label: string;
   sheetsActive: boolean;
   chatActive: boolean;
-  teamsActive: boolean;
   onSheets: () => void;
   onChat: () => void;
-  onTeams: () => void;
   dark: boolean;
 }
 
-function CopyButtons({ label, sheetsActive, chatActive, teamsActive, onSheets, onChat, onTeams, dark }: CopyButtonsProps) {
+function CopyButtons({ label, sheetsActive, chatActive, onSheets, onChat, dark }: CopyButtonsProps) {
   const base = `flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border transition-colors`;
   const active = dark ? "border-emerald-700 text-emerald-400" : "border-emerald-300 text-emerald-600";
   const idle = dark ? "border-neutral-700 text-neutral-400 hover:bg-neutral-800" : "border-neutral-200 text-neutral-500 hover:bg-neutral-50";
   const buttons: { Icon: LucideIcon; btnLabel: string; ariaLabel: string; title: string; isActive: boolean; onClick: () => void }[] = [
     { Icon: Table2, btnLabel: "Sheets", ariaLabel: `Copy ${label} for Google Sheets`, title: "Copy for Google Sheets (tab-separated)", isActive: sheetsActive, onClick: onSheets },
     { Icon: MessageSquare, btnLabel: "Chat", ariaLabel: `Copy ${label} for Google Chat`, title: "Copy for Google Chat (monospace code block)", isActive: chatActive, onClick: onChat },
-    { Icon: LayoutGrid, btnLabel: "Teams", ariaLabel: `Copy ${label} for Microsoft Teams`, title: "Copy for Microsoft Teams (HTML table)", isActive: teamsActive, onClick: onTeams },
   ];
   return (
     <div className="flex items-center gap-1">
@@ -244,7 +240,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
   const [metricFocus, setMetricFocus] = useState<MetricFocus>("all");
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [copiedTable, setCopiedTable] = useState<"noFees-sheets" | "noFees-chat" | "noFees-teams" | "agents-sheets" | "agents-chat" | "agents-teams" | null>(null);
+  const [copiedTable, setCopiedTable] = useState<"noFees-sheets" | "noFees-chat" | "agents-sheets" | "agents-chat" | null>(null);
   const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -271,7 +267,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
     });
   };
 
-  const copyNoFeesTable = (format: "sheets" | "chat" | "teams") => {
+  const copyNoFeesTable = (format: "sheets" | "chat") => {
     const header = format === "sheets"
       ? ["Case Name", "Assigned", "Level", "Claim", "Approval", "Days"]
       : ["Case", "Agent", "Level", "Claim", "Approved", "Days"];
@@ -292,18 +288,13 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
       tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
-    if (format === "teams") {
-      const blob = new Blob([toTeamsHtml("No Fees Cases", header, rows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else {
-      const text = format === "sheets"
-        ? [header, ...rows].map((r) => r.join("\t")).join("\n")
-        : toChatBlock("No Fees Cases", header, rows);
-      navigator.clipboard.writeText(text).then(done);
-    }
+    const text = format === "sheets"
+      ? [header, ...rows].map((r) => r.join("\t")).join("\n")
+      : toChatBlock("No Fees Cases", header, rows);
+    navigator.clipboard.writeText(text).then(done);
   };
 
-  const copyAgentTable = (format: "sheets" | "chat" | "teams") => {
+  const copyAgentTable = (format: "sheets" | "chat") => {
     const chat = format === "chat";
     const headers: string[] = ["Agent"];
     if (showCol("cases"))       headers.push("Open");
@@ -349,15 +340,10 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       if (tableCopyTimerRef.current) clearTimeout(tableCopyTimerRef.current);
       tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
-    if (format === "teams") {
-      const blob = new Blob([toTeamsHtml(`Agent Tracking — ${windowLabel}`, headers, [...dataRows, totalsRow])], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else {
-      const text = format === "sheets"
-        ? [headers, ...dataRows, totalsRow].map((r) => r.join("\t")).join("\n")
-        : toChatBlock(`Agent Tracking — ${windowLabel}`, headers, [...dataRows, totalsRow]);
-      navigator.clipboard.writeText(text).then(done);
-    }
+    const text = format === "sheets"
+      ? [headers, ...dataRows, totalsRow].map((r) => r.join("\t")).join("\n")
+      : toChatBlock(`Agent Tracking — ${windowLabel}`, headers, [...dataRows, totalsRow]);
+    navigator.clipboard.writeText(text).then(done);
   };
 
   const [dateMode, setDateMode] = useState<DateMode>("day");
@@ -795,10 +781,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                 label="No Fees Cases"
                 sheetsActive={copiedTable === "noFees-sheets"}
                 chatActive={copiedTable === "noFees-chat"}
-                teamsActive={copiedTable === "noFees-teams"}
                 onSheets={() => copyNoFeesTable("sheets")}
                 onChat={() => copyNoFeesTable("chat")}
-                onTeams={() => copyNoFeesTable("teams")}
                 dark={dark}
               />
             </div>
@@ -1102,10 +1086,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                   label="Agent Tracking"
                   sheetsActive={copiedTable === "agents-sheets"}
                   chatActive={copiedTable === "agents-chat"}
-                  teamsActive={copiedTable === "agents-teams"}
                   onSheets={() => copyAgentTable("sheets")}
                   onChat={() => copyAgentTable("chat")}
-                  onTeams={() => copyAgentTable("teams")}
                   dark={dark}
                 />
               </div>

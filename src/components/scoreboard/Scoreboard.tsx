@@ -2,20 +2,19 @@
 
 import { useState, useReducer, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare, LayoutGrid, type LucideIcon } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Upload, Trophy, Clipboard, Check, Table2, MessageSquare, type LucideIcon } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { bulkImportDailyMetrics } from "@/app/(dashboard)/scoreboard/actions";
 import { parseDate, parseNonNegativeInt } from "@/lib/import/csv-parser";
 import { teamHeaderBg } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
-import { getMonday, toChatBlock, toTeamsHtml } from "@/lib/formatters";
+import { getMonday, toChatBlock } from "@/lib/formatters";
 
-type CopyFormat = "sheets" | "chat" | "teams";
+type CopyFormat = "sheets" | "chat";
 const COPY_FORMATS: { format: CopyFormat; Icon: LucideIcon; label: string; ariaLabel: string; title: string }[] = [
   { format: "sheets", Icon: Table2, label: "Sheets", ariaLabel: "Copy scoreboard for Google Sheets", title: "Copy for Google Sheets (tab-separated)" },
   { format: "chat", Icon: MessageSquare, label: "Chat", ariaLabel: "Copy scoreboard for Google Chat", title: "Copy for Google Chat (monospace code block)" },
-  { format: "teams", Icon: LayoutGrid, label: "Teams", ariaLabel: "Copy scoreboard for Microsoft Teams", title: "Copy for Microsoft Teams (HTML table)" },
 ];
 
 type PeriodMode = "week" | "month";
@@ -136,7 +135,7 @@ export const Scoreboard = () => {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [copiedTable, setCopiedTable] = useState<"sheets" | "chat" | "teams" | null>(null);
+  const [copiedTable, setCopiedTable] = useState<CopyFormat | null>(null);
   const tableCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copiedTeam, setCopiedTeam] = useState<{ key: string; format: CopyFormat } | null>(null);
   const teamCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -263,11 +262,7 @@ export const Scoreboard = () => {
       tableCopyTimerRef.current = setTimeout(() => setCopiedTable(null), 1500);
     };
 
-    if (format === "teams") {
-      const html = teamBlocks.map(({ teamLabel, header, rows }) => toTeamsHtml(teamLabel, header, rows)).join("");
-      const blob = new Blob([html], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
+    if (format === "sheets") {
       const lines: string[] = [];
       for (const { teamLabel, header, rows } of teamBlocks) {
         lines.push(teamLabel);
@@ -296,10 +291,7 @@ export const Scoreboard = () => {
       teamCopyTimerRef.current = setTimeout(() => setCopiedTeam(null), 1500);
     };
 
-    if (format === "teams") {
-      const blob = new Blob([toTeamsHtml(teamLabel, header, dataRows)], { type: "text/html" });
-      navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]).then(done).catch(console.warn);
-    } else if (format === "sheets") {
+    if (format === "sheets") {
       const lines = [teamLabel, header.join("\t"), ...dataRows.map((r) => r.join("\t"))];
       navigator.clipboard.writeText(lines.join("\n")).then(done);
     } else {
