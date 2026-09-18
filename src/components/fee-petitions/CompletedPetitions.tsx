@@ -15,11 +15,13 @@ import {
   ChevronUp,
   RefreshCw,
   ExternalLink,
+  MinusCircle,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate } from "@/lib/formatters";
-import { upsertFeePetition } from "@/app/(dashboard)/fee-petitions/actions";
+import { fmt, fmtDate, skippedClosedCasesMessage } from "@/lib/formatters";
+import { upsertFeePetition, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { NoteField } from "@/components/shared/NoteField";
+import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
 
 interface CompletedRow {
   id: number;
@@ -67,9 +69,16 @@ const formatRelativeDate = (dateStr: string): string => {
 
 interface Props {
   dark: boolean;
+  /**
+   * Called after this table removes a case from the Fee Petitions section, so
+   * the parent can refresh the "Completed" badge and the stat cards it fetches
+   * separately. Without it those counts keep the pre-removal number until the
+   * next page load — the two tables have no other live sync.
+   */
+  onSectionMembershipChange?: () => void;
 }
 
-export const CompletedPetitions = ({ dark }: Props) => {
+export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) => {
   const t = themeClasses(dark);
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<CompletedRow[]>([]);
@@ -256,7 +265,56 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
   // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + approved flag + note
-  const colSpan = CHECKBOX_COLUMNS.length + 8;
+  // An approved petition sits here until staff take it off the Fee Petitions
+  // section for good. That used to happen by changing the case's Level away
+  // from "Fee Petition"; membership is now the in_fee_petition flag, so the
+  // exit is this explicit remove. Nothing else is touched — the checklist and
+  // approval survive, and "Add to Fee Petitions" on Master Fees brings the
+  // case back exactly as it was.
+  // Confirmed before it runs, same dialog the Pending tab's bulk remove uses.
+  // This is the click that files an approved petition away for good, so it
+  // gets the same guard rather than firing straight off a row icon.
+  //
+  // removeTarget deliberately survives a successful clear: the dialog stays
+  // mounted through its close animation, so nulling it here would drop the
+  // claimant's name out of the title on the way out. `removeOpen` controls
+  // visibility, and the next click replaces the target.
+  const [removeTarget, setRemoveTarget] = useState<CompletedRow | null>(null);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  const openRemoveConfirm = (row: CompletedRow) => {
+    setRemoveTarget(row);
+    setRemoveOpen(true);
+  };
+
+  const removeFromSection = async () => {
+    if (!removeTarget || removing) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      const result = await bulkRemoveFromFeePetitions({ caseIds: [removeTarget.id] });
+      if (!result.ok) throw new Error(result.error);
+      // Nothing updated means the case was closed by someone else while this
+      // dialog was open, so it's outside the action's scope. Leave the row on
+      // screen rather than pretending it cleared.
+      if (result.updated.length === 0) {
+        setRemoveError(skippedClosedCasesMessage(1, 1, "removed"));
+        return;
+      }
+      setRows((prev) => prev.filter((r) => r.id !== removeTarget.id));
+      setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
+      onSectionMembershipChange?.();
+      setRemoveOpen(false);
+    } catch (err) {
+      setRemoveError((err as Error).message);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const colSpan = CHECKBOX_COLUMNS.length + 9;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -439,6 +497,12 @@ export const CompletedPetitions = ({ dark }: Props) => {
                   <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
                     Update
                   </th>
+                  {/* "Clear", not "Remove" — same write as the Pending tab's
+                      action, but here it means the petition is finished rather
+                      than that it shouldn't have been in the workflow. */}
+                  <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
+                    Clear
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -537,6 +601,19 @@ export const CompletedPetitions = ({ dark }: Props) => {
                             status={noteState[row.id]}
                           />
                         </td>
+                        <td className={`${tdBase} text-center`}>
+                          <button
+                            onClick={() => openRemoveConfirm(row)}
+                            disabled={removing}
+                            aria-label={`Clear ${row.claimant} from Fee Petitions`}
+                            title="Clear from Fee Petitions — checklist progress is kept"
+                            className={`h-6 w-6 rounded-md inline-flex items-center justify-center transition-colors disabled:opacity-40 ${dark ? "text-rose-400 hover:bg-rose-950/40" : "text-rose-600 hover:bg-rose-50"}`}
+                          >
+                            {removing && removeTarget?.id === row.id
+                              ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                              : <MinusCircle aria-hidden="true" className="h-3.5 w-3.5" />}
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
@@ -570,6 +647,17 @@ export const CompletedPetitions = ({ dark }: Props) => {
           )}
         </>
       )}
+
+      <RemoveFromFeePetitionsConfirmDialog
+        open={removeOpen}
+        count={1}
+        caseName={removeTarget?.claimant}
+        verb="clear"
+        submitting={removing}
+        error={removeError}
+        onConfirm={removeFromSection}
+        onClose={() => { setRemoveOpen(false); setRemoveError(null); }}
+      />
     </div>
   );
 };

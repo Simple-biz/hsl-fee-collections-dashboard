@@ -184,18 +184,19 @@ export const GET = async (req: NextRequest) => {
         (SELECT COUNT(*) FROM fee_records fr WHERE fr.assigned_to = tm.name) AS cases_assigned,
 
         -- Open cases (current snapshot)
-        -- Fee Petition specialists: active (not-approved) petitions still at
-        -- FEE_PETITION level and not closed — mirrors the Fee Petitions page filter.
+        -- Fee Petition specialists: active (not-approved) petitions still in
+        -- the Fee Petitions section and not closed — mirrors the Fee Petitions
+        -- page filter, which is now the in_fee_petition flag rather than the
+        -- case's Level (see migration 0055).
         -- All other agents: count open fee_records
         CASE WHEN tm.team = 'Fee Petition' THEN
           (SELECT COUNT(DISTINCT fp.id) FROM fee_petitions fp
-           JOIN cases c ON c.client_id = fp.case_id
            WHERE fp.assigned_to = tm.name
            AND fp.fee_petition_approved = FALSE
-           AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
            AND EXISTS (
              SELECT 1 FROM fee_records fr
              WHERE fr.case_id = fp.case_id
+             AND COALESCE(fr.in_fee_petition, FALSE) = TRUE
              AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
            ))
         ELSE
@@ -219,17 +220,18 @@ export const GET = async (req: NextRequest) => {
            AND fr.closed_at < ${endExclusive}::date)
         END AS cases_closed,
 
-        -- Pending fee petition cases — any agent with a case at Fee Petition
-        -- level that isn't yet marked case_status = 'FEE PETITION APPROVED'
-        -- and is still open. Matches what Master Fee Records shows under
-        -- LEVEL = FEE_PETITION; NOT the narrow fee_petitions table, which
-        -- only covers cases formally routed to the Fee Petition specialist
-        -- workflow (Jan/Racquel) and misses cases where the original agent
-        -- (or an import) set case_status directly.
+        -- Pending fee petition cases — any agent with a case that's been added
+        -- to the Fee Petitions section, isn't yet marked case_status = 'FEE
+        -- PETITION APPROVED', and is still open. Keyed off the same
+        -- in_fee_petition flag the Fee Petitions page uses (previously the
+        -- case's Level), so these counts always reconcile with what that page
+        -- lists. Still NOT the narrow fee_petitions table, which only covers
+        -- cases formally routed to the Fee Petition specialist workflow
+        -- (Jan/Racquel) and misses cases where the original agent (or an
+        -- import) set case_status directly.
         (SELECT COUNT(*) FROM fee_records fr
-         JOIN cases c ON c.client_id = fr.case_id
          WHERE fr.assigned_to = tm.name
-         AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
+         AND COALESCE(fr.in_fee_petition, FALSE) = TRUE
          AND fr.case_status IS DISTINCT FROM 'FEE PETITION APPROVED'
          AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
         ) AS pending_fee_petitions,
@@ -239,9 +241,8 @@ export const GET = async (req: NextRequest) => {
         -- Pending above: once a case is closed it's done, and shouldn't
         -- keep counting toward an agent's active FP workload.
         (SELECT COUNT(*) FROM fee_records fr
-         JOIN cases c ON c.client_id = fr.case_id
          WHERE fr.assigned_to = tm.name
-         AND c.level_won IN ('FEE_PETITION', 'FEE PETITION')
+         AND COALESCE(fr.in_fee_petition, FALSE) = TRUE
          AND fr.case_status = 'FEE PETITION APPROVED'
          AND (fr.is_closed IS NULL OR fr.is_closed = FALSE)
         ) AS approved_fee_petitions,

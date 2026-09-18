@@ -284,3 +284,17 @@ export const getSyncColor = (
   const colors = map[status] || STATUS_FALLBACK;
   return dark ? colors[1] : colors[0];
 };
+
+// The Fee Petitions add/remove actions are scoped to open cases, so a case
+// closed by someone else between a confirm dialog opening and being confirmed
+// is silently skipped. Both call sites report the shortfall, and both need the
+// noun to agree with the total while the verb agrees with the skipped count —
+// "1 of 2 cases was closed", never "1 of 2 case was closed".
+export const skippedClosedCasesMessage = (
+  skipped: number,
+  total: number,
+  verb: "added" | "removed",
+): string =>
+  total === 1
+    ? `That case could not be ${verb} — it was closed by someone else.`
+    : `${skipped} of ${total} cases could not be ${verb} — ${skipped === 1 ? "it was" : "they were"} closed by someone else.`;

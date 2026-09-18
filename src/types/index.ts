@@ -77,6 +77,7 @@ export interface CaseRow {
   nextFollowUpDate: string | null;
   isClosed: boolean;
   markedOverpaid: boolean;
+  inFeePetition: boolean;
   closedAt: string | null;
   update: string;
   sync: SyncStatus;
