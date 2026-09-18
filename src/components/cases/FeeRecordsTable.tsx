@@ -1744,10 +1744,7 @@ export const FeeRecordsTable = ({
                 flag a case that stays invisible until it's reopened. */}
             {canAddToFeePetitions && (
               <button
-                onClick={() => {
-                  setBulkFeePetitionError(null);
-                  setFeePetitionConfirmOpen(true);
-                }}
+                onClick={() => setFeePetitionConfirmOpen(true)}
                 disabled={bulkFeePetitionSaving || feePetitionAddableIds.length === 0}
                 title={
                   feePetitionAddableIds.length === 0

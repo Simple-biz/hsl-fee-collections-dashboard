@@ -585,7 +585,7 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                         </td>
                         <td className={`${tdBase} text-center`}>
                           <button
-                            onClick={() => { setRemoveError(null); setRemoveTarget(row); }}
+                            onClick={() => setRemoveTarget(row)}
                             disabled={removing}
                             aria-label={`Clear ${row.claimant} from Fee Petitions`}
                             title="Clear from Fee Petitions — checklist progress is kept"

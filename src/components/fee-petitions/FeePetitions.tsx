@@ -1046,10 +1046,7 @@ export const FeePetitions = () => {
                       All Steps Done
                     </button>
                     <button
-                      onClick={() => {
-                        setBulkRemoveError(null);
-                        setBulkRemoveConfirming(true);
-                      }}
+                      onClick={() => setBulkRemoveConfirming(true)}
                       aria-label="Remove selected cases from Fee Petitions"
                       className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-rose-800 text-rose-300 hover:bg-rose-950/40" : "border-rose-300 text-rose-700 hover:bg-rose-50"} transition-colors`}
                     >
