@@ -2420,9 +2420,13 @@ export const FeeRecordsTable = ({
                             },
                           )}
                         />
+                        {/* cellValue, not c.level — it resolves the optimistic
+                            `pending` edit, so the marker agrees with the
+                            dropdown beside it the instant the Level changes
+                            rather than only after the next refresh. */}
                         <FeePetitionIndicator
                           inFeePetition={c.inFeePetition}
-                          level={c.level === "—" ? null : c.level}
+                          level={cellValue(c, "level") || null}
                           dark={dark}
                         />
                       </div>

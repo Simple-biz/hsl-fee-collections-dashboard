@@ -13,7 +13,7 @@
 //      itself when the whole selection is already there.
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, fireEvent, screen, cleanup } from "@testing-library/react";
+import { render, fireEvent, screen, cleanup, within } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: vi.fn(() => new URLSearchParams()),
@@ -246,5 +246,62 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
     mockRole("admin");
     renderAndSelect([BASE_CASE], "closed");
     expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+});
+
+// The marker has to read the Level through cellValue(), which resolves the
+// optimistic `pending` edit, not the raw c.level off the API row. Reading the
+// raw field made the marker vanish the moment someone picked "Fee Petition" —
+// disagreeing with the dropdown right next to it — and only correct itself on
+// the next refresh. Caught in the browser, not by the unit tests on the
+// component itself, which can't see this wiring.
+describe("FeeRecordsTable — Fee Petitions marker tracks unsaved Level edits", () => {
+  const renderTable = (c: CaseRow) => {
+    mockRole("admin");
+    return render(
+      <FeeRecordsTable
+        cases={[c]}
+        mode="active"
+        dropdownOptions={{ case_level: [
+          { id: 1, name: "INITIAL", isActive: true, sortOrder: 1 },
+          { id: 2, name: "FEE PETITION", isActive: true, sortOrder: 2 },
+        ] }}
+        teamMembers={[]}
+        approvedByOptions={[]}
+      />,
+    );
+  };
+
+  const marker = (re: RegExp) => screen.queryByText(re);
+  const ADDED = /On the Fee Petitions page/;
+  const NOT_ADDED = /not added to the Fee Petitions page yet/;
+
+  it("shows no marker for a case at another level", () => {
+    renderTable(BASE_CASE);
+    expect(marker(ADDED)).toBeNull();
+    expect(marker(NOT_ADDED)).toBeNull();
+  });
+
+  it("shows the not-added marker for a Fee Petition case straight from the API", () => {
+    renderTable({ ...BASE_CASE, level: "FEE PETITION" });
+    expect(marker(NOT_ADDED)).toBeTruthy();
+  });
+
+  it("shows the added marker once the case is in the section", () => {
+    renderTable({ ...BASE_CASE, level: "FEE PETITION", inFeePetition: true });
+    expect(marker(ADDED)).toBeTruthy();
+  });
+
+  it("appears as soon as Level is switched to Fee Petition, before any refresh", () => {
+    renderTable(BASE_CASE);
+    expect(marker(NOT_ADDED)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Case Level"));
+    // Scoped to the popup — the toolbar's Level filter is a native <select>
+    // carrying its own "FEE PETITION" option.
+    const popup = screen.getByRole("listbox");
+    fireEvent.click(within(popup).getByRole("option", { name: /FEE PETITION/ }));
+
+    expect(marker(NOT_ADDED)).toBeTruthy();
   });
 });
