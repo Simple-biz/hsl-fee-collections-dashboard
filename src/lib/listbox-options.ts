@@ -21,12 +21,26 @@ export function buildListboxOptions(
   const label = (name: string) => formatLabel?.(name) || name;
   const active = adminOptions.filter((o) => o.isActive || o.name === current);
   const opts: ListboxOption[] = [{ value: "", label: "— Select —" }];
-  if (current && !active.some((o) => o.name === current)) {
+
+  // The row's value may be a legacy spelling of an option that's still in the
+  // list — `FEE_PETITION` where the list has `FEE PETITION`. Formatting makes
+  // both read "Fee Petition", so listing them separately would show the same
+  // label twice with no way to tell them apart. Collapse to one entry carrying
+  // the row's own value, so the trigger still matches (Listbox finds the
+  // selected option by `value`) and re-picking it is a no-op rather than a
+  // silent rewrite. Once the stored spellings are reconciled — the data half of
+  // #454 — no row reaches this branch.
+  const collapsedInto = current
+    ? active.find((o) => o.name !== current && label(o.name) === label(current))
+    : undefined;
+
+  if (current && !active.some((o) => o.name === current) && !collapsedInto) {
     opts.push({ value: current, label: label(current), ...visual?.(current) });
   }
   for (const o of active) {
+    const isCollapseTarget = o.name === collapsedInto?.name;
     opts.push({
-      value: o.name,
+      value: isCollapseTarget ? current : o.name,
       label: label(o.name),
       tint: tint?.(o.name),
       ...visual?.(o.name),
