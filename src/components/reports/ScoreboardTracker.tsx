@@ -26,7 +26,18 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel, toChatBlock } from "@/lib/formatters";
+import { fmt, fmtDate, namesMatch, getMonday, formatWeekLabel, toChatBlock, caseLevelLabel } from "@/lib/formatters";
+import { normalizeCaseLevel } from "@/lib/case-level-icons";
+
+// Levels reach this table in several stored spellings (FEE_PETITION vs
+// FEE PETITION, RECON vs RECONSIDERATION). Format for display the same way
+// Master Fees does, and detect Fee Petition by the normalised form rather than
+// by a string match that only worked because underscores had been stripped.
+const levelDisplay = (level: string, feePetitionApproved: boolean) => {
+  const isFeePetition = normalizeCaseLevel(level) === "FEE PETITION";
+  const label = caseLevelLabel(level);
+  return { isFeePetition, label: isFeePetition && feePetitionApproved ? `${label} (approved)` : label };
+};
 import { teamBadgeClasses } from "@/lib/team-colors";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import {
@@ -272,9 +283,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       ? ["Case Name", "Assigned", "Level", "Claim", "Approval", "Days"]
       : ["Case", "Agent", "Level", "Claim", "Approved", "Days"];
     const rows = (data?.noFeesCases ?? []).map((c) => {
-      const level = c.level.replace(/_/g, " ");
-      const isFeePetition = level.trim().toUpperCase() === "FEE PETITION";
-      const fullLevel = isFeePetition && c.feePetitionApproved ? "FEE PETITION (approved)" : level;
+      const { isFeePetition, label: fullLevel } = levelDisplay(c.level, c.feePetitionApproved);
       const displayLevel = format === "chat" && isFeePetition && c.feePetitionApproved
         ? "FP (approved)"
         : fullLevel;
@@ -822,11 +831,8 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
                       </td>
                       <td className={`${tdBase} ${t.textSub}`}>{c.assigned}</td>
                       {(() => {
-                        const level = c.level.replace(/_/g, " ");
-                        const isFeePetition = level.trim().toUpperCase() === "FEE PETITION";
-                        const displayLevel = isFeePetition && c.feePetitionApproved
-                          ? "FEE PETITION (approved)"
-                          : level;
+                        const { isFeePetition, label: displayLevel } =
+                          levelDisplay(c.level, c.feePetitionApproved);
                         return (
                           <td
                             className={`${tdBase} ${

@@ -386,7 +386,9 @@ describe("FeeRecordsTable — Fee Petitions marker tracks unsaved Level edits", 
     // Scoped to the popup — the toolbar's Level filter is a native <select>
     // carrying its own "FEE PETITION" option.
     const popup = screen.getByRole("listbox");
-    fireEvent.click(within(popup).getByRole("option", { name: /FEE PETITION/ }));
+    // The option renders the formatted label ("Fee Petition"), not the stored
+    // value ("FEE PETITION") — matching on the formatted form pins that.
+    fireEvent.click(within(popup).getByRole("option", { name: "Fee Petition" }));
 
     expect(marker(NOT_ADDED)).toBeTruthy();
   });
