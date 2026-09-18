@@ -581,14 +581,21 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                         <td className={`${tdBase} ${t.textMuted}`}>{row.assignedTo || "—"}</td>
                         {CHECKBOX_COLUMNS.map((col) => (
                           <td key={col.key} className={`${tdBase} text-center`}>
+                            {/* Read-only here, unlike the Pending tab. The tick
+                                and the dash are both decorative, so without the
+                                sr-only text these cells are silent — a screen
+                                reader reaches the column and hears nothing. */}
                             {row[col.key] ? (
                               <Check
                                 aria-hidden="true"
                                 className={`h-3.5 w-3.5 mx-auto ${dark ? "text-emerald-400" : "text-emerald-600"}`}
                               />
                             ) : (
-                              <span className={t.textMuted}>—</span>
+                              <span aria-hidden="true" className={t.textMuted}>—</span>
                             )}
+                            <span className="sr-only">
+                              {col.label} for {row.claimant}: {row[col.key] ? "done" : "not done"}
+                            </span>
                           </td>
                         ))}
                         <td className={`${tdBase} text-center border-l ${t.borderLight}`}>
