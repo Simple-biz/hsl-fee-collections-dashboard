@@ -1513,10 +1513,15 @@ export const FeePetitions = () => {
                       </td>
                       {CHECKBOX_COLUMNS.map((col) => (
                         <td key={col.key} className={`${tdBase} text-center`}>
+                          {/* Names both the step and the case: a row carries
+                              eight checkboxes, and without this a screen reader
+                              announces seven identical unlabelled controls with
+                              no way to tell Time Delineation from Ltr to ALJ. */}
                           <input
                             type="checkbox"
                             checked={row[col.key]}
                             onChange={() => toggleCheckbox(row.id, col.key)}
+                            aria-label={`${col.label} for ${row.claimant}`}
                             className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
                           />
                         </td>
