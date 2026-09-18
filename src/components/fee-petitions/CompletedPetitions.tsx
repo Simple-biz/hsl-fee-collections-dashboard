@@ -18,7 +18,7 @@ import {
   MinusCircle,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate } from "@/lib/formatters";
+import { fmt, fmtDate, skippedClosedCasesMessage } from "@/lib/formatters";
 import { upsertFeePetition, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { NoteField } from "@/components/shared/NoteField";
 import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
@@ -296,6 +296,13 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
     try {
       const result = await bulkRemoveFromFeePetitions({ caseIds: [removeTarget.id] });
       if (!result.ok) throw new Error(result.error);
+      // Nothing updated means the case was closed by someone else while this
+      // dialog was open, so it's outside the action's scope. Leave the row on
+      // screen rather than pretending it cleared.
+      if (result.updated.length === 0) {
+        setRemoveError(skippedClosedCasesMessage(1, 1, "removed"));
+        return;
+      }
       setRows((prev) => prev.filter((r) => r.id !== removeTarget.id));
       setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
       onSectionMembershipChange?.();

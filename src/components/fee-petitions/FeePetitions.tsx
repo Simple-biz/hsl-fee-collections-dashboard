@@ -23,7 +23,7 @@ import {
   MinusCircle,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate, parseCurrencyInput } from "@/lib/formatters";
+import { fmt, fmtDate, parseCurrencyInput, skippedClosedCasesMessage } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { CompletedPetitions } from "./CompletedPetitions";
 import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
@@ -665,6 +665,15 @@ export const FeePetitions = () => {
     try {
       const result = await bulkRemoveFromFeePetitions({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
+      // Cases closed by someone else while this dialog was open fall outside
+      // the action's scope. Report them instead of letting the refetch below
+      // silently show a different number than was confirmed.
+      const missed = ids.length - result.updated.length;
+      if (missed > 0) {
+        setBulkRemoveError(skippedClosedCasesMessage(missed, ids.length, "removed"));
+        fetchPetitions();
+        return;
+      }
       clearSelection(); // also drops the confirm state
       fetchPetitions();
       fetchCompletedCount();

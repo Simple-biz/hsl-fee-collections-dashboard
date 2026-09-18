@@ -120,9 +120,13 @@ export async function upsertFeePetition(input: {
 // closed case so the scope is unreachable today, but any write to a closed
 // fee_records row makes compute_fee_totals reset its sheet-sourced Pending
 // (see migration 0055's note) — worth making structural rather than incidental.
+// Returns the ids actually updated — see the note on bulkAddToFeePetitions.
+// A case closed by someone else between the confirm opening and being
+// confirmed falls outside the is_closed scope, and the caller must not show it
+// as removed when it wasn't.
 export async function bulkRemoveFromFeePetitions(input: {
   caseIds: number[];
-}): Promise<Result> {
+}): Promise<Result<{ updated: number[] }>> {
   try {
     const guard = await requirePageAccess("fee_petitions");
     if (!guard.ok) return { ok: false, error: "You don't have permission to remove cases from Fee Petitions." };
@@ -130,11 +134,12 @@ export async function bulkRemoveFromFeePetitions(input: {
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
 
-    await db
+    const rows = await db
       .update(feeRecords)
       .set({ inFeePetition: false, updatedAt: new Date() })
-      .where(and(inArray(feeRecords.caseId, input.caseIds), eq(feeRecords.isClosed, false)));
-    return { ok: true };
+      .where(and(inArray(feeRecords.caseId, input.caseIds), eq(feeRecords.isClosed, false)))
+      .returning({ caseId: feeRecords.caseId });
+    return { ok: true, updated: rows.map((r) => r.caseId) };
   } catch (error) {
     console.error("bulkRemoveFromFeePetitions error:", error);
     return { ok: false, error: "Server error" };

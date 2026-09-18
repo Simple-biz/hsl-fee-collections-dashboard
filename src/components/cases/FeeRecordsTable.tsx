@@ -40,6 +40,7 @@ import {
   fmtDate,
   fmtClaimLong,
   parseCurrencyInput,
+  skippedClosedCasesMessage,
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -930,11 +931,21 @@ export const FeeRecordsTable = ({
     try {
       const result = await bulkAddToFeePetitions({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
+      // Mark only what the database actually updated. A case closed by someone
+      // else between opening this dialog and confirming falls outside the
+      // action's scope, and showing it as added would be a lie the next
+      // refresh would quietly correct.
       setRowOverrides((prev) => {
         const next = { ...prev };
-        for (const id of ids) next[id] = { ...next[id], inFeePetition: true };
+        for (const id of result.updated) next[id] = { ...next[id], inFeePetition: true };
         return next;
       });
+      const missed = ids.length - result.updated.length;
+      if (missed > 0) {
+        setBulkFeePetitionError(skippedClosedCasesMessage(missed, ids.length, "added"));
+        setSelectedIds(new Set());
+        return;
+      }
       setSelectedIds(new Set());
       setFeePetitionConfirmOpen(false);
     } catch (err) {

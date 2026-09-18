@@ -13,7 +13,7 @@
 //      itself when the whole selection is already there.
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, fireEvent, screen, cleanup, within } from "@testing-library/react";
+import { render, fireEvent, screen, cleanup, within, waitFor } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: vi.fn(() => new URLSearchParams()),
@@ -103,7 +103,13 @@ beforeAll(() => {
 beforeEach(() => {
   cleanup();
   bulkAddToFeePetitionsMock.mockReset();
-  bulkAddToFeePetitionsMock.mockResolvedValue({ ok: true });
+  // Mirror the real contract: the action reports which ids it actually
+  // updated. Resolving a bare { ok: true } lets the component throw on
+  // result.updated and the try/catch swallow it — green tests over a
+  // TypeError.
+  bulkAddToFeePetitionsMock.mockImplementation(
+    ({ caseIds }: { caseIds: number[] }) => Promise.resolve({ ok: true, updated: caseIds }),
+  );
 });
 
 const BASE_CASE: CaseRow = {
@@ -253,6 +259,28 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: /Add to Fee Petitions/ }),
     );
     expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [1, 2] });
+  });
+
+  // The action is scoped to open cases, so a case closed by someone else
+  // between opening the dialog and confirming is silently skipped. The UI must
+  // reflect what the database did, not what was asked for.
+  it("reports cases the server could not add, and keeps the dialog open", async () => {
+    mockRole("member");
+    bulkAddToFeePetitionsMock.mockResolvedValue({ ok: true, updated: [1] });
+    renderAndSelect([BASE_CASE, SECOND_CASE]);
+    confirmAdd();
+
+    await screen.findByText(/1 of 2 cases could not be added — it was closed by someone else/);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("closes cleanly when the server updated everything asked for", async () => {
+    mockRole("member");
+    renderAndSelect([BASE_CASE, SECOND_CASE]);
+    confirmAdd();
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByText(/closed by someone else/)).toBeNull();
   });
 
   it("tells you in the dialog which selected cases are being left alone", () => {

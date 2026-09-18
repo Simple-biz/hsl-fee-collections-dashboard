@@ -5,7 +5,10 @@ import { feeRecords } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireCapability, requirePageAccess } from "@/lib/auth-helpers";
 
-type Result = { ok: true } | { ok: false; error: string };
+// Same shape as the sibling action files (overpaid-cases, fee-petitions).
+type Result<T = void> = T extends void
+  ? { ok: true } | { ok: false; error: string }
+  : ({ ok: true } & T) | { ok: false; error: string };
 
 export async function bulkReassign(input: {
   caseIds: number[];
@@ -45,9 +48,13 @@ export async function bulkReassign(input: {
 // that the Fees Closed sync deliberately wrote (see migration 0055's note).
 // Keeping the scope here means that can't happen even if the button is later
 // exposed somewhere it isn't today.
+// Returns the ids actually updated, which can be fewer than were asked for
+// when the is_closed scope excludes one — someone else may have closed a case
+// between the confirm dialog opening and being confirmed. The caller needs the
+// real list so its optimistic row update matches what the database did.
 export async function bulkAddToFeePetitions(input: {
   caseIds: number[];
-}): Promise<Result> {
+}): Promise<Result<{ updated: number[] }>> {
   try {
     const guard = await requirePageAccess("master_fees");
     if (!guard.ok) return { ok: false, error: "You don't have permission to add cases to Fee Petitions." };
@@ -55,11 +62,12 @@ export async function bulkAddToFeePetitions(input: {
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
 
-    await db
+    const rows = await db
       .update(feeRecords)
       .set({ inFeePetition: true, updatedAt: new Date() })
-      .where(and(inArray(feeRecords.caseId, input.caseIds), eq(feeRecords.isClosed, false)));
-    return { ok: true };
+      .where(and(inArray(feeRecords.caseId, input.caseIds), eq(feeRecords.isClosed, false)))
+      .returning({ caseId: feeRecords.caseId });
+    return { ok: true, updated: rows.map((r) => r.caseId) };
   } catch (error) {
     console.error("bulkAddToFeePetitions error:", error);
     return { ok: false, error: "Server error" };
