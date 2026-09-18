@@ -65,3 +65,25 @@ describe("buildListboxOptions", () => {
     expect(buildListboxOptions(withRetired, "RETIRED_LEVEL").map((o) => o.value)).toContain("RETIRED_LEVEL");
   });
 });
+
+// The Win Sheet Status <select> hand-rolled its own option list and so missed
+// the collapse entirely — 195 rows store lowercase "started" against an admin
+// list offering "Started", and both formatted to the same label. It now uses
+// this builder too, which is what these cases protect.
+describe("buildListboxOptions — win sheet status casing", () => {
+  const STATUSES = [opt(1, "Started"), opt(2, "Finished")];
+  const label = (s: string) => (s === "started" || s === "Started" ? "Started" : s);
+
+  it("collapses a casing variant of an option still in the list", () => {
+    const opts = buildListboxOptions(STATUSES, "started", undefined, undefined, label);
+    const labels = opts.map((o) => o.label);
+    expect(labels.filter((l) => l === "Started")).toHaveLength(1);
+    expect(opts.find((o) => o.label === "Started")?.value).toBe("started");
+  });
+
+  it("leaves a genuinely distinct legacy value listed on its own", () => {
+    const opts = buildListboxOptions(STATUSES, "not_started", undefined, undefined,
+      (s) => (s === "not_started" ? "Not Started" : s));
+    expect(opts.map((o) => o.label)).toEqual(["— Select —", "Not Started", "Started", "Finished"]);
+  });
+});

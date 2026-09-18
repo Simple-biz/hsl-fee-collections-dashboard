@@ -30,11 +30,17 @@ export function buildListboxOptions(
   // selected option by `value`) and re-picking it is a no-op rather than a
   // silent rewrite. Once the stored spellings are reconciled — the data half of
   // #454 — no row reaches this branch.
-  const collapsedInto = current
-    ? active.find((o) => o.name !== current && label(o.name) === label(current))
-    : undefined;
+  // Only when the row's value has fallen out of the list. If it's still in the
+  // list, it needs no stand-in — and rewriting a sibling option's value onto it
+  // would emit two options sharing one value, which is how an admin adding the
+  // second spelling to the dropdown would break selection outright.
+  const currentIsListed = active.some((o) => o.name === current);
+  const collapsedInto =
+    current && !currentIsListed
+      ? active.find((o) => label(o.name) === label(current))
+      : undefined;
 
-  if (current && !active.some((o) => o.name === current) && !collapsedInto) {
+  if (current && !currentIsListed && !collapsedInto) {
     opts.push({ value: current, label: label(current), ...visual?.(current) });
   }
   for (const o of active) {

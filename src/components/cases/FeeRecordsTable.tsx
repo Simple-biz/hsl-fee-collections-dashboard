@@ -2383,7 +2383,7 @@ export const FeeRecordsTable = ({
                               v &&
                               !feesConfirmationOptions.some(
                                 (o) => o.name === v,
-                              ) && <option value={v}>{winSheetStatusLabel(v)}</option>
+                              ) && <option value={v}>{v}</option>
                             );
                           })()}
                           {feesConfirmationOptions
@@ -2394,7 +2394,7 @@ export const FeeRecordsTable = ({
                             )
                             .map((o) => (
                               <option key={o.id} value={o.name}>
-                                {winSheetStatusLabel(o.name)}
+                                {o.name}
                               </option>
                             ))}
                         </select>
@@ -2606,26 +2606,23 @@ export const FeeRecordsTable = ({
                               : undefined
                           }
                         >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "status");
-                            return (
-                              v &&
-                              !winSheetStatusOptions.some(
-                                (o) => o.name === v,
-                              ) && <option value={v}>{v}</option>
-                            );
-                          })()}
-                          {winSheetStatusOptions
-                            .filter(
-                              (o) =>
-                                o.isActive || o.name === cellValue(c, "status"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
+                          {/* Same builder the Listbox dropdowns use, so this
+                              select gets the placeholder, the retired-value
+                              fallback AND the duplicate-label collapse from one
+                              place. Hand-rolling it here is what left it
+                              showing "Started" twice for the rows that store
+                              the lowercase spelling. */}
+                          {buildListboxOptions(
+                            winSheetStatusOptions,
+                            cellValue(c, "status"),
+                            undefined,
+                            undefined,
+                            winSheetStatusLabel,
+                          ).map((o) => (
+                            <option key={o.value || "__none__"} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
                         </select>
                       ) : (
                         <button
