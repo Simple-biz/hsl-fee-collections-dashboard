@@ -5,7 +5,7 @@ import { feePetitions, feeRecords } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { parseBool } from "@/lib/import/csv-parser";
 import { resolveCaseId } from "@/lib/import/resolve-case";
-import { requireCapability, requirePageAccess } from "@/lib/auth-helpers";
+import { requireCapability } from "@/lib/auth-helpers";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
 
 // The Remarks value written to Master Fees when a lead approves a petition
@@ -113,8 +113,9 @@ export async function upsertFeePetition(input: {
 //
 // Only the membership flag is cleared: the fee_petitions row, its checklist,
 // assignee and notes all survive, so a case removed by mistake comes back
-// exactly as it was when it's re-added. Guarded on page access to match the
-// add side — anyone who can work this page can take a case off it.
+// exactly as it was when it's re-added. Behind the same feePetition.manage
+// capability as the add side, so the two can't drift apart — an agent who
+// cannot add a case shouldn't be able to remove one either.
 //
 // Scoped to open cases, like bulkAddToFeePetitions. This page never lists a
 // closed case so the scope is unreachable today, but any write to a closed
@@ -128,7 +129,7 @@ export async function bulkRemoveFromFeePetitions(input: {
   caseIds: number[];
 }): Promise<Result<{ updated: number[] }>> {
   try {
-    const guard = await requirePageAccess("fee_petitions");
+    const guard = await requireCapability("feePetition.manage");
     if (!guard.ok) return { ok: false, error: "You don't have permission to remove cases from Fee Petitions." };
     if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
