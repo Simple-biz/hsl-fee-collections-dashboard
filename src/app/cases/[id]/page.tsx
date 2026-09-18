@@ -1146,7 +1146,7 @@ const CaseDetailPage = () => {
                         className={inp}
                       />
                     ) : (
-                      <p className={val}>{caseData.t2Decision || "—"}</p>
+                      <p className={val}>{titleCaseLabel(caseData.t2Decision ?? "") || "—"}</p>
                     )}
                   </div>
                   <div>
@@ -1159,7 +1159,7 @@ const CaseDetailPage = () => {
                         className={inp}
                       />
                     ) : (
-                      <p className={val}>{caseData.t16Decision || "—"}</p>
+                      <p className={val}>{titleCaseLabel(caseData.t16Decision ?? "") || "—"}</p>
                     )}
                   </div>
                   <div>
@@ -1175,10 +1175,7 @@ const CaseDetailPage = () => {
                       </select>
                     ) : (
                       <p className={val}>
-                        {(caseData.feeMethod || "fee_agreement").replace(
-                          "_",
-                          " ",
-                        ) || "—"}
+                        {titleCaseLabel(caseData.feeMethod || "fee_agreement") || "—"}
                       </p>
                     )}
                   </div>

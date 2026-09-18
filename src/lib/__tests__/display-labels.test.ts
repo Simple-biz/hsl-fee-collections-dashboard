@@ -86,3 +86,26 @@ describe("winSheetStatusLabel", () => {
     expect(winSheetStatusLabel(null)).toBe("");
   });
 });
+
+// The case detail surfaces render decision and fee-method enums too. They were
+// missed on the first pass because every DOM scan was scoped to `main *` and
+// that route has no <main> — so `fully_favorable` and `fee agreement` sat in
+// plain sight while the scan reported clean.
+describe("titleCaseLabel — decision and fee method enums", () => {
+  it("expands the decision values", () => {
+    expect(titleCaseLabel("fully_favorable")).toBe("Fully Favorable");
+    expect(titleCaseLabel("dismissed")).toBe("Dismissed");
+    expect(titleCaseLabel("remand")).toBe("Remand");
+  });
+
+  it("expands fee method", () => {
+    expect(titleCaseLabel("fee_agreement")).toBe("Fee Agreement");
+  });
+
+  // The old code used .replace("_", " ") with no /g, so only the first
+  // underscore went — "paid_in_full" became "paid in_full".
+  it("replaces every underscore, not just the first", () => {
+    expect(titleCaseLabel("paid_in_full")).toBe("Paid In Full");
+    expect(titleCaseLabel("a_b_c_d")).toBe("A B C D");
+  });
+});

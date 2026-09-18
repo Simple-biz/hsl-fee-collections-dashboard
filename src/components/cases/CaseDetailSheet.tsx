@@ -87,7 +87,9 @@ const dropdownOptionEls = (options: ApprovedByOption[], current: string) => (
 );
 const displayDecision = (mc?: string | null, local?: string | null) => {
   const d = mc && mc !== "unknown" ? mc : local;
-  return d && d !== "unknown" ? d.replace(/_/g, " ") : "—";
+  // titleCaseLabel rather than a bare underscore strip + CSS `capitalize`,
+  // which renders "Fully_favorable" — the underscore survives.
+  return d && d !== "unknown" ? titleCaseLabel(d) : "—";
 };
 
 type MyCaseData = {
@@ -811,7 +813,7 @@ export default function CaseDetailSheet({
                         {myCaseLoading ? (
                           <RefreshCw aria-hidden="true" className={`h-3 w-3 animate-spin ${t.textMuted}`} />
                         ) : (
-                          <p className={`${val} capitalize`}>
+                          <p className={val}>
                             {displayDecision(row.mc, row.local)}
                           </p>
                         )}
