@@ -1,16 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Archive, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Archive } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface ArchiveConfirmDialogProps {
   open: boolean;
@@ -61,60 +53,34 @@ export function ArchiveConfirmDialog({
     }
   };
 
-  const handleOpenChange = (v: boolean) => {
-    if (!v && !submitting) {
-      controllerRef.current?.abort();
-      setError(null);
-      onClose();
-    }
+  // ConfirmDialog already refuses to close mid-request; this adds the pieces it
+  // can't know about — abandoning the in-flight archive and dropping a stale
+  // error so reopening starts clean.
+  const handleClose = () => {
+    controllerRef.current?.abort();
+    setError(null);
+    onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            Archive {count === 1 ? "1 case" : `${count} cases`}?
-          </DialogTitle>
-          <DialogDescription>
-            {count === 1
-              ? "This case will be removed from the active list and moved to the Archive."
-              : `These ${count} cases will be removed from the active list and moved to the Archive.`}{" "}
-            They can be restored from the Archive page at any time.
-          </DialogDescription>
-        </DialogHeader>
-
-        {error && (
-          <p role="alert" className="flex items-center gap-2 text-sm text-destructive">
-            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-            {error}
-          </p>
-        )}
-
-        <DialogFooter className="mt-2 gap-2 sm:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-            ) : (
-              <Archive aria-hidden="true" className="h-4 w-4" />
-            )}
-            Archive
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      submitting={submitting}
+      error={error}
+      onConfirm={handleConfirm}
+      onClose={handleClose}
+      confirmLabel="Archive"
+      confirmIcon={Archive}
+      confirmVariant="destructive"
+      title={`Archive ${count === 1 ? "1 case" : `${count} cases`}?`}
+      description={
+        <>
+          {count === 1
+            ? "This case will be removed from the active list and moved to the Archive."
+            : `These ${count} cases will be removed from the active list and moved to the Archive.`}{" "}
+          They can be restored from the Archive page at any time.
+        </>
+      }
+    />
   );
 }

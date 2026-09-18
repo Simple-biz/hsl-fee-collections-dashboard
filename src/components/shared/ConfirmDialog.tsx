@@ -20,8 +20,11 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   /** Shown on the confirm button when idle; swapped for a spinner while submitting. */
   confirmIcon?: LucideIcon;
-  /** "destructive" for anything that takes something away. */
-  confirmVariant?: "default" | "destructive";
+  /**
+   * "destructive" for anything that takes something away; "secondary" for a
+   * reversal that isn't destructive, like reopening a closed case.
+   */
+  confirmVariant?: "default" | "destructive" | "secondary";
   submitting: boolean;
   /** Rendered in the dialog, not behind it — the caller's page-level banner would be covered by the modal. */
   error: string | null;

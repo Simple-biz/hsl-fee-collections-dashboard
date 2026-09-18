@@ -1,16 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface FeesClosedConfirmDialogProps {
   open: boolean;
@@ -35,6 +26,8 @@ export function FeesClosedConfirmDialog({
 
   const isClose = mode === "close";
 
+  // ConfirmDialog already refuses to close mid-request; this adds what it can't
+  // know about — abandoning the in-flight PATCH and dropping a stale error.
   const handleDismiss = () => {
     controllerRef.current?.abort();
     setError(null);
@@ -71,68 +64,35 @@ export function FeesClosedConfirmDialog({
       if ((e as Error).name === "AbortError") return;
       setError((e as Error).message);
     } finally {
+      // Deliberately not reset when aborted: the dialog is on its way out and
+      // flipping this would flash the idle state during the close.
       if (!controller.signal.aborted) setSubmitting(false);
     }
   };
 
   return (
-    <Dialog
+    <ConfirmDialog
       open={open}
-      onOpenChange={(v) => {
-        if (!v && !submitting) handleDismiss();
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isClose ? "Close this case?" : "Reopen this case?"}
-          </DialogTitle>
-          <DialogDescription>
-            {isClose ? (
-              <>
-                <span className="font-semibold">{caseName}</span> will be moved
-                to Fees Closed and removed from the active dashboard.
-              </>
-            ) : (
-              <>
-                <span className="font-semibold">{caseName}</span> will move back
-                to the active dashboard. PIF and Fees Closed will
-                be cleared.
-              </>
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        {error && (
-          <p
-            role="alert"
-            className="flex items-center gap-2 text-sm text-destructive"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {error}
-          </p>
-        )}
-
-        <DialogFooter className="mt-2 gap-2 sm:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleDismiss}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant={isClose ? "default" : "secondary"}
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {isClose ? "Close case" : "Reopen case"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      submitting={submitting}
+      error={error}
+      onConfirm={handleConfirm}
+      onClose={handleDismiss}
+      confirmLabel={isClose ? "Close case" : "Reopen case"}
+      confirmVariant={isClose ? "default" : "secondary"}
+      title={isClose ? "Close this case?" : "Reopen this case?"}
+      description={
+        isClose ? (
+          <>
+            <span className="font-semibold">{caseName}</span> will be moved to
+            Fees Closed and removed from the active dashboard.
+          </>
+        ) : (
+          <>
+            <span className="font-semibold">{caseName}</span> will move back to
+            the active dashboard. PIF and Fees Closed will be cleared.
+          </>
+        )
+      }
+    />
   );
 }
