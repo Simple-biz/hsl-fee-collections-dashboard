@@ -22,6 +22,7 @@ import { fmt, fmtDate, skippedClosedCasesMessage } from "@/lib/formatters";
 import { upsertFeePetition, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { NoteField } from "@/components/shared/NoteField";
 import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 interface CompletedRow {
   id: number;
@@ -80,6 +81,10 @@ interface Props {
 
 export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) => {
   const t = themeClasses(dark);
+  // Admin and lead only — see capabilities.ts. The server enforces the same, so
+  // this just decides whether the column is worth rendering.
+  const { can } = useCapabilities();
+  const canManageFeePetitions = can("feePetition.manage");
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<CompletedRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -314,7 +319,10 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
     }
   };
 
-  const colSpan = CHECKBOX_COLUMNS.length + 9;
+  // +8 fixed columns, +1 for the Clear column when the user can manage the
+  // section. Must track the conditional <th>/<td> above: a mismatch makes the
+  // loading and empty rows span the wrong width.
+  const colSpan = CHECKBOX_COLUMNS.length + 8 + (canManageFeePetitions ? 1 : 0);
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -500,9 +508,11 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                   {/* "Clear", not "Remove" — same write as the Pending tab's
                       action, but here it means the petition is finished rather
                       than that it shouldn't have been in the workflow. */}
-                  <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    Clear
-                  </th>
+                  {canManageFeePetitions && (
+                    <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
+                      Clear
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -601,6 +611,7 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                             status={noteState[row.id]}
                           />
                         </td>
+                        {canManageFeePetitions && (
                         <td className={`${tdBase} text-center`}>
                           <button
                             onClick={() => openRemoveConfirm(row)}
@@ -614,6 +625,7 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                               : <MinusCircle aria-hidden="true" className="h-3.5 w-3.5" />}
                           </button>
                         </td>
+                        )}
                       </tr>
                     );
                   })

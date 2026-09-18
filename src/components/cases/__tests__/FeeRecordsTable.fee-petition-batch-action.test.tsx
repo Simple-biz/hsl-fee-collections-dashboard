@@ -5,10 +5,10 @@
 // page. Two things make it different from every other action in the batch
 // pill, and both are easy to regress:
 //
-//   1. It is open to ordinary agents, not just admins. The pill used to carry
-//      a single isAdmin gate around everything; that gate now sits on each of
-//      the older buttons individually, so a member sees this one and nothing
-//      else.
+//   1. It is gated on the feePetition.manage capability — admin and lead, not
+//      members. It was briefly open to every agent; staff asked for it
+//      narrowed. A member now has no batch actions at all, so the pill does
+//      not render for them.
 //   2. It only sends the cases that aren't in the section yet, and disables
 //      itself when the whole selection is already there.
 
@@ -156,7 +156,7 @@ const BASE_CASE: CaseRow = {
 
 const SECOND_CASE: CaseRow = { ...BASE_CASE, id: 2, name: "Alvarez, Marco" };
 
-function mockRole(role: "admin" | "member") {
+function mockRole(role: "admin" | "lead" | "member") {
   vi.mocked(useSession).mockReturnValue({
     data: { user: { role, capabilities: [] }, expires: "9999-12-31" },
     status: "authenticated",
@@ -195,8 +195,15 @@ const confirmAdd = () => {
 };
 
 describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
-  it("is available to a member, who gets no other batch action", () => {
+  it("is hidden from a member, who has no batch actions at all", () => {
     mockRole("member");
+    renderAndSelect([BASE_CASE]);
+    expect(addButton()).toBeNull();
+    expect(screen.queryByText("1 selected")).toBeNull();
+  });
+
+  it("is available to a lead, without the admin-only actions", () => {
+    mockRole("lead");
     renderAndSelect([BASE_CASE]);
     expect(addButton()).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Archive$/ })).toBeNull();
@@ -211,7 +218,7 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   });
 
   it("confirms before doing anything, then sends the selected case ids", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([BASE_CASE, SECOND_CASE]);
 
     fireEvent.click(addButton()!);
@@ -225,7 +232,7 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   });
 
   it("does nothing if the confirm is cancelled", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([BASE_CASE]);
     fireEvent.click(addButton()!);
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Cancel$/ }));
@@ -233,7 +240,7 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   });
 
   it("skips cases already in the section and reports the remaining count", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([{ ...BASE_CASE, inFeePetition: true }, SECOND_CASE]);
     expect(addButton()!.textContent).toContain("(1)");
     confirmAdd();
@@ -247,7 +254,7 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   // jsdom, which has no animation. Deselecting behind the open dialog
   // reproduces the same read without needing one.
   it("keeps the count it opened with when the selection changes underneath", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([BASE_CASE, SECOND_CASE]);
     fireEvent.click(addButton()!);
     expect(screen.getByRole("dialog").textContent).toMatch(/Add 2 cases/);
@@ -265,7 +272,7 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   // between opening the dialog and confirming is silently skipped. The UI must
   // reflect what the database did, not what was asked for.
   it("reports cases the server could not add, and keeps the dialog open", async () => {
-    mockRole("member");
+    mockRole("lead");
     bulkAddToFeePetitionsMock.mockResolvedValue({ ok: true, updated: [1] });
     renderAndSelect([BASE_CASE, SECOND_CASE]);
     confirmAdd();
@@ -275,7 +282,7 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   });
 
   it("closes cleanly when the server updated everything asked for", async () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([BASE_CASE, SECOND_CASE]);
     confirmAdd();
 
@@ -284,14 +291,14 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   });
 
   it("tells you in the dialog which selected cases are being left alone", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([{ ...BASE_CASE, inFeePetition: true }, SECOND_CASE]);
     fireEvent.click(addButton()!);
     expect(screen.getByRole("dialog").textContent).toMatch(/1 of the 2 selected is already there/);
   });
 
   it("is disabled when every selected case is already in the section", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([{ ...BASE_CASE, inFeePetition: true }]);
     const btn = addButton() as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
@@ -310,13 +317,13 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   // gates and must get no pill at all — not a floating bar saying "1 selected"
   // with nothing to do.
   it("shows no batch pill at all for a member on the Fees Closed table", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([BASE_CASE], "closed");
     expect(screen.queryByText("1 selected")).toBeNull();
   });
 
   it("still shows the pill for a member on the active table", () => {
-    mockRole("member");
+    mockRole("lead");
     renderAndSelect([BASE_CASE]);
     expect(screen.getByText("1 selected")).toBeTruthy();
   });
