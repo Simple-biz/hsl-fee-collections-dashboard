@@ -270,6 +270,10 @@ export const FeeRecordsTable = ({
   const canEditFees = can("fees.edit");
   const canSeeLeaderNotes = can("leaderNotes.access");
   const canEditFeesConf = can("feesConfirmation.edit");
+  // Adding a case to Fee Petitions was briefly open to every agent; staff asked
+  // for it narrowed to admin and lead. The server enforces the same capability
+  // — this only decides whether the button is worth showing.
+  const canManageFeePetitions = can("feePetition.manage");
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -912,7 +916,7 @@ export const FeeRecordsTable = ({
   // Fees Closed would get a floating bar containing only "N selected".
   // Archive is gated on isAdmin alone, so an admin always has at least one
   // action; everyone else has one exactly when "Add to Fee Petitions" shows.
-  const canAddToFeePetitions = mode !== "closed";
+  const canAddToFeePetitions = mode !== "closed" && canManageFeePetitions;
   const hasBatchActions = canAddToFeePetitions || isAdmin;
 
   // Routes the selected cases into the Fee Petition workflow. Picking "Fee

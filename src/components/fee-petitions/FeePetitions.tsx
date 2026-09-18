@@ -185,6 +185,8 @@ export const FeePetitions = () => {
   }, []);
   const { can } = useCapabilities();
   const canEditFees = can("case.update");
+  // Admin and lead only — see capabilities.ts. Server enforces the same.
+  const canManageFeePetitions = can("feePetition.manage");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -1058,6 +1060,7 @@ export const FeePetitions = () => {
                       <Check aria-hidden="true" className="h-3 w-3" />
                       All Steps Done
                     </button>
+                    {canManageFeePetitions && (
                     <button
                       onClick={() => {
                         setBulkRemovePendingIds(Array.from(selectedIds));
@@ -1069,6 +1072,7 @@ export const FeePetitions = () => {
                       <MinusCircle aria-hidden="true" className="h-3 w-3" />
                       Remove from Fee Petitions
                     </button>
+                    )}
                     <button
                       onClick={clearSelection}
                       aria-label="Clear selection"

@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { feeRecords } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { requireCapability, requirePageAccess } from "@/lib/auth-helpers";
+import { requireCapability } from "@/lib/auth-helpers";
 
 // Same shape as the sibling action files (overpaid-cases, fee-petitions).
 type Result<T = void> = T extends void
@@ -37,10 +37,11 @@ export async function bulkReassign(input: {
 // derived from the case's Level being "Fee Petition"; it's now this explicit
 // flag (see migration 0055), so picking that Level no longer adds anything.
 //
-// Deliberately guarded on page access rather than a capability: any agent who
-// can open Master Fee Records can route a case into the Fee Petition workflow.
-// The counterpart that takes a case back out lives on the Fee Petitions page
-// (bulkRemoveFromFeePetitions in fee-petitions/actions.ts).
+// Guarded on the feePetition.manage capability — admin, lead and system_admin
+// by default. This was briefly open to every agent with Master Fees access;
+// staff asked for it narrowed. The counterpart that takes a case back out lives
+// on the Fee Petitions page (bulkRemoveFromFeePetitions), behind the same
+// capability so the two stay symmetric: whoever can add can also undo.
 //
 // Scoped to open cases. The UI already hides the button in closed mode, so
 // this is belt-and-braces, but it matters: any write to fee_records fires
@@ -56,7 +57,7 @@ export async function bulkAddToFeePetitions(input: {
   caseIds: number[];
 }): Promise<Result<{ updated: number[] }>> {
   try {
-    const guard = await requirePageAccess("master_fees");
+    const guard = await requireCapability("feePetition.manage");
     if (!guard.ok) return { ok: false, error: "You don't have permission to add cases to Fee Petitions." };
     if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
