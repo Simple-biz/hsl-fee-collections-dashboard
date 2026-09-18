@@ -234,6 +234,27 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
     expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [2] });
   });
 
+  // The dialog must read a snapshot taken when it opened, not live selection
+  // state. Confirming clears the selection while the dialog is still mounted
+  // for its close animation, so a live read re-renders it as "Add 0 cases to
+  // Fee Petitions?" on the way out — caught in the browser, invisible to
+  // jsdom, which has no animation. Deselecting behind the open dialog
+  // reproduces the same read without needing one.
+  it("keeps the count it opened with when the selection changes underneath", () => {
+    mockRole("member");
+    renderAndSelect([BASE_CASE, SECOND_CASE]);
+    fireEvent.click(addButton()!);
+    expect(screen.getByRole("dialog").textContent).toMatch(/Add 2 cases/);
+
+    fireEvent.click(screen.getByLabelText(`Select ${SECOND_CASE.name}`));
+    expect(screen.getByRole("dialog").textContent).toMatch(/Add 2 cases/);
+
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /Add to Fee Petitions/ }),
+    );
+    expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [1, 2] });
+  });
+
   it("tells you in the dialog which selected cases are being left alone", () => {
     mockRole("member");
     renderAndSelect([{ ...BASE_CASE, inFeePetition: true }, SECOND_CASE]);

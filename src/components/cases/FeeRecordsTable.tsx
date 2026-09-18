@@ -471,6 +471,14 @@ export const FeeRecordsTable = ({
   const [bulkFeePetitionSaving, setBulkFeePetitionSaving] = useState(false);
   const [bulkFeePetitionError, setBulkFeePetitionError] = useState<string | null>(null);
   const [feePetitionConfirmOpen, setFeePetitionConfirmOpen] = useState(false);
+  // Snapshot taken when the confirm opens, the way bulkClosePendingIds below
+  // does. The dialog must not read live selection state: confirming clears the
+  // selection, and the dialog is still mounted through its close animation, so
+  // it would re-render as "Add 0 cases to Fee Petitions?" on the way out.
+  const [feePetitionPending, setFeePetitionPending] = useState<{
+    ids: number[];
+    selectedCount: number;
+  }>({ ids: [], selectedCount: 0 });
   const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
   const [bulkClosePendingIds, setBulkClosePendingIds] = useState<number[]>([]);
   // Optimistic overrides for fee payment totals after panel add/delete.
@@ -915,10 +923,10 @@ export const FeeRecordsTable = ({
   // reversible, so the dialog guards against a stray click on a large
   // selection rather than warning about anything destructive.
   const handleBatchAddToFeePetitions = async () => {
-    if (feePetitionAddableIds.length === 0 || bulkFeePetitionSaving) return;
+    const ids = feePetitionPending.ids;
+    if (ids.length === 0 || bulkFeePetitionSaving) return;
     setBulkFeePetitionSaving(true);
     setBulkFeePetitionError(null);
-    const ids = feePetitionAddableIds;
     try {
       const result = await bulkAddToFeePetitions({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
@@ -1744,7 +1752,13 @@ export const FeeRecordsTable = ({
                 flag a case that stays invisible until it's reopened. */}
             {canAddToFeePetitions && (
               <button
-                onClick={() => setFeePetitionConfirmOpen(true)}
+                onClick={() => {
+                  setFeePetitionPending({
+                    ids: feePetitionAddableIds,
+                    selectedCount: selectedIds.size,
+                  });
+                  setFeePetitionConfirmOpen(true);
+                }}
                 disabled={bulkFeePetitionSaving || feePetitionAddableIds.length === 0}
                 title={
                   feePetitionAddableIds.length === 0
@@ -3362,8 +3376,8 @@ export const FeeRecordsTable = ({
 
       <AddToFeePetitionsConfirmDialog
         open={feePetitionConfirmOpen}
-        count={feePetitionAddableIds.length}
-        selectedCount={selectedIds.size}
+        count={feePetitionPending.ids.length}
+        selectedCount={feePetitionPending.selectedCount}
         submitting={bulkFeePetitionSaving}
         error={bulkFeePetitionError}
         onConfirm={handleBatchAddToFeePetitions}

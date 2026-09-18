@@ -233,6 +233,10 @@ export const FeePetitions = () => {
   const [bulkRemoveSaving, setBulkRemoveSaving] = useState(false);
   const [bulkRemoveConfirming, setBulkRemoveConfirming] = useState(false);
   const [bulkRemoveError, setBulkRemoveError] = useState<string | null>(null);
+  // Snapshot taken when the confirm opens — confirming clears the selection
+  // while the dialog is still mounted for its close animation, so reading
+  // selectedIds live would flash "Remove 0 cases from Fee Petitions?".
+  const [bulkRemovePendingIds, setBulkRemovePendingIds] = useState<number[]>([]);
   const [exporting, setExporting] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{
     rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
@@ -654,10 +658,10 @@ export const FeePetitions = () => {
   // are all kept server-side, so a case removed by mistake comes back intact
   // via "Add to Fee Petitions" on Master Fee Records.
   const handleBulkRemove = async () => {
-    if (selectedIds.size === 0 || bulkRemoveSaving) return;
+    const ids = bulkRemovePendingIds;
+    if (ids.length === 0 || bulkRemoveSaving) return;
     setBulkRemoveSaving(true);
     setBulkRemoveError(null);
-    const ids = Array.from(selectedIds);
     try {
       const result = await bulkRemoveFromFeePetitions({ caseIds: ids });
       if (!result.ok) throw new Error(result.error);
@@ -1046,7 +1050,10 @@ export const FeePetitions = () => {
                       All Steps Done
                     </button>
                     <button
-                      onClick={() => setBulkRemoveConfirming(true)}
+                      onClick={() => {
+                        setBulkRemovePendingIds(Array.from(selectedIds));
+                        setBulkRemoveConfirming(true);
+                      }}
                       aria-label="Remove selected cases from Fee Petitions"
                       className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-rose-800 text-rose-300 hover:bg-rose-950/40" : "border-rose-300 text-rose-700 hover:bg-rose-50"} transition-colors`}
                     >
@@ -1628,7 +1635,7 @@ export const FeePetitions = () => {
 
       <RemoveFromFeePetitionsConfirmDialog
         open={bulkRemoveConfirming}
-        count={selectedIds.size}
+        count={bulkRemovePendingIds.length}
         submitting={bulkRemoveSaving}
         error={bulkRemoveError}
         onConfirm={handleBulkRemove}

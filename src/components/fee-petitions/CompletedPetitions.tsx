@@ -274,9 +274,20 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
   // Confirmed before it runs, same dialog the Pending tab's bulk remove uses.
   // This is the click that files an approved petition away for good, so it
   // gets the same guard rather than firing straight off a row icon.
+  //
+  // removeTarget deliberately survives a successful clear: the dialog stays
+  // mounted through its close animation, so nulling it here would drop the
+  // claimant's name out of the title on the way out. `removeOpen` controls
+  // visibility, and the next click replaces the target.
   const [removeTarget, setRemoveTarget] = useState<CompletedRow | null>(null);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+
+  const openRemoveConfirm = (row: CompletedRow) => {
+    setRemoveTarget(row);
+    setRemoveOpen(true);
+  };
 
   const removeFromSection = async () => {
     if (!removeTarget || removing) return;
@@ -288,7 +299,7 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
       setRows((prev) => prev.filter((r) => r.id !== removeTarget.id));
       setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
       onSectionMembershipChange?.();
-      setRemoveTarget(null);
+      setRemoveOpen(false);
     } catch (err) {
       setRemoveError((err as Error).message);
     } finally {
@@ -585,7 +596,7 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                         </td>
                         <td className={`${tdBase} text-center`}>
                           <button
-                            onClick={() => setRemoveTarget(row)}
+                            onClick={() => openRemoveConfirm(row)}
                             disabled={removing}
                             aria-label={`Clear ${row.claimant} from Fee Petitions`}
                             title="Clear from Fee Petitions — checklist progress is kept"
@@ -631,14 +642,14 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
       )}
 
       <RemoveFromFeePetitionsConfirmDialog
-        open={removeTarget !== null}
+        open={removeOpen}
         count={1}
         caseName={removeTarget?.claimant}
         verb="clear"
         submitting={removing}
         error={removeError}
         onConfirm={removeFromSection}
-        onClose={() => { setRemoveTarget(null); setRemoveError(null); }}
+        onClose={() => { setRemoveOpen(false); setRemoveError(null); }}
       />
     </div>
   );
