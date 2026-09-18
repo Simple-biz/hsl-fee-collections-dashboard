@@ -1795,8 +1795,22 @@ export const FeeRecordsTable = ({
       {/* Table — own scroll container (both axes). Vertical scroll lets the
           sticky <thead> rows pin; horizontal scroll keeps the frozen Case
           Name + Assigned columns. max-h caps it so the header stays in view
-          on long lists. */}
-      <div className="relative">
+          on long lists.
+
+          [contain:layout] is load-bearing, not decoration. Cells that are
+          sticky on BOTH axes (top-* headers + left-* frozen columns) leak
+          their scroll overflow past the capped scroll div into every ancestor:
+          this wrapper measured 569px tall but reported a 4,490px scrollHeight,
+          which propagated up to <main> and left ~3,800px of empty space to
+          scroll through below the table. Containing layout here stops the leak
+          at its source — measured live, <main> went 4,724px → 884px.
+
+          Same Chromium quirk CompletedPetitions.tsx works around, but NOT the
+          same placement: there it had to go on the outer card. Here the inner
+          wrapper is the one that works, and it also repairs the card's own
+          scrollHeight, which the outer placement leaves inflated. Verify with
+          a live measurement before moving it. */}
+      <div className="relative [contain:layout]">
         <div className="overflow-auto max-h-[75vh]">
           <table className="w-full min-w-400">
             {/* Group headers */}
