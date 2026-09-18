@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog, leaderNotes, userDetails, feePetitions } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, leaderNotes, userDetails } from "@/lib/db/schema";
 import { eq, ilike, sql, desc } from "drizzle-orm";
 import { requireCapability, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
 
@@ -96,6 +96,7 @@ export const GET = async (req: NextRequest) => {
         feeRecordUpdatedAt: feeRecords.updatedAt,
         isClosed: feeRecords.isClosed,
         markedOverpaid: feeRecords.markedOverpaid,
+        inFeePetition: feeRecords.inFeePetition,
         closedAt: feeRecords.closedAt,
         approvedBy: feeRecords.approvedBy,
         feesConfirmation: feeRecords.feesConfirmation,
@@ -256,6 +257,7 @@ export const GET = async (req: NextRequest) => {
         nextFollowUpDate: r.nextFollowUpDate ?? null,
         isClosed: r.isClosed ?? false,
         markedOverpaid: r.markedOverpaid ?? false,
+        inFeePetition: r.inFeePetition ?? false,
         closedAt: r.closedAt ? r.closedAt.toISOString() : null,
         update: activityMap.get(r.clientId) || "—",
         sync: r.syncStatus || "not_synced",
@@ -386,9 +388,12 @@ export const POST = async (req: NextRequest) => {
       winSheetStatus: input.winSheetStatus ?? "not_started",
     });
 
-    if (input.levelWon === "FEE_PETITION") {
-      await db.insert(feePetitions).values({ caseId: input.clientId }).onConflictDoNothing();
-    }
+    // A new case at Fee Petition level used to get its checklist row created
+    // here, which put it straight on the Fee Petitions page. That page is now
+    // an explicit opt-in (fee_records.in_fee_petition, migration 0055), so the
+    // Level alone no longer routes anything — staff add the case with "Add to
+    // Fee Petitions" on Master Fees, and upsertFeePetition creates the
+    // checklist row on the first edit as it does for every other case.
 
     // Best-effort: persist the Chronicle id so the case deep-links to Chronicle.
     // onConflictDoNothing guards the case_id unique key; the .catch swallows a

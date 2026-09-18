@@ -51,6 +51,7 @@ vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
 
 vi.mock("@/app/(dashboard)/master-fees/actions", () => ({
   bulkReassign: vi.fn(),
+  bulkAddToFeePetitions: vi.fn(),
 }));
 
 // Modals/dialogs are conditionally rendered and have complex deps not relevant
@@ -138,6 +139,7 @@ const BASE_CASE: CaseRow = {
   nextFollowUpDate: null,
   isClosed: false,
   markedOverpaid: false,
+  inFeePetition: false,
   closedAt: null,
   update: "",
   sync: "synced",

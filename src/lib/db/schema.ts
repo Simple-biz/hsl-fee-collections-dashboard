@@ -279,6 +279,17 @@ export const feeRecords = pgTable(
     overpaidDismissedAt: timestamp("overpaid_dismissed_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
 
+    // Membership in the Fee Petitions page, set deliberately via the "Add to
+    // Fee Petitions" batch action on Master Fees and cleared by "Remove from
+    // Fee Petitions" on the Fee Petitions page itself. Previously it derived
+    // membership from
+    // cases.level_won being FEE_PETITION, so picking that Level auto-added
+    // the case; staff asked for it to be an explicit opt-in instead (same
+    // move Overpaid Cases made with marked_overpaid above). Level and section
+    // membership are now fully decoupled — changing Level no longer adds or
+    // removes anything.
+    inFeePetition: boolean("in_fee_petition").notNull().default(false),
+
     // Fee Computation Metadata
     feeMethod: feeMethodEnum("fee_method").default("fee_agreement"),
     applicableFeeCap: decimal("applicable_fee_cap", {

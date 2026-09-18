@@ -20,11 +20,13 @@ import {
   Undo2,
   ExternalLink,
   MessageSquare,
+  MinusCircle,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmt, fmtDate, parseCurrencyInput } from "@/lib/formatters";
-import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
+import { fmt, fmtDate, parseCurrencyInput, skippedClosedCasesMessage } from "@/lib/formatters";
+import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { CompletedPetitions } from "./CompletedPetitions";
+import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
@@ -228,6 +230,13 @@ export const FeePetitions = () => {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkChecklistSaving, setBulkChecklistSaving] = useState(false);
   const [bulkChecklistConfirming, setBulkChecklistConfirming] = useState(false);
+  const [bulkRemoveSaving, setBulkRemoveSaving] = useState(false);
+  const [bulkRemoveConfirming, setBulkRemoveConfirming] = useState(false);
+  const [bulkRemoveError, setBulkRemoveError] = useState<string | null>(null);
+  // Snapshot taken when the confirm opens — confirming clears the selection
+  // while the dialog is still mounted for its close animation, so reading
+  // selectedIds live would flash "Remove 0 cases from Fee Petitions?".
+  const [bulkRemovePendingIds, setBulkRemovePendingIds] = useState<number[]>([]);
   const [exporting, setExporting] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{
     rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
@@ -580,6 +589,7 @@ export const FeePetitions = () => {
   const clearSelection = () => {
     setSelectedIds(new Set());
     setBulkChecklistConfirming(false);
+    setBulkRemoveConfirming(false);
   };
 
   const toggleSelectAll = () => {
@@ -641,6 +651,41 @@ export const FeePetitions = () => {
       setError((err as Error).message);
     } finally {
       setBulkChecklistSaving(false);
+    }
+  };
+
+  // Takes the selected cases off this page. The checklist, assignee and notes
+  // are all kept server-side, so a case removed by mistake comes back intact
+  // via "Add to Fee Petitions" on Master Fee Records.
+  const handleBulkRemove = async () => {
+    const ids = bulkRemovePendingIds;
+    if (ids.length === 0 || bulkRemoveSaving) return;
+    setBulkRemoveSaving(true);
+    setBulkRemoveError(null);
+    try {
+      const result = await bulkRemoveFromFeePetitions({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
+      // Cases closed by someone else while this dialog was open fall outside
+      // the action's scope. Report them instead of letting the refetch below
+      // silently show a different number than was confirmed.
+      const missed = ids.length - result.updated.length;
+      if (missed > 0) {
+        setBulkRemoveError(skippedClosedCasesMessage(missed, ids.length, "removed"));
+        fetchPetitions();
+        return;
+      }
+      clearSelection(); // also drops the confirm state
+      fetchPetitions();
+      fetchCompletedCount();
+      // Removal changes the size of the section, so the stat-card totals are
+      // stale too — unlike the checklist actions, which only move rows around.
+      fetchAllTotals();
+    } catch (err) {
+      // Surfaced inside the dialog, which stays open so Try again is one click
+      // away — the page-level error banner would be hidden behind the modal.
+      setBulkRemoveError((err as Error).message);
+    } finally {
+      setBulkRemoveSaving(false);
     }
   };
 
@@ -1012,6 +1057,17 @@ export const FeePetitions = () => {
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
                       All Steps Done
+                    </button>
+                    <button
+                      onClick={() => {
+                        setBulkRemovePendingIds(Array.from(selectedIds));
+                        setBulkRemoveConfirming(true);
+                      }}
+                      aria-label="Remove selected cases from Fee Petitions"
+                      className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-rose-800 text-rose-300 hover:bg-rose-950/40" : "border-rose-300 text-rose-700 hover:bg-rose-50"} transition-colors`}
+                    >
+                      <MinusCircle aria-hidden="true" className="h-3 w-3" />
+                      Remove from Fee Petitions
                     </button>
                     <button
                       onClick={clearSelection}
@@ -1586,7 +1642,25 @@ export const FeePetitions = () => {
         </div>
       </div>
 
-      <CompletedPetitions dark={dark} />
+      <RemoveFromFeePetitionsConfirmDialog
+        open={bulkRemoveConfirming}
+        count={bulkRemovePendingIds.length}
+        submitting={bulkRemoveSaving}
+        error={bulkRemoveError}
+        onConfirm={handleBulkRemove}
+        onClose={() => {
+          setBulkRemoveConfirming(false);
+          setBulkRemoveError(null);
+        }}
+      />
+
+      <CompletedPetitions
+        dark={dark}
+        onSectionMembershipChange={() => {
+          fetchCompletedCount();
+          fetchAllTotals();
+        }}
+      />
 
       {notesFor && (
         <NotesModal
