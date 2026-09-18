@@ -134,8 +134,18 @@ const getMissingClause = (key: string | null) => {
   }
 };
 
+// Membership in this section is an explicit opt-in (fee_records.in_fee_petition),
+// set by the "Add to Fee Petitions" batch action on Master Fees and cleared by
+// "Remove from Fee Petitions" here. It used to be derived from the case's Level
+// being FEE_PETITION, which meant picking that Level auto-added the case —
+// staff asked for the deliberate action instead (see migration 0055). Level is
+// no longer consulted at all: changing it neither adds nor removes a case.
+// Cases already closed to Fees Closed stay excluded, as before.
+const IS_IN_FEE_PETITION = sql`COALESCE(${feeRecords.inFeePetition}, false) = true
+  AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)`;
+
 // GET /api/fee-petitions?page=&limit=&search=&sort=&dir=&status=&touched=&missing=&aging=&assignedTo=
-// Lists cases at FEE_PETITION level with checklist state and aggregate stats
+// Lists cases added to Fee Petitions with checklist state and aggregate stats
 export const GET = async (req: NextRequest) => {
   try {
     const guard = await requirePageAccess("fee_petitions");
@@ -152,8 +162,8 @@ export const GET = async (req: NextRequest) => {
     // search/status/touched/missing/aging/assignedTo and pagination, since
     // the caller already knows which row it wants and just needs its
     // current server state after an edit. Still scoped to the same
-    // Fee Petition / not-closed universe as the list query, though, so this
-    // can't be used to pull fee-petition-shaped data for an arbitrary case.
+    // added-to-Fee-Petitions / not-closed universe as the list query, though,
+    // so this can't be used to pull fee-petition-shaped data for any case.
     const caseIdParam = searchParams.get("caseId");
     if (caseIdParam) {
       const caseId = parseInt(caseIdParam, 10);
@@ -165,9 +175,7 @@ export const GET = async (req: NextRequest) => {
         .from(cases)
         .leftJoin(feePetitions, eq(feePetitions.caseId, cases.clientId))
         .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
-        .where(sql`${cases.clientId} = ${caseId}
-          AND ${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
-          AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)`)
+        .where(sql`${cases.clientId} = ${caseId} AND ${IS_IN_FEE_PETITION}`)
         .limit(1);
       if (!r) {
         return NextResponse.json({ error: "Case not found" }, { status: 404 });
@@ -194,9 +202,9 @@ export const GET = async (req: NextRequest) => {
 
     // A petition moves to "Completed Petitions" once staff check Fee
     // Petition Approved — not tied to the filing checklist or fees received.
-    // Once approved, staff change the case's Level away from FEE_PETITION
-    // (removing it from this page entirely); Completed Petitions is the
-    // holding view of "approved, ready to move to Master Fee Records."
+    // Completed Petitions is the holding view of "approved, ready to move to
+    // Master Fee Records"; a case leaves it via "Remove from Fee Petitions"
+    // (clearing in_fee_petition) or by being closed to Fees Closed.
     // The 6-item filing checklist still drives the per-row progress badge
     // (via progressExpr below) but no longer gates section membership.
     const isApproved = sql`COALESCE(${feePetitions.feePetitionApproved}, false)`;
@@ -237,11 +245,7 @@ export const GET = async (req: NextRequest) => {
           ? sql`AND ${feePetitions.assignedTo} = ${assignedTo}`
           : sql``;
 
-    // Accept both the legacy enum value and the worksheet-direct label
-    // saved via the dashboard dropdown (column C in the master sheet uses
-    // "FEE PETITION" with a space). Exclude cases already closed to Fees Closed.
-    const whereClause = sql`${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
-      AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)
+    const whereClause = sql`${IS_IN_FEE_PETITION}
       ${searchClause}
       ${statusClause}
       ${touchedClause}
@@ -253,8 +257,7 @@ export const GET = async (req: NextRequest) => {
     // Base clause excludes the assignedTo filter itself, so the dropdown's
     // per-specialist counts reflect every other active filter while still
     // offering every specialist as an option (not just the selected one).
-    const assignedToBaseClause = sql`${cases.levelWon} IN ('FEE_PETITION', 'FEE PETITION')
-      AND (${feeRecords.isClosed} IS NULL OR ${feeRecords.isClosed} = false)
+    const assignedToBaseClause = sql`${IS_IN_FEE_PETITION}
       ${searchClause}
       ${statusClause}
       ${touchedClause}

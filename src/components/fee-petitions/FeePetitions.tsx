@@ -20,10 +20,11 @@ import {
   Undo2,
   ExternalLink,
   MessageSquare,
+  MinusCircle,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate, parseCurrencyInput } from "@/lib/formatters";
-import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
+import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { CompletedPetitions } from "./CompletedPetitions";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
@@ -228,6 +229,8 @@ export const FeePetitions = () => {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkChecklistSaving, setBulkChecklistSaving] = useState(false);
   const [bulkChecklistConfirming, setBulkChecklistConfirming] = useState(false);
+  const [bulkRemoveSaving, setBulkRemoveSaving] = useState(false);
+  const [bulkRemoveConfirming, setBulkRemoveConfirming] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{
     rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
@@ -580,6 +583,7 @@ export const FeePetitions = () => {
   const clearSelection = () => {
     setSelectedIds(new Set());
     setBulkChecklistConfirming(false);
+    setBulkRemoveConfirming(false);
   };
 
   const toggleSelectAll = () => {
@@ -641,6 +645,29 @@ export const FeePetitions = () => {
       setError((err as Error).message);
     } finally {
       setBulkChecklistSaving(false);
+    }
+  };
+
+  // Takes the selected cases off this page. The checklist, assignee and notes
+  // are all kept server-side, so a case removed by mistake comes back intact
+  // via "Add to Fee Petitions" on Master Fee Records.
+  const handleBulkRemove = async () => {
+    if (selectedIds.size === 0 || bulkRemoveSaving) return;
+    setBulkRemoveSaving(true);
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await bulkRemoveFromFeePetitions({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
+      clearSelection(); // also drops the confirm state
+      fetchPetitions();
+      fetchCompletedCount();
+      // Removal changes the size of the section, so the stat-card totals are
+      // stale too — unlike the checklist actions, which only move rows around.
+      fetchAllTotals();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBulkRemoveSaving(false);
     }
   };
 
@@ -971,7 +998,29 @@ export const FeePetitions = () => {
           <div>
             {selectedIds.size > 0 ? (
               <div className="flex items-center gap-2 flex-wrap">
-                {bulkChecklistConfirming ? (
+                {bulkRemoveConfirming ? (
+                  <>
+                    <span className={`text-sm ${t.textMuted}`}>
+                      Remove {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} from Fee Petitions? Checklist progress is kept.
+                    </span>
+                    <button
+                      onClick={handleBulkRemove}
+                      disabled={bulkRemoveSaving}
+                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-rose-700 hover:bg-rose-600 text-white" : "bg-rose-600 hover:bg-rose-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
+                    >
+                      {bulkRemoveSaving
+                        ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                        : <Check aria-hidden="true" className="h-3 w-3" />}
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setBulkRemoveConfirming(false)}
+                      className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : bulkChecklistConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
                       Mark all steps done for {selectedChecklistIncompleteCount} case{selectedChecklistIncompleteCount !== 1 ? "s" : ""}?
@@ -1012,6 +1061,14 @@ export const FeePetitions = () => {
                     >
                       <Check aria-hidden="true" className="h-3 w-3" />
                       All Steps Done
+                    </button>
+                    <button
+                      onClick={() => setBulkRemoveConfirming(true)}
+                      aria-label="Remove selected cases from Fee Petitions"
+                      className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-rose-800 text-rose-300 hover:bg-rose-950/40" : "border-rose-300 text-rose-700 hover:bg-rose-50"} transition-colors`}
+                    >
+                      <MinusCircle aria-hidden="true" className="h-3 w-3" />
+                      Remove from Fee Petitions
                     </button>
                     <button
                       onClick={clearSelection}
@@ -1586,7 +1643,13 @@ export const FeePetitions = () => {
         </div>
       </div>
 
-      <CompletedPetitions dark={dark} />
+      <CompletedPetitions
+        dark={dark}
+        onSectionMembershipChange={() => {
+          fetchCompletedCount();
+          fetchAllTotals();
+        }}
+      />
 
       {notesFor && (
         <NotesModal

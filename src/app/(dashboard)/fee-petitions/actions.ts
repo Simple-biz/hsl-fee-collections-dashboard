@@ -2,10 +2,10 @@
 
 import { db } from "@/lib/db";
 import { feePetitions, feeRecords } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { parseBool } from "@/lib/import/csv-parser";
 import { resolveCaseId } from "@/lib/import/resolve-case";
-import { requireCapability } from "@/lib/auth-helpers";
+import { requireCapability, requirePageAccess } from "@/lib/auth-helpers";
 import type { ImportResult } from "@/components/modals/CsvImportModal";
 
 // The Remarks value written to Master Fees when a lead approves a petition
@@ -102,6 +102,41 @@ export async function upsertFeePetition(input: {
     return { ok: true, data: row };
   } catch (error) {
     console.error("upsertFeePetition error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
+// Takes the selected cases back out of the Fee Petitions page — the
+// counterpart to "Add to Fee Petitions" on Master Fees, and now the only way
+// a case leaves this section short of being closed to Fees Closed (changing
+// the case's Level no longer removes it; see migration 0055).
+//
+// Only the membership flag is cleared: the fee_petitions row, its checklist,
+// assignee and notes all survive, so a case removed by mistake comes back
+// exactly as it was when it's re-added. Guarded on page access to match the
+// add side — anyone who can work this page can take a case off it.
+//
+// Scoped to open cases, like bulkAddToFeePetitions. This page never lists a
+// closed case so the scope is unreachable today, but any write to a closed
+// fee_records row makes compute_fee_totals reset its sheet-sourced Pending
+// (see migration 0055's note) — worth making structural rather than incidental.
+export async function bulkRemoveFromFeePetitions(input: {
+  caseIds: number[];
+}): Promise<Result> {
+  try {
+    const guard = await requirePageAccess("fee_petitions");
+    if (!guard.ok) return { ok: false, error: "You don't have permission to remove cases from Fee Petitions." };
+    if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
+    if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
+    if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };
+
+    await db
+      .update(feeRecords)
+      .set({ inFeePetition: false, updatedAt: new Date() })
+      .where(and(inArray(feeRecords.caseId, input.caseIds), eq(feeRecords.isClosed, false)));
+    return { ok: true };
+  } catch (error) {
+    console.error("bulkRemoveFromFeePetitions error:", error);
     return { ok: false, error: "Server error" };
   }
 }

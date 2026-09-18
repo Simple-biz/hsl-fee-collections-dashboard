@@ -1,10 +1,16 @@
 // @vitest-environment jsdom
 //
-// "Add to Overpaid Cases" batch action must be available on Fees Closed too,
-// not just the active table — the underlying server action has no is_closed
-// guard, and the only alternative (unchecking "Reopen") also wipes PIF status
-// just to flag a case Overpaid. "Fees Closed" itself stays active-only, since
-// closing an already-closed case makes no sense.
+// "Add to Fee Petitions" replaces the old behaviour where picking "Fee
+// Petition" in the Level dropdown silently put a case on the Fee Petitions
+// page. Two things make it different from every other action in the batch
+// pill, and both are easy to regress:
+//
+//   1. It is open to ordinary agents, not just admins. The pill used to carry
+//      a single isAdmin gate around everything; that gate now sits on each of
+//      the older buttons individually, so a member sees this one and nothing
+//      else.
+//   2. It only sends the cases that aren't in the section yet, and disables
+//      itself when the whole selection is already there.
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, fireEvent, screen, cleanup } from "@testing-library/react";
@@ -23,7 +29,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next-auth/react", () => ({
   useSession: vi.fn(() => ({
-    data: { user: { role: "admin", capabilities: [] }, expires: "9999-12-31" },
+    data: { user: { role: "member", capabilities: [] }, expires: "9999-12-31" },
     status: "authenticated",
     update: vi.fn(),
   })),
@@ -33,14 +39,14 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),
 }));
 
-const bulkMarkOverpaidMock = vi.fn();
-vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
-  bulkMarkOverpaid: (...args: unknown[]) => bulkMarkOverpaidMock(...args),
-}));
-
+const bulkAddToFeePetitionsMock = vi.fn();
 vi.mock("@/app/(dashboard)/master-fees/actions", () => ({
   bulkReassign: vi.fn(),
-  bulkAddToFeePetitions: vi.fn(),
+  bulkAddToFeePetitions: (...args: unknown[]) => bulkAddToFeePetitionsMock(...args),
+}));
+
+vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
+  bulkMarkOverpaid: vi.fn(),
 }));
 
 vi.mock("@/components/cases/CaseDetailSheet", () => ({ default: () => null }));
@@ -96,8 +102,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   cleanup();
-  bulkMarkOverpaidMock.mockReset();
-  bulkMarkOverpaidMock.mockResolvedValue({ ok: true });
+  bulkAddToFeePetitionsMock.mockReset();
+  bulkAddToFeePetitionsMock.mockResolvedValue({ ok: true });
 });
 
 const BASE_CASE: CaseRow = {
@@ -142,6 +148,8 @@ const BASE_CASE: CaseRow = {
   winSheetLinkText: null,
 };
 
+const SECOND_CASE: CaseRow = { ...BASE_CASE, id: 2, name: "Alvarez, Marco" };
+
 function mockRole(role: "admin" | "member") {
   vi.mocked(useSession).mockReturnValue({
     data: { user: { role, capabilities: [] }, expires: "9999-12-31" },
@@ -150,47 +158,93 @@ function mockRole(role: "admin" | "member") {
   } as unknown as ReturnType<typeof useSession>);
 }
 
-function renderAndSelect(mode: "active" | "closed") {
+function renderAndSelect(
+  cases: CaseRow[],
+  mode: "active" | "closed" = "active",
+) {
   const utils = render(
     <FeeRecordsTable
-      cases={[BASE_CASE]}
+      cases={cases}
       mode={mode}
       dropdownOptions={{}}
       teamMembers={[]}
       approvedByOptions={[]}
     />,
   );
-  fireEvent.click(screen.getByLabelText("Select Watson, Katrina"));
+  for (const c of cases) {
+    fireEvent.click(screen.getByLabelText(`Select ${c.name}`));
+  }
   return utils;
 }
 
-describe("FeeRecordsTable — Add to Overpaid Cases batch action", () => {
-  beforeEach(() => mockRole("admin"));
+const addButton = () => screen.queryByRole("button", { name: /Add to Fee Petitions/ });
 
-  it("is available on the active table for an admin", () => {
-    renderAndSelect("active");
-    expect(screen.getByRole("button", { name: /Add to Overpaid Cases/ })).toBeTruthy();
-  });
-
-  it("is also available on the closed table for an admin", () => {
-    renderAndSelect("closed");
-    expect(screen.getByRole("button", { name: /Add to Overpaid Cases/ })).toBeTruthy();
-  });
-
-  it("hides the redundant Fees Closed action on the closed table", () => {
-    renderAndSelect("closed");
-    expect(screen.queryByRole("button", { name: /^Fees Closed$/ })).toBeNull();
-  });
-
-  it("stays hidden on the closed table for a member (no case.finalize)", () => {
+describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
+  it("is available to a member, who gets no other batch action", () => {
     mockRole("member");
-    renderAndSelect("closed");
+    renderAndSelect([BASE_CASE]);
+    expect(addButton()).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Archive$/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Add to Overpaid Cases/ })).toBeNull();
   });
 
-  it("calls bulkMarkOverpaid with the selected case when clicked from the closed table", () => {
-    renderAndSelect("closed");
-    fireEvent.click(screen.getByRole("button", { name: /Add to Overpaid Cases/ }));
-    expect(bulkMarkOverpaidMock).toHaveBeenCalledWith({ caseIds: [1] });
+  it("is available to an admin alongside the admin-only actions", () => {
+    mockRole("admin");
+    renderAndSelect([BASE_CASE]);
+    expect(addButton()).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Archive$/ })).toBeTruthy();
+  });
+
+  it("sends the selected case ids when clicked", () => {
+    mockRole("member");
+    renderAndSelect([BASE_CASE, SECOND_CASE]);
+    fireEvent.click(addButton()!);
+    expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [1, 2] });
+  });
+
+  it("skips cases already in the section and reports the remaining count", () => {
+    mockRole("member");
+    renderAndSelect([{ ...BASE_CASE, inFeePetition: true }, SECOND_CASE]);
+    const btn = addButton()!;
+    expect(btn.textContent).toContain("(1)");
+    fireEvent.click(btn);
+    expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [2] });
+  });
+
+  it("is disabled when every selected case is already in the section", () => {
+    mockRole("member");
+    renderAndSelect([{ ...BASE_CASE, inFeePetition: true }]);
+    const btn = addButton() as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(bulkAddToFeePetitionsMock).not.toHaveBeenCalled();
+  });
+
+  it("is hidden on the Fees Closed table, which the section excludes anyway", () => {
+    mockRole("admin");
+    renderAndSelect([BASE_CASE], "closed");
+    expect(addButton()).toBeNull();
+  });
+
+  // Every button in the pill is independently gated now, so the pill has to
+  // check that something survives. A member on Fees Closed clears none of the
+  // gates and must get no pill at all — not a floating bar saying "1 selected"
+  // with nothing to do.
+  it("shows no batch pill at all for a member on the Fees Closed table", () => {
+    mockRole("member");
+    renderAndSelect([BASE_CASE], "closed");
+    expect(screen.queryByText("1 selected")).toBeNull();
+  });
+
+  it("still shows the pill for a member on the active table", () => {
+    mockRole("member");
+    renderAndSelect([BASE_CASE]);
+    expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+
+  it("still shows the pill for an admin on the Fees Closed table", () => {
+    mockRole("admin");
+    renderAndSelect([BASE_CASE], "closed");
+    expect(screen.getByText("1 selected")).toBeTruthy();
   });
 });

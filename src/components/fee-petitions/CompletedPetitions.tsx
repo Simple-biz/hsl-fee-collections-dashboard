@@ -15,10 +15,11 @@ import {
   ChevronUp,
   RefreshCw,
   ExternalLink,
+  MinusCircle,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
-import { upsertFeePetition } from "@/app/(dashboard)/fee-petitions/actions";
+import { upsertFeePetition, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { NoteField } from "@/components/shared/NoteField";
 
 interface CompletedRow {
@@ -67,9 +68,16 @@ const formatRelativeDate = (dateStr: string): string => {
 
 interface Props {
   dark: boolean;
+  /**
+   * Called after this table removes a case from the Fee Petitions section, so
+   * the parent can refresh the "Completed" badge and the stat cards it fetches
+   * separately. Without it those counts keep the pre-removal number until the
+   * next page load — the two tables have no other live sync.
+   */
+  onSectionMembershipChange?: () => void;
 }
 
-export const CompletedPetitions = ({ dark }: Props) => {
+export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) => {
   const t = themeClasses(dark);
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<CompletedRow[]>([]);
@@ -256,7 +264,31 @@ export const CompletedPetitions = ({ dark }: Props) => {
   const stickyBg = dark ? "bg-emerald-900" : "bg-emerald-100";
   const stickyHover = dark ? "group-hover/row:bg-emerald-800" : "group-hover/row:bg-emerald-200";
   // claimant + fee requested + fees received + approved + completed + assigned + 7 checkbox cols + approved flag + note
-  const colSpan = CHECKBOX_COLUMNS.length + 8;
+  // An approved petition sits here until staff take it off the Fee Petitions
+  // section for good. That used to happen by changing the case's Level away
+  // from "Fee Petition"; membership is now the in_fee_petition flag, so the
+  // exit is this explicit remove. Nothing else is touched — the checklist and
+  // approval survive, and "Add to Fee Petitions" on Master Fees brings the
+  // case back exactly as it was.
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  const removeFromSection = async (row: CompletedRow) => {
+    if (removingId != null) return;
+    setRemovingId(row.id);
+    try {
+      const result = await bulkRemoveFromFeePetitions({ caseIds: [row.id] });
+      if (!result.ok) throw new Error(result.error);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
+      onSectionMembershipChange?.();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const colSpan = CHECKBOX_COLUMNS.length + 9;
 
   return (
     // contain:layout stops the sticky frozen-column/header cells in the table
@@ -439,6 +471,9 @@ export const CompletedPetitions = ({ dark }: Props) => {
                   <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
                     Update
                   </th>
+                  <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
+                    Remove
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -536,6 +571,19 @@ export const CompletedPetitions = ({ dark }: Props) => {
                             t={t}
                             status={noteState[row.id]}
                           />
+                        </td>
+                        <td className={`${tdBase} text-center`}>
+                          <button
+                            onClick={() => removeFromSection(row)}
+                            disabled={removingId != null}
+                            aria-label={`Remove ${row.claimant} from Fee Petitions`}
+                            title="Remove from Fee Petitions — checklist progress is kept"
+                            className={`h-6 w-6 rounded-md inline-flex items-center justify-center transition-colors disabled:opacity-40 ${dark ? "text-rose-400 hover:bg-rose-950/40" : "text-rose-600 hover:bg-rose-50"}`}
+                          >
+                            {removingId === row.id
+                              ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                              : <MinusCircle aria-hidden="true" className="h-3.5 w-3.5" />}
+                          </button>
                         </td>
                       </tr>
                     );

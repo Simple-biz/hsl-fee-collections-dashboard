@@ -27,6 +27,7 @@ import {
   BookmarkCheck,
   Trash2,
   SearchX,
+  Receipt,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -63,7 +64,8 @@ import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
 import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
-import { bulkReassign } from "@/app/(dashboard)/master-fees/actions";
+import { bulkReassign, bulkAddToFeePetitions } from "@/app/(dashboard)/master-fees/actions";
+import { FeePetitionIndicator } from "./FeePetitionIndicator";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
@@ -465,6 +467,8 @@ export const FeeRecordsTable = ({
   const [bulkOverpaidError, setBulkOverpaidError] = useState<string | null>(null);
   const [bulkReassignSaving, setBulkReassignSaving] = useState(false);
   const [bulkReassignError, setBulkReassignError] = useState<string | null>(null);
+  const [bulkFeePetitionSaving, setBulkFeePetitionSaving] = useState(false);
+  const [bulkFeePetitionError, setBulkFeePetitionError] = useState<string | null>(null);
   const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
   const [bulkClosePendingIds, setBulkClosePendingIds] = useState<number[]>([]);
   // Optimistic overrides for fee payment totals after panel add/delete.
@@ -875,6 +879,56 @@ export const FeeRecordsTable = ({
     mode,
   ]);
 
+  // Cases in the current selection that aren't on the Fee Petitions page yet.
+  // Re-adding one that's already there is a no-op server-side, so the button
+  // reports (and acts on) only the ones that would actually move. Resolved
+  // against the full case list rather than `filtered`, since a selection
+  // survives filter changes, and through rowOverrides so a case added a moment
+  // ago isn't offered again before the next refresh.
+  const casesById = useMemo(() => new Map(cases.map((c) => [c.id, c])), [cases]);
+  const feePetitionAddableIds = useMemo(
+    () =>
+      Array.from(selectedIds).filter((id) => {
+        const row = casesById.get(id);
+        if (!row) return false;
+        return !(rowOverrides[id]?.inFeePetition ?? row.inFeePetition);
+      }),
+    [casesById, rowOverrides, selectedIds],
+  );
+
+  // Does the batch pill have anything to offer this user? Every button in it is
+  // independently gated now, so without this check a member selecting rows on
+  // Fees Closed would get a floating bar containing only "N selected".
+  // Archive is gated on isAdmin alone, so an admin always has at least one
+  // action; everyone else has one exactly when "Add to Fee Petitions" shows.
+  const canAddToFeePetitions = mode !== "closed";
+  const hasBatchActions = canAddToFeePetitions || isAdmin;
+
+  // Routes the selected cases into the Fee Petition workflow. Picking "Fee
+  // Petition" in the Level dropdown no longer does this on its own — adding is
+  // now this deliberate click, and removing is the matching action on the Fee
+  // Petitions page.
+  const handleBatchAddToFeePetitions = async () => {
+    if (feePetitionAddableIds.length === 0 || bulkFeePetitionSaving) return;
+    setBulkFeePetitionSaving(true);
+    setBulkFeePetitionError(null);
+    const ids = feePetitionAddableIds;
+    try {
+      const result = await bulkAddToFeePetitions({ caseIds: ids });
+      if (!result.ok) throw new Error(result.error);
+      setRowOverrides((prev) => {
+        const next = { ...prev };
+        for (const id of ids) next[id] = { ...next[id], inFeePetition: true };
+        return next;
+      });
+      setSelectedIds(new Set());
+    } catch (err) {
+      setBulkFeePetitionError((err as Error).message);
+    } finally {
+      setBulkFeePetitionSaving(false);
+    }
+  };
+
   // ── Pagination ────────────────────────────────────────────────────────────
   const pageCount =
     pageSize === "all" ? 1 : Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -1136,6 +1190,7 @@ export const FeeRecordsTable = ({
         caseStatus: d.caseStatus ?? null,
         isClosed: d.isClosed ?? false,
         markedOverpaid: d.markedOverpaid ?? false,
+        inFeePetition: d.inFeePetition ?? false,
         closedAt: d.closedAt ?? null,
         update: d.activities?.[0]?.message || "—",
         sync: d.syncStatus || "not_synced",
@@ -1622,22 +1677,31 @@ export const FeeRecordsTable = ({
           batch actions. "Add to Overpaid Cases" is also available in closed
           mode — marking overpaid has no is_closed guard server-side, and
           the alternative (unchecking Reopen) would also clear PIF status
-          just to flag a case Overpaid. */}
-      {selectedIds.size > 0 && isAdmin && (
+          just to flag a case Overpaid.
+
+          The pill itself is no longer admin-only: "Add to Fee Petitions" is
+          open to every agent who can reach this page (that was the point of
+          replacing the old Level-driven automation with a deliberate click),
+          so each of the older actions now carries its own isAdmin gate
+          instead of relying on one around the whole pill. Because every button
+          is now independently gated, the pill also has to check that at least
+          one of them survives — otherwise a member selecting rows on Fees
+          Closed would get a floating bar offering nothing. */}
+      {selectedIds.size > 0 && hasBatchActions && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
-          {(bulkOverpaidError || bulkReassignError) && (
+          {(bulkOverpaidError || bulkReassignError || bulkFeePetitionError) && (
             <div
               role="alert"
               className="pointer-events-auto rounded-full bg-red-600 px-3 py-1 text-[12px] font-medium text-white shadow-lg"
             >
-              {bulkOverpaidError ?? bulkReassignError}
+              {bulkOverpaidError ?? bulkReassignError ?? bulkFeePetitionError}
             </div>
           )}
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
             <span className="text-[13px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
               {selectedIds.size} selected
             </span>
-            {mode !== "closed" && canFinalize && (
+            {mode !== "closed" && isAdmin && canFinalize && (
               <button
                 onClick={handleBatchFeesClosed}
                 disabled={bulkCloseConfirmOpen}
@@ -1647,7 +1711,7 @@ export const FeeRecordsTable = ({
                 Fees Closed
               </button>
             )}
-            {canFinalize && (
+            {isAdmin && canFinalize && (
               <button
                 onClick={handleBatchMarkOverpaid}
                 disabled={bulkOverpaidSaving}
@@ -1661,7 +1725,37 @@ export const FeeRecordsTable = ({
                 Add to Overpaid Cases
               </button>
             )}
-            {assignedOptions.length > 0 && (
+            {/* Open to every agent, unlike the actions around it — this is the
+                replacement for the old "pick Fee Petition as the Level and the
+                case appears there" behaviour. Hidden in closed mode: the Fee
+                Petitions page excludes closed cases, so adding one there would
+                flag a case that stays invisible until it's reopened. */}
+            {canAddToFeePetitions && (
+              <button
+                onClick={handleBatchAddToFeePetitions}
+                disabled={bulkFeePetitionSaving || feePetitionAddableIds.length === 0}
+                title={
+                  feePetitionAddableIds.length === 0
+                    ? "All selected cases are already in Fee Petitions"
+                    : undefined
+                }
+                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+              >
+                {bulkFeePetitionSaving ? (
+                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Receipt aria-hidden="true" className="h-3 w-3" />
+                )}
+                Add to Fee Petitions
+                {feePetitionAddableIds.length > 0 &&
+                  feePetitionAddableIds.length < selectedIds.size && (
+                    <span className="font-normal opacity-80">
+                      ({feePetitionAddableIds.length})
+                    </span>
+                  )}
+              </button>
+            )}
+            {isAdmin && assignedOptions.length > 0 && (
               <select
                 value=""
                 onChange={(e) => { if (e.target.value) void handleBulkReassign(e.target.value); }}
@@ -1677,14 +1771,16 @@ export const FeeRecordsTable = ({
                 ))}
               </select>
             )}
-            <button
-              onClick={handleBatchArchive}
-              disabled={archiveConfirmOpen}
-              className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
-            >
-              <Archive aria-hidden="true" className="h-3 w-3" />
-              Archive
-            </button>
+            {isAdmin && (
+              <button
+                onClick={handleBatchArchive}
+                disabled={archiveConfirmOpen}
+                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
+              >
+                <Archive aria-hidden="true" className="h-3 w-3" />
+                Archive
+              </button>
+            )}
             <button
               onClick={() => setSelectedIds(new Set())}
               aria-label="Clear selection"
@@ -2283,42 +2379,53 @@ export const FeeRecordsTable = ({
                         />
                       </td>
                     )}
-                    {/* Level — varchar; lives on the cases row. */}
+                    {/* Level — varchar; lives on the cases row. The Fee
+                        Petitions marker rides alongside it rather than in a
+                        column of its own: Level is where the question comes up,
+                        and the column groups here duplicate colSpan across four
+                        JSX sites (see the column-parity test). */}
                     <td
                       className={`${tdBase} ${isClosedMode ? "" : groupBorder}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Listbox
-                        value={cellValue(c, "level")}
-                        onChange={(v) =>
-                          handleVarcharChange(
-                            c,
-                            "case",
-                            "levelWon",
-                            "level",
-                            "Case Level",
-                            v,
-                          )
-                        }
-                        dark={dark}
-                        t={t}
-                        aria-label="Case Level"
-                        title={
-                          caseLevelOptions.length === 0
-                            ? "No options configured — add them in Settings"
-                            : undefined
-                        }
-                        options={buildListboxOptions(
-                          caseLevelOptions,
-                          cellValue(c, "level"),
-                          (name) => {
-                            const visual = caseLevelVisual(name, dark);
-                            return visual
-                              ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
-                              : undefined;
-                          },
-                        )}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <Listbox
+                          value={cellValue(c, "level")}
+                          onChange={(v) =>
+                            handleVarcharChange(
+                              c,
+                              "case",
+                              "levelWon",
+                              "level",
+                              "Case Level",
+                              v,
+                            )
+                          }
+                          dark={dark}
+                          t={t}
+                          aria-label="Case Level"
+                          title={
+                            caseLevelOptions.length === 0
+                              ? "No options configured — add them in Settings"
+                              : undefined
+                          }
+                          options={buildListboxOptions(
+                            caseLevelOptions,
+                            cellValue(c, "level"),
+                            (name) => {
+                              const visual = caseLevelVisual(name, dark);
+                              return visual
+                                ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
+                                : undefined;
+                            },
+                          )}
+                        />
+                        <FeePetitionIndicator
+                          inFeePetition={c.inFeePetition}
+                          level={c.level === "—" ? null : c.level}
+                          dark={dark}
+                        />
+                      </div>
                     </td>
                     {/* Claim — varchar; lives on the cases row. */}
                     <td

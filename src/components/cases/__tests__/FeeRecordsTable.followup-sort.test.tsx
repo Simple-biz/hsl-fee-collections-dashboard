@@ -41,6 +41,7 @@ vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
 
 vi.mock("@/app/(dashboard)/master-fees/actions", () => ({
   bulkReassign: vi.fn(),
+  bulkAddToFeePetitions: vi.fn(),
 }));
 
 vi.mock("@/components/cases/CaseDetailSheet", () => ({ default: () => null }));
@@ -118,6 +119,7 @@ const caseWith = (id: number, name: string, nextFollowUpDate: string | null): Ca
   nextFollowUpDate,
   isClosed: false,
   markedOverpaid: false,
+  inFeePetition: false,
   closedAt: null,
   update: "",
   sync: "synced",
