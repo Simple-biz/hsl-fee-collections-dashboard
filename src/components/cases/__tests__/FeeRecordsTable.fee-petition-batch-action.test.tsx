@@ -177,7 +177,16 @@ function renderAndSelect(
   return utils;
 }
 
-const addButton = () => screen.queryByRole("button", { name: /Add to Fee Petitions/ });
+// The pill button opens a confirm dialog; the dialog's own button is what
+// fires the action. Both carry the same label, so scope to the dialog.
+const addButton = () =>
+  screen.queryAllByRole("button", { name: /Add to Fee Petitions/ })[0] ?? null;
+
+const confirmAdd = () => {
+  fireEvent.click(addButton()!);
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: /Add to Fee Petitions/ }));
+};
 
 describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
   it("is available to a member, who gets no other batch action", () => {
@@ -195,20 +204,41 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
     expect(screen.getByRole("button", { name: /^Archive$/ })).toBeTruthy();
   });
 
-  it("sends the selected case ids when clicked", () => {
+  it("confirms before doing anything, then sends the selected case ids", () => {
     mockRole("member");
     renderAndSelect([BASE_CASE, SECOND_CASE]);
+
     fireEvent.click(addButton()!);
+    // The click must open the dialog, not fire the action.
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(bulkAddToFeePetitionsMock).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /Add to Fee Petitions/ }));
     expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [1, 2] });
+  });
+
+  it("does nothing if the confirm is cancelled", () => {
+    mockRole("member");
+    renderAndSelect([BASE_CASE]);
+    fireEvent.click(addButton()!);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Cancel$/ }));
+    expect(bulkAddToFeePetitionsMock).not.toHaveBeenCalled();
   });
 
   it("skips cases already in the section and reports the remaining count", () => {
     mockRole("member");
     renderAndSelect([{ ...BASE_CASE, inFeePetition: true }, SECOND_CASE]);
-    const btn = addButton()!;
-    expect(btn.textContent).toContain("(1)");
-    fireEvent.click(btn);
+    expect(addButton()!.textContent).toContain("(1)");
+    confirmAdd();
     expect(bulkAddToFeePetitionsMock).toHaveBeenCalledWith({ caseIds: [2] });
+  });
+
+  it("tells you in the dialog which selected cases are being left alone", () => {
+    mockRole("member");
+    renderAndSelect([{ ...BASE_CASE, inFeePetition: true }, SECOND_CASE]);
+    fireEvent.click(addButton()!);
+    expect(screen.getByRole("dialog").textContent).toMatch(/1 of the 2 selected is already there/);
   });
 
   it("is disabled when every selected case is already in the section", () => {

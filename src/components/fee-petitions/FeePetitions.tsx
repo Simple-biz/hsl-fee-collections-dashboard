@@ -26,6 +26,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate, parseCurrencyInput } from "@/lib/formatters";
 import { upsertFeePetition, bulkMarkComplete, bulkRestoreChecklists, bulkImportFeePetitions, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { CompletedPetitions } from "./CompletedPetitions";
+import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
 import CsvImportModal, { type ColumnDef } from "@/components/modals/CsvImportModal";
 import { parseBool } from "@/lib/import/csv-parser";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
@@ -231,6 +232,7 @@ export const FeePetitions = () => {
   const [bulkChecklistConfirming, setBulkChecklistConfirming] = useState(false);
   const [bulkRemoveSaving, setBulkRemoveSaving] = useState(false);
   const [bulkRemoveConfirming, setBulkRemoveConfirming] = useState(false);
+  const [bulkRemoveError, setBulkRemoveError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [undoInfo, setUndoInfo] = useState<{
     rows: Array<{ caseId: number; fields: Record<CheckboxKey, boolean> }>;
@@ -654,6 +656,7 @@ export const FeePetitions = () => {
   const handleBulkRemove = async () => {
     if (selectedIds.size === 0 || bulkRemoveSaving) return;
     setBulkRemoveSaving(true);
+    setBulkRemoveError(null);
     const ids = Array.from(selectedIds);
     try {
       const result = await bulkRemoveFromFeePetitions({ caseIds: ids });
@@ -665,7 +668,9 @@ export const FeePetitions = () => {
       // stale too — unlike the checklist actions, which only move rows around.
       fetchAllTotals();
     } catch (err) {
-      setError((err as Error).message);
+      // Surfaced inside the dialog, which stays open so Try again is one click
+      // away — the page-level error banner would be hidden behind the modal.
+      setBulkRemoveError((err as Error).message);
     } finally {
       setBulkRemoveSaving(false);
     }
@@ -998,29 +1003,7 @@ export const FeePetitions = () => {
           <div>
             {selectedIds.size > 0 ? (
               <div className="flex items-center gap-2 flex-wrap">
-                {bulkRemoveConfirming ? (
-                  <>
-                    <span className={`text-sm ${t.textMuted}`}>
-                      Remove {selectedIds.size} case{selectedIds.size !== 1 ? "s" : ""} from Fee Petitions? Checklist progress is kept.
-                    </span>
-                    <button
-                      onClick={handleBulkRemove}
-                      disabled={bulkRemoveSaving}
-                      className={`h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${dark ? "bg-rose-700 hover:bg-rose-600 text-white" : "bg-rose-600 hover:bg-rose-700 text-white"} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
-                    >
-                      {bulkRemoveSaving
-                        ? <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                        : <Check aria-hidden="true" className="h-3 w-3" />}
-                      Confirm
-                    </button>
-                    <button
-                      onClick={() => setBulkRemoveConfirming(false)}
-                      className={`h-7 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : bulkChecklistConfirming ? (
+                {bulkChecklistConfirming ? (
                   <>
                     <span className={`text-sm ${t.textMuted}`}>
                       Mark all steps done for {selectedChecklistIncompleteCount} case{selectedChecklistIncompleteCount !== 1 ? "s" : ""}?
@@ -1063,7 +1046,10 @@ export const FeePetitions = () => {
                       All Steps Done
                     </button>
                     <button
-                      onClick={() => setBulkRemoveConfirming(true)}
+                      onClick={() => {
+                        setBulkRemoveError(null);
+                        setBulkRemoveConfirming(true);
+                      }}
                       aria-label="Remove selected cases from Fee Petitions"
                       className={`h-7 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${dark ? "border-rose-800 text-rose-300 hover:bg-rose-950/40" : "border-rose-300 text-rose-700 hover:bg-rose-50"} transition-colors`}
                     >
@@ -1642,6 +1628,18 @@ export const FeePetitions = () => {
           </div>
         </div>
       </div>
+
+      <RemoveFromFeePetitionsConfirmDialog
+        open={bulkRemoveConfirming}
+        count={selectedIds.size}
+        submitting={bulkRemoveSaving}
+        error={bulkRemoveError}
+        onConfirm={handleBulkRemove}
+        onClose={() => {
+          setBulkRemoveConfirming(false);
+          setBulkRemoveError(null);
+        }}
+      />
 
       <CompletedPetitions
         dark={dark}

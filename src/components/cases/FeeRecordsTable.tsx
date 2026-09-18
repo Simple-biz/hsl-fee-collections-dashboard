@@ -66,6 +66,7 @@ import { memberRowTint } from "@/lib/member-colors";
 import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
 import { bulkReassign, bulkAddToFeePetitions } from "@/app/(dashboard)/master-fees/actions";
 import { FeePetitionIndicator } from "./FeePetitionIndicator";
+import { AddToFeePetitionsConfirmDialog } from "./AddToFeePetitionsConfirmDialog";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
@@ -469,6 +470,7 @@ export const FeeRecordsTable = ({
   const [bulkReassignError, setBulkReassignError] = useState<string | null>(null);
   const [bulkFeePetitionSaving, setBulkFeePetitionSaving] = useState(false);
   const [bulkFeePetitionError, setBulkFeePetitionError] = useState<string | null>(null);
+  const [feePetitionConfirmOpen, setFeePetitionConfirmOpen] = useState(false);
   const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
   const [bulkClosePendingIds, setBulkClosePendingIds] = useState<number[]>([]);
   // Optimistic overrides for fee payment totals after panel add/delete.
@@ -908,6 +910,10 @@ export const FeeRecordsTable = ({
   // Petition" in the Level dropdown no longer does this on its own — adding is
   // now this deliberate click, and removing is the matching action on the Fee
   // Petitions page.
+  //
+  // Behind a confirm step like the other batch actions here. Adding is
+  // reversible, so the dialog guards against a stray click on a large
+  // selection rather than warning about anything destructive.
   const handleBatchAddToFeePetitions = async () => {
     if (feePetitionAddableIds.length === 0 || bulkFeePetitionSaving) return;
     setBulkFeePetitionSaving(true);
@@ -922,7 +928,10 @@ export const FeeRecordsTable = ({
         return next;
       });
       setSelectedIds(new Set());
+      setFeePetitionConfirmOpen(false);
     } catch (err) {
+      // Leave the dialog open on failure so the error is read where the
+      // action was taken, and Try again is one click away.
       setBulkFeePetitionError((err as Error).message);
     } finally {
       setBulkFeePetitionSaving(false);
@@ -1689,12 +1698,15 @@ export const FeeRecordsTable = ({
           Closed would get a floating bar offering nothing. */}
       {selectedIds.size > 0 && hasBatchActions && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
-          {(bulkOverpaidError || bulkReassignError || bulkFeePetitionError) && (
+          {/* Fee-petition errors are deliberately absent here — that action
+              now confirms in a dialog, which shows its own error where the
+              click happened rather than behind the modal. */}
+          {(bulkOverpaidError || bulkReassignError) && (
             <div
               role="alert"
               className="pointer-events-auto rounded-full bg-red-600 px-3 py-1 text-[12px] font-medium text-white shadow-lg"
             >
-              {bulkOverpaidError ?? bulkReassignError ?? bulkFeePetitionError}
+              {bulkOverpaidError ?? bulkReassignError}
             </div>
           )}
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
@@ -1732,7 +1744,10 @@ export const FeeRecordsTable = ({
                 flag a case that stays invisible until it's reopened. */}
             {canAddToFeePetitions && (
               <button
-                onClick={handleBatchAddToFeePetitions}
+                onClick={() => {
+                  setBulkFeePetitionError(null);
+                  setFeePetitionConfirmOpen(true);
+                }}
                 disabled={bulkFeePetitionSaving || feePetitionAddableIds.length === 0}
                 title={
                   feePetitionAddableIds.length === 0
@@ -3345,6 +3360,19 @@ export const FeeRecordsTable = ({
         onArchived={() => {
           setSelectedIds(new Set());
           onImported?.();
+        }}
+      />
+
+      <AddToFeePetitionsConfirmDialog
+        open={feePetitionConfirmOpen}
+        count={feePetitionAddableIds.length}
+        selectedCount={selectedIds.size}
+        submitting={bulkFeePetitionSaving}
+        error={bulkFeePetitionError}
+        onConfirm={handleBatchAddToFeePetitions}
+        onClose={() => {
+          setFeePetitionConfirmOpen(false);
+          setBulkFeePetitionError(null);
         }}
       />
 

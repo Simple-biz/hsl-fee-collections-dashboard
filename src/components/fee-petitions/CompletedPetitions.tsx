@@ -21,6 +21,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import { fmt, fmtDate } from "@/lib/formatters";
 import { upsertFeePetition, bulkRemoveFromFeePetitions } from "@/app/(dashboard)/fee-petitions/actions";
 import { NoteField } from "@/components/shared/NoteField";
+import { RemoveFromFeePetitionsConfirmDialog } from "./RemoveFromFeePetitionsConfirmDialog";
 
 interface CompletedRow {
   id: number;
@@ -270,21 +271,28 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
   // exit is this explicit remove. Nothing else is touched — the checklist and
   // approval survive, and "Add to Fee Petitions" on Master Fees brings the
   // case back exactly as it was.
-  const [removingId, setRemovingId] = useState<number | null>(null);
+  // Confirmed before it runs, same dialog the Pending tab's bulk remove uses.
+  // This is the click that files an approved petition away for good, so it
+  // gets the same guard rather than firing straight off a row icon.
+  const [removeTarget, setRemoveTarget] = useState<CompletedRow | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const removeFromSection = async (row: CompletedRow) => {
-    if (removingId != null) return;
-    setRemovingId(row.id);
+  const removeFromSection = async () => {
+    if (!removeTarget || removing) return;
+    setRemoving(true);
+    setRemoveError(null);
     try {
-      const result = await bulkRemoveFromFeePetitions({ caseIds: [row.id] });
+      const result = await bulkRemoveFromFeePetitions({ caseIds: [removeTarget.id] });
       if (!result.ok) throw new Error(result.error);
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setRows((prev) => prev.filter((r) => r.id !== removeTarget.id));
       setTotal((tot) => (tot == null ? tot : Math.max(0, tot - 1)));
       onSectionMembershipChange?.();
+      setRemoveTarget(null);
     } catch (err) {
-      setError((err as Error).message);
+      setRemoveError((err as Error).message);
     } finally {
-      setRemovingId(null);
+      setRemoving(false);
     }
   };
 
@@ -471,8 +479,11 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                   <th className={`${thBase} ${t.textSub} text-left min-w-50 sticky top-0 z-20 ${stickyHeaderBg}`}>
                     Update
                   </th>
+                  {/* "Clear", not "Remove" — same write as the Pending tab's
+                      action, but here it means the petition is finished rather
+                      than that it shouldn't have been in the workflow. */}
                   <th className={`${thBase} ${t.textSub} text-center sticky top-0 z-20 ${stickyHeaderBg}`}>
-                    Remove
+                    Clear
                   </th>
                 </tr>
               </thead>
@@ -574,13 +585,13 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
                         </td>
                         <td className={`${tdBase} text-center`}>
                           <button
-                            onClick={() => removeFromSection(row)}
-                            disabled={removingId != null}
-                            aria-label={`Remove ${row.claimant} from Fee Petitions`}
-                            title="Remove from Fee Petitions — checklist progress is kept"
+                            onClick={() => { setRemoveError(null); setRemoveTarget(row); }}
+                            disabled={removing}
+                            aria-label={`Clear ${row.claimant} from Fee Petitions`}
+                            title="Clear from Fee Petitions — checklist progress is kept"
                             className={`h-6 w-6 rounded-md inline-flex items-center justify-center transition-colors disabled:opacity-40 ${dark ? "text-rose-400 hover:bg-rose-950/40" : "text-rose-600 hover:bg-rose-50"}`}
                           >
-                            {removingId === row.id
+                            {removing && removeTarget?.id === row.id
                               ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
                               : <MinusCircle aria-hidden="true" className="h-3.5 w-3.5" />}
                           </button>
@@ -618,6 +629,17 @@ export const CompletedPetitions = ({ dark, onSectionMembershipChange }: Props) =
           )}
         </>
       )}
+
+      <RemoveFromFeePetitionsConfirmDialog
+        open={removeTarget !== null}
+        count={1}
+        caseName={removeTarget?.claimant}
+        verb="clear"
+        submitting={removing}
+        error={removeError}
+        onConfirm={removeFromSection}
+        onClose={() => { setRemoveTarget(null); setRemoveError(null); }}
+      />
     </div>
   );
 };
