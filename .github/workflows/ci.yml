@@ -1,0 +1,56 @@
+name: CI
+
+# Quality gate for the fee collections dashboard. Runs on every PR, and on
+# pushes to the long-lived branches. Feature-branch pushes are covered by the
+# PR trigger, so filtering `push` keeps us from running the same commit twice.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+# A new push to the same branch makes the in-flight run obsolete — cancel it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, type-check, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node version comes from .nvmrc so CI and local dev can't drift apart.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` (not `install`) — respects the lockfile exactly.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # No env vars: every route is dynamic (server-rendered on demand), so the
+      # build never evaluates DB-backed code. Verified — the build succeeds with
+      # DATABASE_URL unset. Nothing secret-shaped belongs in this file.
+      - name: Build
+        run: npm run build
