@@ -37,6 +37,8 @@ import {
   STATUS_LABELS_DETAIL,
   getStatusColor,
   parseCurrencyInput,
+  caseLevelLabel,
+  titleCaseLabel,
 } from "@/lib/formatters";
 import type { WinSheetStatus, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -637,7 +639,7 @@ const CaseDetailPage = () => {
       if (editStatus !== caseData.status) {
         feeFields.winSheetStatus = editStatus;
         changes.push(
-          `Status → ${STATUS_LABELS_DETAIL[editStatus] || editStatus}`,
+          `Status → ${STATUS_LABELS_DETAIL[editStatus] ?? titleCaseLabel(editStatus)}`,
         );
       }
       if (editFeeMethod !== (caseData.feeMethod || "fee_agreement")) {
@@ -883,12 +885,12 @@ const CaseDetailPage = () => {
               <span
                 className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}
               >
-                {caseData.level}
+                {caseLevelLabel(caseData.level)}
               </span>
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold ${getStatusColor(caseData.status as WinSheetStatus, dark)}`}
               >
-                {STATUS_LABELS_DETAIL[caseData.status] || caseData.status}
+                {STATUS_LABELS_DETAIL[caseData.status] ?? titleCaseLabel(caseData.status)}
               </span>
 
               <div className="ml-auto flex items-center gap-2">
@@ -1131,7 +1133,7 @@ const CaseDetailPage = () => {
                         {dropdownOptionEls(caseLevelOptions, editLevel)}
                       </select>
                     ) : (
-                      <p className={val}>{caseData.level || "—"}</p>
+                      <p className={val}>{caseLevelLabel(caseData.level) || "—"}</p>
                     )}
                   </div>
                   <div>

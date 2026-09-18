@@ -37,6 +37,8 @@ import {
   fmtClaim,
   STATUS_LABELS_DETAIL,
   getStatusColor,
+  caseLevelLabel,
+  titleCaseLabel,
 } from "@/lib/formatters";
 import type {
   WinSheetStatus,
@@ -592,12 +594,12 @@ export default function CaseDetailSheet({
                       {fmtClaim(data.claim)}
                     </span>
                     <span className={`text-[12px] font-medium px-1.5 py-0.5 rounded ${t.pillBg}`}>
-                      {data.level}
+                      {caseLevelLabel(data.level)}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold ${getStatusColor(data.status as WinSheetStatus, dark)}`}
                     >
-                      {STATUS_LABELS_DETAIL[data.status] || data.status}
+                      {STATUS_LABELS_DETAIL[data.status] ?? titleCaseLabel(data.status)}
                     </span>
                   </div>
                   {(chronicleLink || isEditing) && (
@@ -819,7 +821,7 @@ export default function CaseDetailSheet({
                 )}
                 <div className="flex items-center justify-between">
                   <p className={lbl}>Win Sheet Status</p>
-                  <p className={val}>{STATUS_LABELS_DETAIL[data.status] || data.status}</p>
+                  <p className={val}>{STATUS_LABELS_DETAIL[data.status] ?? titleCaseLabel(data.status)}</p>
                 </div>
                 {data.winSheetLink && (
                   <div className="flex items-center justify-between">

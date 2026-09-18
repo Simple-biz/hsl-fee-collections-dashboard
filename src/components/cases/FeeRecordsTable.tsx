@@ -41,6 +41,8 @@ import {
   fmtClaimLong,
   parseCurrencyInput,
   skippedClosedCasesMessage,
+  caseLevelLabel,
+  winSheetStatusLabel,
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -101,10 +103,13 @@ const WIN_SHEET_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 bord
 
 function WinSheetStatusBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
   if (!value) return <span className="text-neutral-400">—</span>;
+  // Colours stay keyed on the stored value — the same status is stored several
+  // ways ("Started"/"started", "not_started") and each spelling needs its own
+  // key — but only the formatted label is shown.
   const colors = WIN_SHEET_STATUS_COLORS[value] ?? WIN_SHEET_STATUS_FALLBACK;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
-      {value}
+      {winSheetStatusLabel(value)}
     </span>
   );
 }
@@ -1577,7 +1582,7 @@ export const FeeRecordsTable = ({
           >
             <option value="all">All Levels</option>
             {caseLevelOptions.map((o) => (
-              <option key={o.name} value={o.name}>{o.name}</option>
+              <option key={o.name} value={o.name}>{caseLevelLabel(o.name)}</option>
             ))}
           </select>
           <select
@@ -2378,7 +2383,7 @@ export const FeeRecordsTable = ({
                               v &&
                               !feesConfirmationOptions.some(
                                 (o) => o.name === v,
-                              ) && <option value={v}>{v}</option>
+                              ) && <option value={v}>{winSheetStatusLabel(v)}</option>
                             );
                           })()}
                           {feesConfirmationOptions
@@ -2389,7 +2394,7 @@ export const FeeRecordsTable = ({
                             )
                             .map((o) => (
                               <option key={o.id} value={o.name}>
-                                {o.name}
+                                {winSheetStatusLabel(o.name)}
                               </option>
                             ))}
                         </select>
@@ -2469,6 +2474,8 @@ export const FeeRecordsTable = ({
                                 ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
                                 : undefined;
                             },
+                            undefined,
+                            caseLevelLabel,
                           )}
                         />
                         {/* cellValue, not c.level — it resolves the optimistic
@@ -2624,7 +2631,7 @@ export const FeeRecordsTable = ({
                         <button
                           onClick={(e) => { e.stopPropagation(); setWinSheetStatusEditId(c.id); }}
                           className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                          aria-label={`Edit Win Sheet Status: ${cellValue(c, "status") || "not set"}`}
+                          aria-label={`Edit Win Sheet Status: ${winSheetStatusLabel(cellValue(c, "status")) || "not set"}`}
                         >
                           <WinSheetStatusBadge value={cellValue(c, "status")} dark={dark} />
                         </button>
