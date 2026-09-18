@@ -30,6 +30,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
+import { buildListboxOptions } from "@/lib/listbox-options";
 import {
   fmtFull,
   fmtDate,
@@ -39,6 +40,7 @@ import {
   parseCurrencyInput,
   caseLevelLabel,
   titleCaseLabel,
+  winSheetStatusLabel,
 } from "@/lib/formatters";
 import type { WinSheetStatus, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -49,19 +51,23 @@ import { useSession } from "next-auth/react";
 
 // Render <option>s from an admin-managed list, keeping the current value as a
 // fallback option when it's not in the (active) list.
-const dropdownOptionEls = (options: ApprovedByOption[], current: string) => (
+// Built from the same helper the Master Fees dropdowns use, so edit mode gets
+// formatted labels and the duplicate-label collapse from one place — a row
+// stored as FEE_PETITION would otherwise show "Fee Petition" twice once the
+// labels are formatted. `value` stays the raw stored string, so saving is
+// unaffected.
+const dropdownOptionEls = (
+  options: ApprovedByOption[],
+  current: string,
+  formatLabel?: (name: string) => string,
+) => (
   <>
-    <option value="">—</option>
-    {current && !options.some((o) => o.name === current) && (
-      <option value={current}>{current}</option>
-    )}
-    {options
-      .filter((o) => o.isActive || o.name === current)
-      .map((o) => (
-        <option key={o.id} value={o.name}>
-          {o.name}
-        </option>
-      ))}
+    {buildListboxOptions(options, current, undefined, undefined, formatLabel).map((o) => (
+      <option key={o.value || "__none__"} value={o.value}>
+        {/* This page's empty option reads "—", not the Listbox placeholder. */}
+        {o.value === "" ? "—" : o.label}
+      </option>
+    ))}
   </>
 );
 
@@ -1130,7 +1136,7 @@ const CaseDetailPage = () => {
                         onChange={(e) => setEditLevel(e.target.value)}
                         className={inp}
                       >
-                        {dropdownOptionEls(caseLevelOptions, editLevel)}
+                        {dropdownOptionEls(caseLevelOptions, editLevel, caseLevelLabel)}
                       </select>
                     ) : (
                       <p className={val}>{caseLevelLabel(caseData.level) || "—"}</p>
@@ -1216,7 +1222,7 @@ const CaseDetailPage = () => {
                         onChange={(e) => setEditStatus(e.target.value)}
                         className={inp}
                       >
-                        {dropdownOptionEls(winSheetStatusOptions, editStatus)}
+                        {dropdownOptionEls(winSheetStatusOptions, editStatus, winSheetStatusLabel)}
                       </select>
                     ) : (
                       <p className={val}>
