@@ -10,7 +10,7 @@
  */
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { inArray, eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import * as schema from "../src/lib/db/schema";
 
 const SYNTHETIC_ID_BASE = 900_000_000;
