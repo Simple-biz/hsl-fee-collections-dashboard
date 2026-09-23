@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseChronicleAllFile } from "@/lib/chronicle-pdf-parser";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { isSsrfSafe } from "@/lib/ssrf-guard";
 
 // pdf-parse v1 tries to load a test PDF on require() — import from lib directly to avoid this
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -28,20 +29,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate URL
-    try {
-      new URL(allFileLink);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid URL provided" },
-        { status: 400 },
-      );
+    // Validate URL — require HTTPS and block private/reserved addresses
+    const ssrf = isSsrfSafe(allFileLink);
+    if (!ssrf.ok) {
+      return NextResponse.json({ error: ssrf.reason }, { status: 400 });
     }
 
     // Download the PDF (public/signed URL — no auth needed)
     console.log(`[pdf-parse] Downloading PDF...`);
-    const pdfResponse = await fetch(allFileLink, {
+    const pdfResponse = await fetch(ssrf.url, {
       signal: AbortSignal.timeout(30000),
+      redirect: "error",
     });
 
     if (!pdfResponse.ok) {
