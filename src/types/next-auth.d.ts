@@ -35,5 +35,7 @@ declare module "@auth/core/jwt" {
     mustChangePassword?: boolean;
     pages?: PageKey[];
     capabilities?: CapabilityKey[];
+    /** Schema version stamp — see src/lib/access/version.ts */
+    accessVersion?: number;
   }
 }

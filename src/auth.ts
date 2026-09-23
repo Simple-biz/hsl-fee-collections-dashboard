@@ -9,6 +9,8 @@ import { users } from "@/lib/db/schema";
 import { resolveAccess } from "@/lib/access/server";
 import { rolePageDefaults } from "@/lib/access/role-defaults";
 import { roleCapabilityDefaults } from "@/lib/access/capabilities";
+import { refreshAccessIfStale } from "@/lib/access/refresh";
+import { ACCESS_SCHEMA_VERSION } from "@/lib/access/version";
 import authConfig from "@/auth.config";
 
 const credentialsSchema = z.object({
@@ -20,6 +22,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   // Credentials provider requires JWT sessions (no DB session table).
   session: { strategy: "jwt" },
+  callbacks: {
+    ...authConfig.callbacks,
+    // Override the jwt callback to add server-side (Node) access refresh.
+    // auth.config.ts's version handles the edge; this one owns the Node path.
+    async jwt({ token, user }) {
+      if (user) {
+        // Sign-in: bake access into the token and stamp the current schema
+        // version so the refresh logic knows the token is up to date.
+        token.id = user.id;
+        token.role = user.role;
+        token.mustChangePassword = user.mustChangePassword ?? false;
+        token.pages = user.pages ?? [];
+        token.capabilities = user.capabilities ?? [];
+        token.accessVersion = ACCESS_SCHEMA_VERSION;
+      } else {
+        // Subsequent requests: re-resolve pages/capabilities from the DB if
+        // the access schema has changed since the token was minted (#466).
+        await refreshAccessIfStale(token);
+      }
+      return token;
+    },
+  },
   providers: [
     Credentials({
       credentials: {
