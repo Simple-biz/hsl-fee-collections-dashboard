@@ -46,10 +46,13 @@ function isPrivateHost(hostname: string): boolean {
   // Strip IPv6 brackets that the URL spec requires (e.g. [::1])
   const bare = h.startsWith("[") && h.endsWith("]") ? h.slice(1, -1) : h;
 
-  // IPv4: match dotted-decimal and check against private/reserved CIDR blocks
+  // IPv4: match dotted-decimal and check against private/reserved CIDR blocks.
+  // Only treat as IPv4 when all four octets are in the valid 0–255 range —
+  // strings like "999.0.0.1" are not valid IP addresses and should fall through.
   const v4 = bare.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4) {
-    const [a, b, c] = [Number(v4[1]), Number(v4[2]), Number(v4[3])];
+    const [a, b, c, d] = [Number(v4[1]), Number(v4[2]), Number(v4[3]), Number(v4[4])];
+    if (a > 255 || b > 255 || c > 255 || d > 255) return false; // not a valid IPv4
     return (
       a === 0 || // 0.0.0.0/8 — "this" network
       a === 10 || // 10.0.0.0/8 — private

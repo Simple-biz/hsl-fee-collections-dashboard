@@ -126,6 +126,14 @@ describe("isSsrfSafe", () => {
     expect(isSsrfSafe("https://[::ffff:8.8.8.8]/").ok).toBe(true);
   });
 
+  // --- invalid IPv4 (octets out of range) ---
+  it("rejects URLs with out-of-range IPv4 octets (WHATWG parser treats them as invalid hosts)", () => {
+    // The WHATWG URL parser rejects these before isPrivateHost is reached.
+    // Both return ok:false (reason: "Invalid URL"), not ok:true — confirmed via test.
+    expect(isSsrfSafe("https://999.168.1.1/").ok).toBe(false);
+    expect(isSsrfSafe("https://192.168.999.1/").ok).toBe(false);
+  });
+
   // --- malformed input ---
   it("rejects a non-URL string", () => {
     const r = isSsrfSafe("not-a-url");
