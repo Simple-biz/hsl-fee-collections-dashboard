@@ -27,7 +27,7 @@ const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 // the full lifetime total owed rather than anything actionable.
 export const GET = async (req: NextRequest) => {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const windowParam = searchParams.get("window");

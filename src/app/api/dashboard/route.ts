@@ -7,7 +7,7 @@ import { eq, sql, count } from "drizzle-orm";
 // GET /api/dashboard — Summary stats + monthly collections data
 export const GET = async () => {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     // Summary stats (active rows only — closed cases live on /fees-closed).

@@ -10,7 +10,7 @@ import { sql } from "drizzle-orm";
 export async function GET(req: NextRequest) {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = session.user?.role;
     if (!isAdminRole(role) && role !== "lead") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

@@ -9,7 +9,7 @@ import { sql } from "drizzle-orm";
 export async function GET(req: NextRequest) {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = req.nextUrl;
     const week = searchParams.get("week") ?? new Date().toISOString().split("T")[0];
