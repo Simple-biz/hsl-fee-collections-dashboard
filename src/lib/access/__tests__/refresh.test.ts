@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockResolveAccess = vi.fn();
 const mockDbQuery = vi.fn();
 const mockDbLimit = vi.fn();
+const mockDbWhere = vi.fn();
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/access/server", () => ({
@@ -20,7 +21,7 @@ vi.mock("@/lib/db", () => ({
     select: () => ({
       from: () => ({
         leftJoin: () => ({
-          where: () => ({ limit: mockDbLimit }),
+          where: mockDbWhere,
         }),
       }),
     }),
@@ -41,6 +42,8 @@ beforeEach(() => {
   mockResolveAccess.mockResolvedValue(FRESH);
   mockDbQuery.mockReset();
   mockDbQuery.mockResolvedValue([]); // safe default: no row → refreshAccessIfChanged skips
+  mockDbWhere.mockReset();
+  mockDbWhere.mockImplementation(() => ({ limit: mockDbLimit }));
   mockDbLimit.mockReset();
   mockDbLimit.mockImplementation(() => mockDbQuery());
 });
@@ -119,6 +122,7 @@ describe("refreshAccessIfChanged", () => {
       role: "admin",
       updatedAt: new Date("2026-09-01"),
       overrideUpdatedAt: null,
+      mustChangePassword: false,
     }]);
     const token: RefreshableToken = { id: "5", role: "admin", accessStamp: "2026-01-01T00:00:00.000Z" };
 
@@ -135,6 +139,7 @@ describe("refreshAccessIfChanged", () => {
       role: "admin",
       updatedAt: new Date(stamp),
       overrideUpdatedAt: null,
+      mustChangePassword: false,
     }]);
     const token: RefreshableToken = { id: "5", role: "admin", accessStamp: stamp };
 
@@ -231,6 +236,14 @@ describe("refreshAccessIfChanged", () => {
 
     expect(result).toBe(token);
     expect(mockDbQuery).not.toHaveBeenCalled();
+    expect(mockDbWhere).not.toHaveBeenCalled();
+  });
+
+  it("applies a WHERE clause with a single argument to filter by user id", async () => {
+    mockDbQuery.mockResolvedValue([]);
+    await refreshAccessIfChanged({ id: "5", role: "admin" });
+    expect(mockDbWhere).toHaveBeenCalledTimes(1);
+    expect(mockDbWhere).toHaveBeenCalledWith(expect.anything());
   });
 
   it("re-resolves on first post-deploy request when accessStamp is absent (migration path)", async () => {

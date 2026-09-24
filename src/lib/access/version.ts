@@ -44,3 +44,16 @@ export const shouldRefreshAccess = <T extends AccessToken>(
   if (!token.role) return false;
   return Number.isFinite(Number(token.id));
 };
+
+/**
+ * Computes the per-user access stamp: GREATEST(users.updated_at, uao.updated_at).
+ * A single canonical implementation shared by sign-in (auth.ts) and the
+ * per-request check (refresh.ts) so they can't drift.
+ */
+export const computeAccessStamp = (
+  updatedAt: Date,
+  overrideUpdatedAt: Date | null,
+): string =>
+  (overrideUpdatedAt !== null && overrideUpdatedAt > updatedAt
+    ? overrideUpdatedAt
+    : updatedAt).toISOString();

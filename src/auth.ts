@@ -10,7 +10,7 @@ import { resolveAccess } from "@/lib/access/server";
 import { rolePageDefaults } from "@/lib/access/role-defaults";
 import { roleCapabilityDefaults } from "@/lib/access/capabilities";
 import { refreshAccessIfStale, refreshAccessIfChanged } from "@/lib/access/refresh";
-import { ACCESS_SCHEMA_VERSION } from "@/lib/access/version";
+import { ACCESS_SCHEMA_VERSION, computeAccessStamp } from "@/lib/access/version";
 import authConfig from "@/auth.config";
 
 const credentialsSchema = z.object({
@@ -105,10 +105,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Per-user access stamp: GREATEST(users.updated_at, uao.updated_at).
         // Compared on every subsequent request to detect deactivation, role
         // changes, and override edits without polling on every page load (#467).
-        const accessStamp =
-          overrideUpdatedAt !== null && overrideUpdatedAt > user.updatedAt
-            ? overrideUpdatedAt.toISOString()
-            : user.updatedAt.toISOString();
+        const accessStamp = computeAccessStamp(user.updatedAt, overrideUpdatedAt);
 
         return {
           // NextAuth expects a string id; users.id is an integer.

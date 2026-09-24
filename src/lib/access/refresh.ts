@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, userAccessOverrides } from "@/lib/db/schema";
 import { resolveAccess } from "@/lib/access/server";
-import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess } from "@/lib/access/version";
+import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess, computeAccessStamp } from "@/lib/access/version";
 
 export interface RefreshableToken {
   id?: string;
@@ -100,11 +100,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
   if (!row) return null;
   if (!row.isActive) return null;
 
-  const greatest =
-    row.overrideUpdatedAt !== null && row.overrideUpdatedAt > row.updatedAt
-      ? row.overrideUpdatedAt
-      : row.updatedAt;
-  const currentStamp = greatest.toISOString();
+  const currentStamp = computeAccessStamp(row.updatedAt, row.overrideUpdatedAt);
 
   if (token.accessStamp === currentStamp) return token;
 
