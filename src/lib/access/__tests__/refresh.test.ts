@@ -1,16 +1,38 @@
 // version.test.ts covers *when* a token is considered stale. This covers what
 // actually happens to it — the half that broke in #466, where the capability
 // existed and the role granted it but the signed-in token never learned.
+// refreshAccessIfChanged tests cover the per-user stamp logic added in #467.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockResolveAccess = vi.fn();
+const mockDbQuery = vi.fn();
+const mockDbLimit = vi.fn();
+const mockDbWhere = vi.fn();
+
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/access/server", () => ({
   resolveAccess: (...args: unknown[]) => mockResolveAccess(...args),
 }));
+// Mock the DB query chain used by refreshAccessIfChanged so tests never hit
+// the real database. The chain is: db.select().from().leftJoin().where().limit()
+vi.mock("@/lib/db", () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        leftJoin: () => ({
+          where: mockDbWhere,
+        }),
+      }),
+    }),
+  },
+}));
+vi.mock("@/lib/db/schema", () => ({
+  users: {},
+  userAccessOverrides: {},
+}));
 
-import { refreshAccessIfStale, type RefreshableToken } from "@/lib/access/refresh";
+import { refreshAccessIfStale, refreshAccessIfChanged, type RefreshableToken } from "@/lib/access/refresh";
 import { ACCESS_SCHEMA_VERSION } from "@/lib/access/version";
 
 const FRESH = { pages: ["cases"], capabilities: ["feePetition.manage"] };
@@ -18,6 +40,12 @@ const FRESH = { pages: ["cases"], capabilities: ["feePetition.manage"] };
 beforeEach(() => {
   mockResolveAccess.mockReset();
   mockResolveAccess.mockResolvedValue(FRESH);
+  mockDbQuery.mockReset();
+  mockDbQuery.mockResolvedValue([]); // safe default: no row → refreshAccessIfChanged skips
+  mockDbWhere.mockReset();
+  mockDbWhere.mockImplementation(() => ({ limit: mockDbLimit }));
+  mockDbLimit.mockReset();
+  mockDbLimit.mockImplementation(() => mockDbQuery());
 });
 
 describe("refreshAccessIfStale", () => {
@@ -74,5 +102,169 @@ describe("refreshAccessIfStale", () => {
   it("ignores a token with no role to resolve against", async () => {
     await refreshAccessIfStale({ id: "7" });
     expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe("refreshAccessIfChanged", () => {
+  it("returns null when the user row is missing (deleted user)", async () => {
+    mockDbQuery.mockResolvedValue([]);
+    const token: RefreshableToken = { id: "5", role: "admin", accessStamp: "2026-01-01T00:00:00.000Z" };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result).toBeNull();
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+
+  it("returns null when isActive is false (deactivated user)", async () => {
+    mockDbQuery.mockResolvedValue([{
+      isActive: false,
+      role: "admin",
+      updatedAt: new Date("2026-09-01"),
+      overrideUpdatedAt: null,
+      overrides: null,
+      mustChangePassword: false,
+    }]);
+    const token: RefreshableToken = { id: "5", role: "admin", accessStamp: "2026-01-01T00:00:00.000Z" };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result).toBeNull();
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+
+  it("fast-paths when the stamp has not changed", async () => {
+    const stamp = "2026-09-01T00:00:00.000Z";
+    mockDbQuery.mockResolvedValue([{
+      isActive: true,
+      role: "admin",
+      updatedAt: new Date(stamp),
+      overrideUpdatedAt: null,
+      overrides: null,
+      mustChangePassword: false,
+    }]);
+    const token: RefreshableToken = { id: "5", role: "admin", accessStamp: stamp };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result).toBe(token);
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+
+  it("re-resolves and re-stamps when users.updated_at has changed (e.g. role change)", async () => {
+    const oldStamp = "2026-09-01T00:00:00.000Z";
+    const newStamp = "2026-09-20T10:00:00.000Z";
+    mockDbQuery.mockResolvedValue([{
+      isActive: true,
+      role: "member",
+      updatedAt: new Date(newStamp),
+      overrideUpdatedAt: null,
+      overrides: null,
+      mustChangePassword: false,
+    }]);
+    const token: RefreshableToken = { id: "5", role: "admin", accessStamp: oldStamp, accessVersion: 1 };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result).not.toBeNull();
+    expect(result?.role).toBe("member");
+    expect(Array.isArray(result?.pages)).toBe(true);
+    expect(Array.isArray(result?.capabilities)).toBe(true);
+    expect(result?.accessStamp).toBe(newStamp);
+    expect(result?.accessVersion).toBe(ACCESS_SCHEMA_VERSION);
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+
+  it("uses overrideUpdatedAt as stamp when it is more recent than users.updated_at", async () => {
+    const userStamp = "2026-09-01T00:00:00.000Z";
+    const overrideStamp = "2026-09-25T12:00:00.000Z";
+    mockDbQuery.mockResolvedValue([{
+      isActive: true,
+      role: "lead",
+      updatedAt: new Date(userStamp),
+      overrideUpdatedAt: new Date(overrideStamp),
+      overrides: { pages: { cases: true } },
+      mustChangePassword: false,
+    }]);
+    const token: RefreshableToken = { id: "5", role: "lead", accessStamp: userStamp };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result?.accessStamp).toBe(overrideStamp);
+    expect(Array.isArray(result?.pages)).toBe(true);
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+
+  it("leaves the token intact when the outer DB query fails (fail open)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockDbQuery.mockRejectedValue(new Error("connection timeout"));
+    const token: RefreshableToken = { id: "5", role: "admin", pages: ["cases"], accessStamp: "2026-01-01T00:00:00.000Z" };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result).toBe(token);
+    expect(result?.pages).toEqual(["cases"]);
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("returns the token unchanged when it has no id", async () => {
+    const token: RefreshableToken = { role: "admin" };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result).toBe(token);
+    expect(mockDbQuery).not.toHaveBeenCalled();
+    expect(mockDbWhere).not.toHaveBeenCalled();
+  });
+
+  it("applies a WHERE clause with a single argument to filter by user id", async () => {
+    mockDbQuery.mockResolvedValue([]);
+    await refreshAccessIfChanged({ id: "5", role: "admin" });
+    expect(mockDbWhere).toHaveBeenCalledTimes(1);
+    expect(mockDbWhere).toHaveBeenCalledWith(expect.anything());
+  });
+
+  it("re-resolves on first post-deploy request when accessStamp is absent (migration path)", async () => {
+    const stamp = "2026-09-01T00:00:00.000Z";
+    mockDbQuery.mockResolvedValue([{
+      isActive: true,
+      role: "admin",
+      updatedAt: new Date(stamp),
+      overrideUpdatedAt: null,
+      overrides: null,
+      mustChangePassword: false,
+    }]);
+    const token: RefreshableToken = { id: "5", role: "admin" }; // no accessStamp
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result?.accessStamp).toBe(stamp);
+    expect(Array.isArray(result?.pages)).toBe(true);
+    expect(mockResolveAccess).not.toHaveBeenCalled();
+  });
+
+  it("propagates mustChangePassword from the DB row on re-resolve", async () => {
+    const newStamp = "2026-09-25T00:00:00.000Z";
+    mockDbQuery.mockResolvedValue([{
+      isActive: true,
+      role: "admin",
+      updatedAt: new Date(newStamp),
+      overrideUpdatedAt: null,
+      overrides: null,
+      mustChangePassword: true,
+    }]);
+    const token: RefreshableToken = { id: "5", role: "admin", accessStamp: "2026-01-01T00:00:00.000Z", mustChangePassword: false };
+
+    const result = await refreshAccessIfChanged(token);
+
+    expect(result?.mustChangePassword).toBe(true);
+  });
+
+  it("queries with limit 1", async () => {
+    mockDbQuery.mockResolvedValue([]);
+    await refreshAccessIfChanged({ id: "5", role: "admin" });
+    expect(mockDbLimit).toHaveBeenCalledWith(1);
   });
 });

@@ -13,6 +13,8 @@ declare module "next-auth" {
     pages?: PageKey[];
     /** Effective capability set, resolved at sign-in. */
     capabilities?: CapabilityKey[];
+    /** ISO timestamp — GREATEST(users.updated_at, user_access_overrides.updated_at) at sign-in. */
+    accessStamp?: string;
   }
 
   interface Session {
@@ -37,5 +39,7 @@ declare module "@auth/core/jwt" {
     capabilities?: CapabilityKey[];
     /** Schema version stamp — see src/lib/access/version.ts */
     accessVersion?: number;
+    /** Per-user access stamp — GREATEST(users.updated_at, user_access_overrides.updated_at). */
+    accessStamp?: string;
   }
 }

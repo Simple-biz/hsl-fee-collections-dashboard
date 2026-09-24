@@ -9,8 +9,8 @@ import { users } from "@/lib/db/schema";
 import { resolveAccess } from "@/lib/access/server";
 import { rolePageDefaults } from "@/lib/access/role-defaults";
 import { roleCapabilityDefaults } from "@/lib/access/capabilities";
-import { refreshAccessIfStale } from "@/lib/access/refresh";
-import { ACCESS_SCHEMA_VERSION } from "@/lib/access/version";
+import { refreshAccessIfStale, refreshAccessIfChanged } from "@/lib/access/refresh";
+import { ACCESS_SCHEMA_VERSION, computeAccessStamp } from "@/lib/access/version";
 import authConfig from "@/auth.config";
 
 const credentialsSchema = z.object({
@@ -28,18 +28,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // auth.config.ts's version handles the edge; this one owns the Node path.
     async jwt({ token, user }) {
       if (user) {
-        // Sign-in: bake access into the token and stamp the current schema
-        // version so the refresh logic knows the token is up to date.
         token.id = user.id;
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword ?? false;
         token.pages = user.pages ?? [];
         token.capabilities = user.capabilities ?? [];
         token.accessVersion = ACCESS_SCHEMA_VERSION;
+        token.accessStamp = user.accessStamp;
       } else {
-        // Subsequent requests: re-resolve pages/capabilities from the DB if
-        // the access schema has changed since the token was minted (#466).
-        await refreshAccessIfStale(token);
+        const result = await refreshAccessIfChanged(token);
+        if (result === null) return null;
+        return await refreshAccessIfStale(result);
       }
       return token;
     },
@@ -88,13 +87,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // gate and API guards need no DB read. On any failure (e.g. overrides
         // table missing), degrade to the role DEFAULTS — never to an empty
         // set, which would lock the user out.
-        const { pages, capabilities } = await resolveAccess(
+        const { pages, capabilities, overrideUpdatedAt } = await resolveAccess(
           user.id,
           user.role,
         ).catch(() => ({
           pages: rolePageDefaults(user.role),
           capabilities: roleCapabilityDefaults(user.role),
+          overrideUpdatedAt: null as Date | null,
         }));
+
+        // Per-user access stamp: GREATEST(users.updated_at, uao.updated_at).
+        // Compared on every subsequent request to detect deactivation, role
+        // changes, and override edits without polling on every page load (#467).
+        const accessStamp = computeAccessStamp(user.updatedAt, overrideUpdatedAt);
 
         return {
           // NextAuth expects a string id; users.id is an integer.
@@ -105,6 +110,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           mustChangePassword: user.mustChangePassword,
           pages,
           capabilities,
+          accessStamp,
         };
       },
     }),

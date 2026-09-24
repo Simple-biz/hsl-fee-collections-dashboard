@@ -7,7 +7,7 @@
 // access is stale enough to be re-resolved from the database.
 
 import { describe, it, expect } from "vitest";
-import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess } from "@/lib/access/version";
+import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess, computeAccessStamp } from "@/lib/access/version";
 
 const token = (over: Record<string, unknown> = {}) => ({
   id: "42",
@@ -57,5 +57,23 @@ describe("shouldRefreshAccess", () => {
     it("is empty", () => {
       expect(shouldRefreshAccess({})).toBe(false);
     });
+  });
+});
+
+describe("computeAccessStamp", () => {
+  const user = new Date("2026-09-20T00:00:00.000Z");
+  const older = new Date("2026-09-01T00:00:00.000Z");
+  const newer = new Date("2026-09-25T00:00:00.000Z");
+
+  it("returns users.updated_at when there is no override row", () => {
+    expect(computeAccessStamp(user, null)).toBe("2026-09-20T00:00:00.000Z");
+  });
+
+  it("returns overrideUpdatedAt when it is more recent than users.updated_at", () => {
+    expect(computeAccessStamp(user, newer)).toBe("2026-09-25T00:00:00.000Z");
+  });
+
+  it("returns users.updated_at when the override row is older", () => {
+    expect(computeAccessStamp(user, older)).toBe("2026-09-20T00:00:00.000Z");
   });
 });

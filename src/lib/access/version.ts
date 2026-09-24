@@ -44,3 +44,12 @@ export const shouldRefreshAccess = <T extends AccessToken>(
   if (!token.role) return false;
   return Number.isFinite(Number(token.id));
 };
+
+/** GREATEST(users.updated_at, uao.updated_at) as an ISO string. */
+export const computeAccessStamp = (
+  updatedAt: Date,
+  overrideUpdatedAt: Date | null,
+): string =>
+  (overrideUpdatedAt !== null && overrideUpdatedAt > updatedAt
+    ? overrideUpdatedAt
+    : updatedAt).toISOString();

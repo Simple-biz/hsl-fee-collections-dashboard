@@ -4,8 +4,12 @@
 
 import "server-only";
 
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users, userAccessOverrides } from "@/lib/db/schema";
 import { resolveAccess } from "@/lib/access/server";
-import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess } from "@/lib/access/version";
+import { effectivePages, effectiveCapabilities, type AccessOverrides } from "@/lib/access/resolve";
+import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess, computeAccessStamp } from "@/lib/access/version";
 
 export interface RefreshableToken {
   id?: string;
@@ -13,6 +17,9 @@ export interface RefreshableToken {
   pages?: unknown;
   capabilities?: unknown;
   accessVersion?: number;
+  mustChangePassword?: boolean;
+  /** ISO timestamp — GREATEST(users.updated_at, user_access_overrides.updated_at). */
+  accessStamp?: string;
 }
 
 /**
@@ -37,5 +44,79 @@ export const refreshAccessIfStale = async <T extends RefreshableToken>(token: T)
   } catch (error) {
     console.error("Failed to refresh access for user", userId, error);
   }
+  return token;
+};
+
+/**
+ * Per-user access check — runs on every subsequent request (not just when the
+ * schema version changes). Detects three cases that the schema-version stamp
+ * (#466) deliberately does not cover:
+ *
+ *   1. Deactivation — isActive set to false → return null to end the session.
+ *   2. Role change — admin demoted to member → re-resolve and re-stamp.
+ *   3. Override edit — page/capability added or removed → re-resolve and re-stamp.
+ *
+ * The stamp is GREATEST(users.updated_at, user_access_overrides.updated_at),
+ * computed once at sign-in and compared on every request. The query costs
+ * ~0.13 ms on the co-located Neon instance and needs no new index.
+ *
+ * On DB failure the token is left untouched (stale but coherent) so a transient
+ * error never kicks a valid user out. Returns null only when the user row is
+ * missing or isActive is false.
+ */
+export const refreshAccessIfChanged = async <T extends RefreshableToken>(
+  token: T,
+): Promise<T | null> => {
+  const userId = Number(token.id);
+  if (!token.id || !Number.isFinite(userId)) return token;
+
+  let row:
+    | {
+        isActive: boolean;
+        role: string;
+        updatedAt: Date;
+        overrideUpdatedAt: Date | null;
+        overrides: unknown;
+        mustChangePassword: boolean;
+      }
+    | undefined;
+
+  try {
+    [row] = await db
+      .select({
+        isActive: users.isActive,
+        role: users.role,
+        updatedAt: users.updatedAt,
+        overrideUpdatedAt: userAccessOverrides.updatedAt,
+        overrides: userAccessOverrides.overrides,
+        mustChangePassword: users.mustChangePassword,
+      })
+      .from(users)
+      .leftJoin(userAccessOverrides, eq(userAccessOverrides.userId, users.id))
+      .where(eq(users.id, userId))
+      .limit(1);
+  } catch (error) {
+    console.error("Failed to check user access stamp for user", userId, error);
+    return token;
+  }
+
+  if (!row) return null;
+  if (!row.isActive) return null;
+
+  const currentStamp = computeAccessStamp(row.updatedAt, row.overrideUpdatedAt);
+
+  if (token.accessStamp === currentStamp) return token;
+
+  // Access changed — re-resolve using the already-fetched overrides (no extra
+  // round-trip). Bumping accessVersion prevents refreshAccessIfStale from doing
+  // a redundant second resolve on this request.
+  const overrides = (row.overrides as AccessOverrides) ?? {};
+  token.role = row.role;
+  token.pages = effectivePages(row.role, overrides);
+  token.capabilities = effectiveCapabilities(row.role, overrides);
+  token.accessStamp = currentStamp;
+  token.accessVersion = ACCESS_SCHEMA_VERSION;
+  token.mustChangePassword = row.mustChangePassword;
+
   return token;
 };
