@@ -113,9 +113,8 @@ export async function upsertFeePetition(input: {
 //
 // Only the membership flag is cleared: the fee_petitions row, its checklist,
 // assignee and notes all survive, so a case removed by mistake comes back
-// exactly as it was when it's re-added. Behind the same feePetition.manage
-// capability as the add side, so the two can't drift apart — an agent who
-// cannot add a case shouldn't be able to remove one either.
+// exactly as it was when it's re-added. Behind feePetition.manage (admin and
+// lead only) — asymmetric with the add side, which is now open to all staff.
 //
 // Scoped to open cases, like bulkAddToFeePetitions. This page never lists a
 // closed case so the scope is unreachable today, but any write to a closed

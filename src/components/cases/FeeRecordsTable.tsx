@@ -275,10 +275,6 @@ export const FeeRecordsTable = ({
   const canEditFees = can("fees.edit");
   const canSeeLeaderNotes = can("leaderNotes.access");
   const canEditFeesConf = can("feesConfirmation.edit");
-  // Adding a case to Fee Petitions was briefly open to every agent; staff asked
-  // for it narrowed to admin and lead. The server enforces the same capability
-  // — this only decides whether the button is worth showing.
-  const canManageFeePetitions = can("feePetition.manage");
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -916,12 +912,11 @@ export const FeeRecordsTable = ({
     [casesById, rowOverrides, selectedIds],
   );
 
-  // Does the batch pill have anything to offer this user? Every button in it is
-  // independently gated now, so without this check a member selecting rows on
-  // Fees Closed would get a floating bar containing only "N selected".
-  // Archive is gated on isAdmin alone, so an admin always has at least one
-  // action; everyone else has one exactly when "Add to Fee Petitions" shows.
-  const canAddToFeePetitions = mode !== "closed" && canManageFeePetitions;
+  // Does the batch pill have anything to offer this user? "Add to Fee Petitions"
+  // is open to all staff on the active table; Archive is admin-only. A member on
+  // Fees Closed has neither, so the pill is suppressed to avoid a floating bar
+  // that says only "N selected" with nothing to click.
+  const canAddToFeePetitions = mode !== "closed";
   const hasBatchActions = canAddToFeePetitions || isAdmin;
 
   // Routes the selected cases into the Fee Petition workflow. Picking "Fee
@@ -1716,14 +1711,10 @@ export const FeeRecordsTable = ({
           the alternative (unchecking Reopen) would also clear PIF status
           just to flag a case Overpaid.
 
-          The pill itself is no longer admin-only: "Add to Fee Petitions" is
-          open to every agent who can reach this page (that was the point of
-          replacing the old Level-driven automation with a deliberate click),
-          so each of the older actions now carries its own isAdmin gate
-          instead of relying on one around the whole pill. Because every button
-          is now independently gated, the pill also has to check that at least
-          one of them survives — otherwise a member selecting rows on Fees
-          Closed would get a floating bar offering nothing. */}
+          "Add to Fee Petitions" is open to all staff on the active table.
+          Archive is admin-only. Each button carries its own gate, so the pill
+          also has to check that at least one survives — otherwise a member on
+          Fees Closed would see a floating bar with nothing to click. */}
       {selectedIds.size > 0 && hasBatchActions && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
           {/* Fee-petition errors are deliberately absent here — that action

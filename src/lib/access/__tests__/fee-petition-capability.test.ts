@@ -1,6 +1,6 @@
-// Adding and removing cases on the Fee Petitions page was briefly open to every
-// agent with page access. Staff asked for it narrowed to admin and lead, so it
-// now sits behind its own capability rather than a page check.
+// Removing cases from the Fee Petitions page is restricted to admin and lead.
+// Adding was also restricted this way at one point, but has since been opened
+// to all authenticated staff — only remove stays behind this capability.
 //
 // A dedicated capability rather than reusing case.finalize: granting a member
 // "finalize" per-user would otherwise also hand them the Fee Petitions list,
