@@ -410,8 +410,27 @@ export const GET = async (req: NextRequest) => {
       WHERE is_closed = false
     `);
 
-    // No Fees Cases aging — same predicate as openCasesFeesStatus.noFees
-    // above (zero dollars received), aged over 60 days by approval_date.
+    // No Fees Cases aging — counts computed server-side so the totals are
+    // accurate even though the row list below is capped at 100.
+    const noFeesAgingPromise = db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE (CURRENT_DATE - c.approval_date)::int > 60
+            AND (CURRENT_DATE - c.approval_date)::int <= 90
+        )::int AS over60,
+        COUNT(*) FILTER (
+          WHERE (CURRENT_DATE - c.approval_date)::int > 90
+        )::int AS over90,
+        COUNT(*)::int AS total
+      FROM fee_records fr
+      JOIN cases c ON c.client_id = fr.case_id
+      WHERE fr.is_closed = FALSE
+        AND COALESCE(fr.total_fees_paid, 0) = 0
+        AND c.approval_date IS NOT NULL
+        AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
+    `);
+
+    // Row-level detail for the No Fees Cases table, capped at 100 rows.
     const noFeesCasesPromise = db.execute(sql`
       SELECT
         c.client_id AS id,
@@ -431,12 +450,14 @@ export const GET = async (req: NextRequest) => {
         AND c.approval_date IS NOT NULL
         AND c.approval_date < CURRENT_DATE - INTERVAL '60 days'
       ORDER BY c.approval_date ASC
+      LIMIT 100
     `);
 
-    const [teamTotals, dailyBreakdown, feesStatusRows, noFeesCaseRows] = await Promise.all([
+    const [teamTotals, dailyBreakdown, feesStatusRows, noFeesAgingRows, noFeesCaseRows] = await Promise.all([
       teamTotalsPromise,
       dailyBreakdownPromise,
       feesStatusPromise,
+      noFeesAgingPromise,
       noFeesCasesPromise,
     ]);
 
@@ -575,13 +596,14 @@ export const GET = async (req: NextRequest) => {
       feePetitionApproved: Boolean(r.fee_petition_approved),
     }));
 
-    // Mutually exclusive buckets — a case over 90 days counts only in the
-    // 90-day bucket, not in both, so the two numbers can be added together
-    // without double-counting.
+    // Mutually exclusive buckets computed server-side from the full population,
+    // not from the capped row list, so counts are always accurate.
+    const [agingRow] = noFeesAgingRows as unknown as [{ over60: number; over90: number; total: number }];
     const noFeesAging = {
-      over60: noFeesCases.filter((c) => c.daysSinceApproval > 60 && c.daysSinceApproval <= 90).length,
-      over90: noFeesCases.filter((c) => c.daysSinceApproval > 90).length,
+      over60: Number(agingRow?.over60) || 0,
+      over90: Number(agingRow?.over90) || 0,
     };
+    const noFeesCasesTotal = Number(agingRow?.total) || 0;
 
     return NextResponse.json({
       week: monday,
@@ -594,6 +616,7 @@ export const GET = async (req: NextRequest) => {
       openCasesFeesStatus,
       noFeesAging,
       noFeesCases,
+      noFeesCasesTotal,
     });
   } catch (error) {
     console.error("GET /api/scoreboard error:", error);

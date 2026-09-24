@@ -113,6 +113,7 @@ interface TrackerData {
   openCasesFeesStatus: { noFees: number };
   noFeesAging: { over60: number; over90: number };
   noFeesCases: NoFeesCaseRow[];
+  noFeesCasesTotal: number;
 }
 
 type CellKey = `${string}|${string}`;
@@ -530,6 +531,7 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
         openCasesFeesStatus: json.openCasesFeesStatus ?? { noFees: 0 },
         noFeesAging: json.noFeesAging ?? { over60: 0, over90: 0 },
         noFeesCases: json.noFeesCases ?? [],
+        noFeesCasesTotal: json.noFeesCasesTotal ?? 0,
       });
       const map = new Map<CellKey, CellValues>();
       for (const d of (json.daily ?? []) as DailyEntry[]) {
@@ -779,7 +781,14 @@ export function ScoreboardTracker({ dark, t }: ScoreboardTrackerProps) {
       {data?.noFeesAging && (
         <div className={`rounded-xl border ${t.card} overflow-hidden`}>
           <div className={`px-4 py-2.5 flex items-center justify-between border-b ${t.borderLight}`}>
-            <span className={`text-xs font-bold ${t.text}`}>No Fees Cases</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold ${t.text}`}>No Fees Cases</span>
+              {data.noFeesCasesTotal > data.noFeesCases.length && (
+                <span className={`text-[11px] ${t.textMuted}`}>
+                  (showing {data.noFeesCases.length} of {data.noFeesCasesTotal})
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-[13px] font-medium tabular-nums">
                 <span className={dark ? "text-amber-400" : "text-amber-600"}>{data.noFeesAging.over60} 60–90 days</span>
