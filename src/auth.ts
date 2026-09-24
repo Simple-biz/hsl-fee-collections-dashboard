@@ -28,8 +28,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // auth.config.ts's version handles the edge; this one owns the Node path.
     async jwt({ token, user }) {
       if (user) {
-        // Sign-in: bake access into the token and stamp both the current
-        // schema version and the per-user access timestamp.
         token.id = user.id;
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword ?? false;
@@ -38,12 +36,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.accessVersion = ACCESS_SCHEMA_VERSION;
         token.accessStamp = user.accessStamp;
       } else {
-        // Subsequent requests: check for per-user access changes first (#467)
-        // — deactivation, role change, or override edit. Returns null when the
-        // session should be terminated (deactivated/deleted user).
         const result = await refreshAccessIfChanged(token);
         if (result === null) return null;
-        // Then re-resolve if the global access schema changed (#466).
         return await refreshAccessIfStale(result);
       }
       return token;

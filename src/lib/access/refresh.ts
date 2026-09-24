@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, userAccessOverrides } from "@/lib/db/schema";
 import { resolveAccess } from "@/lib/access/server";
+import { effectivePages, effectiveCapabilities, type AccessOverrides } from "@/lib/access/resolve";
 import { ACCESS_SCHEMA_VERSION, shouldRefreshAccess, computeAccessStamp } from "@/lib/access/version";
 
 export interface RefreshableToken {
@@ -75,6 +76,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
         role: string;
         updatedAt: Date;
         overrideUpdatedAt: Date | null;
+        overrides: unknown;
         mustChangePassword: boolean;
       }
     | undefined;
@@ -86,6 +88,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
         role: users.role,
         updatedAt: users.updatedAt,
         overrideUpdatedAt: userAccessOverrides.updatedAt,
+        overrides: userAccessOverrides.overrides,
         mustChangePassword: users.mustChangePassword,
       })
       .from(users)
@@ -104,20 +107,16 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
 
   if (token.accessStamp === currentStamp) return token;
 
-  // Access changed — re-resolve and re-stamp. Bumping accessVersion prevents
-  // refreshAccessIfStale from doing a redundant second resolve on this request.
-  try {
-    const { pages, capabilities } = await resolveAccess(userId, row.role);
-    token.role = row.role;
-    token.pages = pages;
-    token.capabilities = capabilities;
-    token.accessStamp = currentStamp;
-    token.accessVersion = ACCESS_SCHEMA_VERSION;
-    token.mustChangePassword = row.mustChangePassword;
-  } catch (error) {
-    console.error("Failed to re-resolve access for user", userId, error);
-    // Don't update the stamp — next request will retry.
-  }
+  // Access changed — re-resolve using the already-fetched overrides (no extra
+  // round-trip). Bumping accessVersion prevents refreshAccessIfStale from doing
+  // a redundant second resolve on this request.
+  const overrides = (row.overrides as AccessOverrides) ?? {};
+  token.role = row.role;
+  token.pages = effectivePages(row.role, overrides);
+  token.capabilities = effectiveCapabilities(row.role, overrides);
+  token.accessStamp = currentStamp;
+  token.accessVersion = ACCESS_SCHEMA_VERSION;
+  token.mustChangePassword = row.mustChangePassword;
 
   return token;
 };
