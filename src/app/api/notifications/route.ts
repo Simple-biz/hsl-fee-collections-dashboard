@@ -275,27 +275,17 @@ async function computeLiveAlerts() {
   // not updated_at, which moves on any write (reassign, overpaid-mark, etc.).
   const recentPayments = await db.execute(sql`
     SELECT
-      sub.client_id,
-      sub.claimant,
-      sub.assigned_to,
-      sub.total_paid,
-      sub.win_sheet_status,
-      sub.latest_payment_date
-    FROM (
-      SELECT
-        c.client_id,
-        c.first_name || ' ' || c.last_name AS claimant,
-        fr.assigned_to,
-        fr.total_fees_paid::numeric AS total_paid,
-        fr.win_sheet_status,
-        GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) AS latest_payment_date
-      FROM fee_records fr
-      JOIN cases c ON c.client_id = fr.case_id
-      WHERE fr.total_fees_paid::numeric > 0
-    ) sub
-    WHERE sub.latest_payment_date IS NOT NULL
-      AND sub.latest_payment_date > CURRENT_DATE - INTERVAL '7 days'
-    ORDER BY sub.latest_payment_date DESC
+      c.client_id,
+      c.first_name || ' ' || c.last_name AS claimant,
+      fr.assigned_to,
+      fr.total_fees_paid::numeric AS total_paid,
+      fr.win_sheet_status,
+      GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) AS latest_payment_date
+    FROM fee_records fr
+    JOIN cases c ON c.client_id = fr.case_id
+    WHERE fr.total_fees_paid::numeric > 0
+      AND GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) > CURRENT_DATE - INTERVAL '7 days'
+    ORDER BY GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) DESC
     LIMIT 15
   `);
 
