@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { feeRecords } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireCapability } from "@/lib/auth-helpers";
+import { auth } from "@/auth";
 
 // Same shape as the sibling action files (overpaid-cases, fee-petitions).
 type Result<T = void> = T extends void
@@ -37,11 +38,9 @@ export async function bulkReassign(input: {
 // derived from the case's Level being "Fee Petition"; it's now this explicit
 // flag (see migration 0055), so picking that Level no longer adds anything.
 //
-// Guarded on the feePetition.manage capability — admin, lead and system_admin
-// by default. This was briefly open to every agent with Master Fees access;
-// staff asked for it narrowed. The counterpart that takes a case back out lives
-// on the Fee Petitions page (bulkRemoveFromFeePetitions), behind the same
-// capability so the two stay symmetric: whoever can add can also undo.
+// Open to all authenticated users — any staff member with Master Fees access
+// can add a case. Removing is separately gated on feePetition.manage so those
+// stay asymmetric by design: lower bar to add, higher bar to undo.
 //
 // Scoped to open cases. The UI already hides the button in closed mode, so
 // this is belt-and-braces, but it matters: any write to fee_records fires
@@ -57,8 +56,8 @@ export async function bulkAddToFeePetitions(input: {
   caseIds: number[];
 }): Promise<Result<{ updated: number[] }>> {
   try {
-    const guard = await requireCapability("feePetition.manage");
-    if (!guard.ok) return { ok: false, error: "You don't have permission to add cases to Fee Petitions." };
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: "Unauthenticated" };
     if (!input.caseIds.length) return { ok: false, error: "No cases selected" };
     if (input.caseIds.length > 500) return { ok: false, error: "Too many cases (max 500)" };
     if (!input.caseIds.every((id) => Number.isFinite(id))) return { ok: false, error: "Invalid case IDs" };

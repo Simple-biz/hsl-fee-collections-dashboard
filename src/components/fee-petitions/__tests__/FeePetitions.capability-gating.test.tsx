@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
-// Adding and removing cases on the Fee Petitions page is restricted to admin
-// and lead via the feePetition.manage capability. The server enforces it; these
-// cover the UI half, which is what staff actually see.
+// Removing cases from the Fee Petitions page is restricted to admin and lead
+// via the feePetition.manage capability. The server enforces it; these cover
+// the UI half, which is what staff actually see.
 //
 // The Completed tab's Clear column is conditional, so its colSpan has to track
 // it. That pairing has caused two production bugs in this repo already, so it
