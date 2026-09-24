@@ -258,7 +258,7 @@ export const POST = async (req: NextRequest) => {
 
     if (apiUrl && apiKey) {
       raw = await fetchChronicleClient(String(clientId), apiUrl, apiKey);
-    } else {
+    } else if (process.env.NEXT_PUBLIC_SHOW_TEST_LOGINS === "true") {
       usingMock = true;
       const mock = MOCK[String(clientId)];
       if (!mock) {
@@ -270,6 +270,11 @@ export const POST = async (req: NextRequest) => {
         );
       }
       raw = mock;
+    } else {
+      return NextResponse.json(
+        { error: "Chronicle API is not configured in this environment (CHRONICLE_API_URL / CHRONICLE_API_KEY missing)" },
+        { status: 503 },
+      );
     }
 
     const parsed = parseChronicleResponse(raw);

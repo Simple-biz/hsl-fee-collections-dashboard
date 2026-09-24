@@ -11,8 +11,11 @@ const WEBHOOK_URL = process.env.N8N_MYCASE_DOCS_WEBHOOK_URL;
 const WEBHOOK_TOKEN = process.env.N8N_MYCASE_DOCS_WEBHOOK_TOKEN;
 // Separate webhook for single-document downloads; shares the same auth token.
 const DOC_FILE_WEBHOOK_URL = process.env.N8N_MYCASE_DOC_FILE_WEBHOOK_URL;
-// Case detail webhook — no auth header; n8n uses auth: None.
+// Case detail webhook. Set N8N_MYCASE_CASE_DETAIL_WEBHOOK_TOKEN once the n8n
+// workflow is updated to verify the header — absent, the header is omitted and
+// existing behaviour is unchanged.
 const CASE_DETAIL_WEBHOOK_URL = process.env.N8N_MYCASE_CASE_DETAIL_WEBHOOK_URL;
+const CASE_DETAIL_WEBHOOK_TOKEN = process.env.N8N_MYCASE_CASE_DETAIL_WEBHOOK_TOKEN;
 const AUTH_HEADER = "Fee-Collections-Docs-App-Token";
 
 export type MyCaseCaseDetail = {
@@ -39,7 +42,10 @@ async function _fetchCaseDetails(caseId: number): Promise<MyCaseCaseDetail> {
 
   const res = await fetch(CASE_DETAIL_WEBHOOK_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(CASE_DETAIL_WEBHOOK_TOKEN ? { [AUTH_HEADER]: CASE_DETAIL_WEBHOOK_TOKEN } : {}),
+    },
     body: JSON.stringify({ id: caseId }),
     cache: "no-store",
   });

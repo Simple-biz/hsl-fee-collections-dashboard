@@ -358,7 +358,16 @@ export const POST = async (req: NextRequest) => {
       });
     }
 
-    // upsert mode
+    // upsert mode — reject if Sheets is not configured in this environment.
+    // NEXT_PUBLIC_SHOW_TEST_LOGINS=true is the explicit dev/test gate used
+    // throughout this app; without it, mock rows must never reach the DB.
+    if (!process.env.SHEETS_SYNC_WEBHOOK_URL && process.env.NEXT_PUBLIC_SHOW_TEST_LOGINS !== "true") {
+      return NextResponse.json(
+        { error: "Sheets sync is not configured in this environment (SHEETS_SYNC_WEBHOOK_URL missing)" },
+        { status: 503 },
+      );
+    }
+
     let body: { selectedClientIds: unknown; linkOverrides?: unknown };
     try {
       body = (await req.json()) as { selectedClientIds: unknown; linkOverrides?: unknown };
