@@ -16,6 +16,7 @@ export interface RefreshableToken {
   pages?: unknown;
   capabilities?: unknown;
   accessVersion?: number;
+  mustChangePassword?: boolean;
   /** ISO timestamp — GREATEST(users.updated_at, user_access_overrides.updated_at). */
   accessStamp?: string;
 }
@@ -74,6 +75,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
         role: string;
         updatedAt: Date;
         overrideUpdatedAt: Date | null;
+        mustChangePassword: boolean;
       }
     | undefined;
 
@@ -84,6 +86,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
         role: users.role,
         updatedAt: users.updatedAt,
         overrideUpdatedAt: userAccessOverrides.updatedAt,
+        mustChangePassword: users.mustChangePassword,
       })
       .from(users)
       .leftJoin(userAccessOverrides, eq(userAccessOverrides.userId, users.id))
@@ -94,10 +97,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
     return token;
   }
 
-  // User row deleted.
   if (!row) return null;
-
-  // Deactivated — terminate the session immediately.
   if (!row.isActive) return null;
 
   const greatest =
@@ -106,7 +106,6 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
       : row.updatedAt;
   const currentStamp = greatest.toISOString();
 
-  // Fast path — nothing changed.
   if (token.accessStamp === currentStamp) return token;
 
   // Access changed — re-resolve and re-stamp. Bumping accessVersion prevents
@@ -118,6 +117,7 @@ export const refreshAccessIfChanged = async <T extends RefreshableToken>(
     token.capabilities = capabilities;
     token.accessStamp = currentStamp;
     token.accessVersion = ACCESS_SCHEMA_VERSION;
+    token.mustChangePassword = row.mustChangePassword;
   } catch (error) {
     console.error("Failed to re-resolve access for user", userId, error);
     // Don't update the stamp — next request will retry.
