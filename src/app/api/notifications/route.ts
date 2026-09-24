@@ -271,22 +271,21 @@ async function computeLiveAlerts() {
     });
   }
 
-  // 2. Recent fee payments (last 7 days)
+  // 2. Recent fee payments (last 7 days) — keyed off actual payment dates,
+  // not updated_at, which moves on any write (reassign, overpaid-mark, etc.).
   const recentPayments = await db.execute(sql`
     SELECT
       c.client_id,
       c.first_name || ' ' || c.last_name AS claimant,
       fr.assigned_to,
       fr.total_fees_paid::numeric AS total_paid,
-      fr.t2_fee_received_date,
-      fr.t16_fee_received_date,
       fr.win_sheet_status,
-      fr.updated_at
+      GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) AS latest_payment_date
     FROM fee_records fr
     JOIN cases c ON c.client_id = fr.case_id
     WHERE fr.total_fees_paid::numeric > 0
-      AND fr.updated_at > NOW() - INTERVAL '7 days'
-    ORDER BY fr.updated_at DESC
+      AND GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) > CURRENT_DATE - INTERVAL '7 days'
+    ORDER BY GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) DESC
     LIMIT 15
   `);
 
@@ -296,7 +295,7 @@ async function computeLiveAlerts() {
     assigned_to: string;
     total_paid: number;
     win_sheet_status: string;
-    updated_at: string;
+    latest_payment_date: string;
   }[]) {
     alerts.push({
       id: `live-payment-${row.client_id}`,
@@ -308,7 +307,7 @@ async function computeLiveAlerts() {
       agentName: row.assigned_to || null,
       isRead: false,
       readAt: null,
-      createdAt: new Date(row.updated_at),
+      createdAt: new Date(row.latest_payment_date),
     });
   }
 
