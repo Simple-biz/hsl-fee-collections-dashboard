@@ -15,7 +15,7 @@ import {
   unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ============================================================================
 // ENUMS
@@ -327,6 +327,13 @@ export const feeRecords = pgTable(
     index("idx_fee_records_sync_status").on(table.syncStatus),
     index("idx_fee_records_pif").on(table.pifReadyToClose),
     index("idx_fee_records_is_closed").on(table.isClosed),
+    // Partial index for the dueToday sidebar poll (/api/cases?dueToday=true),
+    // which runs every 60s per open tab. Without this, the query full-scans
+    // fee_records even though only a handful of rows match on any given day.
+    index("idx_fee_records_follow_up_open")
+      .on(table.nextFollowUpDate)
+      .where(sql`is_closed = false`)
+      .concurrently(),
   ],
 );
 
@@ -991,6 +998,13 @@ export const inboundCallRecords = pgTable(
   (table) => [
     index("idx_inbound_call_records_week").on(table.weekStart),
     index("idx_inbound_call_records_date").on(table.callDate),
+    // Partial index for /api/inbound-calls/backlog, which filters on
+    // called_back_resolved = false. Without this, the query touches nearly the
+    // entire table even though the unresolved subset is a small fraction.
+    index("idx_inbound_call_records_unresolved")
+      .on(table.calledBackResolved)
+      .where(sql`called_back_resolved = false`)
+      .concurrently(),
   ],
 );
 
