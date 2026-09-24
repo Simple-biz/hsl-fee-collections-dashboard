@@ -5,10 +5,9 @@
 // page. Two things make it different from every other action in the batch
 // pill, and both are easy to regress:
 //
-//   1. It is gated on the feePetition.manage capability — admin and lead, not
-//      members. It was briefly open to every agent; staff asked for it
-//      narrowed. A member now has no batch actions at all, so the pill does
-//      not render for them.
+//   1. It is open to all authenticated staff on the active table — not gated
+//      on a capability. Members see the add button (and the pill); only
+//      Fees Closed mode suppresses it.
 //   2. It only sends the cases that aren't in the section yet, and disables
 //      itself when the whole selection is already there.
 
@@ -195,11 +194,13 @@ const confirmAdd = () => {
 };
 
 describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
-  it("is hidden from a member, who has no batch actions at all", () => {
+  it("is available to a member, who gets the add button but no admin-only actions", () => {
     mockRole("member");
     renderAndSelect([BASE_CASE]);
-    expect(addButton()).toBeNull();
-    expect(screen.queryByText("1 selected")).toBeNull();
+    expect(addButton()).toBeTruthy();
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Archive$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add to Overpaid Cases/ })).toBeNull();
   });
 
   it("is available to a lead, without the admin-only actions", () => {
@@ -312,18 +313,18 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
     expect(addButton()).toBeNull();
   });
 
-  // Every button in the pill is independently gated now, so the pill has to
-  // check that something survives. A member on Fees Closed clears none of the
-  // gates and must get no pill at all — not a floating bar saying "1 selected"
+  // "Add to Fee Petitions" is the only non-admin batch action. On Fees Closed
+  // it is suppressed (the section excludes closed cases), so a member selecting
+  // rows there gets no pill at all — not a floating bar saying "1 selected"
   // with nothing to do.
   it("shows no batch pill at all for a member on the Fees Closed table", () => {
-    mockRole("lead");
+    mockRole("member");
     renderAndSelect([BASE_CASE], "closed");
     expect(screen.queryByText("1 selected")).toBeNull();
   });
 
   it("still shows the pill for a member on the active table", () => {
-    mockRole("lead");
+    mockRole("member");
     renderAndSelect([BASE_CASE]);
     expect(screen.getByText("1 selected")).toBeTruthy();
   });
@@ -386,7 +387,9 @@ describe("FeeRecordsTable — Fee Petitions marker tracks unsaved Level edits", 
     // Scoped to the popup — the toolbar's Level filter is a native <select>
     // carrying its own "FEE PETITION" option.
     const popup = screen.getByRole("listbox");
-    fireEvent.click(within(popup).getByRole("option", { name: /FEE PETITION/ }));
+    // The option renders the formatted label ("Fee Petition"), not the stored
+    // value ("FEE PETITION") — matching on the formatted form pins that.
+    fireEvent.click(within(popup).getByRole("option", { name: "Fee Petition" }));
 
     expect(marker(NOT_ADDED)).toBeTruthy();
   });

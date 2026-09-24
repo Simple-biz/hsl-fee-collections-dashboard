@@ -13,7 +13,7 @@ const querySchema = z.object({
 // GET /api/reports?from=2026-02-17&to=2026-02-24
 export const GET = async (req: NextRequest) => {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const parsed = querySchema.safeParse({
     from: new URL(req.url).searchParams.get("from"),

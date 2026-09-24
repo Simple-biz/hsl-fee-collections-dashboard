@@ -1,16 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Check } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface BulkFeesClosedConfirmDialogProps {
   open: boolean;
@@ -124,59 +116,30 @@ export function BulkFeesClosedConfirmDialog({
     onClose();
   };
 
-  const handleOpenChange = (v: boolean) => {
-    if (!v && !submitting) {
-      controllerRef.current?.abort();
-      setError(null);
-      onClose();
-    }
+  // ConfirmDialog already refuses to close mid-request; this adds what it can't
+  // know about — abandoning the in-flight batch and dropping a stale error, so
+  // reopening starts from the full selection rather than a failed subset.
+  const handleDismiss = () => {
+    controllerRef.current?.abort();
+    setError(null);
+    onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            Close {count === 1 ? "1 case" : `${count} cases`}?
-          </DialogTitle>
-          <DialogDescription>
-            {count === 1
-              ? "This case will be moved to Fees Closed and removed from the active dashboard."
-              : `These ${count} cases will be moved to Fees Closed and removed from the active dashboard.`}
-          </DialogDescription>
-        </DialogHeader>
-
-        {error && (
-          <p role="alert" className="flex items-center gap-2 text-sm text-destructive">
-            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-            {error}
-          </p>
-        )}
-
-        <DialogFooter className="mt-2 gap-2 sm:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check aria-hidden="true" className="h-4 w-4" />
-            )}
-            Fees Closed
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      submitting={submitting}
+      error={error}
+      onConfirm={handleConfirm}
+      onClose={handleDismiss}
+      confirmLabel="Fees Closed"
+      confirmIcon={Check}
+      title={`Close ${count === 1 ? "1 case" : `${count} cases`}?`}
+      description={
+        count === 1
+          ? "This case will be moved to Fees Closed and removed from the active dashboard."
+          : `These ${count} cases will be moved to Fees Closed and removed from the active dashboard.`
+      }
+    />
   );
 }

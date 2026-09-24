@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { sessionHasPageAccess, sessionHasCapability } from "@/lib/auth-helpers";
 import { fetchDocumentDownloadUrl } from "@/lib/mycase-proxy";
 
 // Filename-extension → MIME, used to coerce a previewable Content-Type when
@@ -30,11 +32,26 @@ const resolveParams = async (context: {
 // browser previews it (PDFs/images) instead of downloading. MyCase's signed URL
 // forces `attachment` and we can't change that on the URL itself (it's part of
 // the signature), so we override the disposition here.
+//
+// Access rule: any authenticated user with Master Fees page access and the
+// case.editPii capability may fetch documents for any case (all-staff model —
+// see issue #443 for the explicit entitlement decision).
 export const GET = async (
   _req: NextRequest,
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (
+      !sessionHasPageAccess(session, "master_fees") ||
+      !sessionHasCapability(session, "case.editPii")
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const documentId = await resolveParams(context);
     if (!Number.isFinite(documentId)) {
       return NextResponse.json(

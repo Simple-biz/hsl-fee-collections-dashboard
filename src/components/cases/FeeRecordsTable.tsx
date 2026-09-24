@@ -41,6 +41,8 @@ import {
   fmtClaimLong,
   parseCurrencyInput,
   skippedClosedCasesMessage,
+  caseLevelLabel,
+  winSheetStatusLabel,
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
@@ -101,10 +103,13 @@ const WIN_SHEET_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 bord
 
 function WinSheetStatusBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
   if (!value) return <span className="text-neutral-400">—</span>;
+  // Colours stay keyed on the stored value — the same status is stored several
+  // ways ("Started"/"started", "not_started") and each spelling needs its own
+  // key — but only the formatted label is shown.
   const colors = WIN_SHEET_STATUS_COLORS[value] ?? WIN_SHEET_STATUS_FALLBACK;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
-      {value}
+      {winSheetStatusLabel(value)}
     </span>
   );
 }
@@ -270,10 +275,6 @@ export const FeeRecordsTable = ({
   const canEditFees = can("fees.edit");
   const canSeeLeaderNotes = can("leaderNotes.access");
   const canEditFeesConf = can("feesConfirmation.edit");
-  // Adding a case to Fee Petitions was briefly open to every agent; staff asked
-  // for it narrowed to admin and lead. The server enforces the same capability
-  // — this only decides whether the button is worth showing.
-  const canManageFeePetitions = can("feePetition.manage");
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -911,12 +912,11 @@ export const FeeRecordsTable = ({
     [casesById, rowOverrides, selectedIds],
   );
 
-  // Does the batch pill have anything to offer this user? Every button in it is
-  // independently gated now, so without this check a member selecting rows on
-  // Fees Closed would get a floating bar containing only "N selected".
-  // Archive is gated on isAdmin alone, so an admin always has at least one
-  // action; everyone else has one exactly when "Add to Fee Petitions" shows.
-  const canAddToFeePetitions = mode !== "closed" && canManageFeePetitions;
+  // Does the batch pill have anything to offer this user? "Add to Fee Petitions"
+  // is open to all staff on the active table; Archive is admin-only. A member on
+  // Fees Closed has neither, so the pill is suppressed to avoid a floating bar
+  // that says only "N selected" with nothing to click.
+  const canAddToFeePetitions = mode !== "closed";
   const hasBatchActions = canAddToFeePetitions || isAdmin;
 
   // Routes the selected cases into the Fee Petition workflow. Picking "Fee
@@ -1581,7 +1581,7 @@ export const FeeRecordsTable = ({
           >
             <option value="all">All Levels</option>
             {caseLevelOptions.map((o) => (
-              <option key={o.name} value={o.name}>{o.name}</option>
+              <option key={o.name} value={o.name}>{caseLevelLabel(o.name)}</option>
             ))}
           </select>
           <select
@@ -1711,14 +1711,10 @@ export const FeeRecordsTable = ({
           the alternative (unchecking Reopen) would also clear PIF status
           just to flag a case Overpaid.
 
-          The pill itself is no longer admin-only: "Add to Fee Petitions" is
-          open to every agent who can reach this page (that was the point of
-          replacing the old Level-driven automation with a deliberate click),
-          so each of the older actions now carries its own isAdmin gate
-          instead of relying on one around the whole pill. Because every button
-          is now independently gated, the pill also has to check that at least
-          one of them survives — otherwise a member selecting rows on Fees
-          Closed would get a floating bar offering nothing. */}
+          "Add to Fee Petitions" is open to all staff on the active table.
+          Archive is admin-only. Each button carries its own gate, so the pill
+          also has to check that at least one survives — otherwise a member on
+          Fees Closed would see a floating bar with nothing to click. */}
       {selectedIds.size > 0 && hasBatchActions && (
         <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
           {/* Fee-petition errors are deliberately absent here — that action
@@ -2473,6 +2469,8 @@ export const FeeRecordsTable = ({
                                 ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
                                 : undefined;
                             },
+                            undefined,
+                            caseLevelLabel,
                           )}
                         />
                         {/* cellValue, not c.level — it resolves the optimistic
@@ -2603,32 +2601,29 @@ export const FeeRecordsTable = ({
                               : undefined
                           }
                         >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "status");
-                            return (
-                              v &&
-                              !winSheetStatusOptions.some(
-                                (o) => o.name === v,
-                              ) && <option value={v}>{v}</option>
-                            );
-                          })()}
-                          {winSheetStatusOptions
-                            .filter(
-                              (o) =>
-                                o.isActive || o.name === cellValue(c, "status"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
+                          {/* Same builder the Listbox dropdowns use, so this
+                              select gets the placeholder, the retired-value
+                              fallback AND the duplicate-label collapse from one
+                              place. Hand-rolling it here is what left it
+                              showing "Started" twice for the rows that store
+                              the lowercase spelling. */}
+                          {buildListboxOptions(
+                            winSheetStatusOptions,
+                            cellValue(c, "status"),
+                            undefined,
+                            undefined,
+                            winSheetStatusLabel,
+                          ).map((o) => (
+                            <option key={o.value || "__none__"} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
                         </select>
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); setWinSheetStatusEditId(c.id); }}
                           className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                          aria-label={`Edit Win Sheet Status: ${cellValue(c, "status") || "not set"}`}
+                          aria-label={`Edit Win Sheet Status: ${winSheetStatusLabel(cellValue(c, "status")) || "not set"}`}
                         >
                           <WinSheetStatusBadge value={cellValue(c, "status")} dark={dark} />
                         </button>

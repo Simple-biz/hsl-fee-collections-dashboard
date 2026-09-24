@@ -298,3 +298,64 @@ export const skippedClosedCasesMessage = (
   total === 1
     ? `That case could not be ${verb} — it was closed by someone else.`
     : `${skipped} of ${total} cases could not be ${verb} — ${skipped === 1 ? "it was" : "they were"} closed by someone else.`;
+
+// ── Display labels for stored values ────────────────────────────────────────
+//
+// Levels, statuses and claim types are free text: they come from the
+// admin-managed dropdown_options lists, from legacy enums, and from sheet
+// imports, so the same thing is stored several ways ("FEE PETITION" and
+// "FEE_PETITION", "Started" and "started"). Rendering the stored string
+// directly is what leaks `FEE_PETITION` and `not_started` into the UI.
+//
+// These helpers format for display only — callers keep saving the raw value,
+// so nothing here changes what lands in the database.
+
+// Tokens that must not be title-cased. Without this, "AC Remand" becomes
+// "Ac Remand" and the claim types lose their capitals.
+const ACRONYMS = new Set([
+  "AC", "ALJ", "AUX", "CONC", "DAC", "DWB", "NOA", "PIF",
+  "SSA", "SSI", "T2", "T16", "II", "XVI",
+]);
+
+/**
+ * Fallback label for a value with no explicit mapping: underscores become
+ * spaces and each word is title-cased, with known acronyms left alone.
+ *
+ * Deliberately a fallback rather than the only rule — an admin adding a new
+ * dropdown value still gets something readable instead of a raw enum, without
+ * anyone having to extend a map first.
+ */
+export const titleCaseLabel = (raw: string): string =>
+  raw
+    .trim()
+    .replace(/[_\s]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => {
+      const upper = word.toUpperCase();
+      if (ACRONYMS.has(upper)) return upper;
+      return upper.charAt(0) + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+
+/** Case level for display — "FEE_PETITION" and "FEE PETITION" both read "Fee Petition". */
+export const caseLevelLabel = (raw: string | null | undefined): string => {
+  if (!raw) return "";
+  // RECONSIDERATION is a duplicate of RECON that predates the current dropdown;
+  // both read the same until the data is reconciled (see the data half of #454).
+  const explicit: Record<string, string> = {
+    "FEE PETITION": "Fee Petition",
+    FEE_PETITION: "Fee Petition",
+    RECON: "Recon",
+    RECONSIDERATION: "Recon",
+    FEDERAL_COURT: "Fed Court",
+    "FEDERAL COURT": "Fed Court",
+  };
+  return explicit[raw.trim().toUpperCase()] ?? titleCaseLabel(raw);
+};
+
+/** Win sheet status for display — "not_started" reads "Not Started". */
+export const winSheetStatusLabel = (raw: string | null | undefined): string => {
+  if (!raw) return "";
+  return STATUS_LABELS[raw] ?? titleCaseLabel(raw);
+};
