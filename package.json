@@ -13,7 +13,8 @@
     "user:create": "dotenv -e .env.local -- tsx scripts/create-user.ts",
     "seed:test-users": "dotenv -e .env.local -- tsx scripts/seed-test-users.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "apply-migration-0056": "dotenv -e .env.local -- tsx scripts/apply-migration-0056.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
