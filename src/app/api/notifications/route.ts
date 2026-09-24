@@ -280,7 +280,7 @@ async function computeLiveAlerts() {
       fr.assigned_to,
       fr.total_fees_paid::numeric AS total_paid,
       fr.win_sheet_status,
-      GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date) AS latest_payment_date
+      GREATEST(fr.t2_fee_received_date, fr.t16_fee_received_date, fr.aux_fee_received_date)::timestamptz AS latest_payment_date
     FROM fee_records fr
     JOIN cases c ON c.client_id = fr.case_id
     WHERE fr.total_fees_paid::numeric > 0
