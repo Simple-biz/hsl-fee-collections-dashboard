@@ -295,7 +295,7 @@ async function computeLiveAlerts() {
     assigned_to: string;
     total_paid: number;
     win_sheet_status: string;
-    latest_payment_date: string;
+    latest_payment_date: Date;
   }[]) {
     alerts.push({
       id: `live-payment-${row.client_id}`,
