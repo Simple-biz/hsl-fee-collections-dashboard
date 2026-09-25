@@ -90,10 +90,13 @@ const chain = {
   onConflictDoUpdate: vi.fn().mockResolvedValue([]),
   returning: vi.fn().mockResolvedValue([]),
 };
-// Make every non-terminal method return the same chain so arbitrary depth works.
+// Terminal methods must resolve to a Promise; everything else chains back.
+const TERMINAL_CHAIN_METHODS = new Set([
+  "limit", "offset", "execute", "onConflictDoUpdate", "returning",
+]);
 Object.keys(chain).forEach((k) => {
   const fn = chain[k as keyof typeof chain];
-  if (typeof fn === "function" && !String(fn).includes("mockResolvedValue")) {
+  if (typeof fn === "function" && !TERMINAL_CHAIN_METHODS.has(k)) {
     (fn as ReturnType<typeof vi.fn>).mockReturnValue(chain);
   }
 });

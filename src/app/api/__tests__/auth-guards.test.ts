@@ -212,8 +212,10 @@ describe("#372 regression — mycase document file download gate", () => {
   });
 
   it("403 when authenticated with master_fees page but missing case.editPii", async () => {
+    // capabilities must be non-empty to suppress the role-defaults fallback;
+    // "case.update" is a real member capability that isn't case.editPii.
     mockAuth.mockResolvedValue(
-      makeSession("member", { pages: ["master_fees"], capabilities: [] }),
+      makeSession("member", { pages: ["master_fees"], capabilities: ["case.update"] }),
     );
     const GET = await getMycaseDocFile();
     const res = await GET(makeReq("GET"), makeCtx(42));
@@ -235,8 +237,9 @@ describe("#372 regression — chronicle import page gate", () => {
   });
 
   it("403 when member lacks chronicle page access", async () => {
+    // pages must be non-empty to suppress the role-defaults fallback.
     mockAuth.mockResolvedValue(
-      makeSession("member", { pages: [], capabilities: [] }),
+      makeSession("member", { pages: ["overview"], capabilities: ["case.update"] }),
     );
     const POST = await getChronicleImport();
     const res = await POST(makeReq("POST", { cases: [], pdfFields: null }));
@@ -256,8 +259,9 @@ describe("#372 regression — team-members GET auth guard", () => {
   });
 
   it("403 when member lacks team page access", async () => {
+    // pages must be non-empty to suppress the role-defaults fallback.
     mockAuth.mockResolvedValue(
-      makeSession("member", { pages: [], capabilities: [] }),
+      makeSession("member", { pages: ["overview"], capabilities: ["case.update"] }),
     );
     const GET = await getTeamMembersGET();
     const res = await GET(makeReq("GET"));
