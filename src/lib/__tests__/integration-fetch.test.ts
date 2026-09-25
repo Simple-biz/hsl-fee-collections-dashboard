@@ -117,14 +117,14 @@ describe("integrationFetch", () => {
     });
   });
 
-  it("throws IntegrationError(upstream_5xx) on network error", async () => {
+  it("throws IntegrationError(network_error) on DNS/connection failure", async () => {
     mockFetch.mockRejectedValue(new TypeError("fetch failed"));
 
     await expect(
       integrationFetch("https://example.com/api", { timeoutMs: 5_000 }, identity),
     ).rejects.toMatchObject({
       name: "IntegrationError",
-      outcome: "upstream_5xx",
+      outcome: "network_error",
     });
   });
 });

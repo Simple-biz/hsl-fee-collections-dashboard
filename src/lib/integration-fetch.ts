@@ -8,6 +8,7 @@
 export type IntegrationOutcome =
   | "success"
   | "timeout"
+  | "network_error"
   | "upstream_4xx"
   | "upstream_5xx"
   | "invalid_payload"
@@ -32,8 +33,9 @@ export class IntegrationError extends Error {
 /**
  * Fetch `url` with a mandatory timeout. Throws `IntegrationError` on:
  *  - timeout (AbortSignal fires before the server responds)
- *  - non-2xx HTTP status
- *  - non-JSON or structurally invalid response body
+ *  - network_error (DNS failure, ECONNREFUSED, TLS error — server never reached)
+ *  - non-2xx HTTP status (upstream_4xx / upstream_5xx)
+ *  - non-JSON or structurally invalid response body (invalid_payload)
  *
  * `validate` receives the parsed JSON body and must return `T` or throw.
  * Any thrown error from `validate` is wrapped as `invalid_payload`.
@@ -58,7 +60,7 @@ export async function integrationFetch<T>(
         `Request timed out after ${timeoutMs}ms`,
       );
     }
-    throw new IntegrationError("upstream_5xx", `Network error: ${String(e)}`);
+    throw new IntegrationError("network_error", `Network error: ${String(e)}`);
   }
 
   if (!res.ok) {

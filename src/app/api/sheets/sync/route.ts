@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
-import { integrationFetch } from "@/lib/integration-fetch";
+import { integrationFetch, IntegrationError } from "@/lib/integration-fetch";
 import {
   mapSheetRows,
   MYCASE_URL_RE,
@@ -59,20 +59,30 @@ const fetchFeesClosedSheetRows = async (): Promise<SheetRow[]> => {
   // Fees Closed sheet is optional — if unconfigured, skip it silently.
   if (!webhookUrl) return [];
 
-  return integrationFetch(
-    webhookUrl,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trigger: "manual" }),
-      timeoutMs: 55_000,
-    },
-    (body) => {
-      if (!Array.isArray(body))
-        throw new Error(`expected array, got ${typeof body}`);
-      return body as SheetRow[];
-    },
-  );
+  try {
+    return await integrationFetch(
+      webhookUrl,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger: "manual" }),
+        timeoutMs: 55_000,
+      },
+      (body) => {
+        if (!Array.isArray(body))
+          throw new Error(`expected array, got ${typeof body}`);
+        return body as SheetRow[];
+      },
+    );
+  } catch (e) {
+    // Fees Closed is a supplementary feed — degrade gracefully so master-list
+    // sync is not blocked by a transient webhook outage.
+    console.warn(
+      "[sheets/sync] Fees Closed webhook failed, skipping:",
+      e instanceof IntegrationError ? `${e.outcome}: ${e.message}` : String(e),
+    );
+    return [];
+  }
 };
 
 const toCaseInsert = (r: ParsedCaseRow) => ({
