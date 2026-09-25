@@ -12,12 +12,14 @@
 import { vi } from "vitest";
 import { NextRequest } from "next/server";
 import type { Session } from "next-auth";
+import type { PageKey } from "@/lib/access/pages";
+import type { CapabilityKey } from "@/lib/access/capabilities";
 
 export type AppRole = "member" | "lead" | "admin" | "system_admin";
 
 interface SessionOptions {
-  pages?: string[];
-  capabilities?: string[];
+  pages?: PageKey[];
+  capabilities?: CapabilityKey[];
   mustChangePassword?: boolean;
 }
 
@@ -51,7 +53,7 @@ export function makeReq(
     init.body = JSON.stringify(body);
     init.headers = { "Content-Type": "application/json" };
   }
-  return new NextRequest(url, init);
+  return new NextRequest(url, init as ConstructorParameters<typeof NextRequest>[1]);
 }
 
 /** Build the route context object expected by dynamic segment handlers. */

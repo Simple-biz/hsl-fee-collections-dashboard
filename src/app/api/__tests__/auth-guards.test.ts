@@ -12,6 +12,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from "vitest";
+import type { Session } from "next-auth";
 import { auth } from "@/auth";
 import { makeSession, makeReq, makeCtx, mockDb } from "./helpers";
 
@@ -54,7 +55,7 @@ const getInboundCallsDelete = async () =>
 const getArchiveReopen = async () =>
   (await import("@/app/api/archive/reopen/route")).POST;
 
-const mockAuth = vi.mocked(auth);
+const mockAuth = vi.mocked(auth as unknown as () => Promise<Session | null>);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -254,7 +255,7 @@ describe("#372 regression — team-members GET auth guard", () => {
   it("401 when unauthenticated", async () => {
     mockAuth.mockResolvedValue(NULL_SESSION);
     const GET = await getTeamMembersGET();
-    const res = await GET(makeReq("GET"));
+    const res = await GET();
     expect(res.status).toBe(401);
   });
 
@@ -264,7 +265,7 @@ describe("#372 regression — team-members GET auth guard", () => {
       makeSession("member", { pages: ["overview"], capabilities: ["case.update"] }),
     );
     const GET = await getTeamMembersGET();
-    const res = await GET(makeReq("GET"));
+    const res = await GET();
     expect(res.status).toBe(403);
   });
 });
