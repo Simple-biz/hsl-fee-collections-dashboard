@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
 import {
   resolveDecisionOutcome,
   resolveLevelWon,
@@ -74,6 +75,8 @@ type PdfFields = z.infer<typeof pdfFieldsSchema>;
 
 // POST /api/chronicle/import — Import selected cases into DB with optional PDF-extracted fields
 export const POST = async (req: NextRequest) => {
+  const cid = correlationId(req);
+  const start = Date.now();
   try {
     const guard = await requirePageAccess("chronicle");
     if (!guard.ok) {
@@ -190,6 +193,20 @@ export const POST = async (req: NextRequest) => {
       }
     }
 
+    logEvent({
+      correlationId: cid,
+      route: "/api/chronicle/import",
+      operation: "chronicle.import",
+      integration: "chronicle",
+      durationMs: Date.now() - start,
+      outcome: "success",
+      counts: {
+        attempted: importCases.length,
+        succeeded: imported.length,
+        failed: errors.length,
+      },
+    });
+
     return NextResponse.json({
       status: "ok",
       imported: imported.length,
@@ -197,9 +214,17 @@ export const POST = async (req: NextRequest) => {
       details: { imported, errors },
     });
   } catch (error) {
-    console.error("POST /api/chronicle/import error:", error);
+    logEvent({
+      correlationId: cid,
+      route: "/api/chronicle/import",
+      operation: "chronicle.import",
+      integration: "chronicle",
+      durationMs: Date.now() - start,
+      outcome: classifyError(error),
+      serverError: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Import failed", correlationId: cid },
       { status: 500 },
     );
   }

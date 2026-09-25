@@ -4,6 +4,7 @@ import { inArray, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
 import {
   mapSheetRows,
   MYCASE_URL_RE,
@@ -126,6 +127,8 @@ const toClosedAt = (closedDate: string | null): Date | null => {
 //   mode=preview  → diff MASTER LIST + Fees Closed sheet vs DB; return all 4 categories
 //   mode=upsert   → import new rows, update existing, and mark Fees Closed rows closed
 export const POST = async (req: NextRequest) => {
+  const cid = correlationId(req);
+  const start = Date.now();
   try {
     const guard = await requireAdmin();
     if (!guard.ok) {
@@ -673,11 +676,29 @@ export const POST = async (req: NextRequest) => {
       updated = updateRows.length;
     }
 
+    logEvent({
+      correlationId: cid,
+      route: "/api/sheets/sync",
+      operation: "sheets.sync",
+      integration: "google_sheets",
+      durationMs: Date.now() - start,
+      outcome: "success",
+      counts: { attempted: inserted + updated + closed, succeeded: inserted + updated + closed, failed: 0 },
+    });
+
     return NextResponse.json({ inserted, updated, closed });
   } catch (error) {
-    console.error("POST /api/sheets/sync error:", error);
+    logEvent({
+      correlationId: cid,
+      route: "/api/sheets/sync",
+      operation: "sheets.sync",
+      integration: "google_sheets",
+      durationMs: Date.now() - start,
+      outcome: classifyError(error),
+      serverError: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: "Sync failed", correlationId: cid },
       { status: 500 },
     );
   }

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { myCaseDb } from "@/lib/db/mycase";
 import { cases, feeRecords, activityLog, myCaseSyncTags } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
 import { mapMyCaseRows, type MyCaseDbRow } from "@/lib/import/mycase-mapper";
 import type { ParsedCaseRow } from "@/lib/import/xlsx-mapper";
 
@@ -117,6 +118,8 @@ const toFeeInsert = (r: ParsedCaseRow) => ({
 //   mode=preview → diff MyCase DB against local fee collections DB
 //   mode=upsert  → body: { selectedClientIds: number[] }
 export const POST = async (req: NextRequest) => {
+  const cid = correlationId(req);
+  const start = Date.now();
   try {
     const guard = await requireAdmin();
     if (!guard.ok) {
@@ -486,11 +489,29 @@ export const POST = async (req: NextRequest) => {
       updated = updateRows.length;
     }
 
+    logEvent({
+      correlationId: cid,
+      route: "/api/mycase/sync",
+      operation: "mycase.sync",
+      integration: "mycase",
+      durationMs: Date.now() - start,
+      outcome: "success",
+      counts: { attempted: inserted + updated, succeeded: inserted + updated, failed: 0 },
+    });
+
     return NextResponse.json({ inserted, updated });
   } catch (error) {
-    console.error("POST /api/mycase/sync error:", error);
+    logEvent({
+      correlationId: cid,
+      route: "/api/mycase/sync",
+      operation: "mycase.sync",
+      integration: "mycase",
+      durationMs: Date.now() - start,
+      outcome: classifyError(error),
+      serverError: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: "Sync failed", correlationId: cid },
       { status: 500 },
     );
   }
