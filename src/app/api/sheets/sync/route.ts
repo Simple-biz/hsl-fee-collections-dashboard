@@ -336,6 +336,15 @@ export const POST = async (req: NextRequest) => {
       const newCount = sheetRows.filter((r) => r.status === "new").length;
       const changedCount = sheetRows.filter((r) => r.status === "changed").length;
 
+      logEvent({
+        correlationId: cid,
+        route: "/api/sheets/sync",
+        operation: "sheets.sync.preview",
+        integration: "google_sheets",
+        durationMs: Date.now() - start,
+        outcome: "success",
+      });
+
       return NextResponse.json({
         mode,
         usingMock,
@@ -463,6 +472,15 @@ export const POST = async (req: NextRequest) => {
     });
 
     if (candidates.length === 0 && feesClosedMatches.length === 0) {
+      logEvent({
+        correlationId: cid,
+        route: "/api/sheets/sync",
+        operation: "sheets.sync.upsert",
+        integration: "google_sheets",
+        durationMs: Date.now() - start,
+        outcome: "success",
+        counts: { attempted: 0, succeeded: 0, failed: 0 },
+      });
       return NextResponse.json({ inserted: 0, updated: 0, closed: 0 });
     }
 
@@ -679,7 +697,7 @@ export const POST = async (req: NextRequest) => {
     logEvent({
       correlationId: cid,
       route: "/api/sheets/sync",
-      operation: "sheets.sync",
+      operation: "sheets.sync.upsert",
       integration: "google_sheets",
       durationMs: Date.now() - start,
       outcome: "success",
@@ -696,9 +714,10 @@ export const POST = async (req: NextRequest) => {
       durationMs: Date.now() - start,
       outcome: classifyError(error),
       serverError: error instanceof Error ? error.message : String(error),
+      serverStack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      { error: "Sync failed", correlationId: cid },
+      { error: error instanceof Error ? error.message : String(error), correlationId: cid },
       { status: 500 },
     );
   }

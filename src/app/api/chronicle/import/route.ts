@@ -199,7 +199,7 @@ export const POST = async (req: NextRequest) => {
       operation: "chronicle.import",
       integration: "chronicle",
       durationMs: Date.now() - start,
-      outcome: "success",
+      outcome: errors.length > 0 ? "partial" : "success",
       counts: {
         attempted: importCases.length,
         succeeded: imported.length,
@@ -222,9 +222,10 @@ export const POST = async (req: NextRequest) => {
       durationMs: Date.now() - start,
       outcome: classifyError(error),
       serverError: error instanceof Error ? error.message : String(error),
+      serverStack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      { error: "Import failed", correlationId: cid },
+      { error: error instanceof Error ? error.message : String(error), correlationId: cid },
       { status: 500 },
     );
   }

@@ -18,8 +18,9 @@ describe("redactPii", () => {
     expect(redactPii("SSN is 123-45-6789 on record")).toBe("SSN is [SSN] on record");
   });
 
-  it("masks bare 9-digit SSN", () => {
-    expect(redactPii("id=123456789")).toBe("id=[SSN]");
+  it("does NOT mask bare 9-digit numbers (too broad — masks legitimate IDs)", () => {
+    // 9-digit numbers like Chronicle client IDs must not be redacted
+    expect(redactPii("id=112221000")).toBe("id=112221000");
   });
 
   it("masks Bearer token", () => {
@@ -58,8 +59,9 @@ describe("classifyError", () => {
     expect(classifyError(new Error("upstream timeout after 30s"))).toBe("timeout");
   });
 
-  it("returns 'timeout' for aborted errors", () => {
-    expect(classifyError(new Error("The operation was aborted"))).toBe("timeout");
+  it("returns 'unexpected' for AbortError (client cancel, not a timeout)", () => {
+    const err = new DOMException("The user aborted a request", "AbortError");
+    expect(classifyError(err)).toBe("unexpected");
   });
 
   it("returns 'db_error' for connection errors", () => {
@@ -140,6 +142,33 @@ describe("logEvent", () => {
     expect(infoSpy).not.toHaveBeenCalled();
     const parsed = JSON.parse(errorSpy.mock.calls[0][0] as string);
     expect(parsed.level).toBe("error");
+  });
+
+  it("calls console.error for 'partial' outcome", () => {
+    logEvent({
+      correlationId: "req-2b",
+      route: "/api/chronicle/import",
+      operation: "chronicle.import",
+      outcome: "partial",
+      counts: { attempted: 5, succeeded: 2, failed: 3 },
+    });
+    expect(errorSpy).toHaveBeenCalledOnce();
+    const parsed = JSON.parse(errorSpy.mock.calls[0][0] as string);
+    expect(parsed.outcome).toBe("partial");
+    expect(parsed.level).toBe("error");
+  });
+
+  it("includes serverStack when provided", () => {
+    logEvent({
+      correlationId: "req-sk",
+      route: "/api/test",
+      operation: "test.op",
+      outcome: "unexpected",
+      serverError: "something failed",
+      serverStack: "Error: something failed\n  at route.ts:42",
+    });
+    const parsed = JSON.parse(errorSpy.mock.calls[0][0] as string);
+    expect(parsed.serverStack).toBe("Error: something failed\n  at route.ts:42");
   });
 
   it("redacts PII in serverError before logging", () => {

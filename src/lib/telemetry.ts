@@ -7,6 +7,7 @@ import type { NextRequest } from "next/server";
 
 export type OutcomeCategory =
   | "success"
+  | "partial"
   | "timeout"
   | "upstream_4xx"
   | "upstream_5xx"
@@ -32,6 +33,8 @@ export interface TelemetryEvent {
   statusCode?: number;
   /** Server-side error detail — never forwarded to API callers. */
   serverError?: string;
+  /** Stack trace for the server-side error — never forwarded to API callers. */
+  serverStack?: string;
   counts?: ImportCounts;
 }
 
@@ -40,10 +43,8 @@ export interface TelemetryEvent {
 // ---------------------------------------------------------------------------
 
 const PII_PATTERNS: [RegExp, string][] = [
-  // Full SSN with dashes (e.g. 123-45-6789)
+  // Full SSN with dashes (e.g. 123-45-6789) — only this form is specific enough
   [/\b\d{3}-\d{2}-\d{4}\b/g, "[SSN]"],
-  // 9-digit numeric run (possible bare SSN — conservative heuristic)
-  [/\b\d{9}\b/g, "[SSN]"],
   // Bearer / Authorization header values
   [/Bearer\s+\S+/gi, "Bearer [REDACTED]"],
   // URL query-string parameters that carry secrets
@@ -77,6 +78,7 @@ export function logEvent(event: TelemetryEvent): void {
     outcome: event.outcome,
     ...(event.statusCode != null && { statusCode: event.statusCode }),
     ...(event.serverError != null && { serverError: redactPii(event.serverError) }),
+    ...(event.serverStack != null && { serverStack: event.serverStack }),
     ...(event.counts != null && { counts: event.counts }),
   };
   if (event.outcome === "success") {
@@ -95,11 +97,12 @@ export function classifyError(err: unknown): OutcomeCategory {
   if (!(err instanceof Error)) return "unexpected";
   const msg = err.message.toLowerCase();
   const name = err.name.toLowerCase();
+  // AbortError is a client-initiated cancel, not a server-side timeout.
+  if (name === "aborterror") return "unexpected";
   if (
     name === "timeouterror" ||
     msg.includes("timeout") ||
-    msg.includes("timed out") ||
-    msg.includes("aborted")
+    msg.includes("timed out")
   ) {
     return "timeout";
   }

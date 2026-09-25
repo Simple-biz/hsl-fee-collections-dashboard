@@ -264,6 +264,15 @@ export const POST = async (req: NextRequest) => {
       const changedCount = sourceRows.filter((r) => r.status === "changed").length;
       const viewedCount = sourceRows.filter((r) => r.status === "viewed").length;
 
+      logEvent({
+        correlationId: cid,
+        route: "/api/mycase/sync",
+        operation: "mycase.sync.preview",
+        integration: "mycase",
+        durationMs: Date.now() - start,
+        outcome: "success",
+      });
+
       return NextResponse.json({
         mode,
         summary: {
@@ -316,6 +325,15 @@ export const POST = async (req: NextRequest) => {
     const candidates = parsed.filter((r) => selectedSet.has(r.clientId));
 
     if (candidates.length === 0) {
+      logEvent({
+        correlationId: cid,
+        route: "/api/mycase/sync",
+        operation: "mycase.sync.upsert",
+        integration: "mycase",
+        durationMs: Date.now() - start,
+        outcome: "success",
+        counts: { attempted: 0, succeeded: 0, failed: 0 },
+      });
       return NextResponse.json({ inserted: 0, updated: 0 });
     }
 
@@ -492,7 +510,7 @@ export const POST = async (req: NextRequest) => {
     logEvent({
       correlationId: cid,
       route: "/api/mycase/sync",
-      operation: "mycase.sync",
+      operation: "mycase.sync.upsert",
       integration: "mycase",
       durationMs: Date.now() - start,
       outcome: "success",
@@ -509,9 +527,10 @@ export const POST = async (req: NextRequest) => {
       durationMs: Date.now() - start,
       outcome: classifyError(error),
       serverError: error instanceof Error ? error.message : String(error),
+      serverStack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      { error: "Sync failed", correlationId: cid },
+      { error: error instanceof Error ? error.message : String(error), correlationId: cid },
       { status: 500 },
     );
   }
