@@ -284,6 +284,7 @@ export const fetchChronicleClient = async (
       "x-api-key": apiKey,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -332,6 +333,7 @@ export const searchChronicleClients = async (
       "x-api-key": apiKey,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
