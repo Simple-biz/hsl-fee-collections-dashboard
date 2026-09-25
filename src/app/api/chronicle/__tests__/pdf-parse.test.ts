@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 
 // --- mocks (must be declared before route import) ---
 
@@ -228,10 +226,7 @@ describe("POST /api/chronicle/pdf-parse", () => {
 
   // --- happy path ---
   it("returns 200 with extracted data for a valid PDF", async () => {
-    // Use pdf-parse's own test fixture — guaranteed parseable by pdf.js
-    const buf = readFileSync(
-      resolve("node_modules/pdf-parse/test/data/04-valid.pdf"),
-    );
+    const buf = minimalPdfBuffer();
     mockFetchOk(buf);
     const res = await POST(makeRequest({ allFileLink: VALID_URL }));
     expect(res.status).toBe(200);
