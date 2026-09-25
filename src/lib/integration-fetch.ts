@@ -40,7 +40,7 @@ export class IntegrationError extends Error {
  */
 export async function integrationFetch<T>(
   url: string,
-  init: RequestInit & { timeoutMs: number },
+  init: Omit<RequestInit, "signal"> & { timeoutMs: number },
   validate: (body: unknown) => T,
 ): Promise<T> {
   const { timeoutMs, ...fetchInit } = init;
