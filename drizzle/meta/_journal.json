@@ -400,6 +400,13 @@
       "when": 1790291796788,
       "tag": "0056_add_partial_indexes_follow_up_and_backlog",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1790352393924,
+      "tag": "0057_normalize_enum_spellings",
+      "breakpoints": true
     }
   ]
 }
