@@ -48,3 +48,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 repomix-output.xml
+
+# Playwright
+e2e/.auth/
+playwright-report/
+test-results/

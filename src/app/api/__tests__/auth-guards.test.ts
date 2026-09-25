@@ -9,6 +9,58 @@
  *   - Capability bypass on POST /api/chronicle/import
  *   - Missing gate on GET /api/team-members  (fixed in this PR)
  *   - Unauthorized DELETE /api/inbound-calls/[id]
+ *
+ * ─── CALLER INVENTORY ────────────────────────────────────────────────────────
+ * Before changing a route's auth guard, verify every caller listed here still
+ * works under the new constraint. A caller on a member-accessible page means
+ * the route must be accessible to members — DO NOT restrict to a non-member
+ * page key without auditing all callers first (#491).
+ *
+ * GET  /api/archive/cases
+ *   - ArchivePageClient.tsx (archive page — admin-only)
+ *
+ * POST /api/archive/cases
+ *   - SheetSyncModal.tsx (inside FeeRecordsTable — member-accessible)
+ *   - ArchiveConfirmDialog.tsx (inside FeeRecordsTable — member-accessible)
+ *   NOTE: 403 expected for members; the dialog gate is enforced server-side.
+ *
+ * POST /api/archive/reopen
+ *   - ArchiveTable.tsx (archive page — admin-only)
+ *
+ * POST /api/chronicle/import
+ *   - ChroniclePull.tsx (chronicle page — lead+ only)
+ *
+ * POST /api/chronicle/pull
+ *   - ChroniclePull.tsx (chronicle page — lead+ only)
+ *
+ * GET  /api/mycase/documents/[id]/file
+ *   - MyCaseDocumentsDialog.tsx anchor link (via CaseDetailSheet → FeeRecordsTable — MEMBER-ACCESSIBLE)
+ *
+ * GET  /api/mycase/cases/[id]/documents
+ *   - MyCaseDocumentsDialog.tsx fetch (via CaseDetailSheet → FeeRecordsTable — MEMBER-ACCESSIBLE)
+ *
+ * POST /api/mycase/sync
+ *   - MyCaseSyncModal.tsx (inside FeeRecordsTable — member-accessible page)
+ *   NOTE: route requires admin; 403 for members is intentional.
+ *
+ * GET  /api/cases/[id]
+ *   - CaseDetailSheet.tsx (inside FeeRecordsTable — MEMBER-ACCESSIBLE)
+ *   - cases/[id]/page.tsx (case detail page — any authenticated user)
+ *   - FeeRecordsTable.tsx row refresh after edits (MEMBER-ACCESSIBLE)
+ *
+ * GET  /api/team-members
+ *   - useDashboard.ts hook (overview + master-fees — MEMBER-ACCESSIBLE)
+ *   - TeamManagement.tsx (team page — lead+ only)
+ *   GUARD: auth-only (any authenticated user). DO NOT add page restriction —
+ *   this endpoint feeds member-facing dropdowns. (#489 regression post-mortem)
+ *
+ * POST /api/team-members
+ *   - TeamManagement.tsx (team page — lead+ only)
+ *
+ * DELETE /api/inbound-calls/[id]
+ *   - InboundCallsClient.tsx (inbound-calls page — MEMBER-ACCESSIBLE)
+ *   NOTE: auth-only gate is intentional; any authenticated user may delete.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { vi, describe, it, expect, beforeEach } from "vitest";
