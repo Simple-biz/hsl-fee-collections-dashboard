@@ -142,7 +142,9 @@ beforeEach(() => {
   // Default: main list returns one row; totals and count return empty
   global.fetch = vi.fn().mockImplementation((url: string) => {
     const u = String(url);
-    if (u.includes("status=complete") || u.includes("limit=1")) {
+    // Match limit=1 exactly (not limit=10, limit=100, etc.)
+    const isCountOrTotals = u.includes("status=complete") || /[?&]limit=1(?:&|$)/.test(u);
+    if (isCountOrTotals) {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ data: [], total: 0, assignees: [], unassignedCount: 0 }),
@@ -158,6 +160,7 @@ beforeEach(() => {
   mockBulkRemoveFromFeePetitions.mockReset();
   mockBulkRestoreChecklists.mockReset();
   mockUpsertFeePetition.mockReset();
+  mockBulkImportFeePetitions.mockReset();
 });
 
 afterEach(() => {
@@ -180,7 +183,8 @@ describe("FeePetitions — wiring", () => {
   it("renders a second row when the API returns two rows", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       const u = String(url);
-      if (u.includes("status=complete") || u.includes("limit=1")) {
+      const isCountOrTotals = u.includes("status=complete") || /[?&]limit=1(?:&|$)/.test(u);
+      if (isCountOrTotals) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ data: [], total: 0, assignees: [], unassignedCount: 0 }),
@@ -238,6 +242,21 @@ describe("FeePetitions — bulk checklist done", () => {
     await waitFor(() => {
       expect(mockBulkMarkComplete).toHaveBeenCalledWith({ caseIds: [1] });
     });
+
+    // Optimistic update: all 6 checklist checkboxes for the row must flip to checked
+    // immediately on success without waiting for a re-fetch.
+    const checklistLabels = [
+      "Time Delineation for Watson, Diana",
+      "Fee Petition Doc for Watson, Diana",
+      "Ltr to Clmt for Watson, Diana",
+      "Ltr to Clmt w/ Signature for Watson, Diana",
+      "Ltr to ALJ for Watson, Diana",
+      "Fax Conf Fee Pet for Watson, Diana",
+    ];
+    for (const label of checklistLabels) {
+      const cb = screen.getByRole("checkbox", { name: label }) as HTMLInputElement;
+      expect(cb.checked).toBe(true);
+    }
   });
 
   it("shows an error banner when bulkMarkComplete fails", async () => {
