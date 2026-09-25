@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { teamMembers, feeRecords, feePetitions, notifications } from "@/lib/db/schema";
 import { eq, sql, count, sum, and } from "drizzle-orm";
@@ -20,14 +21,13 @@ const patchBodySchema = z.object({
 });
 
 // GET /api/team-members — list all team members with case stats
+// Auth-only: any authenticated user needs this for dropdowns (assigned-to, etc.)
+// Mutating operations (POST/PATCH/DELETE) still require the "team" page.
 export const GET = async () => {
   try {
-    const guard = await requirePageAccess("team");
-    if (!guard.ok) {
-      return NextResponse.json(
-        { error: guard.error },
-        { status: guardStatus(guard.error) },
-      );
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     const rows = await db

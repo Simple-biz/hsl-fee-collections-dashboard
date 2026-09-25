@@ -250,6 +250,9 @@ describe("#372 regression — chronicle import page gate", () => {
 
 // ---------------------------------------------------------------------------
 // #372 regression — GET /api/team-members was unguarded (fixed in this PR)
+// Auth-only: any authenticated user may fetch team members (needed for
+// assigned-to dropdowns in Master Fees, Reports, etc.). Mutating operations
+// still require the "team" page.
 // ---------------------------------------------------------------------------
 describe("#372 regression — team-members GET auth guard", () => {
   it("401 when unauthenticated", async () => {
@@ -259,14 +262,15 @@ describe("#372 regression — team-members GET auth guard", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403 when member lacks team page access", async () => {
-    // pages must be non-empty to suppress the role-defaults fallback.
+  it("200 when authenticated member (no team page required)", async () => {
     mockAuth.mockResolvedValue(
       makeSession("member", { pages: ["overview"], capabilities: ["case.update"] }),
     );
     const GET = await getTeamMembersGET();
     const res = await GET();
-    expect(res.status).toBe(403);
+    // 200 or 500 (db mock returns empty) — not 401/403
+    expect(res.status).not.toBe(401);
+    expect(res.status).not.toBe(403);
   });
 });
 
