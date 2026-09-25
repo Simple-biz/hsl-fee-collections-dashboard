@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PDFParse } from "pdf-parse";
 import { parseChronicleAllFile } from "@/lib/chronicle-pdf-parser";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 import { isSsrfSafe } from "@/lib/ssrf-guard";
-
-// pdf-parse v1 tries to load a test PDF on require() — import from lib directly to avoid this
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse/lib/pdf-parse");
 
 export const maxDuration = 60;
 
@@ -113,15 +110,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse PDF text
-    const pdfData = await pdfParse(buffer);
-    const rawText: string = pdfData.text;
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const textResult = await parser.getText();
+    await parser.destroy();
+    const rawText: string = textResult.text;
+    const numpages = textResult.total;
 
     console.log(
-      `[pdf-parse] Extracted ${rawText.length} chars from ${pdfData.numpages} pages`,
+      `[pdf-parse] Extracted ${rawText.length} chars from ${numpages} pages`,
     );
 
     // Run extraction
-    const extracted = parseChronicleAllFile(rawText, pdfData.numpages);
+    const extracted = parseChronicleAllFile(rawText, numpages);
 
     console.log(`[pdf-parse] Results:`, {
       fullSsn: extracted.fullSsn ? "✓" : "✗",
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: extracted,
       meta: {
-        pdfPages: pdfData.numpages,
+        pdfPages: numpages,
         pdfSizeMB: fileSizeMB,
         textLength: rawText.length,
       },
