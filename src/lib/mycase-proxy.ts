@@ -48,6 +48,7 @@ async function _fetchCaseDetails(caseId: number): Promise<MyCaseCaseDetail> {
     },
     body: JSON.stringify({ id: caseId }),
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -103,6 +104,7 @@ export async function fetchCaseDocuments(
     body: JSON.stringify({ id: caseId }),
     // Document lists can change as MyCase syncs; never cache.
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -126,7 +128,9 @@ export async function fetchCaseDocuments(
   if (Array.isArray(json?.folders) || Array.isArray(json?.unfiled_documents)) {
     return flattenFolderTree(json);
   }
-  return [];
+  throw new Error(
+    `MyCase documents webhook returned unrecognized response shape: ${JSON.stringify(json).slice(0, 200)}`,
+  );
 }
 
 /**
@@ -153,6 +157,7 @@ export async function fetchDocumentDownloadUrl(
     },
     body: JSON.stringify({ id: documentId }),
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
