@@ -22,6 +22,14 @@ const patchBodySchema = z.object({
 // GET /api/team-members — list all team members with case stats
 export const GET = async () => {
   try {
+    const guard = await requirePageAccess("team");
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        { status: guardStatus(guard.error) },
+      );
+    }
+
     const rows = await db
       .select({
         id: teamMembers.id,
