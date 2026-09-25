@@ -22,9 +22,12 @@ import { ChroniclePull } from "@/components/chronicle/ChroniclePull";
 // Fixture
 // ---------------------------------------------------------------------------
 
+// chronicleClientId intentionally differs from the typed input ("112221")
+// so the wiring assertion proves the displayed ID comes from the API response,
+// not from the component's own input state.
 const PULL_RESPONSE = {
   parsed: {
-    chronicleClientId: 112221,
+    chronicleClientId: 999001,
     externalId: "EX-001",
     firstName: "Patricia",
     lastName: "Walsh",
@@ -115,12 +118,14 @@ describe("ChroniclePull — wiring", () => {
   it("renders the chronicle client ID from the API response", async () => {
     render(<ChroniclePull />);
 
+    // Type a different ID than the one in the fixture (999001) to prove the
+    // displayed value comes from the API response, not from local input state.
     typeClientId("112221");
     clickPull();
 
     await waitFor(() => {
-      // Chronicle ID shown in the result card info grid
-      expect(screen.getByText("112221")).toBeTruthy();
+      // 999001 only appears if it came from result.parsed.chronicleClientId
+      expect(screen.getByText("999001")).toBeTruthy();
     });
   });
 });

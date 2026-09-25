@@ -10,7 +10,7 @@
 //      without crashing.
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
 vi.mock("next-auth/react", () => ({
   useSession: vi.fn(() => ({
@@ -94,6 +94,9 @@ beforeAll(() => {
   global.ResizeObserver = vi.fn().mockImplementation(() => ({
     observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn(),
   })) as unknown as typeof ResizeObserver;
+  // jsdom doesn't implement scrollIntoView; stub it so the entry-panel
+  // open effect doesn't throw an unhandled exception.
+  Element.prototype.scrollIntoView = vi.fn();
   global.IntersectionObserver = vi.fn().mockImplementation(() => ({
     observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn(),
   })) as unknown as typeof IntersectionObserver;
@@ -181,7 +184,87 @@ describe("ScoreboardTracker — wiring", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Error handling — failed scoreboard fetch
+// 2. Optimistic UI — daily-metrics save
+// ---------------------------------------------------------------------------
+
+describe("ScoreboardTracker — daily-metrics save", () => {
+  it("shows a success message after a successful POST to /api/daily-metrics", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("/api/daily-metrics") && (opts as RequestInit | undefined)?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ count: 1 }),
+        });
+      }
+      if (u.includes("/api/scoreboard")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(SCOREBOARD_RESPONSE),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as unknown as typeof fetch;
+
+    const { container } = renderTracker();
+    await waitFor(() => screen.getByText("Preston, Carol"));
+
+    // Open the call log entry panel
+    fireEvent.click(screen.getByRole("button", { name: /log calls/i }));
+    await waitFor(() => screen.getByText("Daily Call Log"));
+
+    // Type into the first SSA-calls number input to make the form dirty
+    const [ssaInput] = container.querySelectorAll('input[type="number"]') as NodeListOf<HTMLInputElement>;
+    fireEvent.change(ssaInput, { target: { value: "3" } });
+
+    // Save All becomes enabled when dirty=true; click it
+    fireEvent.click(screen.getByRole("button", { name: /save all/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.getByRole("alert").textContent).toMatch(/saved/i);
+    });
+  });
+
+  it("shows an error message when the POST to /api/daily-metrics fails", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("/api/daily-metrics") && (opts as RequestInit | undefined)?.method === "POST") {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({}),
+        });
+      }
+      if (u.includes("/api/scoreboard")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(SCOREBOARD_RESPONSE),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as unknown as typeof fetch;
+
+    const { container } = renderTracker();
+    await waitFor(() => screen.getByText("Preston, Carol"));
+
+    fireEvent.click(screen.getByRole("button", { name: /log calls/i }));
+    await waitFor(() => screen.getByText("Daily Call Log"));
+
+    const [ssaInput] = container.querySelectorAll('input[type="number"]') as NodeListOf<HTMLInputElement>;
+    fireEvent.change(ssaInput, { target: { value: "3" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /save all/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.getByRole("alert").textContent).toMatch(/error saving/i);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. Error handling — failed scoreboard fetch
 // ---------------------------------------------------------------------------
 
 describe("ScoreboardTracker — errors", () => {

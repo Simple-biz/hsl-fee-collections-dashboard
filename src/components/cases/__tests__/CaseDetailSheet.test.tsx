@@ -200,6 +200,46 @@ describe("CaseDetailSheet — errors", () => {
 // ---------------------------------------------------------------------------
 
 describe("CaseDetailSheet — save", () => {
+  it("exits editing mode and re-fetches after a successful PATCH", async () => {
+    let fetchCount = 0;
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      const u = String(url);
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({}),
+        });
+      }
+      if (u.includes("/api/cases/") && !u.includes("mycase")) {
+        fetchCount++;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(CASE_RESPONSE),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as unknown as typeof fetch;
+
+    renderSheet();
+    await waitFor(() => screen.getByText("Holloway, Grant"));
+    const initialFetchCount = fetchCount;
+
+    fireEvent.click(screen.getByRole("button", { name: /edit local details/i }));
+
+    const externalIdInput = screen.getByDisplayValue("EX-042");
+    fireEvent.change(externalIdInput, { target: { value: "EX-999" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    // Edit mode exits — "Edit local details" button reappears
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /edit local details/i })).toBeTruthy();
+    });
+
+    // fetchCase was called again after the save
+    expect(fetchCount).toBeGreaterThan(initialFetchCount);
+  });
+
   it("shows a save error banner when the PATCH fails", async () => {
     global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       const u = String(url);
