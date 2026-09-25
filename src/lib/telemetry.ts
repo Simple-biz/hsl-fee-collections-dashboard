@@ -78,7 +78,7 @@ export function logEvent(event: TelemetryEvent): void {
     outcome: event.outcome,
     ...(event.statusCode != null && { statusCode: event.statusCode }),
     ...(event.serverError != null && { serverError: redactPii(event.serverError) }),
-    ...(event.serverStack != null && { serverStack: event.serverStack }),
+    ...(event.serverStack != null && { serverStack: redactPii(event.serverStack) }),
     ...(event.counts != null && { counts: event.counts }),
   };
   if (event.outcome === "success") {
@@ -120,6 +120,7 @@ export function classifyError(err: unknown): OutcomeCategory {
 /** Derive an outcome from an upstream HTTP status code. */
 export function httpOutcome(status: number): OutcomeCategory {
   if (status >= 200 && status < 300) return "success";
+  if (status >= 300 && status < 400) return "upstream_4xx";
   if (status >= 400 && status < 500) return "upstream_4xx";
   return "upstream_5xx";
 }

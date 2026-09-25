@@ -92,6 +92,11 @@ describe("httpOutcome", () => {
     expect(httpOutcome(404)).toBe("upstream_4xx");
   });
 
+  it("maps 3xx to upstream_4xx (redirects treated as upstream errors)", () => {
+    expect(httpOutcome(301)).toBe("upstream_4xx");
+    expect(httpOutcome(302)).toBe("upstream_4xx");
+  });
+
   it("maps 5xx to upstream_5xx", () => {
     expect(httpOutcome(500)).toBe("upstream_5xx");
     expect(httpOutcome(503)).toBe("upstream_5xx");
@@ -158,17 +163,19 @@ describe("logEvent", () => {
     expect(parsed.level).toBe("error");
   });
 
-  it("includes serverStack when provided", () => {
+  it("redacts PII in serverStack before logging", () => {
     logEvent({
       correlationId: "req-sk",
       route: "/api/test",
       operation: "test.op",
       outcome: "unexpected",
       serverError: "something failed",
-      serverStack: "Error: something failed\n  at route.ts:42",
+      serverStack: "Error: ssn=123-45-6789 failed\n  at route.ts:42",
     });
     const parsed = JSON.parse(errorSpy.mock.calls[0][0] as string);
-    expect(parsed.serverStack).toBe("Error: something failed\n  at route.ts:42");
+    expect(parsed.serverStack).not.toContain("123-45-6789");
+    expect(parsed.serverStack).toContain("[SSN]");
+    expect(parsed.serverStack).toContain("at route.ts:42");
   });
 
   it("redacts PII in serverError before logging", () => {
