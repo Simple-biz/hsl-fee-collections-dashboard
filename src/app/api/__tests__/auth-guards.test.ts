@@ -296,7 +296,7 @@ describe("GET /api/mycase/cases/[id]/documents — capability gate", () => {
 
   it("403 when missing case.editPii capability", async () => {
     mockAuth.mockResolvedValue(
-      makeSession("member", { pages: ["master_fees"], capabilities: [] }),
+      makeSession("member", { pages: ["master_fees"], capabilities: ["case.update"] }),
     );
     const GET = await getMycaseDocs();
     const res = await GET(makeReq("GET"), makeCtx(1));
@@ -316,7 +316,7 @@ describe("POST /api/chronicle/pull — page gate", () => {
   });
 
   it("403 when member lacks chronicle page", async () => {
-    mockAuth.mockResolvedValue(makeSession("member", { pages: [] }));
+    mockAuth.mockResolvedValue(makeSession("member", { pages: ["overview"] }));
     const POST = await getChroniclePull();
     const res = await POST(makeReq("POST", { clientId: 112221 }));
     expect(res.status).toBe(403);
