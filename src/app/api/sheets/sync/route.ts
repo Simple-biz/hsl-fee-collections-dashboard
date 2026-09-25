@@ -4,6 +4,7 @@ import { inArray, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
 import {
   mapSheetRows,
   MYCASE_URL_RE,
@@ -126,6 +127,8 @@ const toClosedAt = (closedDate: string | null): Date | null => {
 //   mode=preview  → diff MASTER LIST + Fees Closed sheet vs DB; return all 4 categories
 //   mode=upsert   → import new rows, update existing, and mark Fees Closed rows closed
 export const POST = async (req: NextRequest) => {
+  const cid = correlationId(req);
+  const start = Date.now();
   try {
     const guard = await requireAdmin();
     if (!guard.ok) {
@@ -333,6 +336,15 @@ export const POST = async (req: NextRequest) => {
       const newCount = sheetRows.filter((r) => r.status === "new").length;
       const changedCount = sheetRows.filter((r) => r.status === "changed").length;
 
+      logEvent({
+        correlationId: cid,
+        route: "/api/sheets/sync",
+        operation: "sheets.sync.preview",
+        integration: "google_sheets",
+        durationMs: Date.now() - start,
+        outcome: "success",
+      });
+
       return NextResponse.json({
         mode,
         usingMock,
@@ -358,7 +370,16 @@ export const POST = async (req: NextRequest) => {
       });
     }
 
-    // upsert mode
+    // upsert mode — reject if Sheets is not configured in this environment.
+    // NEXT_PUBLIC_SHOW_TEST_LOGINS=true is the explicit dev/test gate used
+    // throughout this app; without it, mock rows must never reach the DB.
+    if (!process.env.SHEETS_SYNC_WEBHOOK_URL && process.env.NEXT_PUBLIC_SHOW_TEST_LOGINS !== "true") {
+      return NextResponse.json(
+        { error: "Sheets sync is not configured in this environment (SHEETS_SYNC_WEBHOOK_URL missing)" },
+        { status: 503 },
+      );
+    }
+
     let body: { selectedClientIds: unknown; linkOverrides?: unknown };
     try {
       body = (await req.json()) as { selectedClientIds: unknown; linkOverrides?: unknown };
@@ -451,6 +472,15 @@ export const POST = async (req: NextRequest) => {
     });
 
     if (candidates.length === 0 && feesClosedMatches.length === 0) {
+      logEvent({
+        correlationId: cid,
+        route: "/api/sheets/sync",
+        operation: "sheets.sync.upsert",
+        integration: "google_sheets",
+        durationMs: Date.now() - start,
+        outcome: "success",
+        counts: { attempted: 0, succeeded: 0, failed: 0 },
+      });
       return NextResponse.json({ inserted: 0, updated: 0, closed: 0 });
     }
 
@@ -664,11 +694,30 @@ export const POST = async (req: NextRequest) => {
       updated = updateRows.length;
     }
 
+    logEvent({
+      correlationId: cid,
+      route: "/api/sheets/sync",
+      operation: "sheets.sync.upsert",
+      integration: "google_sheets",
+      durationMs: Date.now() - start,
+      outcome: "success",
+      counts: { attempted: inserted + updated + closed, succeeded: inserted + updated + closed, failed: 0 },
+    });
+
     return NextResponse.json({ inserted, updated, closed });
   } catch (error) {
-    console.error("POST /api/sheets/sync error:", error);
+    logEvent({
+      correlationId: cid,
+      route: "/api/sheets/sync",
+      operation: "sheets.sync",
+      integration: "google_sheets",
+      durationMs: Date.now() - start,
+      outcome: classifyError(error),
+      serverError: error instanceof Error ? error.message : String(error),
+      serverStack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: error instanceof Error ? error.message : String(error), correlationId: cid },
       { status: 500 },
     );
   }
