@@ -1,28 +1,25 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/**
- * Smoke tests — run against the local dev server.
- *
- * Prerequisites:
- *   1. Set E2E_MEMBER_EMAIL + E2E_MEMBER_PASSWORD to a member-role prod account.
- *      Do NOT use seed-test-users credentials against the production DB.
- *   2. npm run dev  (or set E2E_BASE_URL to another running instance)
- *
- * Run:
- *   E2E_MEMBER_EMAIL=you@hogansmith.com E2E_MEMBER_PASSWORD=... npm run test:e2e
- */
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
-  retries: 1,
-  timeout: 30_000,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  workers: 1,
+  reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    // Support the old E2E_BASE_URL name alongside the new PLAYWRIGHT_BASE_URL.
+    baseURL:
+      process.env.E2E_BASE_URL ??
+      process.env.PLAYWRIGHT_BASE_URL ??
+      "http://localhost:3000",
     trace: "on-first-retry",
   },
   projects: [
-    // Auth setup runs first, saves session state for the other projects.
+    // Auth setup — saves member session state for master-fees tests.
     { name: "setup", testMatch: /auth\.setup\.ts/ },
+
+    // Existing master-fees smoke tests — require a member session.
     {
       name: "member-smoke",
       use: {
@@ -30,6 +27,28 @@ export default defineConfig({
         storageState: "e2e/.auth/member.json",
       },
       dependencies: ["setup"],
+      testMatch: ["**/smoke/*.spec.ts"],
+    },
+
+    // New smoke.spec.ts — handles its own auth inline, no storageState needed.
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: ["e2e/smoke.spec.ts"],
     },
   ],
+  webServer: process.env.CI
+    ? {
+        command: "npm run build && npm run start",
+        url: "http://localhost:3000",
+        reuseExistingServer: false,
+        timeout: 120_000,
+        env: {
+          DATABASE_URL: process.env.E2E_DATABASE_URL ?? "",
+          MYCASE_DB_URL: process.env.E2E_MYCASE_DB_URL ?? "",
+          AUTH_SECRET: process.env.AUTH_SECRET ?? "ci-test-secret-32-chars-minimum!!",
+          NEXTAUTH_URL: "http://localhost:3000",
+        },
+      }
+    : undefined,
 });
