@@ -133,7 +133,7 @@ afterEach(() => {
 // Default render helper (isOpen=true required to mount content)
 // ---------------------------------------------------------------------------
 
-function renderSheet(overrides?: Parameters<typeof CaseDetailSheet>[0]) {
+function renderSheet(overrides?: Partial<Parameters<typeof CaseDetailSheet>[0]>) {
   return render(
     <CaseDetailSheet
       caseId={42}
@@ -162,7 +162,7 @@ describe("CaseDetailSheet — wiring", () => {
 
     await waitFor(() => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-      const caseCall = calls.find(([url]: [string]) => String(url).includes("/api/cases/99"));
+      const caseCall = calls.find(([url]) => String(url).includes("/api/cases/99"));
       expect(caseCall).toBeTruthy();
     });
   });
