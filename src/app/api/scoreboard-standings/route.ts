@@ -107,7 +107,8 @@ export const GET = async (req: NextRequest) => {
             CASE WHEN tm.team = 'Fee Petition' THEN
               (SELECT COUNT(*) FROM fee_petitions fp
                WHERE fp.assigned_to = tm.name
-               AND fp.fee_petition_approved = TRUE)
+               AND fp.approved_at >= ${startDate}::date
+               AND fp.approved_at < ${endExclusive}::date)
             ELSE
               (SELECT COUNT(*) FROM fee_records fr
                WHERE fr.assigned_to = tm.name
