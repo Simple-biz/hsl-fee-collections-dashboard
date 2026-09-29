@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -108,15 +108,15 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
 ];
 
 const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
-  { key: "notifications",   label: "Notifications",   icon: Bell },
-  { key: "payments",              label: "Payments",              icon: DollarSign },
-  { key: "fee_petition_approved", label: "Fee Petition Approved", icon: CheckCircle2 },
-  { key: "closed_cases",          label: "Closed Cases",          icon: CheckCircle },
-  { key: "recent_activity",       label: "Recent Activity",       icon: Activity },
-  { key: "new_cases",             label: "New Cases",             icon: UserPlus },
-  { key: "calls_backlog",           label: "Calls Backlog",      icon: PhoneCall },
-  { key: "follow_ups",              label: "Follow-Ups",         icon: CalendarClock },
-  { key: "scoreboard_standings",    label: "Standings",          icon: Trophy },
+  { key: "notifications",          label: "Notifications",  icon: Bell },
+  { key: "payments",               label: "Payments",       icon: DollarSign },
+  { key: "fee_petition_approved",  label: "FP Approved",    icon: CheckCircle2 },
+  { key: "closed_cases",           label: "Closed",         icon: CheckCircle },
+  { key: "recent_activity",        label: "Activity",       icon: Activity },
+  { key: "new_cases",              label: "New Cases",      icon: UserPlus },
+  { key: "calls_backlog",          label: "Calls",          icon: PhoneCall },
+  { key: "follow_ups",             label: "Follow-Ups",     icon: CalendarClock },
+  { key: "scoreboard_standings",   label: "Standings",      icon: Trophy },
 ];
 
 // ============================================================================
@@ -147,14 +147,21 @@ const LEAD_ONLY_TABS = new Set<PageTab>(["calls_backlog", "follow_ups", "scorebo
 
 export default function NotificationsPage() {
   const { resolvedTheme } = useTheme();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dark = mounted ? resolvedTheme === "dark" : false;
   const t = themeClasses(dark);
 
   const role = session?.user?.role;
-  const canSeeLeadTabs = role === "lead" || role === "admin" || role === "system_admin";
+  // While the session is loading we optimistically show all tabs (avoids layout
+  // shift when the session resolves and lead-only tabs suddenly appear, which
+  // was causing the first click to land on a shifted element).
+  const canSeeLeadTabs =
+    sessionStatus === "loading" ||
+    role === "lead" ||
+    role === "admin" ||
+    role === "system_admin";
   const visibleTabs = PAGE_TABS.filter((tab) => !LEAD_ONLY_TABS.has(tab.key) || canSeeLeadTabs);
 
   const [stored, setStored] = useState<Notification[]>([]);
@@ -193,6 +200,14 @@ export default function NotificationsPage() {
     fetchNotifications();
     return () => fetchAbortRef.current?.abort();
   }, [fetchNotifications]);
+
+  // If the session resolves and the user turns out not to be a lead/admin,
+  // reset any active lead-only tab so restricted content stops rendering.
+  useEffect(() => {
+    if (sessionStatus !== "loading" && !canSeeLeadTabs && LEAD_ONLY_TABS.has(pageTab)) {
+      setPageTab("notifications");
+    }
+  }, [sessionStatus, canSeeLeadTabs, pageTab]);
 
   // Combine stored + live, dedupe by id, sort desc
   const all = useMemo(() => {
@@ -275,30 +290,39 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-4">
       {/* Page-level tab switcher */}
-      <div className={`flex gap-1 p-1 rounded-lg border w-fit ${dark ? "bg-neutral-900 border-neutral-800" : "bg-neutral-100/60 border-neutral-200"}`}>
-        {visibleTabs.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setPageTab(key)}
-            className={`h-8 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
-              pageTab === key
-                ? dark
-                  ? "bg-neutral-800 text-neutral-100"
-                  : "bg-white text-neutral-900 shadow-sm"
-                : dark
-                  ? "text-neutral-400 hover:text-neutral-200"
-                  : "text-neutral-500 hover:text-neutral-700"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            {label}
-            {key === "notifications" && unreadCount > 0 && (
-              <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className={`rounded-xl border ${t.card} overflow-x-auto`}>
+        <div className={`flex border-b ${dark ? "border-neutral-800" : "border-neutral-200"} min-w-max`}>
+          {visibleTabs.map(({ key, label, icon: Icon }) => {
+            const active = pageTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => startTransition(() => setPageTab(key))}
+                className={`relative flex items-center gap-2 px-4 py-3 text-[13px] font-medium shrink-0 transition-colors whitespace-nowrap
+                  ${active
+                    ? dark
+                      ? "text-indigo-300"
+                      : "text-indigo-700"
+                    : dark
+                      ? "text-neutral-400 hover:text-neutral-200"
+                      : "text-neutral-500 hover:text-neutral-800"
+                  }`}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {label}
+                {key === "notifications" && unreadCount > 0 && (
+                  <span className="min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+                {/* Active underline */}
+                {active && (
+                  <span className={`absolute bottom-0 inset-x-0 h-0.5 rounded-t ${dark ? "bg-indigo-400" : "bg-indigo-600"}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Payments tab */}
