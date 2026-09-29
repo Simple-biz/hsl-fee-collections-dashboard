@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Trophy, AlertCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday } from "@/lib/formatters";
 import { teamHeaderBg } from "@/lib/team-colors";
 
-type PeriodMode = "week" | "month";
 type Metric = "cases_closed" | "fees_collected" | "calls_logged";
 
 interface AgentRow {
@@ -50,16 +48,6 @@ const valueLabel = (metric: Metric): string => {
   return "closed";
 };
 
-const weekRangeLabel = (monday: string): string => {
-  const start = new Date(monday + "T12:00:00");
-  const end = new Date(monday + "T12:00:00");
-  end.setDate(start.getDate() + 4);
-  const mo: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  const endOpts: Intl.DateTimeFormatOptions =
-    end.getMonth() !== start.getMonth() ? mo : { day: "numeric" };
-  return `${start.toLocaleDateString("en-US", mo)} – ${end.toLocaleDateString("en-US", endOpts)}`;
-};
-
 const getMonthRange = (offset: number): { from: string; to: string; label: string } => {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
@@ -93,32 +81,19 @@ function computeStandings(agents: AgentRow[]): TeamStanding[] {
 }
 
 export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps) {
-  const [mode, setMode] = useState<PeriodMode>("week");
   const [metric, setMetric] = useState<Metric>("cases_closed");
-  const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const offset = mode === "week" ? weekOffset : monthOffset;
-  const monday = mode === "week" ? getMonday(offset) : null;
-  const monthRange = mode === "month" ? getMonthRange(offset) : null;
+  const offset = monthOffset;
+  const monthRange = getMonthRange(offset);
 
-  const periodLabel =
-    mode === "week"
-      ? offset === 0
-        ? "This week"
-        : weekRangeLabel(monday!)
-      : offset === 0
-        ? "This month"
-        : (monthRange?.label ?? "");
+  const periodLabel = offset === 0 ? "This month" : (monthRange?.label ?? "");
 
-  const apiUrl =
-    mode === "week"
-      ? `/api/scoreboard-standings?week=${monday}&metric=${metric}`
-      : `/api/scoreboard-standings?from=${monthRange!.from}&to=${monthRange!.to}&metric=${metric}`;
+  const apiUrl = `/api/scoreboard-standings?from=${monthRange.from}&to=${monthRange.to}&metric=${metric}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -160,25 +135,8 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
 
   const canGoForward = offset < 0;
 
-  const handlePrev = () => {
-    if (mode === "week") setWeekOffset((v) => v - 1);
-    else setMonthOffset((v) => v - 1);
-  };
-  const handleNext = () => {
-    if (mode === "week") setWeekOffset((v) => v + 1);
-    else setMonthOffset((v) => v + 1);
-  };
-
-  const modeBtn = (m: PeriodMode) =>
-    `h-7 px-3 rounded-md text-xs font-medium transition-colors ${
-      mode === m
-        ? dark
-          ? "bg-neutral-700 text-neutral-100"
-          : "bg-white text-neutral-900 shadow-sm"
-        : dark
-          ? "text-neutral-400 hover:text-neutral-200"
-          : "text-neutral-500 hover:text-neutral-700"
-    }`;
+  const handlePrev = () => setMonthOffset((v) => v - 1);
+  const handleNext = () => setMonthOffset((v) => v + 1);
 
   return (
     <div className="space-y-4">
@@ -213,12 +171,6 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-
-            {/* Week / Month toggle */}
-            <div className={`flex gap-0.5 p-0.5 rounded-lg ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
-              <button className={modeBtn("week")} onClick={() => setMode("week")}>Week</button>
-              <button className={modeBtn("month")} onClick={() => setMode("month")}>Month</button>
-            </div>
 
             {/* Period navigation */}
             <button
