@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Eye,
   Activity,
+  Trophy,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { PaymentsTab } from "@/components/notifications/PaymentsTab";
@@ -30,6 +31,7 @@ import { RecentActivityTab } from "@/components/notifications/RecentActivityTab"
 import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 import { CallsBacklogTab } from "@/components/notifications/CallsBacklogTab";
 import { FollowUpsTab } from "@/components/notifications/FollowUpsTab";
+import { ScoreboardStandingsTab } from "@/components/notifications/ScoreboardStandingsTab";
 
 // ============================================================================
 // Types
@@ -49,7 +51,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases" | "calls_backlog" | "follow_ups";
+type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases" | "calls_backlog" | "follow_ups" | "scoreboard_standings";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -112,8 +114,9 @@ const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "closed_cases",          label: "Closed Cases",          icon: CheckCircle },
   { key: "recent_activity",       label: "Recent Activity",       icon: Activity },
   { key: "new_cases",             label: "New Cases",             icon: UserPlus },
-  { key: "calls_backlog",         label: "Calls Backlog",         icon: PhoneCall },
-  { key: "follow_ups",            label: "Follow-Ups",            icon: CalendarClock },
+  { key: "calls_backlog",           label: "Calls Backlog",      icon: PhoneCall },
+  { key: "follow_ups",              label: "Follow-Ups",         icon: CalendarClock },
+  { key: "scoreboard_standings",    label: "Standings",          icon: Trophy },
 ];
 
 // ============================================================================
@@ -140,7 +143,7 @@ function timeAgo(dateStr: string): string {
 // ============================================================================
 
 // Tabs hidden from member role — visible to lead, admin, system_admin only.
-const LEAD_ONLY_TABS = new Set<PageTab>(["calls_backlog", "follow_ups"]);
+const LEAD_ONLY_TABS = new Set<PageTab>(["calls_backlog", "follow_ups", "scoreboard_standings"]);
 
 export default function NotificationsPage() {
   const { resolvedTheme } = useTheme();
@@ -318,6 +321,9 @@ export default function NotificationsPage() {
 
       {/* Follow-Ups tab */}
       {pageTab === "follow_ups" && <FollowUpsTab dark={dark} t={t} />}
+
+      {/* Scoreboard Standings tab */}
+      {pageTab === "scoreboard_standings" && <ScoreboardStandingsTab dark={dark} t={t} />}
 
       {/* Notifications tab */}
       {pageTab === "notifications" && <>
