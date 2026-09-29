@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -297,7 +297,7 @@ export default function NotificationsPage() {
             return (
               <button
                 key={key}
-                onClick={() => startTransition(() => setPageTab(key))}
+                onClick={() => setPageTab(key)}
                 className={`relative flex items-center gap-2 px-4 py-3 text-[13px] font-medium shrink-0 transition-colors whitespace-nowrap
                   ${active
                     ? dark
