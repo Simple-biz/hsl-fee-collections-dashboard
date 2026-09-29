@@ -81,7 +81,11 @@ export async function upsertFeePetition(input: {
     // picking a Remarks value without a lead/Lori reviewing first).
     const row = await db.transaction(async (tx) => {
       const approvalStamp =
-        updates.feePetitionApproved === true ? { approvedAt: new Date() } : {};
+        updates.feePetitionApproved === true
+          ? { approvedAt: new Date() }
+          : updates.feePetitionApproved === false
+            ? { approvedAt: null }
+            : {};
 
       const [r] = await tx
         .insert(feePetitions)
