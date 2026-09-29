@@ -37,6 +37,9 @@ export const GET = async (req: NextRequest) => {
     // when no `week` param is supplied, and every current caller always
     // supplies one, but toISOString() would still be wrong by a day for a
     // server running outside UTC.
+    if (weekParam && !ISO_DATE_RE.test(weekParam)) {
+      return NextResponse.json({ error: "Invalid week param" }, { status: 400 });
+    }
     let monday: string;
     if (weekParam) {
       monday = weekParam;
