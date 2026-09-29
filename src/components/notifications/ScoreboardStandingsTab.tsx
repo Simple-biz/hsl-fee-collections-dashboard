@@ -103,6 +103,7 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
 
