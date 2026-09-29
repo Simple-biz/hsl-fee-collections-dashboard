@@ -374,6 +374,7 @@ export const feePetitions = pgTable(
     // (Remarks → this flag) was intentionally removed so agents cannot
     // self-approve by editing Remarks directly in Master Fees.
     feePetitionApproved: boolean("fee_petition_approved").notNull().default(false),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
 
     // Inline note (legacy — superseded by activity_log + feePetitionId)
     updateNote: text("update_note").notNull().default(""),
