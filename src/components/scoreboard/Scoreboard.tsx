@@ -41,7 +41,9 @@ const weekRangeLabel = (monday: string): string => {
   const end = new Date(monday + "T12:00:00");
   end.setDate(start.getDate() + 4);
   const mo: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  return `${start.toLocaleDateString("en-US", mo)} – ${end.toLocaleDateString("en-US", { day: "numeric" })}`;
+  const endOpts: Intl.DateTimeFormatOptions =
+    end.getMonth() !== start.getMonth() ? mo : { day: "numeric" };
+  return `${start.toLocaleDateString("en-US", mo)} – ${end.toLocaleDateString("en-US", endOpts)}`;
 };
 
 // First/last day (YYYY-MM-DD) of the calendar month `offset` months from the
