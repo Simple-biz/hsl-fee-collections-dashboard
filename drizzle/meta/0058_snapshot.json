@@ -1,6 +1,6 @@
 {
-  "id": "099a0829-e730-4cad-b6ca-cbfc503796ca",
-  "prevId": "8f5d8b8b-74b8-4fb4-b2a1-9ea625513171",
+  "id": "1c16e487-0d1f-437b-ad57-bac380cae33e",
+  "prevId": "099a0829-e730-4cad-b6ca-cbfc503796ca",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1610,6 +1610,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "update_note": {
           "name": "update_note",

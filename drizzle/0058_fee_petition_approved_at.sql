@@ -1,0 +1,1 @@
+ALTER TABLE "fee_petitions" ADD COLUMN "approved_at" timestamp with time zone;

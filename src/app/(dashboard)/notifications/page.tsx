@@ -142,8 +142,10 @@ function timeAgo(dateStr: string): string {
 // Component
 // ============================================================================
 
-// Tabs hidden from member role — visible to lead, admin, system_admin only.
-const LEAD_ONLY_TABS = new Set<PageTab>(["calls_backlog", "follow_ups", "scoreboard_standings"]);
+// Tabs visible to lead, admin, system_admin only.
+const LEAD_ONLY_TABS = new Set<PageTab>(["calls_backlog", "follow_ups"]);
+// Tabs visible to admin and system_admin only.
+const ADMIN_ONLY_TABS = new Set<PageTab>(["scoreboard_standings"]);
 
 export default function NotificationsPage() {
   const { resolvedTheme } = useTheme();
@@ -154,15 +156,21 @@ export default function NotificationsPage() {
   const t = themeClasses(dark);
 
   const role = session?.user?.role;
-  // While the session is loading we optimistically show all tabs (avoids layout
-  // shift when the session resolves and lead-only tabs suddenly appear, which
-  // was causing the first click to land on a shifted element).
+  // Optimistically show all tabs while session loads to prevent layout shift.
   const canSeeLeadTabs =
     sessionStatus === "loading" ||
     role === "lead" ||
     role === "admin" ||
     role === "system_admin";
-  const visibleTabs = PAGE_TABS.filter((tab) => !LEAD_ONLY_TABS.has(tab.key) || canSeeLeadTabs);
+  const canSeeAdminTabs =
+    sessionStatus === "loading" ||
+    role === "admin" ||
+    role === "system_admin";
+  const visibleTabs = PAGE_TABS.filter(
+    (tab) =>
+      (!LEAD_ONLY_TABS.has(tab.key) || canSeeLeadTabs) &&
+      (!ADMIN_ONLY_TABS.has(tab.key) || canSeeAdminTabs),
+  );
 
   const [stored, setStored] = useState<Notification[]>([]);
   const [live, setLive] = useState<Notification[]>([]);
@@ -209,14 +217,17 @@ export default function NotificationsPage() {
     return () => fetchAbortRef.current?.abort();
   }, [fetchNotifications]);
 
-  // If the session resolves and the user turns out not to be a lead/admin,
-  // reset any active lead-only tab so restricted content stops rendering.
+  // If the session resolves and the user lacks access to the active tab,
+  // reset to notifications so restricted content stops rendering.
   useEffect(() => {
-    if (sessionStatus !== "loading" && !canSeeLeadTabs && LEAD_ONLY_TABS.has(activeTab)) {
+    const restricted =
+      (!canSeeLeadTabs && LEAD_ONLY_TABS.has(activeTab)) ||
+      (!canSeeAdminTabs && ADMIN_ONLY_TABS.has(activeTab));
+    if (sessionStatus !== "loading" && restricted) {
       setActiveTab("notifications");
       startTransition(() => setContentTab("notifications"));
     }
-  }, [sessionStatus, canSeeLeadTabs, activeTab]);
+  }, [sessionStatus, canSeeLeadTabs, canSeeAdminTabs, activeTab]);
 
   // Combine stored + live, dedupe by id, sort desc
   const all = useMemo(() => {

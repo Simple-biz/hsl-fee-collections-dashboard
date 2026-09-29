@@ -3,16 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Trophy, AlertCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { getMonday } from "@/lib/formatters";
 import { teamHeaderBg } from "@/lib/team-colors";
 
-type PeriodMode = "week" | "month";
+type Metric = "cases_closed" | "fees_collected" | "calls_logged";
 
 interface AgentRow {
   agent: string;
   team: string;
   role: string | null;
-  casesClosed: number;
+  value: number;
 }
 
 interface TeamStanding {
@@ -28,14 +27,25 @@ interface ScoreboardStandingsTabProps {
 
 const TEAMS = ["Concurrent", "T2", "T16"];
 
-const weekRangeLabel = (monday: string): string => {
-  const start = new Date(monday + "T12:00:00");
-  const end = new Date(monday + "T12:00:00");
-  end.setDate(start.getDate() + 4);
-  const mo: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  const endOpts: Intl.DateTimeFormatOptions =
-    end.getMonth() !== start.getMonth() ? mo : { day: "numeric" };
-  return `${start.toLocaleDateString("en-US", mo)} – ${end.toLocaleDateString("en-US", endOpts)}`;
+const METRIC_OPTIONS: { value: Metric; label: string }[] = [
+  { value: "cases_closed",   label: "Cases Closed" },
+  { value: "fees_collected", label: "Fees Collected" },
+  { value: "calls_logged",   label: "Calls Logged" },
+];
+
+const formatValue = (metric: Metric, value: number): string => {
+  if (metric === "fees_collected") {
+    return value === 0
+      ? "$0"
+      : "$" + value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+  return String(value);
+};
+
+const valueLabel = (metric: Metric): string => {
+  if (metric === "fees_collected") return "collected";
+  if (metric === "calls_logged")   return "calls";
+  return "closed";
 };
 
 const getMonthRange = (offset: number): { from: string; to: string; label: string } => {
@@ -55,48 +65,35 @@ function computeStandings(agents: AgentRow[]): TeamStanding[] {
   return TEAMS.map((team) => {
     const ranked = agents
       .filter((a) => a.team === team && a.role !== "team_lead")
-      .sort((a, b) => b.casesClosed - a.casesClosed);
+      .sort((a, b) => b.value - a.value);
 
     if (ranked.length === 0) return { team, top: [], bottom: [] };
 
-    const topScore = ranked[0].casesClosed;
-    const bottomScore = ranked[ranked.length - 1].casesClosed;
+    const topScore = ranked[0].value;
+    const bottomScore = ranked[ranked.length - 1].value;
 
-    const top = ranked.filter((a) => a.casesClosed === topScore);
-    // Only show bottom if it's different from the top score (avoids showing same person twice)
+    const top = ranked.filter((a) => a.value === topScore);
     const bottom =
-      bottomScore < topScore ? ranked.filter((a) => a.casesClosed === bottomScore) : [];
+      bottomScore < topScore ? ranked.filter((a) => a.value === bottomScore) : [];
 
     return { team, top, bottom };
   });
 }
 
 export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps) {
-  const [mode, setMode] = useState<PeriodMode>("week");
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [metric, setMetric] = useState<Metric>("cases_closed");
   const [monthOffset, setMonthOffset] = useState(0);
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const offset = mode === "week" ? weekOffset : monthOffset;
-  const monday = mode === "week" ? getMonday(offset) : null;
-  const monthRange = mode === "month" ? getMonthRange(offset) : null;
+  const offset = monthOffset;
+  const monthRange = getMonthRange(offset);
 
-  const periodLabel =
-    mode === "week"
-      ? offset === 0
-        ? "This week"
-        : weekRangeLabel(monday!)
-      : offset === 0
-        ? "This month"
-        : (monthRange?.label ?? "");
+  const periodLabel = offset === 0 ? "This month" : (monthRange?.label ?? "");
 
-  const apiUrl =
-    mode === "week"
-      ? `/api/scoreboard-standings?week=${monday}`
-      : `/api/scoreboard-standings?from=${monthRange!.from}&to=${monthRange!.to}`;
+  const apiUrl = `/api/scoreboard-standings?from=${monthRange.from}&to=${monthRange.to}&metric=${metric}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +115,7 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
           agent: a.agent,
           team: a.team ?? "",
           role: a.role ?? null,
-          casesClosed: a.casesClosed ?? 0,
+          value: a.value ?? 0,
         }));
         setStandings(computeStandings(agents));
       })
@@ -138,25 +135,8 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
 
   const canGoForward = offset < 0;
 
-  const handlePrev = () => {
-    if (mode === "week") setWeekOffset((v) => v - 1);
-    else setMonthOffset((v) => v - 1);
-  };
-  const handleNext = () => {
-    if (mode === "week") setWeekOffset((v) => v + 1);
-    else setMonthOffset((v) => v + 1);
-  };
-
-  const modeBtn = (m: PeriodMode) =>
-    `h-7 px-3 rounded-md text-xs font-medium transition-colors ${
-      mode === m
-        ? dark
-          ? "bg-neutral-700 text-neutral-100"
-          : "bg-white text-neutral-900 shadow-sm"
-        : dark
-          ? "text-neutral-400 hover:text-neutral-200"
-          : "text-neutral-500 hover:text-neutral-700"
-    }`;
+  const handlePrev = () => setMonthOffset((v) => v - 1);
+  const handleNext = () => setMonthOffset((v) => v + 1);
 
   return (
     <div className="space-y-4">
@@ -175,12 +155,22 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Week / Month toggle */}
-            <div className={`flex gap-0.5 p-0.5 rounded-lg ${dark ? "bg-neutral-800" : "bg-neutral-100"}`}>
-              <button className={modeBtn("week")} onClick={() => setMode("week")}>Week</button>
-              <button className={modeBtn("month")} onClick={() => setMode("month")}>Month</button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Metric dropdown */}
+            <select
+              value={metric}
+              onChange={(e) => setMetric(e.target.value as Metric)}
+              className={`h-8 px-2 pr-6 rounded-md text-xs font-medium border appearance-none cursor-pointer transition-colors
+                ${dark
+                  ? "bg-neutral-800 border-neutral-700 text-neutral-200"
+                  : "bg-white border-neutral-200 text-neutral-800"
+                }`}
+              aria-label="Ranking metric"
+            >
+              {METRIC_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
 
             {/* Period navigation */}
             <button
@@ -230,16 +220,10 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
               const headerBg = teamHeaderBg(team);
               return (
                 <div key={team}>
-                  {/* Team header */}
                   <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white ${headerBg}`}>
                     {team === "Concurrent" ? "Concurrent Team" : `${team} Team`}
                   </div>
 
-                  {team === "Fee Petition" && (
-                    <p className={`px-4 pt-2 text-[11px] ${dark ? "text-neutral-500" : "text-neutral-400"}`}>
-                      All-time totals — approval date not recorded
-                    </p>
-                  )}
                   <div className="px-4 py-3 grid grid-cols-2 gap-4">
                     {/* Top performer */}
                     <div>
@@ -253,7 +237,7 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
                             <li key={a.agent} className={`text-sm font-medium ${t.text}`}>
                               {a.agent}
                               <span className={`ml-1.5 text-[11px] font-normal ${t.textMuted}`}>
-                                {a.casesClosed} closed
+                                {formatValue(metric, a.value)} {valueLabel(metric)}
                               </span>
                             </li>
                           ))}
@@ -275,7 +259,7 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
                             <li key={a.agent} className={`text-sm font-medium ${t.text}`}>
                               {a.agent}
                               <span className={`ml-1.5 text-[11px] font-normal ${t.textMuted}`}>
-                                {a.casesClosed} closed
+                                {formatValue(metric, a.value)} {valueLabel(metric)}
                               </span>
                             </li>
                           ))}

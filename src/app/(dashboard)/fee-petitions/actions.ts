@@ -80,12 +80,19 @@ export async function upsertFeePetition(input: {
     // (the reverse sync was removed so that agents cannot self-approve by
     // picking a Remarks value without a lead/Lori reviewing first).
     const row = await db.transaction(async (tx) => {
+      const approvalStamp =
+        updates.feePetitionApproved === true
+          ? { approvedAt: new Date() }
+          : updates.feePetitionApproved === false
+            ? { approvedAt: null }
+            : {};
+
       const [r] = await tx
         .insert(feePetitions)
-        .values({ caseId: input.caseId, ...updates })
+        .values({ caseId: input.caseId, ...updates, ...approvalStamp })
         .onConflictDoUpdate({
           target: feePetitions.caseId,
-          set: { ...updates, updatedAt: new Date() },
+          set: { ...updates, ...approvalStamp, updatedAt: new Date() },
         })
         .returning();
 
