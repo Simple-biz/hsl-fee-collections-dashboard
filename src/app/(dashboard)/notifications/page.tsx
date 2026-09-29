@@ -201,6 +201,14 @@ export default function NotificationsPage() {
     return () => fetchAbortRef.current?.abort();
   }, [fetchNotifications]);
 
+  // If the session resolves and the user turns out not to be a lead/admin,
+  // reset any active lead-only tab so restricted content stops rendering.
+  useEffect(() => {
+    if (sessionStatus !== "loading" && !canSeeLeadTabs && LEAD_ONLY_TABS.has(pageTab)) {
+      setPageTab("notifications");
+    }
+  }, [sessionStatus, canSeeLeadTabs, pageTab]);
+
   // Combine stored + live, dedupe by id, sort desc
   const all = useMemo(() => {
     const map = new Map<string, Notification>();
