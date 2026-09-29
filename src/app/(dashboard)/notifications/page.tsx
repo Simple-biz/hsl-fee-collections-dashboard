@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -171,7 +171,15 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [markingAll, setMarkingAll] = useState(false);
-  const [pageTab, setPageTab] = useState<PageTab>("notifications");
+  // activeTab drives the underline (high-priority, synchronous).
+  // contentTab drives what renders below (deferred via startTransition so
+  // the underline moves instantly even while the heavy unmount/mount runs).
+  const [activeTab, setActiveTab] = useState<PageTab>("notifications");
+  const [contentTab, setContentTab] = useState<PageTab>("notifications");
+  const setPageTab = (key: PageTab) => {
+    setActiveTab(key);
+    startTransition(() => setContentTab(key));
+  };
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -204,10 +212,11 @@ export default function NotificationsPage() {
   // If the session resolves and the user turns out not to be a lead/admin,
   // reset any active lead-only tab so restricted content stops rendering.
   useEffect(() => {
-    if (sessionStatus !== "loading" && !canSeeLeadTabs && LEAD_ONLY_TABS.has(pageTab)) {
-      setPageTab("notifications");
+    if (sessionStatus !== "loading" && !canSeeLeadTabs && LEAD_ONLY_TABS.has(activeTab)) {
+      setActiveTab("notifications");
+      startTransition(() => setContentTab("notifications"));
     }
-  }, [sessionStatus, canSeeLeadTabs, pageTab]);
+  }, [sessionStatus, canSeeLeadTabs, activeTab]);
 
   // Combine stored + live, dedupe by id, sort desc
   const all = useMemo(() => {
@@ -293,7 +302,7 @@ export default function NotificationsPage() {
       <div className={`rounded-xl border ${t.card} overflow-x-auto`}>
         <div className={`flex border-b ${dark ? "border-neutral-800" : "border-neutral-200"} min-w-max`}>
           {visibleTabs.map(({ key, label, icon: Icon }) => {
-            const active = pageTab === key;
+            const active = activeTab === key;
             return (
               <button
                 key={key}
@@ -326,31 +335,31 @@ export default function NotificationsPage() {
       </div>
 
       {/* Payments tab */}
-      {pageTab === "payments" && <PaymentsTab dark={dark} t={t} />}
+      {contentTab === "payments" && <PaymentsTab dark={dark} t={t} />}
 
       {/* Fee Petition Approved tab */}
-      {pageTab === "fee_petition_approved" && <FeePetitionApprovedTab dark={dark} t={t} />}
+      {contentTab === "fee_petition_approved" && <FeePetitionApprovedTab dark={dark} t={t} />}
 
       {/* Closed Cases tab */}
-      {pageTab === "closed_cases" && <ClosedCasesTab dark={dark} t={t} />}
+      {contentTab === "closed_cases" && <ClosedCasesTab dark={dark} t={t} />}
 
       {/* Recent Activity tab */}
-      {pageTab === "recent_activity" && <RecentActivityTab dark={dark} t={t} />}
+      {contentTab === "recent_activity" && <RecentActivityTab dark={dark} t={t} />}
 
       {/* New Cases tab */}
-      {pageTab === "new_cases" && <NewCasesTab dark={dark} t={t} />}
+      {contentTab === "new_cases" && <NewCasesTab dark={dark} t={t} />}
 
       {/* Calls Backlog tab */}
-      {pageTab === "calls_backlog" && <CallsBacklogTab dark={dark} t={t} />}
+      {contentTab === "calls_backlog" && <CallsBacklogTab dark={dark} t={t} />}
 
       {/* Follow-Ups tab */}
-      {pageTab === "follow_ups" && <FollowUpsTab dark={dark} t={t} />}
+      {contentTab === "follow_ups" && <FollowUpsTab dark={dark} t={t} />}
 
       {/* Scoreboard Standings tab */}
-      {pageTab === "scoreboard_standings" && <ScoreboardStandingsTab dark={dark} t={t} />}
+      {contentTab === "scoreboard_standings" && <ScoreboardStandingsTab dark={dark} t={t} />}
 
       {/* Notifications tab */}
-      {pageTab === "notifications" && <>
+      {contentTab === "notifications" && <>
       {/* Header */}
       <div className={`rounded-xl border ${t.card}`}>
         <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
