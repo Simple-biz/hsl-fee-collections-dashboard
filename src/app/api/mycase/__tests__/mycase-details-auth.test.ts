@@ -1,10 +1,13 @@
 /**
  * Regression guard for the MyCase case-details auth hardening (issue #392).
  *
- * GET /api/mycase/cases/[id]/details was auth-only and returned sensitive data
- * (ssnLast4, chronicleLink, decisions). It now requires master_fees page access
- * AND case.editPii capability, matching the gate already on the documents and
- * file routes (fixed in issue #443).
+ * GET /api/mycase/cases/[id]/details was auth-only despite returning sensitive
+ * data (ssnLast4, chronicleLink, decisions). It now requires master_fees page
+ * access — the page the endpoint belongs to. case.editPii is intentionally NOT
+ * required here: member-role users have master_fees by default but not
+ * case.editPii, so adding that capability gate would silently break all members'
+ * case detail sheet. The documents and file routes (#443) use the stronger
+ * master_fees + case.editPii gate because they serve raw files containing PII.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
