@@ -121,6 +121,7 @@ describe("GET /api/inbound-calls", () => {
     const req = new Request("http://localhost/api/inbound-calls?week=2024-01-15");
     const res = await GET(req as never);
     expect(res.status).toBe(200);
+    expect(mockRequirePage).not.toHaveBeenCalled();
   });
 });
 
@@ -169,7 +170,7 @@ describe("PATCH /api/inbound-calls/[id]", () => {
 
   it("200 — inbound_calls page access granted", async () => {
     setGuard({ ok: true, session: allowedSession });
-    const res = await PATCH(makePatchReq() as never, makeCtx("1") as never);
+    const res = await PATCH(makePatchReq({ callDate: "2024-02-01", number: "555-1234" }) as never, makeCtx("1") as never);
     expect(res.status).toBe(200);
   });
 });

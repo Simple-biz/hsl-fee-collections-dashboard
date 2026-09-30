@@ -10,7 +10,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Session } from "next-auth";
 import type { PageKey } from "@/lib/access/pages";
-import type { CapabilityKey } from "@/lib/access/capabilities";
 
 // ---- mocks ----
 
@@ -19,7 +18,6 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
 vi.mock("@/lib/auth-helpers", () => ({
   sessionHasPageAccess: vi.fn(),
-  sessionHasCapability: vi.fn(),
 }));
 
 // Prevent real DB / external API calls.
@@ -52,12 +50,11 @@ vi.mock("@/lib/chronicle-client", () => ({
 }));
 
 import { auth } from "@/auth";
-import { sessionHasPageAccess, sessionHasCapability } from "@/lib/auth-helpers";
+import { sessionHasPageAccess } from "@/lib/auth-helpers";
 import { GET } from "@/app/api/mycase/cases/[id]/details/route";
 
 const mockAuth = vi.mocked(auth);
 const mockHasPage = vi.mocked(sessionHasPageAccess);
-const mockHasCap = vi.mocked(sessionHasCapability);
 
 const fakeSession: Session = {
   user: {
@@ -67,7 +64,7 @@ const fakeSession: Session = {
     role: "lead",
     mustChangePassword: false,
     pages: ["master_fees"] as PageKey[],
-    capabilities: ["case.editPii"] as CapabilityKey[],
+    capabilities: [],
   },
   expires: "9999",
 };
@@ -75,42 +72,33 @@ const fakeSession: Session = {
 const makeReq = () => new Request("http://localhost/api/mycase/cases/1/details");
 const makeCtx = (id: string) => ({ params: Promise.resolve({ id }) });
 
-const setGate = (hasSession: boolean, hasPage: boolean, hasCap: boolean) => {
+const setGate = (hasSession: boolean, hasPage: boolean) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockAuth.mockResolvedValue(hasSession ? fakeSession : (null as any));
   mockHasPage.mockReturnValue(hasPage);
-  mockHasCap.mockReturnValue(hasCap);
 };
 
 describe("GET /api/mycase/cases/[id]/details", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("401 — unauthenticated (no session)", async () => {
-    setGate(false, false, false);
+    setGate(false, false);
     const res = await GET(makeReq() as never, makeCtx("1") as never);
     expect(res.status).toBe(401);
   });
 
-  it("403 — authenticated but lacks master_fees page access", async () => {
-    setGate(true, false, true);
+  it("403 — authenticated but lacks master_fees page access (member on another page)", async () => {
+    setGate(true, false);
     const res = await GET(makeReq() as never, makeCtx("1") as never);
     expect(res.status).toBe(403);
     expect(mockHasPage).toHaveBeenCalledWith(expect.anything(), "master_fees");
   });
 
-  it("403 — authenticated but lacks case.editPii capability", async () => {
-    setGate(true, true, false);
-    const res = await GET(makeReq() as never, makeCtx("1") as never);
-    expect(res.status).toBe(403);
-    expect(mockHasCap).toHaveBeenCalledWith(expect.anything(), "case.editPii");
-  });
-
-  it("passes gate (master_fees + case.editPii) and proceeds to data fetch", async () => {
-    setGate(true, true, true);
+  it("200 — member with master_fees access can view case details (no case.editPii required)", async () => {
+    setGate(true, true);
     const res = await GET(makeReq() as never, makeCtx("1") as never);
     // myCaseDb returns [] → 404 "Case not found in MyCase"; the 403 gate did NOT fire
     expect(res.status).toBe(404);
     expect(mockHasPage).toHaveBeenCalledWith(expect.anything(), "master_fees");
-    expect(mockHasCap).toHaveBeenCalledWith(expect.anything(), "case.editPii");
   });
 });

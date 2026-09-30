@@ -8,7 +8,7 @@ import { mapMyCaseRows, mapDecision, type MyCaseDbRow } from "@/lib/import/mycas
 import { fetchCaseDetails } from "@/lib/mycase-proxy";
 import { fetchChronicleClient, parseChronicleResponse } from "@/lib/chronicle-client";
 import { auth } from "@/auth";
-import { sessionHasPageAccess, sessionHasCapability } from "@/lib/auth-helpers";
+import { sessionHasPageAccess } from "@/lib/auth-helpers";
 
 const CHRONICLE_LINK_FIELD_ID = 1101112;
 
@@ -34,10 +34,7 @@ export const GET = async (
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
-    if (
-      !sessionHasPageAccess(session, "master_fees") ||
-      !sessionHasCapability(session, "case.editPii")
-    ) {
+    if (!sessionHasPageAccess(session, "master_fees")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
