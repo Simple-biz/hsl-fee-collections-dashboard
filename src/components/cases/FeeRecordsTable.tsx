@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useTransition } from "react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   ArrowUpDown,
@@ -40,7 +40,6 @@ import {
   fmtDate,
   fmtClaimLong,
   parseCurrencyInput,
-  skippedClosedCasesMessage,
   caseLevelLabel,
   winSheetStatusLabel,
 } from "@/lib/formatters";
@@ -66,10 +65,12 @@ import { caseLevelVisual, normalizeCaseLevel } from "@/lib/case-level-icons";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
-import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
-import { bulkReassign, bulkAddToFeePetitions } from "@/app/(dashboard)/master-fees/actions";
 import { FeePetitionIndicator } from "./FeePetitionIndicator";
 import { AddToFeePetitionsConfirmDialog } from "./AddToFeePetitionsConfirmDialog";
+import { useServerPaginatedFetch } from "@/hooks/useServerPaginatedFetch";
+import { useFeeRecordsFilters } from "@/hooks/useFeeRecordsFilters";
+import { useBulkActions } from "@/hooks/useBulkActions";
+import type { SortKey, SortDir, FilterPreset } from "./fee-records-types";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
   "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
@@ -230,8 +231,6 @@ const currency = (v: number | null) => (
 const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
 const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
 
-type FilterPreset = { id: string; name: string; params: string };
-
 const timeAgo = (date: Date): string => {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
   if (diff < 60) return "just now";
@@ -245,18 +244,6 @@ const AGING_COLORS = (cat: string | null, dark: boolean) => {
   if (cat === "≤60") return dark ? "text-emerald-400" : "text-emerald-600";
   return dark ? "text-neutral-500" : "text-neutral-400";
 };
-
-type SortKey =
-  | "name"
-  | "assigned"
-  | "date"
-  | "expected"
-  | "paid"
-  | "daysAfterApproval"
-  | "nextFollowUpDate"
-  | "closedAt"
-  | "createdAt";
-type SortDir = "asc" | "desc";
 
 export const FeeRecordsTable = ({
   cases: casesProp = [],
@@ -284,20 +271,7 @@ export const FeeRecordsTable = ({
   const canSeeLeaderNotes = can("leaderNotes.access");
   const canEditFeesConf = can("feesConfirmation.edit");
 
-  // ── Server-paginated self-fetch state ────────────────────────────────────
-  const [fetchedCases, setFetchedCases] = useState<CaseRow[]>([]);
-  const [fetchTotal, setFetchTotal] = useState(0);
-  const [fetchLoading, setFetchLoading] = useState(serverPaginated);
-  const [fetchLoadedOnce, setFetchLoadedOnce] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  // Incrementing this triggers a forced re-fetch (e.g. after an import/sync).
-  const [fetchRevision, setFetchRevision] = useState(0);
-  const fetchAbortRef = useRef<AbortController | null>(null);
-  // In serverPaginated mode, data comes from the server. Otherwise use the prop.
-  const cases = serverPaginated ? fetchedCases : casesProp;
-
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const assignedOptions = dropdownOptions.assigned_to ?? [];
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
@@ -336,25 +310,9 @@ export const FeeRecordsTable = ({
   const [winSheetError, setWinSheetError] = useState<string | null>(null);
   const winSheetAbortRef = useRef<AbortController | null>(null);
 
-  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "all");
-  const [assignedFilter, setAssignedFilter] = useState(() => searchParams.get("assigned") ?? "all");
-  const [feesConfFilter, setFeesConfFilter] = useState(() => searchParams.get("pif") ?? "all");
-  const [claimFilter, setClaimFilter] = useState(() => searchParams.get("claim") ?? "all");
-  const [caseStatusFilter, setCaseStatusFilter] = useState(() => searchParams.get("cs") ?? "all");
-  const [levelFilter, setLevelFilter] = useState(() => searchParams.get("level") ?? "all");
-  const [approverFilter, setApproverFilter] = useState(() => searchParams.get("approver") ?? "all");
-  // Follow-up date filter — "day" narrows to one specific date, "range" to a
-  // from/to window; both are no-ops until a date is actually picked, so
-  // switching modes alone doesn't suddenly hide every case with no follow-up
-  // scheduled (see the `filtered` useMemo below).
-  const [followUpMode, setFollowUpMode] = useState<"all" | "day" | "range">(() => {
-    const m = searchParams.get("fuMode");
-    return m === "day" || m === "range" ? m : "all";
-  });
-  const [followUpDay, setFollowUpDay] = useState(() => searchParams.get("fuDay") ?? "");
-  const [followUpFrom, setFollowUpFrom] = useState(() => searchParams.get("fuFrom") ?? "");
-  const [followUpTo, setFollowUpTo] = useState(() => searchParams.get("fuTo") ?? "");
+  // ── Filter state ─────────────────────────────────────────────────────────
+  // Managed by useFeeRecordsFilters — declared after sort/page state below.
+
   // Minimized T16/T2/AUX column groups — collapses a claim type's 5 editable
   // columns down to a single read-only Fee Due glance, so staff working a
   // single claim type can't mistakenly enter Retro/Fee Due on the wrong one.
@@ -392,6 +350,72 @@ export const FeeRecordsTable = ({
   // the change a transition keeps the click responsive (shows a pending state)
   // instead of hard-freezing the main thread during that render.
   const [isPending, startTransition] = useTransition();
+
+  // ── Filter state (hook) ───────────────────────────────────────────────────
+  const {
+    search, setSearch,
+    statusFilter, setStatusFilter,
+    assignedFilter, setAssignedFilter,
+    feesConfFilter, setFeesConfFilter,
+    claimFilter, setClaimFilter,
+    caseStatusFilter, setCaseStatusFilter,
+    levelFilter, setLevelFilter,
+    approverFilter, setApproverFilter,
+    followUpMode, setFollowUpMode,
+    followUpDay, setFollowUpDay,
+    followUpFrom, setFollowUpFrom,
+    followUpTo, setFollowUpTo,
+    hasActiveFilters,
+    clearFilters,
+  } = useFeeRecordsFilters({
+    searchParams,
+    sortKey,
+    sortDir,
+    pageSize,
+    defaultSortKey,
+    dateRange,
+    agingFilter,
+    setPageIndex,
+    onClearSort: () => {
+      setSortKey(defaultSortKey);
+      setSortDir("desc");
+      setPageIndex(0);
+    },
+  });
+
+  // ── Server-paginated self-fetch (hook) ────────────────────────────────────
+  const {
+    fetchedCases,
+    fetchTotal,
+    fetchLoading,
+    fetchLoadedOnce,
+    fetchError,
+    setFetchRevision,
+  } = useServerPaginatedFetch({
+    serverPaginated,
+    mode,
+    pageIndex,
+    pageSize,
+    search,
+    statusFilter,
+    assignedFilter,
+    feesConfFilter,
+    claimFilter,
+    caseStatusFilter,
+    levelFilter,
+    approverFilter,
+    followUpMode,
+    followUpDay,
+    followUpFrom,
+    followUpTo,
+    agingFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+  });
+  // In serverPaginated mode, data comes from the server. Otherwise use the prop.
+  const cases = serverPaginated ? fetchedCases : casesProp;
+
   const [feesConfEditId, setFeesConfEditId] = useState<number | null>(null);
   const [claimEditId, setClaimEditId] = useState<number | null>(null);
   const [winSheetStatusEditId, setWinSheetStatusEditId] = useState<number | null>(null);
@@ -485,28 +509,6 @@ export const FeeRecordsTable = ({
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
-  const [archivePendingIds, setArchivePendingIds] = useState<number[]>([]);
-  const [archivePendingSource, setArchivePendingSource] = useState<
-    "active_sheet" | "fees_closed_sheet"
-  >("active_sheet");
-  const [bulkOverpaidSaving, setBulkOverpaidSaving] = useState(false);
-  const [bulkOverpaidError, setBulkOverpaidError] = useState<string | null>(null);
-  const [bulkReassignSaving, setBulkReassignSaving] = useState(false);
-  const [bulkReassignError, setBulkReassignError] = useState<string | null>(null);
-  const [bulkFeePetitionSaving, setBulkFeePetitionSaving] = useState(false);
-  const [bulkFeePetitionError, setBulkFeePetitionError] = useState<string | null>(null);
-  const [feePetitionConfirmOpen, setFeePetitionConfirmOpen] = useState(false);
-  // Snapshot taken when the confirm opens, the way bulkClosePendingIds below
-  // does. The dialog must not read live selection state: confirming clears the
-  // selection, and the dialog is still mounted through its close animation, so
-  // it would re-render as "Add 0 cases to Fee Petitions?" on the way out.
-  const [feePetitionPending, setFeePetitionPending] = useState<{
-    ids: number[];
-    selectedCount: number;
-  }>({ ids: [], selectedCount: 0 });
-  const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
-  const [bulkClosePendingIds, setBulkClosePendingIds] = useState<number[]>([]);
   // Optimistic overrides for fee payment totals after panel add/delete.
   // Pending is deliberately absent — it's fully derived (Fee Due minus
   // Received) by the compute_fee_totals trigger, never set optimistically.
@@ -519,6 +521,29 @@ export const FeeRecordsTable = ({
   // whole table. Takes priority over feeOverrides/pending once populated,
   // since it reflects confirmed server state rather than an optimistic guess.
   const [rowOverrides, setRowOverrides] = useState<Record<number, Partial<CaseRow>>>({});
+
+  // ── Bulk action state + handlers (hook) ──────────────────────────────────
+  const {
+    archiveConfirmOpen, setArchiveConfirmOpen,
+    archivePendingIds,
+    archivePendingSource,
+    bulkCloseConfirmOpen, setBulkCloseConfirmOpen,
+    bulkClosePendingIds,
+    bulkOverpaidSaving,
+    bulkOverpaidError, setBulkOverpaidError,
+    bulkReassignSaving,
+    bulkReassignError, setBulkReassignError,
+    bulkFeePetitionSaving,
+    bulkFeePetitionError, setBulkFeePetitionError,
+    feePetitionConfirmOpen, setFeePetitionConfirmOpen,
+    feePetitionPending, setFeePetitionPending,
+    handleBulkReassign,
+    handleBatchArchive,
+    handleBatchFeesClosed,
+    handleBatchMarkOverpaid,
+    handleBatchAddToFeePetitions,
+  } = useBulkActions({ selectedIds, setSelectedIds, setRowOverrides, mode });
+
   // A per-row refresh snapshot must not outlive the next full-list refetch
   // (CSV import, Sheets/MyCase sync) — otherwise it would keep shadowing
   // newer data for that case indefinitely, since it's spread last in the
@@ -571,102 +596,7 @@ export const FeeRecordsTable = ({
     };
   }, []);
 
-  // ── Server-paginated data fetch ───────────────────────────────────────────
-  // Fires whenever filter/sort/page state changes (or fetchRevision increments
-  // after an import/sync). Search is debounced 300ms; all other changes are
-  // immediate. The AbortController ensures stale responses are discarded.
-  useEffect(() => {
-    if (!serverPaginated) return;
 
-    const controller = new AbortController();
-    fetchAbortRef.current?.abort();
-    fetchAbortRef.current = controller;
-
-    const params = new URLSearchParams();
-    params.set("isClosed", mode === "closed" ? "true" : "false");
-    params.set("page", String(pageIndex + 1));
-    params.set("limit", String(pageSize === "all" ? 10000 : pageSize));
-    if (search) params.set("search", search);
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    if (assignedFilter !== "all") params.set("assigned", assignedFilter);
-    if (feesConfFilter !== "all") params.set("pif", feesConfFilter);
-    if (claimFilter !== "all") params.set("claim", claimFilter);
-    if (caseStatusFilter !== "all") params.set("cs", caseStatusFilter);
-    if (levelFilter !== "all") params.set("level", levelFilter);
-    if (approverFilter !== "all") params.set("approver", approverFilter);
-    if (followUpMode !== "all") params.set("fuMode", followUpMode);
-    if (followUpDay) params.set("fuDay", followUpDay);
-    if (followUpFrom) params.set("fuFrom", followUpFrom);
-    if (followUpTo) params.set("fuTo", followUpTo);
-    if (agingFilter && agingFilter !== "all") params.set("aging", agingFilter);
-    if (dateRange && mode !== "closed") {
-      params.set("dateFrom", dateRange.from);
-      params.set("dateTo", dateRange.to);
-    }
-    params.set("sortKey", sortKey);
-    params.set("sortDir", sortDir);
-
-    const doFetch = async () => {
-      setFetchLoading(true);
-      setFetchError(null);
-      try {
-        const res = await fetch(`/api/cases?${params}`, { signal: controller.signal });
-        if (!res.ok) throw new Error(`Failed to load cases (${res.status})`);
-        const json = await res.json() as { data: CaseRow[]; total: number };
-        if (!controller.signal.aborted) {
-          setFetchedCases(json.data ?? []);
-          setFetchTotal(json.total ?? 0);
-          setFetchLoadedOnce(true);
-        }
-      } catch (err) {
-        if (!controller.signal.aborted && (err as Error).name !== "AbortError") {
-          setFetchError((err as Error).message);
-        }
-      } finally {
-        if (!controller.signal.aborted) setFetchLoading(false);
-      }
-    };
-
-    const timer = search ? setTimeout(doFetch, 300) : null;
-    if (!timer) doFetch();
-
-    return () => {
-      controller.abort();
-      if (timer) clearTimeout(timer);
-    };
-  }, [
-    serverPaginated, pageIndex, pageSize, search, statusFilter, assignedFilter,
-    feesConfFilter, claimFilter, caseStatusFilter, levelFilter, approverFilter,
-    followUpMode, followUpDay, followUpFrom, followUpTo, agingFilter,
-    dateRange, sortKey, sortDir, mode, fetchRevision,
-  ]);
-
-  // Persist filter/sort/pageSize in the URL so reloads and shared links
-  // restore the same view. State is the source of truth; URL is a debounced
-  // write-only sink. pageIndex is deliberately excluded — it always resets to 0.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const params = new URLSearchParams();
-      if (search) params.set("q", search);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (assignedFilter !== "all") params.set("assigned", assignedFilter);
-      if (feesConfFilter !== "all") params.set("pif", feesConfFilter);
-      if (claimFilter !== "all") params.set("claim", claimFilter);
-      if (caseStatusFilter !== "all") params.set("cs", caseStatusFilter);
-      if (levelFilter !== "all") params.set("level", levelFilter);
-      if (approverFilter !== "all") params.set("approver", approverFilter);
-      if (followUpMode !== "all") params.set("fuMode", followUpMode);
-      if (followUpDay) params.set("fuDay", followUpDay);
-      if (followUpFrom) params.set("fuFrom", followUpFrom);
-      if (followUpTo) params.set("fuTo", followUpTo);
-      if (sortKey !== defaultSortKey) params.set("sort", sortKey);
-      if (sortDir !== "desc") params.set("dir", sortDir);
-      if (pageSize !== 100) params.set("size", String(pageSize));
-      const qs = params.toString();
-      router.replace(qs ? `?${qs}` : "?", { scroll: false });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search, statusFilter, assignedFilter, feesConfFilter, claimFilter, caseStatusFilter, levelFilter, approverFilter, followUpMode, followUpDay, followUpFrom, followUpTo, sortKey, sortDir, pageSize, defaultSortKey, router]);
 
   const toggleRowSelection = (id: number) => {
     setSelectedIds((prev) => {
@@ -692,95 +622,6 @@ export const FeeRecordsTable = ({
     );
   };
 
-  const handleBulkReassign = async (assignedTo: string) => {
-    if (selectedIds.size === 0 || bulkReassignSaving) return;
-    setBulkReassignSaving(true);
-    setBulkReassignError(null);
-    const ids = Array.from(selectedIds);
-    try {
-      const result = await bulkReassign({ caseIds: ids, assignedTo });
-      if (!result.ok) throw new Error(result.error);
-      setRowOverrides((prev) => {
-        const next = { ...prev };
-        for (const id of ids) next[id] = { ...next[id], assigned: assignedTo === "" ? "—" : assignedTo };
-        return next;
-      });
-      setSelectedIds(new Set());
-    } catch (err) {
-      setBulkReassignError((err as Error).message);
-    } finally {
-      setBulkReassignSaving(false);
-    }
-  };
-
-  const hasActiveFilters =
-    !!search ||
-    !!dateRange ||
-    statusFilter !== "all" ||
-    assignedFilter !== "all" ||
-    feesConfFilter !== "all" ||
-    claimFilter !== "all" ||
-    caseStatusFilter !== "all" ||
-    levelFilter !== "all" ||
-    approverFilter !== "all" ||
-    followUpMode !== "all" ||
-    agingFilter !== "all";
-
-  const clearFilters = () => {
-    setSearch("");
-    setStatusFilter("all");
-    setAssignedFilter("all");
-    setFeesConfFilter("all");
-    setClaimFilter("all");
-    setCaseStatusFilter("all");
-    setLevelFilter("all");
-    setApproverFilter("all");
-    setFollowUpMode("all");
-    setFollowUpDay("");
-    setFollowUpFrom("");
-    setFollowUpTo("");
-    setSortKey(defaultSortKey);
-    setSortDir("desc");
-    setPageIndex(0);
-  };
-
-  const handleBatchArchive = () => {
-    if (selectedIds.size === 0) return;
-    setArchivePendingIds(Array.from(selectedIds));
-    setArchivePendingSource(
-      mode === "closed" ? "fees_closed_sheet" : "active_sheet",
-    );
-    setArchiveConfirmOpen(true);
-  };
-
-  const handleBatchFeesClosed = () => {
-    if (selectedIds.size === 0) return;
-    setBulkClosePendingIds(Array.from(selectedIds));
-    setBulkCloseConfirmOpen(true);
-  };
-
-  // Adds the selected cases to the Overpaid Cases page at will — independent
-  // of whether the automatic PIF detection has flagged them "Overpaid" yet.
-  const handleBatchMarkOverpaid = async () => {
-    if (selectedIds.size === 0 || bulkOverpaidSaving) return;
-    setBulkOverpaidSaving(true);
-    setBulkOverpaidError(null);
-    const ids = Array.from(selectedIds);
-    try {
-      const result = await bulkMarkOverpaid({ caseIds: ids });
-      if (!result.ok) throw new Error(result.error);
-      setRowOverrides((prev) => {
-        const next = { ...prev };
-        for (const id of ids) next[id] = { ...next[id], markedOverpaid: true };
-        return next;
-      });
-      setSelectedIds(new Set());
-    } catch (err) {
-      setBulkOverpaidError((err as Error).message);
-    } finally {
-      setBulkOverpaidSaving(false);
-    }
-  };
 
   // Unique assignees for filter dropdown
   const assignees = useMemo(() => {
@@ -1032,47 +873,6 @@ export const FeeRecordsTable = ({
   const canAddToFeePetitions = mode !== "closed";
   const hasBatchActions = canAddToFeePetitions || isAdmin;
 
-  // Routes the selected cases into the Fee Petition workflow. Picking "Fee
-  // Petition" in the Level dropdown no longer does this on its own — adding is
-  // now this deliberate click, and removing is the matching action on the Fee
-  // Petitions page.
-  //
-  // Behind a confirm step like the other batch actions here. Adding is
-  // reversible, so the dialog guards against a stray click on a large
-  // selection rather than warning about anything destructive.
-  const handleBatchAddToFeePetitions = async () => {
-    const ids = feePetitionPending.ids;
-    if (ids.length === 0 || bulkFeePetitionSaving) return;
-    setBulkFeePetitionSaving(true);
-    setBulkFeePetitionError(null);
-    try {
-      const result = await bulkAddToFeePetitions({ caseIds: ids });
-      if (!result.ok) throw new Error(result.error);
-      // Mark only what the database actually updated. A case closed by someone
-      // else between opening this dialog and confirming falls outside the
-      // action's scope, and showing it as added would be a lie the next
-      // refresh would quietly correct.
-      setRowOverrides((prev) => {
-        const next = { ...prev };
-        for (const id of result.updated) next[id] = { ...next[id], inFeePetition: true };
-        return next;
-      });
-      const missed = ids.length - result.updated.length;
-      if (missed > 0) {
-        setBulkFeePetitionError(skippedClosedCasesMessage(missed, ids.length, "added"));
-        setSelectedIds(new Set());
-        return;
-      }
-      setSelectedIds(new Set());
-      setFeePetitionConfirmOpen(false);
-    } catch (err) {
-      // Leave the dialog open on failure so the error is read where the
-      // action was taken, and Try again is one click away.
-      setBulkFeePetitionError((err as Error).message);
-    } finally {
-      setBulkFeePetitionSaving(false);
-    }
-  };
 
   // ── Pagination ────────────────────────────────────────────────────────────
   // In server-paginated mode, the total comes from the API response; the
@@ -1092,28 +892,6 @@ export const FeeRecordsTable = ({
   const paged =
     serverPaginated || pageSize === "all" ? filtered : filtered.slice(pageStart, pageEnd);
 
-  // Reset to the first page whenever the result set or page size changes.
-  useEffect(() => {
-    setPageIndex(0);
-  }, [
-    search,
-    statusFilter,
-    assignedFilter,
-    feesConfFilter,
-    claimFilter,
-    caseStatusFilter,
-    levelFilter,
-    approverFilter,
-    followUpMode,
-    followUpDay,
-    followUpFrom,
-    followUpTo,
-    sortKey,
-    sortDir,
-    pageSize,
-    dateRange,
-    agingFilter,
-  ]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;
