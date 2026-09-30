@@ -3,8 +3,43 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog, leaderNotes, userDetails } from "@/lib/db/schema";
-import { eq, ilike, sql, desc } from "drizzle-orm";
+import { eq, ilike, sql, desc, asc } from "drizzle-orm";
 import { requireCapability, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
+
+// Maps client-side sortKey values to ORDER BY expressions. Falls back to the
+// legacy defaults (closedAt desc for closed view, approvalDate desc otherwise)
+// when no sortKey is supplied, preserving existing callers' behavior.
+function buildOrderBy(
+  sortKey: string | null,
+  sortDir: string | null,
+  isClosedParam: string | null,
+) {
+  const dir = sortDir === "asc" ? asc : desc;
+  switch (sortKey) {
+    case "name":
+      return [dir(cases.lastName), dir(cases.firstName)] as const;
+    case "assigned":
+      return [dir(feeRecords.assignedTo)] as const;
+    case "date":
+      return [dir(cases.approvalDate)] as const;
+    case "expected":
+      return [dir(feeRecords.totalFeesExpected)] as const;
+    case "paid":
+      return [dir(feeRecords.totalFeesPaid)] as const;
+    // daysAfterApproval = now − approvalDate. Sorting desc means most days
+    // first = oldest approval date first, so the sort direction is inverted.
+    case "daysAfterApproval":
+      return [sortDir === "asc" ? desc(cases.approvalDate) : asc(cases.approvalDate)] as const;
+    case "nextFollowUpDate":
+      return [dir(feeRecords.nextFollowUpDate)] as const;
+    case "closedAt":
+      return [dir(feeRecords.closedAt)] as const;
+    case "createdAt":
+      return [dir(cases.createdAt)] as const;
+    default:
+      return [isClosedParam === "true" ? desc(feeRecords.closedAt) : desc(cases.approvalDate)] as const;
+  }
+}
 
 // GET /api/cases — List cases with fee records + latest activity
 export const GET = async (req: NextRequest) => {
@@ -30,14 +65,43 @@ export const GET = async (req: NextRequest) => {
     const limit = dueToday ? 10000 : parseInt(searchParams.get("limit") || "50");
     const offset = dueToday ? 0 : (page - 1) * limit;
 
+    // Extended filter params for server-side filtering (used by the
+    // Master Fees page in serverPaginated mode).
+    const pif = searchParams.get("pif");           // feesConfirmation value or "__none__"
+    const claimParam = searchParams.get("claim");  // "T16" | "T2" | "CONC" | etc.
+    const cs = searchParams.get("cs");             // caseStatus exact match
+    const level = searchParams.get("level");       // levelWon (normalized)
+    const approver = searchParams.get("approver"); // approvedBy ILIKE
+    const fuMode = searchParams.get("fuMode");     // "day" | "range"
+    const fuDay = searchParams.get("fuDay");       // YYYY-MM-DD for day mode
+    const fuFrom = searchParams.get("fuFrom");     // YYYY-MM-DD range start
+    const fuTo = searchParams.get("fuTo");         // YYYY-MM-DD range end
+    const aging = searchParams.get("aging");       // "unpaid_60" | "unpaid_90"
+    const dateFrom = searchParams.get("dateFrom"); // approvalDate range start
+    const dateTo = searchParams.get("dateTo");     // approvalDate range end
+    const sortKeyParam = searchParams.get("sortKey");
+    const sortDirParam = searchParams.get("sortDir"); // "asc" | "desc"
+
     // Shared WHERE for the count and main queries.
     const whereClause = sql`TRUE
       ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
       ${status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
-      ${assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
+      ${assigned === "__unassigned__" ? sql`AND (${feeRecords.assignedTo} IS NULL OR ${feeRecords.assignedTo} = '')` : assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
       ${isClosedParam === "true" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = true` : sql``}
       ${isClosedParam === "false" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
       ${dueToday ? sql`AND ${feeRecords.nextFollowUpDate} = CURRENT_DATE AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
+      ${pif === "__none__" ? sql`AND ${feeRecords.feesConfirmation} IS NULL` : pif ? sql`AND ${feeRecords.feesConfirmation} = ${pif}` : sql``}
+      ${claimParam === "CONC" ? sql`AND (${cases.claimTypeLabel} = ${"T2_T16"} OR ${cases.claimTypeLabel} = ${"CONCURRENT"})` : claimParam ? sql`AND ${cases.claimTypeLabel} = ${claimParam}` : sql``}
+      ${cs ? sql`AND ${feeRecords.caseStatus} = ${cs}` : sql``}
+      ${level ? sql`AND UPPER(TRIM(COALESCE(${cases.levelWon}, ''))) = UPPER(TRIM(${level}))` : sql``}
+      ${approver ? sql`AND ${ilike(feeRecords.approvedBy, `%${approver}%`)}` : sql``}
+      ${fuMode === "day" && fuDay ? sql`AND ${feeRecords.nextFollowUpDate} = ${fuDay}` : sql``}
+      ${fuMode === "range" && fuFrom ? sql`AND ${feeRecords.nextFollowUpDate} >= ${fuFrom}` : sql``}
+      ${fuMode === "range" && fuTo ? sql`AND ${feeRecords.nextFollowUpDate} <= ${fuTo}` : sql``}
+      ${aging === "unpaid_60" ? sql`AND ${cases.approvalDate} <= CURRENT_DATE - INTERVAL '61 days' AND (COALESCE(${feeRecords.t16FeeReceived}::numeric, 0) + COALESCE(${feeRecords.t2FeeReceived}::numeric, 0) + COALESCE(${feeRecords.auxFeeReceived}::numeric, 0)) = 0` : sql``}
+      ${aging === "unpaid_90" ? sql`AND ${cases.approvalDate} <= CURRENT_DATE - INTERVAL '91 days' AND (COALESCE(${feeRecords.t16FeeReceived}::numeric, 0) + COALESCE(${feeRecords.t2FeeReceived}::numeric, 0) + COALESCE(${feeRecords.auxFeeReceived}::numeric, 0)) = 0` : sql``}
+      ${dateFrom ? sql`AND ${cases.approvalDate} >= ${dateFrom}` : sql``}
+      ${dateTo ? sql`AND ${cases.approvalDate} <= ${dateTo}` : sql``}
     `;
 
     // Total count (respecting filters, ignoring pagination)
@@ -116,7 +180,7 @@ export const GET = async (req: NextRequest) => {
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
       .leftJoin(userDetails, eq(userDetails.caseId, cases.clientId))
       .where(whereClause)
-      .orderBy(isClosedParam === "true" ? desc(feeRecords.closedAt) : desc(cases.approvalDate))
+      .orderBy(...buildOrderBy(sortKeyParam, sortDirParam, isClosedParam))
       .limit(limit)
       .offset(offset);
 
