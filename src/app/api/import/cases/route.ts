@@ -108,7 +108,7 @@ export const POST = async (req: NextRequest) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const parsed = parseWorksheet(buffer);
+    const parsed = await parseWorksheet(buffer);
 
     // Look up which clientIds already exist
     const incomingIds = parsed.rows.map((r) => r.clientId);
