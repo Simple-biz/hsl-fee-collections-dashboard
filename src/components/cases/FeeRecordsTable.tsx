@@ -3138,7 +3138,7 @@ export const FeeRecordsTable = ({
             </tbody>
           </table>
         </div>
-        {isPending && (
+        {(isPending || (serverPaginated && fetchLoadedOnce && fetchLoading)) && (
           <div
             className={`absolute inset-0 z-40 flex items-center justify-center gap-2 text-sm font-medium ${t.text} ${dark ? "bg-neutral-900/60" : "bg-white/60"}`}
           >
