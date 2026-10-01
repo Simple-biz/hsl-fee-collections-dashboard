@@ -66,55 +66,84 @@ export const GET = async (req: NextRequest) => {
     if ((fromParam || toParam) && !useRange) {
       return NextResponse.json({ error: "Invalid from/to range" }, { status: 400 });
     }
+    const allTime = !useRange && !weekParam;
     const startDate = useRange ? fromParam! : monday;
     const endExclusive = useRange ? addDays(toParam!, 1) : addDays(monday, 7);
 
     // Build the per-agent value subquery based on the requested metric.
-    // cases_closed: Fee Petition team uses all-time approved petition count
-    //   (no approved_at column exists), all others use closed_at window.
-    // fees_collected: sum of the three per-type fee_received columns where
-    //   the matching received_date falls in the window.
-    // calls_logged: sum of daily_metrics call columns in the window.
+    // When allTime is true, date filters are omitted entirely.
+    // cases_closed: Fee Petition uses approved_at window; others use closed_at.
+    // fees_collected: sum of the three per-type fee_received columns in window.
+    // calls_logged: sum of daily_metrics call columns in window.
     const valueExpr =
       metricParam === "fees_collected"
-        ? sql`
-            COALESCE((
-              SELECT SUM(
-                CASE WHEN fr.t16_fee_received_date >= ${startDate}::date
-                          AND fr.t16_fee_received_date < ${endExclusive}::date
-                     THEN COALESCE(fr.t16_fee_received::numeric, 0) ELSE 0 END
-              + CASE WHEN fr.t2_fee_received_date >= ${startDate}::date
-                          AND fr.t2_fee_received_date < ${endExclusive}::date
-                     THEN COALESCE(fr.t2_fee_received::numeric, 0) ELSE 0 END
-              + CASE WHEN fr.aux_fee_received_date >= ${startDate}::date
-                          AND fr.aux_fee_received_date < ${endExclusive}::date
-                     THEN COALESCE(fr.aux_fee_received::numeric, 0) ELSE 0 END
-              )
-              FROM fee_records fr
-              WHERE fr.assigned_to = tm.name
-            ), 0)`
-        : metricParam === "calls_logged"
+        ? allTime
           ? sql`
-            COALESCE((
-              SELECT SUM(dm.ssa_calls + dm.client_calls_ib + dm.client_calls_ob)
-              FROM daily_metrics dm
-              WHERE dm.agent_name = tm.name
-              AND dm.metric_date >= ${startDate}::date
-              AND dm.metric_date < ${endExclusive}::date
-            ), 0)`
+              COALESCE((
+                SELECT SUM(
+                  COALESCE(fr.t16_fee_received::numeric, 0)
+                + COALESCE(fr.t2_fee_received::numeric, 0)
+                + COALESCE(fr.aux_fee_received::numeric, 0)
+                )
+                FROM fee_records fr
+                WHERE fr.assigned_to = tm.name
+              ), 0)`
+          : sql`
+              COALESCE((
+                SELECT SUM(
+                  CASE WHEN fr.t16_fee_received_date >= ${startDate}::date
+                            AND fr.t16_fee_received_date < ${endExclusive}::date
+                       THEN COALESCE(fr.t16_fee_received::numeric, 0) ELSE 0 END
+                + CASE WHEN fr.t2_fee_received_date >= ${startDate}::date
+                            AND fr.t2_fee_received_date < ${endExclusive}::date
+                       THEN COALESCE(fr.t2_fee_received::numeric, 0) ELSE 0 END
+                + CASE WHEN fr.aux_fee_received_date >= ${startDate}::date
+                            AND fr.aux_fee_received_date < ${endExclusive}::date
+                       THEN COALESCE(fr.aux_fee_received::numeric, 0) ELSE 0 END
+                )
+                FROM fee_records fr
+                WHERE fr.assigned_to = tm.name
+              ), 0)`
+        : metricParam === "calls_logged"
+          ? allTime
+            ? sql`
+              COALESCE((
+                SELECT SUM(dm.ssa_calls + dm.client_calls_ib + dm.client_calls_ob)
+                FROM daily_metrics dm
+                WHERE dm.agent_name = tm.name
+              ), 0)`
+            : sql`
+              COALESCE((
+                SELECT SUM(dm.ssa_calls + dm.client_calls_ib + dm.client_calls_ob)
+                FROM daily_metrics dm
+                WHERE dm.agent_name = tm.name
+                AND dm.metric_date >= ${startDate}::date
+                AND dm.metric_date < ${endExclusive}::date
+              ), 0)`
           : // cases_closed (default)
-            sql`
-            CASE WHEN tm.team = 'Fee Petition' THEN
-              (SELECT COUNT(*) FROM fee_petitions fp
-               WHERE fp.assigned_to = tm.name
-               AND fp.approved_at >= ${startDate}::date
-               AND fp.approved_at < ${endExclusive}::date)
-            ELSE
-              (SELECT COUNT(*) FROM fee_records fr
-               WHERE fr.assigned_to = tm.name
-               AND fr.closed_at >= ${startDate}::date
-               AND fr.closed_at < ${endExclusive}::date)
-            END`;
+            allTime
+            ? sql`
+              CASE WHEN tm.team = 'Fee Petition' THEN
+                (SELECT COUNT(*) FROM fee_petitions fp
+                 WHERE fp.assigned_to = tm.name
+                 AND fp.fee_petition_approved = true)
+              ELSE
+                (SELECT COUNT(*) FROM fee_records fr
+                 WHERE fr.assigned_to = tm.name
+                 AND fr.is_closed = true)
+              END`
+            : sql`
+              CASE WHEN tm.team = 'Fee Petition' THEN
+                (SELECT COUNT(*) FROM fee_petitions fp
+                 WHERE fp.assigned_to = tm.name
+                 AND fp.approved_at >= ${startDate}::date
+                 AND fp.approved_at < ${endExclusive}::date)
+              ELSE
+                (SELECT COUNT(*) FROM fee_records fr
+                 WHERE fr.assigned_to = tm.name
+                 AND fr.closed_at >= ${startDate}::date
+                 AND fr.closed_at < ${endExclusive}::date)
+              END`;
 
     const rows = await db.execute(sql`
       SELECT

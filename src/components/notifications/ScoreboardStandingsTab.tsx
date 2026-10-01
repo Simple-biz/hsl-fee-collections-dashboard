@@ -6,6 +6,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import { teamHeaderBg } from "@/lib/team-colors";
 
 type Metric = "cases_closed" | "fees_collected" | "calls_logged";
+type Mode = "monthly" | "all_time";
 
 interface AgentRow {
   agent: string;
@@ -82,18 +83,25 @@ function computeStandings(agents: AgentRow[]): TeamStanding[] {
 
 export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps) {
   const [metric, setMetric] = useState<Metric>("cases_closed");
+  const [mode, setMode] = useState<Mode>("monthly");
   const [monthOffset, setMonthOffset] = useState(0);
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const offset = monthOffset;
-  const monthRange = getMonthRange(offset);
+  const monthRange = getMonthRange(monthOffset);
+  const periodLabel =
+    mode === "all_time"
+      ? "All time"
+      : monthOffset === 0
+        ? "This month"
+        : (monthRange?.label ?? "");
 
-  const periodLabel = offset === 0 ? "This month" : (monthRange?.label ?? "");
-
-  const apiUrl = `/api/scoreboard-standings?from=${monthRange.from}&to=${monthRange.to}&metric=${metric}`;
+  const apiUrl =
+    mode === "all_time"
+      ? `/api/scoreboard-standings?metric=${metric}`
+      : `/api/scoreboard-standings?from=${monthRange.from}&to=${monthRange.to}&metric=${metric}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -133,7 +141,7 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
     };
   }, [apiUrl]);
 
-  const canGoForward = offset < 0;
+  const canGoForward = monthOffset < 0;
 
   const handlePrev = () => setMonthOffset((v) => v - 1);
   const handleNext = () => setMonthOffset((v) => v + 1);
@@ -172,25 +180,57 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
               ))}
             </select>
 
-            {/* Period navigation */}
-            <button
-              onClick={handlePrev}
-              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
-              aria-label="Previous period"
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
-              {periodLabel}
-            </span>
-            <button
-              onClick={handleNext}
-              disabled={!canGoForward}
-              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
-              aria-label="Next period"
-            >
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </button>
+            {/* Mode toggle */}
+            <div className={`flex rounded-md border overflow-hidden text-xs font-medium ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
+              {(["monthly", "all_time"] as Mode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`h-8 px-3 transition-colors ${
+                    mode === m
+                      ? dark
+                        ? "bg-neutral-700 text-white"
+                        : "bg-neutral-100 text-neutral-900"
+                      : dark
+                        ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-750"
+                        : "bg-white text-neutral-500 hover:bg-neutral-50"
+                  }`}
+                >
+                  {m === "monthly" ? "Monthly" : "All Time"}
+                </button>
+              ))}
+            </div>
+
+            {/* Period navigation — monthly mode only */}
+            {mode === "monthly" && (
+              <>
+                <button
+                  onClick={handlePrev}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
+                  aria-label="Previous period"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
+                  {periodLabel}
+                </span>
+                <button
+                  onClick={handleNext}
+                  disabled={!canGoForward}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
+                  aria-label="Next period"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </>
+            )}
+
+            {/* All-time label */}
+            {mode === "all_time" && (
+              <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
+                All time
+              </span>
+            )}
           </div>
         </div>
 
