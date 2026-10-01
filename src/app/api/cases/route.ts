@@ -88,13 +88,13 @@ export const GET = async (req: NextRequest) => {
     // Shared WHERE for the count and main queries.
     const whereClause = sql`TRUE
       ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
-      ${status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
+      ${status === "finished" ? sql`AND LOWER(${feeRecords.winSheetStatus}) IN ('finished', 'pending_payment', 'partially_paid', 'paid_in_full')` : status === "started" ? sql`AND LOWER(${feeRecords.winSheetStatus}) IN ('started', 'in_progress')` : status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
       ${assigned === "__unassigned__" ? sql`AND (${feeRecords.assignedTo} IS NULL OR ${feeRecords.assignedTo} = '')` : assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
       ${isClosedParam === "true" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = true` : sql``}
       ${isClosedParam === "false" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
       ${dueToday ? sql`AND ${feeRecords.nextFollowUpDate} = CURRENT_DATE AND COALESCE(${feeRecords.isClosed}, false) = false` : sql``}
       ${pif === "__none__" ? sql`AND ${feeRecords.feesConfirmation} IS NULL` : pif ? sql`AND ${feeRecords.feesConfirmation} = ${pif}` : sql``}
-      ${claimParam === "CONC" ? sql`AND (${cases.claimTypeLabel} = ${"T2_T16"} OR ${cases.claimTypeLabel} = ${"CONCURRENT"})` : claimParam ? sql`AND ${cases.claimTypeLabel} = ${claimParam}` : sql``}
+      ${claimParam === "CONC" ? sql`AND (${cases.claimTypeLabel} = ${"T2_T16"} OR ${cases.claimTypeLabel} = ${"CONCURRENT"} OR ${cases.claimTypeLabel} = ${"CONC"})` : claimParam ? sql`AND ${cases.claimTypeLabel} = ${claimParam}` : sql``}
       ${cs ? sql`AND ${feeRecords.caseStatus} = ${cs}` : sql``}
       ${level ? sql`AND UPPER(TRIM(COALESCE(${cases.levelWon}, ''))) = UPPER(TRIM(${level}))` : sql``}
       ${approver ? sql`AND ${ilike(feeRecords.approvedBy, `%${approver}%`)}` : sql``}
