@@ -38,8 +38,11 @@ const patchBodySchema = z.union([
 export const GET = async (req: NextRequest) => {
   try {
     const session = await auth();
-    const agentName = session?.user?.name;
-    const isAdmin = isAdminRole(session?.user?.role);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    const agentName = session.user.name;
+    const isAdmin = isAdminRole(session.user.role);
     // Agent-only types (e.g. follow_up_due) are stripped out unless they
     // belong to the requesting user — applied after the DB query since
     // namesMatch tolerates case/whitespace drift that SQL equality wouldn't.
