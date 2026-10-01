@@ -14,16 +14,23 @@ import {
 import { themeClasses } from "@/lib/theme-classes";
 import { fmt } from "@/lib/formatters";
 import type { DashboardSummary } from "@/types";
+import type { DateRange } from "@/lib/date-range-context";
 
 interface StatCardsProps {
   stats: DashboardSummary;
+  dateRange?: DateRange | null;
 }
 
 
-export const StatCards = ({ stats }: StatCardsProps) => {
+export const StatCards = ({ stats, dateRange }: StatCardsProps) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
+
+  const rangeSub = dateRange
+    ? `${dateRange.from} – ${dateRange.to}`
+    : "Current calendar month";
+  const periodSuffix = dateRange ? "" : " (MTD)";
 
   type CardSpec = {
     icon: typeof FolderOpen;
@@ -49,19 +56,19 @@ export const StatCards = ({ stats }: StatCardsProps) => {
     },
     {
       icon: DollarSign,
-      label: "Fees Collected (MTD)",
+      label: `Fees Collected${periodSuffix}`,
       value: fmt(stats.feesCollectedMTD),
-      sub: "Current calendar month",
-      detail: stats.feesCollectedMTD > 0 ? "Collected this month" : "None yet this month",
+      sub: rangeSub,
+      detail: stats.feesCollectedMTD > 0 ? "Collected this period" : "None yet this period",
       detailTone: stats.feesCollectedMTD > 0 ? "up" : "neutral",
       accent: "#059669",
     },
     {
       icon: CalendarCheck,
-      label: "Cases Closed (MTD)",
+      label: `Cases Closed${periodSuffix}`,
       value: String(stats.casesClosedMTD),
-      sub: "Current calendar month",
-      detail: stats.casesClosedMTD > 0 ? "Closed this month" : "None yet this month",
+      sub: rangeSub,
+      detail: stats.casesClosedMTD > 0 ? "Closed this period" : "None yet this period",
       detailTone: stats.casesClosedMTD > 0 ? "up" : "neutral",
       accent: "#d97706",
       href: "/fees-closed",
