@@ -16,7 +16,7 @@ const AGING_OPTIONS: { value: AgingFilter; label: string }[] = [
 ];
 
 export default function MasterFeesPage() {
-  const { team, approvedByOptions, dropdownOptions, refresh } = useDashboard();
+  const { team, approvedByOptions, dropdownOptions, refreshSummary } = useDashboard();
   const teamMembers = team.map((m) => ({
     name: m.name,
     team: m.team,
@@ -59,7 +59,7 @@ export default function MasterFeesPage() {
           serverPaginated
           agingFilter={agingFilter}
           dateRange={dateRange}
-          onImported={refresh}
+          onImported={refreshSummary}
           approvedByOptions={approvedByOptions}
           dropdownOptions={dropdownOptions}
           teamMembers={teamMembers}

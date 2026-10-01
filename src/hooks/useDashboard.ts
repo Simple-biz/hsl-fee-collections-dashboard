@@ -32,6 +32,9 @@ interface DashboardData {
   casesLoadedOnce: boolean;
   error: string | null;
   refresh: () => void;
+  // Refreshes only the summary/team/dropdown data — not the cases list.
+  // Use this when the caller manages cases independently (e.g. server-paginated mode).
+  refreshSummary: () => void;
 }
 
 const EMPTY_SUMMARY: DashboardSummary = {
@@ -187,6 +190,10 @@ export const useDashboard = (dateRange?: DateRange | null): DashboardData => {
     fetchCases();
   }, [fetchSummary, fetchCases]);
 
+  const refreshSummary = useCallback(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
   return {
     cases,
     summary,
@@ -199,5 +206,6 @@ export const useDashboard = (dateRange?: DateRange | null): DashboardData => {
     casesLoadedOnce,
     error,
     refresh,
+    refreshSummary,
   };
 };

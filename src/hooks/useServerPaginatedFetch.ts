@@ -103,9 +103,12 @@ export function useServerPaginatedFetch({
     params.set("sortKey", sortKey);
     params.set("sortDir", sortDir);
 
+    // Set loading immediately so the table overlay fires even during the
+    // 300ms search debounce, not only after the timer fires.
+    setFetchLoading(true);
+    setFetchError(null);
+
     const doFetch = async () => {
-      setFetchLoading(true);
-      setFetchError(null);
       try {
         const res = await fetch(`/api/cases?${params}`, { signal: controller.signal });
         if (!res.ok) throw new Error(`Failed to load cases (${res.status})`);
