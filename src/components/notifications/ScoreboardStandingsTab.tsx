@@ -63,20 +63,18 @@ const getMonthRange = (offset: number): { from: string; to: string; label: strin
   };
 };
 
-const getQuarterRange = (): { from: string; to: string; label: string } => {
+const getQuarterRange = (offset: number): { from: string; to: string; label: string } => {
   const now = new Date();
-  const q = Math.floor(now.getMonth() / 3);
-  const first = new Date(now.getFullYear(), q * 3, 1);
-  const last = new Date(now.getFullYear(), q * 3 + 3, 0);
-  return {
-    from: iso(first),
-    to: iso(last),
-    label: `Q${q + 1} ${now.getFullYear()}`,
-  };
+  const totalQ = now.getFullYear() * 4 + Math.floor(now.getMonth() / 3) + offset;
+  const year = Math.floor(totalQ / 4);
+  const q = ((totalQ % 4) + 4) % 4;
+  const first = new Date(year, q * 3, 1);
+  const last = new Date(year, q * 3 + 3, 0);
+  return { from: iso(first), to: iso(last), label: `Q${q + 1} ${year}` };
 };
 
-const getYearRange = (): { from: string; to: string; label: string } => {
-  const year = new Date().getFullYear();
+const getYearRange = (offset: number): { from: string; to: string; label: string } => {
+  const year = new Date().getFullYear() + offset;
   return { from: `${year}-01-01`, to: `${year}-12-31`, label: String(year) };
 };
 
@@ -103,14 +101,21 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
   const [metric, setMetric] = useState<Metric>("cases_closed");
   const [mode, setMode] = useState<Mode>("monthly");
   const [monthOffset, setMonthOffset] = useState(0);
+  const [quarterOffset, setQuarterOffset] = useState(0);
+  const [yearOffset, setYearOffset] = useState(0);
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const monthRange = getMonthRange(monthOffset);
-  const quarterRange = getQuarterRange();
-  const yearRange = getYearRange();
+  const quarterRange = getQuarterRange(quarterOffset);
+  const yearRange = getYearRange(yearOffset);
+
+  const currentOffset =
+    mode === "quarterly" ? quarterOffset
+    : mode === "yearly"  ? yearOffset
+    : monthOffset;
 
   const periodLabel =
     mode === "quarterly"
@@ -127,6 +132,19 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
     : monthRange;
 
   const apiUrl = `/api/scoreboard-standings?from=${from}&to=${to}&metric=${metric}`;
+
+  const canGoForward = currentOffset < 0;
+
+  const handlePrev = () => {
+    if (mode === "quarterly") setQuarterOffset((v) => v - 1);
+    else if (mode === "yearly") setYearOffset((v) => v - 1);
+    else setMonthOffset((v) => v - 1);
+  };
+  const handleNext = () => {
+    if (mode === "quarterly") setQuarterOffset((v) => v + 1);
+    else if (mode === "yearly") setYearOffset((v) => v + 1);
+    else setMonthOffset((v) => v + 1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -165,11 +183,6 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
       abortRef.current?.abort();
     };
   }, [apiUrl]);
-
-  const canGoForward = monthOffset < 0;
-
-  const handlePrev = () => setMonthOffset((v) => v - 1);
-  const handleNext = () => setMonthOffset((v) => v + 1);
 
   return (
     <div className="space-y-4">
@@ -226,36 +239,25 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
               ))}
             </div>
 
-            {/* Month prev/next — monthly mode only */}
-            {mode === "monthly" && (
-              <>
-                <button
-                  onClick={handlePrev}
-                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
-                  aria-label="Previous month"
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                </button>
-                <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
-                  {periodLabel}
-                </span>
-                <button
-                  onClick={handleNext}
-                  disabled={!canGoForward}
-                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
-                  aria-label="Next month"
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </>
-            )}
-
-            {/* Period label — quarterly / yearly */}
-            {mode !== "monthly" && (
-              <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
-                {periodLabel}
-              </span>
-            )}
+            {/* Period navigation — all modes */}
+            <button
+              onClick={handlePrev}
+              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
+              aria-label="Previous period"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
+              {periodLabel}
+            </span>
+            <button
+              onClick={handleNext}
+              disabled={!canGoForward}
+              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
+              aria-label="Next period"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
           </div>
         </div>
 
