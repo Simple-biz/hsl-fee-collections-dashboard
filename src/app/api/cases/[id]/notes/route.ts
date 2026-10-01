@@ -5,6 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { activityLog } from "@/lib/db/schema";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+import { auth } from "@/auth";
 
 // GET /api/cases/:id/notes — activity log entries for a case (clientId)
 export const GET = async (
@@ -12,6 +13,11 @@ export const GET = async (
   { params }: { params: Promise<{ id: string }> },
 ) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
     const { id } = await params;
     const caseId = Number(id);
     if (!Number.isFinite(caseId)) {

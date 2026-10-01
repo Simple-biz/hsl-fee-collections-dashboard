@@ -1,9 +1,16 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
+import type { Session } from "next-auth";
 import { db } from "@/lib/db";
 import { leaderNotes } from "@/lib/db/schema";
-import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+import { requireCapability, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
+
+// Author can delete their own note; case.delete capability (admins) can delete any.
+const canModifyNote = (session: Session, createdBy: string | null) => {
+  const author = session.user?.name?.trim();
+  return (!!author && author === createdBy) || sessionHasCapability(session, "case.delete");
+};
 
 // DELETE /api/cases/:id/leader-notes/:noteId — remove a single leader note.
 // Gated by leaderNotes.access (not the stricter case.delete used by the
@@ -31,6 +38,18 @@ export const DELETE = async (
     }
     if (!noteId) {
       return NextResponse.json({ error: "Invalid note id" }, { status: 400 });
+    }
+
+    const [existing] = await db
+      .select({ createdBy: leaderNotes.createdBy })
+      .from(leaderNotes)
+      .where(and(eq(leaderNotes.id, noteId), eq(leaderNotes.caseId, caseId)));
+
+    if (!existing) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
+    if (!canModifyNote(guard.session, existing.createdBy)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const deleted = await db

@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { eq, sql, desc, and, or, inArray } from "drizzle-orm";
 import { namesMatch } from "@/lib/formatters";
-import { isAdminRole } from "@/lib/auth-helpers";
+import { isAdminRole, requireAdmin, guardStatus } from "@/lib/auth-helpers";
 import { feePetitions } from "@/lib/db/schema";
 
 // Notification types visible only to their assigned agent — nobody else,
@@ -38,8 +38,11 @@ const patchBodySchema = z.union([
 export const GET = async (req: NextRequest) => {
   try {
     const session = await auth();
-    const agentName = session?.user?.name;
-    const isAdmin = isAdminRole(session?.user?.role);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    const agentName = session.user.name;
+    const isAdmin = isAdminRole(session.user.role);
     // Agent-only types (e.g. follow_up_due) are stripped out unless they
     // belong to the requesting user — applied after the DB query since
     // namesMatch tolerates case/whitespace drift that SQL equality wouldn't.
@@ -115,9 +118,9 @@ export const GET = async (req: NextRequest) => {
 // ============================================================================
 export const POST = async (req: NextRequest) => {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
     }
 
     const parsedBody = postBodySchema.safeParse(await req.json());
