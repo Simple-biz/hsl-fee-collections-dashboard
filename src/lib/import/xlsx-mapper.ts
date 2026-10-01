@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 export interface ParsedCaseRow {
   clientId: number;
@@ -103,8 +103,6 @@ const dateOnly = (v: unknown): string | null => {
   return null;
 };
 
-// Strip one or more trailing annotation groups from a segment — e.g.
-// " (SSI case)", " [VIA PHONE]", or both stacked: "Detherage (Remand) [PHONE]".
 const stripTrailingAnnotations = (s: string): string => {
   let prev: string;
   do {
@@ -114,10 +112,6 @@ const stripTrailingAnnotations = (s: string): string => {
   return s;
 };
 
-// Parse "YYYY.MM.DD Lastname, Firstname v. ALJ NAME (annotations)" → names.
-// The separator is forgiving: it matches "v.", "vs", "vs.", or a BARE "v"
-// (e.g. "Roy v ALJ Detherage"), each case-insensitively. The left side may be
-// "Last, First" or "First Last", and trailing "(...)"/"[...]" notes are dropped.
 const parseCaseLink = (
   link: string,
 ): {
@@ -127,15 +121,11 @@ const parseCaseLink = (
   aljLastName: string | null;
 } => {
   let s = link.trim();
-  // Strip leading date "YYYY.MM.DD "
   s = s.replace(/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s+/, "");
-  // Split on the claimant-vs-respondent separator. "vs?" allows a bare "v";
-  // "(?:[.,]\s*|\s+)" consumes a trailing "." / "," or the following space.
   const parts = s.split(/\s+vs?(?:[.,]\s*|\s+)/i);
   const left = parts[0] || "";
   const right = parts[1] || "";
 
-  // Left: "Lastname, Firstname" — or "Firstname Lastname" when no comma.
   const leftClean = stripTrailingAnnotations(left);
   let lastRaw: string, firstRaw: string;
   if (leftClean.includes(",")) {
@@ -148,7 +138,6 @@ const parseCaseLink = (
   const lastName = (lastRaw || leftClean).trim();
   const firstName = (firstRaw || "").trim();
 
-  // Right: "ALJ FIRST LAST" — strip "ALJ " prefix, then split into first/last
   let aljFirstName: string | null = null;
   let aljLastName: string | null = null;
   const aljClean = stripTrailingAnnotations(right.replace(/^ALJ\s+/i, ""));
@@ -216,26 +205,93 @@ const mapWinSheetStatus = (raw: unknown): ParsedCaseRow["winSheetStatus"] => {
   return "started";
 };
 
-export const parseWorksheet = (buffer: Buffer): ParseResult => {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
-  const sheetName = wb.SheetNames.includes("MASTER LIST")
-    ? "MASTER LIST"
-    : wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
+// Extract the cell's display text as a plain string.
+const cellText = (cell: ExcelJS.Cell | null): string => {
+  if (!cell) return "";
+  const v = cell.value;
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === "object") {
+    // Hyperlink value { text, hyperlink }
+    if ("hyperlink" in v && "text" in v) {
+      const text = (v as { text: string | ExcelJS.CellRichTextValue; hyperlink: string }).text;
+      if (typeof text === "string") return text;
+      if (typeof text === "object" && "richText" in text) {
+        return (text as ExcelJS.CellRichTextValue).richText.map((r) => r.text).join("");
+      }
+      return String(text);
+    }
+    // RichText
+    if ("richText" in v) {
+      return (v as ExcelJS.CellRichTextValue).richText.map((r) => r.text).join("");
+    }
+    // Shared formula / formula result
+    if ("result" in v) {
+      const res = (v as ExcelJS.CellFormulaValue).result;
+      if (res === null || res === undefined) return "";
+      if (typeof res === "string") return res;
+      if (typeof res === "number" || typeof res === "boolean") return String(res);
+      if (res instanceof Date) return res.toISOString();
+      return String(res);
+    }
+  }
+  return String(v);
+};
+
+// Extract the cell's numeric/date value for monetary and date columns.
+const cellRaw = (cell: ExcelJS.Cell | null): unknown => {
+  if (!cell) return null;
+  const v = cell.value;
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number" || v instanceof Date) return v;
+  if (typeof v === "object") {
+    if ("result" in v) return (v as ExcelJS.CellFormulaValue).result ?? null;
+    if ("richText" in v) return (v as ExcelJS.CellRichTextValue).richText.map((r) => r.text).join("");
+    // Hyperlink value — extract the display text for numeric coercion
+    if ("hyperlink" in v && "text" in v) {
+      const text = (v as { text: string | ExcelJS.CellRichTextValue }).text;
+      if (typeof text === "string") return text;
+      if (typeof text === "object" && "richText" in text) {
+        return (text as ExcelJS.CellRichTextValue).richText.map((r) => r.text).join("");
+      }
+      return String(text);
+    }
+  }
+  return v;
+};
+
+// Extract the hyperlink URL from a cell, if present.
+const cellHyperlink = (cell: ExcelJS.Cell | null): string | null => {
+  if (!cell) return null;
+  const h = cell.hyperlink;
+  if (!h) return null;
+  if (typeof h === "string") return h;
+  // ExcelJS.CellHyperlinkValue has { hyperlink: string; tooltip?: string }
+  if (typeof h === "object" && "hyperlink" in h) {
+    return (h as { hyperlink: string }).hyperlink ?? null;
+  }
+  return null;
+};
+
+export const parseWorksheet = async (buffer: Buffer): Promise<ParseResult> => {
+  const wb = new ExcelJS.Workbook();
+  // exceljs bundles its own (older) @types/node via a transitive dep whose
+  // Buffer type structurally conflicts — the runtime value is a plain Buffer.
+  await wb.xlsx.load(buffer as unknown as Parameters<typeof wb.xlsx.load>[0]);
+
+  const ws =
+    wb.getWorksheet("MASTER LIST") ?? wb.getWorksheet(wb.worksheets[0]?.name);
   if (!ws) return { rows: [], warnings: [{ row: 0, message: "No sheet found" }] };
 
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, {
-    header: 1,
-    defval: null,
-    blankrows: false,
+  // Row 1 is the header; exceljs rows are 1-indexed.
+  const headerRow = ws.getRow(1);
+  const header: string[] = [];
+  headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    header[colNumber - 1] = cellText(cell).trim().toUpperCase();
   });
-  if (aoa.length < 2) return { rows: [], warnings: [] };
 
-  const header = (aoa[0] as string[]).map((h) =>
-    String(h ?? "")
-      .trim()
-      .toUpperCase(),
-  );
   const idx = (name: string) => header.indexOf(name.toUpperCase());
 
   const C = {
@@ -268,32 +324,25 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
     dateAssigned: idx("DATE ASSIGNED TO AGENT"),
   };
 
-  // Pull hyperlinks for CASE LINK and WIN SHEET LINK columns
-  const caseLinkUrls = new Map<number, string>();
-  const winSheetLinkUrls = new Map<number, string>();
-  const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-  for (let r = range.s.r + 1; r <= range.e.r; r++) {
-    if (C.caseLink >= 0) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c: C.caseLink })];
-      if (cell?.l?.Target) caseLinkUrls.set(r, cell.l.Target);
-    }
-    if (C.winSheetLink >= 0) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c: C.winSheetLink })];
-      if (cell?.l?.Target) winSheetLinkUrls.set(r, cell.l.Target);
-    }
-  }
+  // exceljs columns are 1-indexed; our idx() values are 0-indexed.
+  const col = (zeroIdx: number) => zeroIdx + 1;
 
   const rows: ParsedCaseRow[] = [];
   const warnings: ParseResult["warnings"] = [];
   const seenIds = new Set<number>();
   let synthetic = SYNTHETIC_ID_BASE;
 
-  for (let r = 1; r < aoa.length; r++) {
-    const row = aoa[r] as unknown[];
-    const linkText = String(row[C.caseLink] ?? "").trim();
-    if (!linkText) continue; // skip blank rows
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return; // skip header
 
-    const link = caseLinkUrls.get(r) ?? null;
+    const getCell = (zeroIdx: number): ExcelJS.Cell | null =>
+      zeroIdx < 0 ? null : row.getCell(col(zeroIdx));
+
+    const caseLinkCell = getCell(C.caseLink);
+    const linkText = cellText(caseLinkCell).trim();
+    if (!linkText) return; // skip blank rows
+
+    const link = cellHyperlink(caseLinkCell);
     const myCaseMatch = link?.match(MYCASE_URL_RE);
     const myCaseId = myCaseMatch ? Number(myCaseMatch[1]) : null;
 
@@ -305,7 +354,7 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
       clientId = synthetic++;
       if (myCaseId)
         warnings.push({
-          row: r + 1,
+          row: rowNumber,
           message: `Duplicate MyCase id ${myCaseId} — using synthetic ${clientId}`,
         });
     }
@@ -313,53 +362,51 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
 
     const { firstName, lastName, aljFirstName, aljLastName } =
       parseCaseLink(linkText);
-    const ct = mapClaimType(row[C.claimType]);
+    const ct = mapClaimType(cellText(getCell(C.claimType)));
+
+    const winSheetCell = getCell(C.winSheetLink);
+    const winSheetUrl = cellHyperlink(winSheetCell);
+    const winSheetText = cellText(winSheetCell).trim() || null;
 
     rows.push({
       clientId,
-      externalId: link, // store the MyCase URL for traceability
+      externalId: link,
       caseLink: linkText,
       firstName: firstName || "Unknown",
       lastName: lastName || "Unknown",
-      approvalDate: dateOnly(row[C.approvalDate]),
-      levelWon: mapLevelWon(row[C.caseLevel]),
+      approvalDate: dateOnly(cellRaw(getCell(C.approvalDate))),
+      levelWon: mapLevelWon(cellText(getCell(C.caseLevel))),
       claimType: ct.claimType,
       claimTypeLabel: ct.claimTypeLabel,
       aljFirstName,
       aljLastName,
 
-      assignedTo: row[C.assignedTo] ? String(row[C.assignedTo]).trim() : null,
-      winSheetStatus: mapWinSheetStatus(row[C.winSheetStatus]),
-      winSheetLink:
-        winSheetLinkUrls.get(r) ??
-        (row[C.winSheetLink] ? String(row[C.winSheetLink]).trim() : null),
-      winSheetLinkText: row[C.winSheetLink]
-        ? String(row[C.winSheetLink]).trim()
-        : null,
-      caseStatus: row[C.caseStatus] ? String(row[C.caseStatus]).trim() : null,
-      feesConfirmation: row[C.feesConfirmation]
-        ? String(row[C.feesConfirmation]).trim()
-        : null,
-      dateAssignedToAgent: dateOnly(row[C.dateAssigned]),
-      approvedBy: row[C.approvedBy] ? String(row[C.approvedBy]).trim() : null,
+      assignedTo: cellText(getCell(C.assignedTo)).trim() || null,
+      winSheetStatus: mapWinSheetStatus(cellText(getCell(C.winSheetStatus))),
+      winSheetLink: winSheetUrl ?? winSheetText,
+      winSheetLinkText: winSheetText,
+      caseStatus: cellText(getCell(C.caseStatus)).trim() || null,
+      feesConfirmation: cellText(getCell(C.feesConfirmation)).trim() || null,
+      dateAssignedToAgent: dateOnly(cellRaw(getCell(C.dateAssigned))),
+      approvedBy: cellText(getCell(C.approvedBy)).trim() || null,
 
-      t16Retro: num(row[C.t16Retro]),
-      t16FeeDue: num(row[C.t16FeeDue]),
-      t16FeeReceived: num(row[C.t16FeeRcv]),
-      t16Pending: num(row[C.t16Pending]),
-      t16FeeReceivedDate: dateOnly(row[C.t16Date]),
+      t16Retro: num(cellRaw(getCell(C.t16Retro))),
+      t16FeeDue: num(cellRaw(getCell(C.t16FeeDue))),
+      t16FeeReceived: num(cellRaw(getCell(C.t16FeeRcv))),
+      t16Pending: num(cellRaw(getCell(C.t16Pending))),
+      t16FeeReceivedDate: dateOnly(cellRaw(getCell(C.t16Date))),
 
-      t2Retro: num(row[C.t2Retro]),
-      t2FeeDue: num(row[C.t2FeeDue]),
-      t2FeeReceived: num(row[C.t2FeeRcv]),
-      t2Pending: num(row[C.t2Pending]),
-      t2FeeReceivedDate: dateOnly(row[C.t2Date]),
+      t2Retro: num(cellRaw(getCell(C.t2Retro))),
+      t2FeeDue: num(cellRaw(getCell(C.t2FeeDue))),
+      t2FeeReceived: num(cellRaw(getCell(C.t2FeeRcv))),
+      t2Pending: num(cellRaw(getCell(C.t2Pending))),
+      t2FeeReceivedDate: dateOnly(cellRaw(getCell(C.t2Date))),
 
-      auxRetro: num(row[C.auxRetro]),
-      auxFeeDue: num(row[C.auxFeeDue]),
-      auxFeeReceived: num(row[C.auxFeeRcv]),
-      auxPending: num(row[C.auxPending]),
-      auxFeeReceivedDate: dateOnly(row[C.auxDate]),
+      auxRetro: num(cellRaw(getCell(C.auxRetro))),
+      auxFeeDue: num(cellRaw(getCell(C.auxFeeDue))),
+      auxFeeReceived: num(cellRaw(getCell(C.auxFeeRcv))),
+      auxPending: num(cellRaw(getCell(C.auxPending))),
+      auxFeeReceivedDate: dateOnly(cellRaw(getCell(C.auxDate))),
 
       daysAfterApproval: null,
       approvalCategory: null,
@@ -368,9 +415,9 @@ export const parseWorksheet = (buffer: Buffer): ParseResult => {
       monthAssignedToAgent: null,
       t2Decision: "unknown",
       t16Decision: "unknown",
-      notes: row[C.notes] ? String(row[C.notes]).trim() : null,
+      notes: cellText(getCell(C.notes)).trim() || null,
     });
-  }
+  });
 
   return { rows, warnings };
 };

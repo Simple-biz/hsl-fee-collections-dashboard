@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { auth } from "@/auth";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 import { z } from "zod";
 import { getMondayOfDate } from "@/lib/formatters";
 
@@ -22,14 +22,16 @@ const patchSchema = z.object({
   calledBackResolved: z.boolean().optional(),
 });
 
-// PATCH /api/inbound-calls/[id] — anyone authenticated
+// PATCH /api/inbound-calls/[id] — inbound_calls page access required
 export const PATCH = async (
   req: NextRequest,
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
-    const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const guard = await requirePageAccess("inbound_calls");
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
+    }
 
     const id = await resolveId(context);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -74,14 +76,16 @@ export const PATCH = async (
   }
 };
 
-// DELETE /api/inbound-calls/[id] — anyone authenticated
+// DELETE /api/inbound-calls/[id] — inbound_calls page access required
 export const DELETE = async (
   req: NextRequest,
   context: { params: { id: string } | Promise<{ id: string }> },
 ) => {
   try {
-    const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const guard = await requirePageAccess("inbound_calls");
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
+    }
 
     const id = await resolveId(context);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });

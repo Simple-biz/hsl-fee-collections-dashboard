@@ -6,6 +6,7 @@ import { StatCards } from "@/components/cases/StatCards";
 import { CollectionsPanel } from "@/components/cases/CollectionsPanel";
 import { RevenuePanel } from "@/components/cases/RevenuePanel";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import { RecentActivityFeed, ActivityEntry } from "@/components/reports/RecentActivityFeed";
@@ -13,13 +14,14 @@ import { RecentActivityFeed, ActivityEntry } from "@/components/reports/RecentAc
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function OverviewPage() {
+  const { dateRange } = useDateRange();
   const {
     summary,
     monthlyData,
     loading,
     error,
     refresh,
-  } = useDashboard();
+  } = useDashboard(dateRange);
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const t = themeClasses(dark);
@@ -81,7 +83,7 @@ export default function OverviewPage() {
 
   return (
     <>
-      <StatCards stats={summary} />
+      <StatCards stats={summary} dateRange={dateRange} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         <CollectionsPanel data={monthlyData} />
         <RevenuePanel />

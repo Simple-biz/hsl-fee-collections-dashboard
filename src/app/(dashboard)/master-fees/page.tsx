@@ -6,7 +6,6 @@ import { FeeRecordsTable } from "@/components/cases/FeeRecordsTable";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
-import { RefreshCw, AlertCircle } from "lucide-react";
 
 type AgingFilter = "all" | "unpaid_60" | "unpaid_90";
 
@@ -17,16 +16,7 @@ const AGING_OPTIONS: { value: AgingFilter; label: string }[] = [
 ];
 
 export default function MasterFeesPage() {
-  const {
-    cases,
-    team,
-    approvedByOptions,
-    dropdownOptions,
-    casesLoading,
-    casesLoadedOnce,
-    error,
-    refresh,
-  } = useDashboard();
+  const { team, approvedByOptions, dropdownOptions, refreshSummary } = useDashboard();
   const teamMembers = team.map((m) => ({
     name: m.name,
     team: m.team,
@@ -38,47 +28,6 @@ export default function MasterFeesPage() {
   const t = themeClasses(dark);
 
   const [agingFilter, setAgingFilter] = useState<AgingFilter>("all");
-
-  if (error) {
-    return (
-      <div
-        className={`rounded-xl border p-4 flex items-center gap-3 ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
-        role="alert"
-      >
-        <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-        <span className="text-sm">Failed to load data: {error}</span>
-        <button onClick={refresh} className="ml-auto text-xs font-medium underline">
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  // Only block the whole page on the initial load. A later refresh() (e.g.
-  // after saving a win sheet link, note, or archive action) re-runs the same
-  // fetch and flips casesLoading again — without this guard, every one of
-  // those small edits would blank the entire table back to a spinner instead
-  // of just quietly swapping in fresh data once it arrives. Gating on
-  // casesLoadedOnce (not cases.length === 0) also keeps a genuinely empty
-  // filtered result from re-showing the full spinner on every refresh.
-  if (casesLoading && !casesLoadedOnce) {
-    return (
-      <div className={`rounded-xl border ${t.card} flex items-center justify-center py-16`}>
-        <RefreshCw aria-hidden="true" className={`h-5 w-5 animate-spin ${t.textMuted}`} />
-        <span className={`ml-3 text-sm ${t.textSub}`}>Loading cases...</span>
-      </div>
-    );
-  }
-
-  const agingFiltered =
-    agingFilter === "all"
-      ? cases
-      : cases.filter(
-          (c) =>
-            c.paid === 0 &&
-            c.daysAfterApproval != null &&
-            c.daysAfterApproval > (agingFilter === "unpaid_60" ? 60 : 90),
-        );
 
   const presetBase = `px-3 py-1 rounded-full text-[13px] font-medium border transition-colors`;
   const presetActive = dark
@@ -107,9 +56,10 @@ export default function MasterFeesPage() {
       </div>
       <Suspense>
         <FeeRecordsTable
-          cases={agingFiltered}
+          serverPaginated
+          agingFilter={agingFilter}
           dateRange={dateRange}
-          onImported={refresh}
+          onImported={refreshSummary}
           approvedByOptions={approvedByOptions}
           dropdownOptions={dropdownOptions}
           teamMembers={teamMembers}

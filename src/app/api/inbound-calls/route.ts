@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { auth } from "@/auth";
+import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
 import { z } from "zod";
 import { getMondayOfDate } from "@/lib/formatters";
 
@@ -58,11 +59,13 @@ const createSchema = z.object({
   calledBackResolved: z.boolean().optional(),
 });
 
-// POST /api/inbound-calls — anyone authenticated
+// POST /api/inbound-calls — inbound_calls page access required
 export const POST = async (req: NextRequest) => {
   try {
-    const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const guard = await requirePageAccess("inbound_calls");
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
+    }
 
     const body = await req.json();
     const parsed = createSchema.safeParse(body);

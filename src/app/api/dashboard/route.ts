@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cases, feeRecords } from "@/lib/db/schema";
 import { eq, sql, count } from "drizzle-orm";
 
 // GET /api/dashboard — Summary stats + monthly collections data
-export const GET = async () => {
+// Optional query params: from (YYYY-MM-DD), to (YYYY-MM-DD)
+// When provided, fees-collected and cases-closed stats use that range instead of the current calendar month.
+export const GET = async (req: NextRequest) => {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = req.nextUrl;
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
 
   try {
     // Summary stats (active rows only — closed cases live on /fees-closed).
@@ -52,26 +58,62 @@ export const GET = async () => {
     // detail page, so a month where fees arrived via MyCase/Sheets sync or a
     // CSV import (which write t16/t2/aux_fee_received directly) showed $0
     // here even with real money recorded.
-    const [mtd] = await db.execute(sql`
-      SELECT
-        (
-          SELECT COALESCE(SUM(
-            CASE WHEN DATE_TRUNC('month', t16_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
-              THEN COALESCE(t16_fee_received, 0)::numeric ELSE 0 END
-            + CASE WHEN DATE_TRUNC('month', t2_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
-              THEN COALESCE(t2_fee_received, 0)::numeric ELSE 0 END
-            + CASE WHEN DATE_TRUNC('month', aux_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
-              THEN COALESCE(aux_fee_received, 0)::numeric ELSE 0 END
-          ), 0)
-          FROM fee_records
-        ) AS fees_collected_mtd,
-        (
-          SELECT COUNT(*)
-          FROM fee_records
-          WHERE closed_at IS NOT NULL
-            AND DATE_TRUNC('month', closed_at) = DATE_TRUNC('month', NOW())
-        ) AS cases_closed_mtd
-    `) as unknown as [{ fees_collected_mtd: string; cases_closed_mtd: string }];
+    // Date window for fees-collected / cases-closed stats.
+    // Validate format AND calendar semantics — "2025-02-30" passes a simple
+    // regex but PostgreSQL rejects it with a 500. The round-trip check via
+    // Date.toISOString() catches calendar-impossible values (JS rolls them).
+    const isValidISODate = (s: string): boolean => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+      const d = new Date(s + "T12:00:00Z");
+      return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+    };
+    const safeFrom = fromParam && isValidISODate(fromParam) ? fromParam : null;
+    const safeTo = toParam && isValidISODate(toParam) ? toParam : null;
+    const useCustomRange = safeFrom != null && safeTo != null;
+
+    const mtdResult = useCustomRange
+      ? await db.execute(sql`
+          SELECT
+            (
+              SELECT COALESCE(SUM(
+                CASE WHEN t16_fee_received_date BETWEEN ${safeFrom}::date AND ${safeTo}::date
+                  THEN COALESCE(t16_fee_received, 0)::numeric ELSE 0 END
+                + CASE WHEN t2_fee_received_date BETWEEN ${safeFrom}::date AND ${safeTo}::date
+                  THEN COALESCE(t2_fee_received, 0)::numeric ELSE 0 END
+                + CASE WHEN aux_fee_received_date BETWEEN ${safeFrom}::date AND ${safeTo}::date
+                  THEN COALESCE(aux_fee_received, 0)::numeric ELSE 0 END
+              ), 0)
+              FROM fee_records
+            ) AS fees_collected_mtd,
+            (
+              SELECT COUNT(*)
+              FROM fee_records
+              WHERE closed_at IS NOT NULL
+                AND closed_at::date BETWEEN ${safeFrom}::date AND ${safeTo}::date
+            ) AS cases_closed_mtd
+        `)
+      : await db.execute(sql`
+          SELECT
+            (
+              SELECT COALESCE(SUM(
+                CASE WHEN DATE_TRUNC('month', t16_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
+                  THEN COALESCE(t16_fee_received, 0)::numeric ELSE 0 END
+                + CASE WHEN DATE_TRUNC('month', t2_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
+                  THEN COALESCE(t2_fee_received, 0)::numeric ELSE 0 END
+                + CASE WHEN DATE_TRUNC('month', aux_fee_received_date) = DATE_TRUNC('month', CURRENT_DATE)
+                  THEN COALESCE(aux_fee_received, 0)::numeric ELSE 0 END
+              ), 0)
+              FROM fee_records
+            ) AS fees_collected_mtd,
+            (
+              SELECT COUNT(*)
+              FROM fee_records
+              WHERE closed_at IS NOT NULL
+                AND DATE_TRUNC('month', closed_at) = DATE_TRUNC('month', NOW())
+            ) AS cases_closed_mtd
+        `);
+
+    const [mtd] = mtdResult as unknown as [{ fees_collected_mtd: string; cases_closed_mtd: string }];
 
     // Monthly collections data (last 6 months). Same dataset as the summary
     // above — closed cases excluded, totals computed from T16+T2+AUX
