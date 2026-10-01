@@ -47,6 +47,9 @@ export const GET = async (req: NextRequest) => {
     // leaderNotesCount is only computed/returned for sessions with
     // leaderNotes.access — members shouldn't learn even the count exists.
     const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
     const canSeeLeaderNotes = sessionHasCapability(session, "leaderNotes.access");
 
     const { searchParams } = new URL(req.url);
