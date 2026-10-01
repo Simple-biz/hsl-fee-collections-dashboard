@@ -6,6 +6,7 @@ import { themeClasses } from "@/lib/theme-classes";
 import { teamHeaderBg } from "@/lib/team-colors";
 
 type Metric = "cases_closed" | "fees_collected" | "calls_logged";
+type Mode = "monthly" | "quarterly" | "yearly";
 
 interface AgentRow {
   agent: string;
@@ -48,17 +49,35 @@ const valueLabel = (metric: Metric): string => {
   return "closed";
 };
 
+const pad = (n: number) => String(n).padStart(2, "0");
+const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
 const getMonthRange = (offset: number): { from: string; to: string; label: string } => {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
   const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   return {
     from: iso(first),
     to: iso(lastDay),
     label: first.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
   };
+};
+
+const getQuarterRange = (): { from: string; to: string; label: string } => {
+  const now = new Date();
+  const q = Math.floor(now.getMonth() / 3);
+  const first = new Date(now.getFullYear(), q * 3, 1);
+  const last = new Date(now.getFullYear(), q * 3 + 3, 0);
+  return {
+    from: iso(first),
+    to: iso(last),
+    label: `Q${q + 1} ${now.getFullYear()}`,
+  };
+};
+
+const getYearRange = (): { from: string; to: string; label: string } => {
+  const year = new Date().getFullYear();
+  return { from: `${year}-01-01`, to: `${year}-12-31`, label: String(year) };
 };
 
 function computeStandings(agents: AgentRow[]): TeamStanding[] {
@@ -82,18 +101,32 @@ function computeStandings(agents: AgentRow[]): TeamStanding[] {
 
 export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps) {
   const [metric, setMetric] = useState<Metric>("cases_closed");
+  const [mode, setMode] = useState<Mode>("monthly");
   const [monthOffset, setMonthOffset] = useState(0);
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const offset = monthOffset;
-  const monthRange = getMonthRange(offset);
+  const monthRange = getMonthRange(monthOffset);
+  const quarterRange = getQuarterRange();
+  const yearRange = getYearRange();
 
-  const periodLabel = offset === 0 ? "This month" : (monthRange?.label ?? "");
+  const periodLabel =
+    mode === "quarterly"
+      ? quarterRange.label
+      : mode === "yearly"
+        ? yearRange.label
+        : monthOffset === 0
+          ? "This month"
+          : (monthRange.label ?? "");
 
-  const apiUrl = `/api/scoreboard-standings?from=${monthRange.from}&to=${monthRange.to}&metric=${metric}`;
+  const { from, to } =
+    mode === "quarterly" ? quarterRange
+    : mode === "yearly"  ? yearRange
+    : monthRange;
+
+  const apiUrl = `/api/scoreboard-standings?from=${from}&to=${to}&metric=${metric}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -133,7 +166,7 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
     };
   }, [apiUrl]);
 
-  const canGoForward = offset < 0;
+  const canGoForward = monthOffset < 0;
 
   const handlePrev = () => setMonthOffset((v) => v - 1);
   const handleNext = () => setMonthOffset((v) => v + 1);
@@ -172,25 +205,57 @@ export function ScoreboardStandingsTab({ dark, t }: ScoreboardStandingsTabProps)
               ))}
             </select>
 
-            {/* Period navigation */}
-            <button
-              onClick={handlePrev}
-              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
-              aria-label="Previous period"
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
-              {periodLabel}
-            </span>
-            <button
-              onClick={handleNext}
-              disabled={!canGoForward}
-              className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
-              aria-label="Next period"
-            >
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </button>
+            {/* Mode toggle */}
+            <div className={`flex rounded-md border overflow-hidden text-xs font-medium ${dark ? "border-neutral-700" : "border-neutral-200"}`}>
+              {(["monthly", "quarterly", "yearly"] as Mode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`h-8 px-3 transition-colors ${
+                    mode === m
+                      ? dark
+                        ? "bg-neutral-700 text-white"
+                        : "bg-neutral-100 text-neutral-900"
+                      : dark
+                        ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-750"
+                        : "bg-white text-neutral-500 hover:bg-neutral-50"
+                  }`}
+                >
+                  {m === "monthly" ? "Monthly" : m === "quarterly" ? "Quarterly" : "Yearly"}
+                </button>
+              ))}
+            </div>
+
+            {/* Month prev/next — monthly mode only */}
+            {mode === "monthly" && (
+              <>
+                <button
+                  onClick={handlePrev}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub}`}
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
+                  {periodLabel}
+                </span>
+                <button
+                  onClick={handleNext}
+                  disabled={!canGoForward}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${t.hover} ${t.textSub} disabled:opacity-40`}
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </>
+            )}
+
+            {/* Period label — quarterly / yearly */}
+            {mode !== "monthly" && (
+              <span className={`text-[13px] font-medium ${t.textSub} whitespace-nowrap px-1`}>
+                {periodLabel}
+              </span>
+            )}
           </div>
         </div>
 
