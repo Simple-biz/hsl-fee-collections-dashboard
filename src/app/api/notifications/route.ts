@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
-import { eq, sql, desc, and, inArray } from "drizzle-orm";
+import { eq, sql, desc, and, or, inArray } from "drizzle-orm";
 import { namesMatch } from "@/lib/formatters";
 import { isAdminRole } from "@/lib/auth-helpers";
 import { feePetitions } from "@/lib/db/schema";
@@ -171,11 +171,34 @@ export const PATCH = async (req: NextRequest) => {
     }
     const body = parsedBody.data;
 
+    const isAdmin = isAdminRole(session.user.role);
+    const userName = session.user.name?.trim() ?? null;
+    // Build agent-only list from the canonical Set so SQL stays in sync with
+    // visibleToSession when new agent-only types are added.
+    const agentOnlyList = sql.join(
+      [...AGENT_ONLY_TYPES].map((t) => sql`${t}`),
+      sql`, `,
+    );
+    // Mirror visibleToSession: team-wide types (not agent-only) are visible to
+    // all; agent-only types are scoped to the named agent. lower() matches the
+    // case-insensitive namesMatch used by the GET handler.
+    const visibilityCondition = isAdmin
+      ? undefined
+      : or(
+          sql`${notifications.type} NOT IN (${agentOnlyList})`,
+          userName
+            ? sql`lower(${notifications.agentName}) = lower(${userName})`
+            : sql`false`,
+        );
+
     if ("markAllRead" in body) {
+      const readScope = visibilityCondition
+        ? and(eq(notifications.isRead, false), visibilityCondition)
+        : eq(notifications.isRead, false);
       await db
         .update(notifications)
         .set({ isRead: true, readAt: new Date() })
-        .where(eq(notifications.isRead, false));
+        .where(readScope);
 
       return NextResponse.json({ status: "ok", message: "All marked as read" });
     }
@@ -183,7 +206,11 @@ export const PATCH = async (req: NextRequest) => {
     await db
       .update(notifications)
       .set({ isRead: true, readAt: new Date() })
-      .where(inArray(notifications.id, body.ids));
+      .where(
+        visibilityCondition
+          ? and(inArray(notifications.id, body.ids), visibilityCondition)
+          : inArray(notifications.id, body.ids),
+      );
 
     return NextResponse.json({ status: "ok", count: body.ids.length });
   } catch (error) {
