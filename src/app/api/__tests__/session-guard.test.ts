@@ -7,6 +7,7 @@
 // still be treated as unauthenticated.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 const mockAuth = vi.fn();
 vi.mock("@/auth", () => ({ auth: (...args: unknown[]) => mockAuth(...args) }));
@@ -19,6 +20,8 @@ vi.mock("@/lib/db", () => ({
 
 import { GET } from "@/app/api/dashboard/route";
 
+const makeReq = () => new NextRequest("http://localhost/api/dashboard");
+
 beforeEach(() => {
   mockAuth.mockReset();
 });
@@ -26,7 +29,7 @@ beforeEach(() => {
 describe("session guard — GHSA-8fpg-xm3f-6cx3 regression", () => {
   it("returns 401 when auth() returns null", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(401);
   });
 
@@ -34,19 +37,19 @@ describe("session guard — GHSA-8fpg-xm3f-6cx3 regression", () => {
   // session (e.g. an error envelope). `if (!session)` passes; `if (!session?.user)` catches it.
   it("returns 401 when auth() returns a truthy object with no user", async () => {
     mockAuth.mockResolvedValue({});
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(401);
   });
 
   it("returns 401 when auth() returns a session with user: null", async () => {
     mockAuth.mockResolvedValue({ user: null });
-    const res = await GET();
+    const res = await GET(makeReq());
     expect(res.status).toBe(401);
   });
 
   it("passes the guard when auth() returns a valid session", async () => {
     mockAuth.mockResolvedValue({ user: { id: "1", role: "member" } });
-    const res = await GET();
+    const res = await GET(makeReq());
     // Guard passed — may succeed or fail on the DB mock, but not 401.
     expect(res.status).not.toBe(401);
   });

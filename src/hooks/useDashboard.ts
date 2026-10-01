@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import type { DropdownCategory } from "@/lib/dropdown-categories";
 import type { DropdownOptionsByCategory } from "@/lib/dropdown-options";
+import type { DateRange } from "@/lib/date-range-context";
 
 // Re-exported for the many existing `from "@/hooks/useDashboard"` imports —
 // the type itself now lives in lib/dropdown-options.ts alongside the fetch
@@ -45,7 +46,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
   casesClosedMTD: 0,
 };
 
-export const useDashboard = (): DashboardData => {
+export const useDashboard = (dateRange?: DateRange | null): DashboardData => {
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
@@ -60,25 +61,30 @@ export const useDashboard = (): DashboardData => {
   const [casesLoadedOnce, setCasesLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const abortRef = useRef<AbortController | null>(null);
-  const cancelledRef = useRef(false);
+  const summaryAbortRef = useRef<AbortController | null>(null);
+  const summaryCancelledRef = useRef(false);
+  const casesAbortRef = useRef<AbortController | null>(null);
+  const casesCancelledRef = useRef(false);
 
-  const fetchAll = useCallback(async () => {
-    abortRef.current?.abort();
+  // Fetches summary, team, and dropdown options. Re-runs on dateRange change.
+  const fetchSummary = useCallback(() => {
+    summaryAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
-    cancelledRef.current = false;
+    summaryAbortRef.current = controller;
 
     setLoading(true);
-    setCasesLoading(true);
     setError(null);
+
+    const dashboardUrl = dateRange
+      ? `/api/dashboard?from=${dateRange.from}&to=${dateRange.to}`
+      : "/api/dashboard";
 
     // Summary + team + ALL dropdown_options (one round-trip, grouped by
     // category on the client) power the KPI cards and the inline-editable
     // dropdowns in the fee records table.
-    const summaryTask = (async () => {
+    void (async () => {
       const [dashRes, teamRes, optRes] = await Promise.all([
-        fetch("/api/dashboard", { signal: controller.signal }),
+        fetch(dashboardUrl, { signal: controller.signal }),
         fetch("/api/team-members", { signal: controller.signal }),
         fetch("/api/settings/dropdown-options", { signal: controller.signal }),
       ]);
@@ -88,7 +94,7 @@ export const useDashboard = (): DashboardData => {
         throw new Error(`Failed to fetch team data (${teamRes.status})`);
       const dashJson = await dashRes.json();
       const teamJson = await teamRes.json();
-      if (cancelledRef.current) return;
+      if (summaryCancelledRef.current) return;
       setSummary(dashJson.summary);
       setMonthlyData(dashJson.monthlyData);
       setTeam(teamJson.data);
@@ -108,63 +114,78 @@ export const useDashboard = (): DashboardData => {
         for (const o of all) {
           (grouped[o.category] ||= []).push(o);
         }
-        if (cancelledRef.current) return;
+        if (summaryCancelledRef.current) return;
         setDropdownOptions(grouped);
         setApprovedByOptions(grouped.approved_by || []);
       }
-    })();
+    })()
+      .catch((err: unknown) => {
+        if ((err as Error).name === "AbortError") return;
+        if (!summaryCancelledRef.current) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && !summaryCancelledRef.current)
+          setLoading(false);
+      });
+  }, [dateRange]);
 
-    // The cases list is heavier; let it resolve independently so the table
-    // doesn't hold up the rest of the dashboard. Active (non-closed) only —
-    // closed cases live on /fees-closed.
-    const casesTask = (async () => {
-      // Pull the full active set in one request — the table paginates/filters
-      // client-side, so it needs every row, not the API's default page of 50.
-      // Active caseload is hundreds to low-thousands; a high limit is fine.
+  // Fetches the active cases list. Runs once on mount — date-insensitive, so
+  // it doesn't re-run when the range changes. Strict Mode safe: [] deps means
+  // React re-runs it on remount in dev, which is harmless (cases load twice).
+  const fetchCases = useCallback(() => {
+    casesAbortRef.current?.abort();
+    const controller = new AbortController();
+    casesAbortRef.current = controller;
+
+    setCasesLoading(true);
+
+    // Pull the full active set in one request — the table paginates/filters
+    // client-side, so it needs every row, not the API's default page of 50.
+    // Active caseload is hundreds to low-thousands; a high limit is fine.
+    void (async () => {
       const casesRes = await fetch("/api/cases?isClosed=false&limit=100000", {
         signal: controller.signal,
       });
       if (!casesRes.ok)
         throw new Error(`Failed to fetch cases (${casesRes.status})`);
       const casesJson = await casesRes.json();
-      if (cancelledRef.current) return;
+      if (casesCancelledRef.current) return;
       setCases(casesJson.data);
-    })();
-
-    // Both fetches run in parallel; flip each loading flag as it settles.
-    await Promise.all([
-      summaryTask
-        .catch((err: unknown) => {
-          if ((err as Error).name === "AbortError") return;
-          if (!cancelledRef.current) setError((err as Error).message);
-        })
-        .finally(() => {
-          // cancelledRef resets on re-mount (Strict Mode) before this fires; signal stays aborted
-          if (!controller.signal.aborted && !cancelledRef.current) setLoading(false);
-        }),
-      casesTask
-        .catch((err: unknown) => {
-          if ((err as Error).name === "AbortError") return;
-          if (!cancelledRef.current) setError((err as Error).message);
-        })
-        .finally(() => {
-          // same Strict Mode guard as summaryTask above
-          if (!controller.signal.aborted && !cancelledRef.current) {
-            setCasesLoading(false);
-            setCasesLoadedOnce(true);
-          }
-        }),
-    ]);
+    })()
+      .catch((err: unknown) => {
+        if ((err as Error).name === "AbortError") return;
+        if (!casesCancelledRef.current) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && !casesCancelledRef.current) {
+          setCasesLoading(false);
+          setCasesLoadedOnce(true);
+        }
+      });
   }, []);
 
   useEffect(() => {
-    cancelledRef.current = false;
-    fetchAll();
+    summaryCancelledRef.current = false;
+    fetchSummary();
     return () => {
-      cancelledRef.current = true;
-      abortRef.current?.abort();
+      summaryCancelledRef.current = true;
+      summaryAbortRef.current?.abort();
     };
-  }, [fetchAll]);
+  }, [fetchSummary]);
+
+  useEffect(() => {
+    casesCancelledRef.current = false;
+    fetchCases();
+    return () => {
+      casesCancelledRef.current = true;
+      casesAbortRef.current?.abort();
+    };
+  }, [fetchCases]);
+
+  const refresh = useCallback(() => {
+    fetchSummary();
+    fetchCases();
+  }, [fetchSummary, fetchCases]);
 
   return {
     cases,
@@ -177,6 +198,6 @@ export const useDashboard = (): DashboardData => {
     casesLoading,
     casesLoadedOnce,
     error,
-    refresh: fetchAll,
+    refresh,
   };
 };
