@@ -38,7 +38,7 @@ const fmtDate = (iso: string): string =>
   });
 
 const isToday = (iso: string): boolean =>
-  iso === new Date().toISOString().split("T")[0];
+  iso === new Date().toLocaleDateString("en-CA");
 
 const fmtTime = (iso: string): string =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });

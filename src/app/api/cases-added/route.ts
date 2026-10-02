@@ -25,10 +25,11 @@ export async function GET(req: NextRequest) {
         c.first_name AS first_name,
         c.last_name AS last_name,
         c.external_id AS external_id,
-        c.created_at AS created_at
+        c.created_at AS created_at,
+        DATE(c.created_at AT TIME ZONE 'America/New_York') AS et_date
       FROM cases c
-      WHERE c.created_at >= ${week}::date
-        AND c.created_at < ${week}::date + INTERVAL '7 days'
+      WHERE DATE(c.created_at AT TIME ZONE 'America/New_York') >= ${week}::date
+        AND DATE(c.created_at AT TIME ZONE 'America/New_York') < ${week}::date + INTERVAL '7 days'
       ORDER BY c.created_at ASC
     `) as unknown as {
       id: number;
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
       last_name: string | null;
       external_id: string | null;
       created_at: string;
+      et_date: string;
     }[];
 
     const cases = caseRows.map((r) => ({
@@ -43,7 +45,7 @@ export async function GET(req: NextRequest) {
       name: `${r.last_name ?? ""}, ${r.first_name ?? ""}`,
       externalId: r.external_id,
       createdAt: r.created_at,
-      date: new Date(r.created_at).toISOString().split("T")[0],
+      date: r.et_date,
     }));
 
     const countByDate = new Map<string, number>();
