@@ -87,7 +87,7 @@ export const GET = async (req: NextRequest) => {
 
     // Shared WHERE for the count and main queries.
     const whereClause = sql`TRUE
-      ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)})` : sql``}
+      ${search ? sql`AND (${ilike(cases.firstName, `%${search}%`)} OR ${ilike(cases.lastName, `%${search}%`)} OR ${ilike(cases.externalId, `%${search}%`)} OR (${cases.firstName} || ' ' || ${cases.lastName}) ILIKE ${'%' + search + '%'} OR (${cases.lastName} || ', ' || ${cases.firstName}) ILIKE ${'%' + search + '%'})` : sql``}
       ${status === "finished" ? sql`AND LOWER(${feeRecords.winSheetStatus}) IN ('finished', 'pending_payment', 'partially_paid', 'paid_in_full')` : status === "started" ? sql`AND LOWER(${feeRecords.winSheetStatus}) IN ('started', 'in_progress')` : status ? sql`AND ${feeRecords.winSheetStatus} = ${status}` : sql``}
       ${assigned === "__unassigned__" ? sql`AND (${feeRecords.assignedTo} IS NULL OR ${feeRecords.assignedTo} = '')` : assigned ? sql`AND ${eq(feeRecords.assignedTo, assigned)}` : sql``}
       ${isClosedParam === "true" ? sql`AND COALESCE(${feeRecords.isClosed}, false) = true` : sql``}
