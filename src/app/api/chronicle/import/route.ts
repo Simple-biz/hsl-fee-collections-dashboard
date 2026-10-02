@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
-import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { requirePageAccess, requireCapability, guardStatus } from "@/lib/auth-helpers";
 import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
 import {
   resolveDecisionOutcome,
@@ -83,6 +83,14 @@ export const POST = async (req: NextRequest) => {
       return NextResponse.json(
         { error: guard.error },
         { status: guardStatus(guard.error) },
+      );
+    }
+
+    const piiGuard = await requireCapability("case.editPii");
+    if (!piiGuard.ok) {
+      return NextResponse.json(
+        { error: "Insufficient permissions to import PII fields" },
+        { status: 403 },
       );
     }
 
