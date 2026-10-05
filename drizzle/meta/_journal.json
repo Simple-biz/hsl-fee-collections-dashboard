@@ -414,6 +414,13 @@
       "when": 1790710139076,
       "tag": "0058_fee_petition_approved_at",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791227896322,
+      "tag": "0059_add_login_lockout_columns",
+      "breakpoints": true
     }
   ]
 }
