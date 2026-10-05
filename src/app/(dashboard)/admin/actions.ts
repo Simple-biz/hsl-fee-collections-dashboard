@@ -295,6 +295,43 @@ export async function resetUserPassword(input: {
   }
 }
 
+export async function unlockUser(input: {
+  userId: number;
+}): Promise<ActionResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { ok: false, error: guard.error };
+
+  if (!Number.isFinite(input.userId)) return { ok: false, error: "Invalid user id" };
+
+  try {
+    const [target] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
+    if (!target) return { ok: false, error: "User not found" };
+
+    await db
+      .update(users)
+      .set({ failedLoginAttempts: 0, lockedUntil: null, updatedAt: new Date() })
+      .where(eq(users.id, input.userId));
+
+    await logAdminActivity({
+      actor: actorFromGuard(guard.session),
+      action: "user.unlock",
+      targetUserId: target.id,
+      targetEmail: target.email,
+      summary: `Cleared login lockout for ${target.email}`,
+    });
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (error) {
+    console.error("unlockUser error:", error);
+    return { ok: false, error: "Server error" };
+  }
+}
+
 // ---- Access overrides (page-level) -----------------------------------------
 
 /** Load a user's page access for the admin modal: role default, the stored
