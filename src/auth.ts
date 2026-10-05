@@ -62,21 +62,46 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, email))
           .limit(1);
 
-        // Same null response whether the user is missing, disabled, or the
-        // password is wrong — don't leak which accounts exist.
+        // Same null response whether the user is missing, disabled, locked,
+        // or the password is wrong — don't leak which accounts exist.
         if (!user || !user.isActive) return null;
+
+        // Check lockout before bcrypt to avoid a timing oracle during lockout.
+        const now = new Date();
+        if (user.lockedUntil && user.lockedUntil > now) return null;
 
         const passwordMatches = await bcrypt.compare(
           password,
           user.passwordHash,
         );
-        if (!passwordMatches) return null;
 
-        // Best-effort last-login stamp; never block sign-in on this.
+        if (!passwordMatches) {
+          // Increment attempt counter; lock after 10 failures with exponential
+          // backoff: 15 min × 2^(n-1) capped at 24 h.
+          const attempts = (user.failedLoginAttempts ?? 0) + 1;
+          const LOCK_THRESHOLD = 10;
+          let lockedUntil: Date | null = null;
+          if (attempts >= LOCK_THRESHOLD) {
+            const lockouts = attempts - LOCK_THRESHOLD + 1;
+            const minutes = Math.min(15 * Math.pow(2, lockouts - 1), 60 * 24);
+            lockedUntil = new Date(now.getTime() + minutes * 60 * 1000);
+          }
+          try {
+            await db
+              .update(users)
+              .set({ failedLoginAttempts: attempts, lockedUntil })
+              .where(eq(users.id, user.id));
+          } catch {
+            /* non-critical */
+          }
+          return null;
+        }
+
+        // Best-effort last-login stamp + reset counter; never block sign-in on this.
         try {
           await db
             .update(users)
-            .set({ lastLoginAt: new Date() })
+            .set({ lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null })
             .where(eq(users.id, user.id));
         } catch {
           /* non-critical */
