@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { inboundCallRecords } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { requirePageAccess, requireCapability, guardStatus } from "@/lib/auth-helpers";
 import { z } from "zod";
 import { getMondayOfDate } from "@/lib/formatters";
 
@@ -76,7 +76,7 @@ export const PATCH = async (
   }
 };
 
-// DELETE /api/inbound-calls/[id] — inbound_calls page access required
+// DELETE /api/inbound-calls/[id] — inbound_calls page access + inboundCalls.delete capability required
 export const DELETE = async (
   req: NextRequest,
   context: { params: { id: string } | Promise<{ id: string }> },
@@ -85,6 +85,11 @@ export const DELETE = async (
     const guard = await requirePageAccess("inbound_calls");
     if (!guard.ok) {
       return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
+    }
+
+    const capGuard = await requireCapability("inboundCalls.delete");
+    if (!capGuard.ok) {
+      return NextResponse.json({ error: capGuard.error }, { status: guardStatus(capGuard.error) });
     }
 
     const id = await resolveId(context);

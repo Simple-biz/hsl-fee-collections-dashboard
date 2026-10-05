@@ -63,6 +63,11 @@ export const CAPABILITIES = [
     label: "Edit PIF",
     description: "Change the PIF dropdown on a case. Doesn't include Fees Closed, which stays admin-only.",
   },
+  {
+    key: "inboundCalls.delete",
+    label: "Delete inbound-call records",
+    description: "Permanently delete an inbound-call log entry. Requires inbound_calls page access.",
+  },
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];
