@@ -104,8 +104,12 @@ export const POST = async (req: NextRequest) => {
         pdfFields.email != null ||
         pdfFields.phone != null ||
         pdfFields.primaryDiagnosis != null ||
+        pdfFields.primaryDiagnosisCode != null ||
         pdfFields.secondaryDiagnosis != null ||
-        pdfFields.allegations != null);
+        pdfFields.secondaryDiagnosisCode != null ||
+        pdfFields.allegations != null ||
+        pdfFields.blindDli != null ||
+        pdfFields.dateLastInsured != null);
 
     if (hasPiiFields) {
       const piiGuard = await requireCapability("case.editPii");
