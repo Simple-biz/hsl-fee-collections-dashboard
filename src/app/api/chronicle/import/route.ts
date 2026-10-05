@@ -86,14 +86,6 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const piiGuard = await requireCapability("case.editPii");
-    if (!piiGuard.ok) {
-      return NextResponse.json(
-        { error: "Insufficient permissions to import PII fields" },
-        { status: 403 },
-      );
-    }
-
     const rawBody = await req.json().catch(() => null);
     const parsedBody = bodySchema.safeParse(rawBody);
     if (!parsedBody.success) {
@@ -104,6 +96,26 @@ export const POST = async (req: NextRequest) => {
     }
     const importCases = parsedBody.data.cases;
     const pdfFields: PdfFields | null = parsedBody.data.pdfFields ?? null;
+
+    const hasPiiFields =
+      pdfFields != null &&
+      (pdfFields.fullSsn != null ||
+        pdfFields.dob != null ||
+        pdfFields.email != null ||
+        pdfFields.phone != null ||
+        pdfFields.primaryDiagnosis != null ||
+        pdfFields.secondaryDiagnosis != null ||
+        pdfFields.allegations != null);
+
+    if (hasPiiFields) {
+      const piiGuard = await requireCapability("case.editPii");
+      if (!piiGuard.ok) {
+        return NextResponse.json(
+          { error: "Insufficient permissions to import PII fields" },
+          { status: 403 },
+        );
+      }
+    }
 
     const imported: { clientId: number; name: string }[] = [];
     const errors: { name: string; error: string }[] = [];
