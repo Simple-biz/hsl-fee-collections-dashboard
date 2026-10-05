@@ -30,15 +30,44 @@ function generatePassword(): string {
 }
 
 async function main() {
-  if (process.env.NODE_ENV === "production") {
-    console.error("❌  Refusing to seed test accounts in a production environment (NODE_ENV=production).");
-    process.exit(1);
-  }
-
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     console.error("DATABASE_URL is not set. Run via: npm run seed:test-users");
     process.exit(1);
+  }
+
+  if (connectionString.includes("neon.tech") && !process.env.SEED_ALLOW_NEON) {
+    console.error(
+      "❌  DATABASE_URL points to a Neon endpoint. Refusing to seed.\n" +
+      "    To seed the Neon test branch, set SEED_ALLOW_NEON=1:\n" +
+      "    SEED_ALLOW_NEON=1 dotenv -e .env.neon-branch -- tsx scripts/seed-test-users.ts",
+    );
+    process.exit(1);
+  }
+
+  if (connectionString.includes("neon.tech") && process.env.SEED_ALLOW_NEON) {
+    const host = new URL(connectionString).hostname;
+    process.stdout.write(
+      `⚠️   SEED_ALLOW_NEON is set. Writing to Neon host: ${host}\n` +
+      `    Type "yes" to proceed: `,
+    );
+    const answer = await new Promise<string>((resolve) => {
+      const cleanup = (val: string) => {
+        process.stdin.removeListener("data", onData);
+        process.stdin.removeListener("end", onEnd);
+        process.stdin.removeListener("close", onEnd);
+        resolve(val);
+      };
+      const onData = (d: Buffer) => cleanup(d.toString().trim());
+      const onEnd = () => cleanup("");
+      process.stdin.once("data", onData);
+      process.stdin.once("end", onEnd);
+      process.stdin.once("close", onEnd);
+    });
+    if (answer !== "yes") {
+      console.log("Aborted.");
+      process.exit(0);
+    }
   }
 
   const client = postgres(connectionString, { max: 1, prepare: false });
