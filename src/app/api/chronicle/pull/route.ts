@@ -7,6 +7,11 @@ import {
   type ChronicleApiResponse,
 } from "@/lib/chronicle-client";
 import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { z } from "zod";
+
+const pullBodySchema = z.object({
+  clientId: z.string().min(1).max(20).regex(/^\d+$/, "clientId must be numeric"),
+});
 
 // ============================================================================
 // MOCK DATA — 4 sample clients for development
@@ -242,13 +247,15 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const { clientId } = await req.json();
-    if (!clientId) {
+    const body = await req.json();
+    const bodyParsed = pullBodySchema.safeParse(body);
+    if (!bodyParsed.success) {
       return NextResponse.json(
-        { error: "Client ID is required" },
+        { error: "Invalid request body", issues: bodyParsed.error.issues },
         { status: 400 },
       );
     }
+    const { clientId } = bodyParsed.data;
 
     const apiUrl =
       process.env.CHRONICLE_API_URL || process.env.CHRONICLE_BASE_URL || "";
