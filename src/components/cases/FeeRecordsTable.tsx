@@ -70,6 +70,9 @@ import { AddToFeePetitionsConfirmDialog } from "./AddToFeePetitionsConfirmDialog
 import { useServerPaginatedFetch } from "@/hooks/useServerPaginatedFetch";
 import { useFeeRecordsFilters } from "@/hooks/useFeeRecordsFilters";
 import { useBulkActions } from "@/hooks/useBulkActions";
+import { useWinSheetEdit } from "@/hooks/useWinSheetEdit";
+import { useFeeAmountEdit } from "@/hooks/useFeeAmountEdit";
+import type { FeeAmountField } from "@/hooks/useFeeAmountEdit";
 import type { SortKey, SortDir, FilterPreset } from "./fee-records-types";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
@@ -302,13 +305,6 @@ export const FeeRecordsTable = ({
   // Case targeted by the Reopen confirmation dialog (Fees Closed page only —
   // closing is now a batch action, see bulkCloseConfirmOpen below).
   const [reopenConfirmCase, setReopenConfirmCase] = useState<CaseRow | null>(null);
-
-  // Win sheet link inline edit state.
-  const [winSheetEditing, setWinSheetEditing] = useState<number | null>(null);
-  const [winSheetDraft, setWinSheetDraft] = useState<{ url: string; text: string }>({ url: "", text: "" });
-  const [winSheetSaving, setWinSheetSaving] = useState<number | null>(null);
-  const [winSheetError, setWinSheetError] = useState<string | null>(null);
-  const winSheetAbortRef = useRef<AbortController | null>(null);
 
   // ── Filter state ─────────────────────────────────────────────────────────
   // Managed by useFeeRecordsFilters — declared after sort/page state below.
@@ -553,18 +549,6 @@ export const FeeRecordsTable = ({
   }, [cases]);
   const [rowRefreshing, setRowRefreshing] = useState<Set<number>>(new Set());
   const rowRefreshAbortRef = useRef<Map<number, AbortController>>(new Map());
-  type FeeAmountField =
-    | "t16Retro" | "t16FeeDue"
-    | "t2Retro" | "t2FeeDue"
-    | "auxRetro" | "auxFeeDue";
-  const [feeAmountEdit, setFeeAmountEdit] = useState<{
-    caseId: number;
-    field: FeeAmountField;
-    draft: string;
-  } | null>(null);
-  const [feeAmountSaving, setFeeAmountSaving] = useState(false);
-  const [feeAmountError, setFeeAmountError] = useState<string | null>(null);
-  const feeAmountAbortRef = useRef<AbortController | null>(null);
   const [copiedDateId, setCopiedDateId] = useState<number | null>(null);
   const copyDateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -584,12 +568,10 @@ export const FeeRecordsTable = ({
   }, []);
   useEffect(() => {
     const abortMap = patchAbortRef.current;
-    const feeAmountRef = feeAmountAbortRef;
     const rowRefreshMap = rowRefreshAbortRef.current;
     return () => {
       for (const ctrl of abortMap.values()) ctrl.abort();
       abortMap.clear();
-      feeAmountRef.current?.abort();
       for (const ctrl of rowRefreshMap.values()) ctrl.abort();
       rowRefreshMap.clear();
       if (copyDateTimerRef.current) clearTimeout(copyDateTimerRef.current);
@@ -613,6 +595,21 @@ export const FeeRecordsTable = ({
     await onImported?.();
     if (serverPaginated) setFetchRevision((n) => n + 1);
   };
+
+  const {
+    winSheetEditing, setWinSheetEditing,
+    winSheetDraft, setWinSheetDraft,
+    winSheetSaving,
+    winSheetError, setWinSheetError,
+    handleWinSheetSave,
+  } = useWinSheetEdit({ onRefresh: handleRefresh });
+
+  const {
+    feeAmountEdit, setFeeAmountEdit,
+    feeAmountSaving,
+    feeAmountError, setFeeAmountError,
+    handleFeeAmountSave,
+  } = useFeeAmountEdit({ setFeeOverrides });
 
   const toggleSelectAll = () => {
     const allSelected =
@@ -972,96 +969,6 @@ export const FeeRecordsTable = ({
       if (patchAbortRef.current.get(key) === controller) {
         patchAbortRef.current.delete(key);
       }
-    }
-  };
-
-  const handleWinSheetSave = async (c: CaseRow) => {
-    if (winSheetSaving != null) return;
-    winSheetAbortRef.current?.abort();
-    const controller = new AbortController();
-    winSheetAbortRef.current = controller;
-    setWinSheetSaving(c.id);
-    setWinSheetError(null);
-    try {
-      const res = await fetch(`/api/cases/${c.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feeFields: {
-            winSheetLink: winSheetDraft.url ?? null,
-            winSheetLinkText: winSheetDraft.text ?? null,
-          },
-          logMessage: "Win Sheet link updated.",
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? `Save failed (${res.status})`);
-      }
-      setWinSheetEditing(null);
-      handleRefresh();
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setWinSheetError((err as Error).message);
-    } finally {
-      if (!controller.signal.aborted) setWinSheetSaving(null);
-    }
-  };
-
-  const handleFeeAmountSave = async () => {
-    if (!feeAmountEdit || feeAmountSaving) return;
-    const { caseId, field } = feeAmountEdit;
-    // Fee Due is the only field where null is a meaningful, distinct value
-    // ("never touched", renders "—") from an explicit $0.00 — Retro fields
-    // still default to 0 at the DB level, so a bare "-" there is just invalid
-    // input, not a clear-to-null gesture.
-    const isFeeDue = field.endsWith("FeeDue");
-    const clearing = isFeeDue && feeAmountEdit.draft.trim() === "-";
-    const parsed = parseCurrencyInput(feeAmountEdit.draft);
-    if (!clearing && (isNaN(parsed) || parsed < 0)) {
-      setFeeAmountError(
-        isFeeDue ? "Enter a valid amount (0 or more), or \"-\" to clear." : "Enter a valid amount (0 or more).",
-      );
-      return;
-    }
-    const amount: number | null = clearing ? null : parsed;
-    feeAmountAbortRef.current?.abort();
-    const controller = new AbortController();
-    feeAmountAbortRef.current = controller;
-    setFeeAmountSaving(true);
-    setFeeAmountError(null);
-    const labelMap: Record<FeeAmountField, string> = {
-      t16Retro: "T16 Retro", t16FeeDue: "T16 Fee Due",
-      t2Retro: "T2 Retro",   t2FeeDue: "T2 Fee Due",
-      auxRetro: "AUX Retro", auxFeeDue: "AUX Fee Due",
-    };
-    try {
-      const res = await fetch(`/api/cases/${caseId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feeFields: { [field]: amount },
-          logMessage: clearing
-            ? `${labelMap[field]} cleared`
-            : `${labelMap[field]} updated to ${fmtFull(parsed)}`,
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error ?? `Save failed (${res.status})`);
-      }
-      setFeeOverrides((prev) => ({
-        ...prev,
-        [caseId]: { ...prev[caseId], [field]: amount },
-      }));
-      setFeeAmountEdit(null);
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setFeeAmountError((err as Error).message);
-    } finally {
-      if (!controller.signal.aborted) setFeeAmountSaving(false);
     }
   };
 
