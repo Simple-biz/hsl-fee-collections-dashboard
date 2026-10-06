@@ -322,9 +322,7 @@ describe("#372 regression — team-members GET auth guard", () => {
     );
     const GET = await getTeamMembersGET();
     const res = await GET();
-    // 200 or 500 (db mock returns empty) — not 401/403
-    expect(res.status).not.toBe(401);
-    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(200);
   });
 });
 

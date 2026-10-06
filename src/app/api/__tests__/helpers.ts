@@ -83,7 +83,7 @@ const chain = {
   leftJoin: vi.fn(),
   innerJoin: vi.fn(),
   groupBy: vi.fn(),
-  orderBy: vi.fn(),
+  orderBy: vi.fn().mockResolvedValue([]),
   limit: vi.fn().mockResolvedValue([]),
   offset: vi.fn().mockResolvedValue([]),
   execute: vi.fn().mockResolvedValue([]),
