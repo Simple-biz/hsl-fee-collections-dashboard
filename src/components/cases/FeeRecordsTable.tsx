@@ -34,7 +34,6 @@ import {
   fmtFull,
   fmtDate,
   fmtClaimLong,
-  parseCurrencyInput,
   caseLevelLabel,
   winSheetStatusLabel,
 } from "@/lib/formatters";
@@ -67,7 +66,6 @@ import { useFeeRecordsFilters } from "@/hooks/useFeeRecordsFilters";
 import { useBulkActions } from "@/hooks/useBulkActions";
 import { useWinSheetEdit } from "@/hooks/useWinSheetEdit";
 import { useFeeAmountEdit } from "@/hooks/useFeeAmountEdit";
-import type { FeeAmountField } from "@/hooks/useFeeAmountEdit";
 import { FilterPresetsMenu } from "./FilterPresetsMenu";
 import { BatchActionPill } from "./BatchActionPill";
 import type { SortKey, SortDir, FilterPreset } from "./fee-records-types";
