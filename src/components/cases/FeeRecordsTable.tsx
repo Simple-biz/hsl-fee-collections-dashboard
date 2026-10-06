@@ -19,15 +19,10 @@ import {
   Clipboard,
   Plus,
   X,
-  Archive,
   RefreshCw,
   Minimize2,
   Maximize2,
-  Bookmark,
-  BookmarkCheck,
-  Trash2,
   SearchX,
-  Receipt,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
@@ -73,6 +68,8 @@ import { useBulkActions } from "@/hooks/useBulkActions";
 import { useWinSheetEdit } from "@/hooks/useWinSheetEdit";
 import { useFeeAmountEdit } from "@/hooks/useFeeAmountEdit";
 import type { FeeAmountField } from "@/hooks/useFeeAmountEdit";
+import { FilterPresetsMenu } from "./FilterPresetsMenu";
+import { BatchActionPill } from "./BatchActionPill";
 import type { SortKey, SortDir, FilterPreset } from "./fee-records-types";
 
 const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
@@ -1294,65 +1291,12 @@ export const FeeRecordsTable = ({
             </p>
           </div>
           {/* Filter presets */}
-          <div className="relative" ref={presetsRef}>
-            <button
-              onClick={() => setPresetsOpen((o) => !o)}
-              aria-label="Filter presets"
-              title="Filter presets"
-              className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${presetsOpen ? (dark ? "bg-indigo-700 text-white" : "bg-indigo-100 text-indigo-700") : `${t.hover} ${t.textMuted}`}`}
-            >
-              {presets.length > 0
-                ? <BookmarkCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                : <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
-              }
-            </button>
-            {presetsOpen && (
-              <div className={`absolute left-0 top-9 z-50 w-64 rounded-xl border shadow-xl ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}>
-                <div className={`p-3 border-b ${t.borderLight}`}>
-                  <p className={`text-[11px] font-semibold uppercase tracking-wider ${t.textMuted} mb-2`}>Save current filters</p>
-                  <div className="flex gap-1.5">
-                    <input
-                      value={presetName}
-                      onChange={(e) => setPresetName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && savePreset()}
-                      placeholder="Preset name…"
-                      className={`flex-1 h-7 px-2 rounded-md border text-xs outline-none ${t.inputBg}`}
-                    />
-                    <button
-                      onClick={savePreset}
-                      disabled={!presetName.trim()}
-                      className={`h-7 px-2 rounded-md text-xs font-semibold ${t.ctaBtn} disabled:opacity-40`}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-                {presets.length > 0 ? (
-                  <ul className="py-1 max-h-48 overflow-y-auto">
-                    {presets.map((preset) => (
-                      <li key={preset.id} className={`flex items-center gap-1 px-2 py-1 ${dark ? "hover:bg-neutral-800" : "hover:bg-neutral-50"}`}>
-                        <button
-                          onClick={() => applyPreset(preset)}
-                          className={`flex-1 text-left text-xs ${t.text} truncate`}
-                        >
-                          {preset.name}
-                        </button>
-                        <button
-                          onClick={() => deletePreset(preset.id)}
-                          aria-label={`Delete preset ${preset.name}`}
-                          className={`shrink-0 p-0.5 rounded ${dark ? "hover:bg-neutral-700 text-neutral-500" : "hover:bg-neutral-100 text-neutral-400"}`}
-                        >
-                          <Trash2 className="h-3 w-3" aria-hidden="true" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className={`text-[13px] ${t.textMuted} p-3`}>No saved presets yet.</p>
-                )}
-              </div>
-            )}
-          </div>
+          <FilterPresetsMenu
+            dark={dark} t={t}
+            presetsRef={presetsRef} presetsOpen={presetsOpen} setPresetsOpen={setPresetsOpen}
+            presets={presets} presetName={presetName} setPresetName={setPresetName}
+            savePreset={savePreset} applyPreset={applyPreset} deletePreset={deletePreset}
+          />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 sm:flex-none">
@@ -1545,117 +1489,21 @@ export const FeeRecordsTable = ({
           also has to check that at least one survives — otherwise a member on
           Fees Closed would see a floating bar with nothing to click. */}
       {selectedIds.size > 0 && hasBatchActions && (
-        <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center gap-2">
-          {/* Fee-petition errors are deliberately absent here — that action
-              now confirms in a dialog, which shows its own error where the
-              click happened rather than behind the modal. */}
-          {(bulkOverpaidError || bulkReassignError) && (
-            <div
-              role="alert"
-              className="pointer-events-auto rounded-full bg-red-600 px-3 py-1 text-[12px] font-medium text-white shadow-lg"
-            >
-              {bulkOverpaidError ?? bulkReassignError}
-            </div>
-          )}
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2.5 shadow-2xl ring-1 ring-white/10 dark:bg-gray-800">
-            <span className="text-[13px] font-semibold text-gray-300 pr-1 border-r border-white/20 mr-1">
-              {selectedIds.size} selected
-            </span>
-            {mode !== "closed" && isAdmin && canFinalize && (
-              <button
-                onClick={handleBatchFeesClosed}
-                disabled={bulkCloseConfirmOpen}
-                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
-              >
-                <Check aria-hidden="true" className="h-3 w-3" />
-                Fees Closed
-              </button>
-            )}
-            {isAdmin && canFinalize && (
-              <button
-                onClick={handleBatchMarkOverpaid}
-                disabled={bulkOverpaidSaving}
-                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-50"
-              >
-                {bulkOverpaidSaving ? (
-                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Plus aria-hidden="true" className="h-3 w-3" />
-                )}
-                Add to Overpaid Cases
-              </button>
-            )}
-            {/* Open to every agent, unlike the actions around it — this is the
-                replacement for the old "pick Fee Petition as the Level and the
-                case appears there" behaviour. Hidden in closed mode: the Fee
-                Petitions page excludes closed cases, so adding one there would
-                flag a case that stays invisible until it's reopened. */}
-            {canAddToFeePetitions && (
-              <button
-                onClick={() => {
-                  setFeePetitionPending({
-                    ids: feePetitionAddableIds,
-                    selectedCount: selectedIds.size,
-                  });
-                  setFeePetitionConfirmOpen(true);
-                }}
-                disabled={bulkFeePetitionSaving || feePetitionAddableIds.length === 0}
-                title={
-                  feePetitionAddableIds.length === 0
-                    ? "All selected cases are already in Fee Petitions"
-                    : undefined
-                }
-                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
-              >
-                {bulkFeePetitionSaving ? (
-                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Receipt aria-hidden="true" className="h-3 w-3" />
-                )}
-                Add to Fee Petitions
-                {feePetitionAddableIds.length > 0 &&
-                  feePetitionAddableIds.length < selectedIds.size && (
-                    <span className="font-normal opacity-80">
-                      ({feePetitionAddableIds.length})
-                    </span>
-                  )}
-              </button>
-            )}
-            {isAdmin && assignedOptions.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => { if (e.target.value) void handleBulkReassign(e.target.value); }}
-                disabled={bulkReassignSaving}
-                aria-label="Reassign selected cases"
-                className="h-7 px-2 rounded-full text-[13px] font-semibold bg-blue-600 hover:bg-blue-500 text-white border-0 outline-none cursor-pointer disabled:opacity-50 transition-colors"
-              >
-                <option value="" disabled>
-                  {bulkReassignSaving ? "Reassigning…" : "Reassign to…"}
-                </option>
-                {assignedOptions.filter((o) => o.isActive).map((o) => (
-                  <option key={o.id} value={o.name}>{o.name}</option>
-                ))}
-              </select>
-            )}
-            {isAdmin && (
-              <button
-                onClick={handleBatchArchive}
-                disabled={archiveConfirmOpen}
-                className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white transition-colors disabled:opacity-50"
-              >
-                <Archive aria-hidden="true" className="h-3 w-3" />
-                Archive
-              </button>
-            )}
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              aria-label="Clear selection"
-              className="h-7 w-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-gray-300 transition-colors ml-1"
-            >
-              <X aria-hidden="true" className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
+        <BatchActionPill
+          selectedIds={selectedIds} mode={mode} isAdmin={isAdmin}
+          canFinalize={canFinalize} canAddToFeePetitions={canAddToFeePetitions}
+          bulkOverpaidError={bulkOverpaidError} bulkReassignError={bulkReassignError}
+          bulkCloseConfirmOpen={bulkCloseConfirmOpen} handleBatchFeesClosed={handleBatchFeesClosed}
+          bulkOverpaidSaving={bulkOverpaidSaving} handleBatchMarkOverpaid={handleBatchMarkOverpaid}
+          feePetitionAddableIds={feePetitionAddableIds}
+          bulkFeePetitionSaving={bulkFeePetitionSaving}
+          setFeePetitionPending={setFeePetitionPending}
+          setFeePetitionConfirmOpen={setFeePetitionConfirmOpen}
+          assignedOptions={assignedOptions} bulkReassignSaving={bulkReassignSaving}
+          handleBulkReassign={handleBulkReassign}
+          archiveConfirmOpen={archiveConfirmOpen} handleBatchArchive={handleBatchArchive}
+          setSelectedIds={setSelectedIds}
+        />
       )}
 
       {/* Table — own scroll container (both axes). Vertical scroll lets the
