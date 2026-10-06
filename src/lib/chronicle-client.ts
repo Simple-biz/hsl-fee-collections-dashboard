@@ -279,7 +279,7 @@ export const fetchChronicleClient = async (
   apiUrl: string,
   apiKey: string,
 ): Promise<ChronicleApiResponse> => {
-  const res = await fetch(`${apiUrl}/api/clients/${clientId}`, {
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(String(clientId))}`, {
     headers: {
       "x-api-key": apiKey,
       Accept: "application/json",

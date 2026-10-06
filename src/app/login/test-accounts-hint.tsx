@@ -6,11 +6,12 @@ import { ChevronDown, Info } from "lucide-react";
 // TEST-ONLY: surfaced on the login page when NEXT_PUBLIC_SHOW_TEST_LOGINS is
 // set, so a tester knows which seeded accounts to use. system_admin is
 // intentionally excluded. Remove the env flag (and the seeded accounts) before
-// production.
+// production. Passwords are generated at seed time — run `npm run seed:test-users`
+// and copy the printed credentials.
 const TEST_ACCOUNTS = [
-  { role: "Admin", email: "admin@hogansmith.com", password: "admin123" },
-  { role: "Lead", email: "lead@hogansmith.com", password: "lead123" },
-  { role: "Member", email: "member@hogansmith.com", password: "member123" },
+  { role: "Admin", email: "admin@hogansmith.com" },
+  { role: "Lead", email: "lead@hogansmith.com" },
+  { role: "Member", email: "member@hogansmith.com" },
 ];
 
 export function TestAccountsHint() {
@@ -39,12 +40,14 @@ export function TestAccountsHint() {
               {TEST_ACCOUNTS.map((a) => (
                 <tr key={a.email}>
                   <td className="pr-3 py-0.5 font-medium">{a.role}</td>
-                  <td className="pr-3 py-0.5 font-mono select-all">{a.email}</td>
-                  <td className="py-0.5 font-mono select-all">{a.password}</td>
+                  <td className="py-0.5 font-mono select-all">{a.email}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <p className="mt-1.5 text-[11px] text-neutral-400">
+            Passwords are generated at seed time — see <code>npm run seed:test-users</code> output.
+          </p>
         </div>
       )}
     </div>
