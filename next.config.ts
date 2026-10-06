@@ -25,14 +25,19 @@ const securityHeaders = [
     value: "max-age=63072000; includeSubDomains",
   },
   {
-    // Report-Only: logs violations without blocking anything.
+    // Report-Only: evaluates the policy and sends violation reports to
+    // /api/csp-report without blocking anything.
+    // TODO: create src/app/api/csp-report/route.ts to receive and log these reports.
     // Promote to Content-Security-Policy after verifying on a preview deployment.
     key: "Content-Security-Policy-Report-Only",
     value: [
       "default-src 'self'",
       // 'unsafe-inline' required for chart.tsx's injected <style> tag.
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self'",
+      // 'unsafe-inline' required: Next.js App Router injects inline <script> tags
+      // for hydration and RSC flight payloads. Remove once a nonce-based approach
+      // is implemented and passed through the Next.js nonce header mechanism.
+      "script-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
       "connect-src 'self'",
@@ -40,6 +45,7 @@ const securityHeaders = [
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "report-uri /api/csp-report",
     ].join("; "),
   },
 ];
