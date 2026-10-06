@@ -8,40 +8,24 @@ import {
   Search,
   Upload,
   FileDown,
-  MessageSquare,
   FileSpreadsheet,
   Database,
   Loader2,
-  ExternalLink,
-  Pencil,
-  Check,
-  Clipboard,
   Plus,
-  X,
   RefreshCw,
   SearchX,
 } from "lucide-react";
 
 import { themeClasses } from "@/lib/theme-classes";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
-import { FeePaymentPanel } from "@/components/cases/FeePaymentPanel";
-import { FeeAmountCell } from "@/components/cases/FeeAmountCell";
-import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import {
   fmtFull,
   fmtDate,
-  fmtClaimLong,
   caseLevelLabel,
-  winSheetStatusLabel,
 } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import { useCapabilities } from "@/hooks/useCapabilities";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import CaseDetailSheet from "./CaseDetailSheet";
 import ImportCasesModal from "@/components/modals/ImportCasesModal";
 import AddCaseModal from "@/components/modals/AddCaseModal";
@@ -51,12 +35,7 @@ import NotesModal from "@/components/modals/NotesModal";
 import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
 import { BulkFeesClosedConfirmDialog } from "./BulkFeesClosedConfirmDialog";
-import { Listbox } from "@/components/shared/Listbox";
-import { caseLevelVisual, normalizeCaseLevel } from "@/lib/case-level-icons";
-import { buildListboxOptions } from "@/lib/listbox-options";
-import { teamRowTint } from "@/lib/team-colors";
-import { memberRowTint } from "@/lib/member-colors";
-import { FeePetitionIndicator } from "./FeePetitionIndicator";
+import { normalizeCaseLevel } from "@/lib/case-level-icons";
 import { AddToFeePetitionsConfirmDialog } from "./AddToFeePetitionsConfirmDialog";
 import { useServerPaginatedFetch } from "@/hooks/useServerPaginatedFetch";
 import { useFeeRecordsFilters } from "@/hooks/useFeeRecordsFilters";
@@ -66,80 +45,8 @@ import { useFeeAmountEdit } from "@/hooks/useFeeAmountEdit";
 import { FilterPresetsMenu } from "./FilterPresetsMenu";
 import { BatchActionPill } from "./BatchActionPill";
 import { FeeRecordsTableHeader } from "./FeeRecordsTableHeader";
-import type { SortKey, SortDir, FilterPreset } from "./fee-records-types";
-
-const CLAIM_TYPE_COLORS: Record<string, { badge: string; badgeDark: string }> = {
-  "T16":  { badge: "bg-blue-50 text-blue-700 border-blue-300",     badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"     },
-  "T2":   { badge: "bg-violet-50 text-violet-700 border-violet-300", badgeDark: "bg-violet-900/40 text-violet-300 border-violet-700" },
-  "CONC": { badge: "bg-amber-50 text-amber-700 border-amber-300",   badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"   },
-};
-const CLAIM_TYPE_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
-
-function ClaimTypeBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
-  if (!value) return <span className="text-neutral-400">—</span>;
-  const colors = CLAIM_TYPE_COLORS[value] ?? CLAIM_TYPE_FALLBACK;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
-      {value}
-    </span>
-  );
-}
-
-// Keyed on what's actually stored in fee_records.win_sheet_status today —
-// a mix of the dropdown-configured "Started"/"Finished" and older
-// lowercase/underscored values written by the MyCase sync ("not_started",
-// "started", "closed").
-const WIN_SHEET_STATUS_COLORS: Record<string, { badge: string; badgeDark: string }> = {
-  "not_started": { badge: "bg-neutral-100 text-neutral-600 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" },
-  "started":     { badge: "bg-amber-50 text-amber-700 border-amber-300",       badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"     },
-  "Started":     { badge: "bg-amber-50 text-amber-700 border-amber-300",       badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"     },
-  "closed":      { badge: "bg-emerald-50 text-emerald-700 border-emerald-300", badgeDark: "bg-emerald-900/40 text-emerald-300 border-emerald-700" },
-  "Finished":    { badge: "bg-emerald-50 text-emerald-700 border-emerald-300", badgeDark: "bg-emerald-900/40 text-emerald-300 border-emerald-700" },
-};
-const WIN_SHEET_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
-
-function WinSheetStatusBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
-  if (!value) return <span className="text-neutral-400">—</span>;
-  // Colours stay keyed on the stored value — the same status is stored several
-  // ways ("Started"/"started", "not_started") and each spelling needs its own
-  // key — but only the formatted label is shown.
-  const colors = WIN_SHEET_STATUS_COLORS[value] ?? WIN_SHEET_STATUS_FALLBACK;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
-      {winSheetStatusLabel(value)}
-    </span>
-  );
-}
-
-// Keyed on both the dropdown-configured categories and the pre-dropdown
-// free-text values still sitting on older fee_records rows (e.g. "Ready for
-// Review" vs. the current "Ready for Review (Specialist)"). One-off custom
-// remarks not listed here fall through to the neutral fallback below.
-const CASE_STATUS_COLORS: Record<string, { badge: string; badgeDark: string }> = {
-  "Ready for Review (Specialist)": { badge: "bg-green-50 text-green-700 border-green-300",     badgeDark: "bg-green-900/40 text-green-300 border-green-700"   },
-  "Ready for Review":              { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
-  "Pending for Review":            { badge: "bg-blue-50 text-blue-700 border-blue-300",       badgeDark: "bg-blue-900/40 text-blue-300 border-blue-700"       },
-  "Reviewing (Management)":        { badge: "bg-violet-50 text-violet-700 border-violet-300", badgeDark: "bg-violet-900/40 text-violet-300 border-violet-700" },
-  "For follow up":                 { badge: "bg-amber-50 text-amber-700 border-amber-300",     badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"    },
-  "For follow-up":                 { badge: "bg-amber-50 text-amber-700 border-amber-300",     badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"    },
-  "Overpaid but ready to close":   { badge: "bg-amber-50 text-amber-700 border-amber-300",     badgeDark: "bg-amber-900/40 text-amber-300 border-amber-700"    },
-  "Not ready to close":            { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
-  "Incomplete win sheet":          { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
-  "Missing fees":                  { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
-  "NEED AUX FEE":                  { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
-  "FEE PETITION APPROVED":         { badge: "bg-red-50 text-red-700 border-red-300",           badgeDark: "bg-red-900/40 text-red-300 border-red-700"          },
-};
-const CASE_STATUS_FALLBACK = { badge: "bg-neutral-100 text-neutral-500 border-neutral-300", badgeDark: "bg-neutral-700 text-neutral-300 border-neutral-600" };
-
-function CaseStatusBadge({ value, dark }: { value: string | null | undefined; dark: boolean }) {
-  if (!value) return <span className="text-neutral-400">—</span>;
-  const colors = CASE_STATUS_COLORS[value] ?? CASE_STATUS_FALLBACK;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium border whitespace-nowrap ${dark ? colors.badgeDark : colors.badge}`}>
-      {value}
-    </span>
-  );
-}
+import { FeeRecordsTableRow } from "./FeeRecordsTableRow";
+import type { SortKey, SortDir, FilterPreset, CaseField, FeeField, DropdownRowKey } from "./fee-records-types";
 
 
 interface FeeRecordsTableProps {
@@ -169,14 +76,6 @@ interface FeeRecordsTableProps {
 
 // Whether a field lives on the `fee_records` row or the `cases` row.
 // The PATCH endpoint splits its body into `feeFields` and `caseFields`.
-type CaseField = "claimTypeLabel" | "levelWon";
-type FeeField =
-  | "assignedTo"
-  | "approvedBy"
-  | "feesConfirmation"
-  | "caseStatus"
-  | "winSheetStatus"
-  | "nextFollowUpDate";
 
 // Sends a single-field patch and logs an activity entry so the side
 // panel keeps a trail of who changed what.
@@ -212,33 +111,12 @@ const patchSingleField = async (
   }
 };
 
-const currency = (v: number | null) => (
-  <span
-    className="select-all cursor-text"
-    onClick={(e) => e.stopPropagation()}
-  >
-    {(v ?? 0) > 0 ? fmtFull(v as number) : "—"}
-  </span>
-);
-// Pending can go negative (overpaid) now that it's auto-calculated as Fee
-// Due minus Rec'd — unlike currency() above, a negative value here is real
-// signal (the PIF "Overpaid" badge is the primary flag, but the exact
-// overage is still worth showing here rather than collapsing to "—").
-const pendingDisplay = (v: number) => (v === 0 ? "—" : fmtFull(v));
-const dateStr = (d: string | null) => (d ? fmtDate(d) : "—");
-
 const timeAgo = (date: Date): string => {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
-};
-
-const AGING_COLORS = (cat: string | null, dark: boolean) => {
-  if (cat === ">60") return dark ? "text-red-400" : "text-red-600";
-  if (cat === "≤60") return dark ? "text-emerald-400" : "text-emerald-600";
-  return dark ? "text-neutral-500" : "text-neutral-400";
 };
 
 export const FeeRecordsTable = ({
@@ -276,18 +154,6 @@ export const FeeRecordsTable = ({
   const claimTypeOptions = dropdownOptions.claim_type ?? [];
   const winSheetStatusOptions = dropdownOptions.win_sheet_status ?? [];
   const leaders = teamMembers.filter((m) => m.role === "team_lead");
-
-  // Keys for varchar cells that support inline-edit dropdowns. `status` is
-  // the win_sheet_status row field; `level`/`claim` live on the cases row.
-  type DropdownRowKey =
-    | "assigned"
-    | "approvedBy"
-    | "feesConfirmation"
-    | "caseStatus"
-    | "nextFollowUpDate"
-    | "level"
-    | "claim"
-    | "status";
 
   // Optimistic overrides keyed by case id — the row value is patched
   // immediately on change, and the server reconciles on the next refresh.
@@ -519,9 +385,9 @@ export const FeeRecordsTable = ({
     bulkCloseConfirmOpen, setBulkCloseConfirmOpen,
     bulkClosePendingIds,
     bulkOverpaidSaving,
-    bulkOverpaidError, setBulkOverpaidError,
+    bulkOverpaidError,
     bulkReassignSaving,
-    bulkReassignError, setBulkReassignError,
+    bulkReassignError,
     bulkFeePetitionSaving,
     bulkFeePetitionError, setBulkFeePetitionError,
     feePetitionConfirmOpen, setFeePetitionConfirmOpen,
@@ -1553,1004 +1419,104 @@ export const FeeRecordsTable = ({
             <tbody>
               {paged.map((rawC) => {
                 const c = { ...rawC, ...feeOverrides[rawC.id], ...rowOverrides[rawC.id] };
-                const isOverpaid = c.markedOverpaid;
                 return (
-                  <tr
+                  <FeeRecordsTableRow
                     key={c.id}
-                    onClick={() => setSelectedCaseId(c.id)}
-                    className={`border-b ${rowBorder} ${rowHover} transition-colors cursor-pointer group ${isOverpaid ? "border-l-2 border-l-amber-500" : ""}`}
-                  >
-                    {/* Checkbox */}
-                    <td
-                      className={`${stickyCheckTd} px-3 text-center`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(c.id)}
-                        onChange={() => toggleRowSelection(c.id)}
-                        aria-label={`Select ${c.name}`}
-                        className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-                      />
-                    </td>
-                    {/* Refresh — moved to the front (frozen), before Case
-                        Name, so it's usable without scrolling right. */}
-                    <td
-                      className={`${tdBase} text-center ${stickyTdRefresh}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleRowRefresh(c)}
-                        disabled={rowRefreshing.has(c.id)}
-                        aria-label={`Refresh ${c.name}`}
-                        title="Refresh this case's fee data from the server"
-                        className={`inline-flex items-center justify-center h-6 w-6 rounded ${t.hover} ${t.textSub} disabled:opacity-50`}
-                      >
-                        <RefreshCw
-                          className={`h-3.5 w-3.5 ${rowRefreshing.has(c.id) ? "animate-spin" : ""}`}
-                          aria-hidden="true"
-                        />
-                      </button>
-                    </td>
-                    {/* Closed On — frozen, "closed" mode only, first data
-                        column so it's visible without scrolling. */}
-                    {isClosedMode && (
-                      <td className={`${tdBase} ${t.textSub} ${stickyTdClosedOn}`}>
-                        {dateStr(c.closedAt ? c.closedAt.slice(0, 10) : null)}
-                      </td>
-                    )}
-                    {/* Case Info — first two columns are frozen.
-                        Name deep-links to MyCase (external_id); a Win Sheet
-                        link and the long-form claim label sit on a sub-line. */}
-                    <td className={`${tdBase} ${stickyTd1}`} title={c.name}>
-                      {/* overflow-hidden keeps the sub-line from spilling past
-                          the frozen column onto Assigned during h-scroll. */}
-                      <div className="flex flex-col gap-0.5 overflow-hidden">
-                        <a
-                          href={c.externalId || buildMyCaseUrl(c.id)}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className={`inline-flex items-center gap-1 max-w-full ${t.text} font-semibold hover:underline`}
-                        >
-                          <span className="truncate">{c.name}</span>
-                          <ExternalLink
-                            className="h-3 w-3 shrink-0 opacity-50"
-                            aria-hidden="true"
-                          />
-                        </a>
-                        <div className="flex items-center gap-2 text-[13px] leading-none min-w-0">
-                          {(() => {
-                            // Mirror the Claim column's optimistic value so the
-                            // sub-line updates the instant the dropdown changes.
-                            const claim = cellValue(c, "claim");
-                            return claim && claim !== "—" ? (
-                              <span className={`${t.textMuted} truncate`}>
-                                {fmtClaimLong(claim)}
-                              </span>
-                            ) : null;
-                          })()}
-                          {c.winSheetLink && (
-                            <a
-                              href={c.winSheetLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className={`inline-flex items-center gap-0.5 hover:underline shrink-0 ${dark ? "text-blue-400" : "text-blue-600"}`}
-                            >
-                              Win Sheet
-                              <ExternalLink
-                                className="h-2.5 w-2.5"
-                                aria-hidden="true"
-                              />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td
-                      className={`${tdBase} ${t.textSub} ${stickyTd2}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Listbox
-                        value={cellValue(c, "assigned")}
-                        onChange={(v) =>
-                          handleVarcharChange(
-                            c,
-                            "fee",
-                            "assignedTo",
-                            "assigned",
-                            "Assigned To",
-                            v,
-                          )
-                        }
-                        dark={dark}
-                        t={t}
-                        aria-label="Assigned To"
-                        className="w-full"
-                        title={
-                          assignedOptions.length === 0
-                            ? "No options configured — add them in Settings"
-                            : undefined
-                        }
-                        options={buildListboxOptions(
-                          assignedOptions,
-                          cellValue(c, "assigned"),
-                          undefined,
-                          (name) => memberRowTint(name, dark),
-                        )}
-                      />
-                    </td>
-                    {/* Fees Confirmation — 3rd frozen column */}
-                    <td
-                      className={`${tdBase} ${t.textSub} ${stickyTd3}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {canEditFeesConf && feesConfEditId === c.id ? (
-                        <select
-                          autoFocus
-                          value={cellValue(c, "feesConfirmation")}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => setFeesConfEditId(null)}
-                          onChange={(e) => {
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "feesConfirmation",
-                              "feesConfirmation",
-                              "PIF",
-                              e.target.value,
-                            );
-                            setFeesConfEditId(null);
-                          }}
-                          className={`w-full h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            feesConfirmationOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "feesConfirmation");
-                            return (
-                              v &&
-                              !feesConfirmationOptions.some(
-                                (o) => o.name === v,
-                              ) && <option value={v}>{v}</option>
-                            );
-                          })()}
-                          {feesConfirmationOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "feesConfirmation"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
-                      ) : canEditFeesConf ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setFeesConfEditId(c.id); }}
-                          className="cursor-pointer"
-                        >
-                          <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
-                        </button>
-                      ) : (
-                        <FeesConfBadge value={cellValue(c, "feesConfirmation")} dark={dark} />
-                      )}
-                    </td>
-                    {/* Case Status group — Level/Claim/Approval/Win Sheet
-                        Status/Win Sheet/Leader Notes (+ Fees Closed reopen on
-                        the Fees Closed page); collapses to one blank cell. */}
-                    {collapsedGroups.has("caseStatus") ? (
-                      <td aria-hidden="true" className={`${tdBase} ${groupBorder}`} />
-                    ) : (
-                      <>
-                    {/* Fees Closed — Fees Closed page only; checked, unchecking
-                        opens the reopen dialog. Closing from Master Fees is a
-                        batch action now (see the selection pill). */}
-                    {isClosedMode && (
-                      <td
-                        className={`${tdBase} text-center ${groupBorder}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked
-                          className={`h-4 w-4 ${canFinalize ? "cursor-pointer" : "cursor-default opacity-60"}`}
-                          aria-label="Reopen case — move back to active dashboard"
-                          disabled={!canFinalize}
-                          onChange={() => setReopenConfirmCase(c)}
-                        />
-                      </td>
-                    )}
-                    {/* Level — varchar; lives on the cases row. The Fee
-                        Petitions marker rides alongside it rather than in a
-                        column of its own: Level is where the question comes up,
-                        and the column groups here duplicate colSpan across four
-                        JSX sites (see the column-parity test). */}
-                    <td
-                      className={`${tdBase} ${isClosedMode ? "" : groupBorder}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Listbox
-                          value={cellValue(c, "level")}
-                          onChange={(v) =>
-                            handleVarcharChange(
-                              c,
-                              "case",
-                              "levelWon",
-                              "level",
-                              "Case Level",
-                              v,
-                            )
-                          }
-                          dark={dark}
-                          t={t}
-                          aria-label="Case Level"
-                          title={
-                            caseLevelOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                          options={buildListboxOptions(
-                            caseLevelOptions,
-                            cellValue(c, "level"),
-                            (name) => {
-                              const visual = caseLevelVisual(name, dark);
-                              return visual
-                                ? { icon: visual.Icon, iconBg: visual.bg, iconFg: visual.fg }
-                                : undefined;
-                            },
-                            undefined,
-                            caseLevelLabel,
-                          )}
-                        />
-                        {/* cellValue, not c.level — it resolves the optimistic
-                            `pending` edit, so the marker agrees with the
-                            dropdown beside it the instant the Level changes
-                            rather than only after the next refresh. */}
-                        <FeePetitionIndicator
-                          inFeePetition={c.inFeePetition}
-                          level={cellValue(c, "level") || null}
-                          dark={dark}
-                        />
-                      </div>
-                    </td>
-                    {/* Claim — varchar; lives on the cases row. */}
-                    <td
-                      className={`${tdBase}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {claimEditId === c.id ? (
-                        <select
-                          autoFocus
-                          value={cellValue(c, "claim")}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => setClaimEditId(null)}
-                          onChange={(e) => {
-                            handleVarcharChange(
-                              c,
-                              "case",
-                              "claimTypeLabel",
-                              "claim",
-                              "Claim Type",
-                              e.target.value,
-                            );
-                            setClaimEditId(null);
-                          }}
-                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            claimTypeOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "claim");
-                            return (
-                              v &&
-                              !claimTypeOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {claimTypeOptions
-                            .filter(
-                              (o) =>
-                                o.isActive || o.name === cellValue(c, "claim"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setClaimEditId(c.id); }}
-                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                          aria-label={`Edit claim type: ${cellValue(c, "claim") || "not set"}`}
-                        >
-                          <ClaimTypeBadge value={cellValue(c, "claim")} dark={dark} />
-                        </button>
-                      )}
-                    </td>
-                    <td
-                      className={`${tdBase} ${t.textSub} tabular-nums`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>{dateStr(c.date)}</span>
-                        {c.date && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(dateStr(c.date)).then(() => {
-                                setCopiedDateId(c.id);
-                                if (copyDateTimerRef.current) clearTimeout(copyDateTimerRef.current);
-                                copyDateTimerRef.current = setTimeout(() => setCopiedDateId(null), 1500);
-                              });
-                            }}
-                            aria-label="Copy approval date"
-                            className={`opacity-0 group-hover:opacity-100 transition-colors shrink-0 p-0.5 rounded ${t.hover}`}
-                          >
-                            {copiedDateId === c.id
-                              ? <Check className={`h-3 w-3 text-emerald-500`} aria-hidden="true" />
-                              : <Clipboard className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
-                            }
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    {/* Win-sheet Status — varchar; lives on fee_records. */}
-                    <td
-                      className={`${tdBase}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {winSheetStatusEditId === c.id ? (
-                        <select
-                          autoFocus
-                          value={cellValue(c, "status")}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => setWinSheetStatusEditId(null)}
-                          onChange={(e) => {
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "winSheetStatus",
-                              "status",
-                              "Win Sheet Status",
-                              e.target.value,
-                            );
-                            setWinSheetStatusEditId(null);
-                          }}
-                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            winSheetStatusOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          {/* Same builder the Listbox dropdowns use, so this
-                              select gets the placeholder, the retired-value
-                              fallback AND the duplicate-label collapse from one
-                              place. Hand-rolling it here is what left it
-                              showing "Started" twice for the rows that store
-                              the lowercase spelling. */}
-                          {buildListboxOptions(
-                            winSheetStatusOptions,
-                            cellValue(c, "status"),
-                            undefined,
-                            undefined,
-                            winSheetStatusLabel,
-                          ).map((o) => (
-                            <option key={o.value || "__none__"} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setWinSheetStatusEditId(c.id); }}
-                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                          aria-label={`Edit Win Sheet Status: ${winSheetStatusLabel(cellValue(c, "status")) || "not set"}`}
-                        >
-                          <WinSheetStatusBadge value={cellValue(c, "status")} dark={dark} />
-                        </button>
-                      )}
-                    </td>
-
-                    {/* Win Sheet Link — hover pen to edit; HoverCard shows URL + text */}
-                    <td
-                      className={`${tdBase}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {winSheetEditing === c.id ? (
-                        <div
-                          className="flex flex-col gap-1 min-w-[200px]"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="url"
-                            placeholder="https://..."
-                            value={winSheetDraft.url}
-                            autoFocus
-                            onChange={(e) =>
-                              setWinSheetDraft((d) => ({ ...d, url: e.target.value }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleWinSheetSave(c);
-                              if (e.key === "Escape") setWinSheetEditing(null);
-                            }}
-                            className={`h-6 px-2 rounded border text-[13px] outline-none w-full ${t.inputBg}`}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Display text (optional)"
-                            value={winSheetDraft.text}
-                            onChange={(e) =>
-                              setWinSheetDraft((d) => ({ ...d, text: e.target.value }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleWinSheetSave(c);
-                              if (e.key === "Escape") setWinSheetEditing(null);
-                            }}
-                            className={`h-6 px-2 rounded border text-[13px] outline-none w-full ${t.inputBg}`}
-                          />
-                          {winSheetError && (
-                            <p role="alert" className={`text-[12px] text-red-500`}>
-                              {winSheetError}
-                            </p>
-                          )}
-                          <div className="flex gap-1 justify-end">
-                            {winSheetSaving === c.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin self-center" aria-hidden="true" />
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleWinSheetSave(c)}
-                                  className="inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[12px] font-semibold bg-blue-500 text-white hover:bg-blue-600"
-                                >
-                                  <Check className="h-3 w-3" aria-hidden="true" />
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setWinSheetEditing(null); setWinSheetError(null); }}
-                                  className={`inline-flex items-center gap-0.5 h-5 px-1.5 rounded text-[12px] font-semibold border ${t.outlineBtn}`}
-                                >
-                                  <X className="h-3 w-3" aria-hidden="true" />
-                                  Cancel
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          {c.winSheetLink ? (
-                            <HoverCard openDelay={150} closeDelay={50}>
-                              <HoverCardTrigger asChild>
-                                <a
-                                  href={c.winSheetLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 text-[13px] font-medium text-blue-500 hover:underline"
-                                >
-                                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                                  {c.winSheetLinkText || "Open"}
-                                </a>
-                              </HoverCardTrigger>
-                              <HoverCardContent
-                                align="start"
-                                collisionPadding={12}
-                                className="w-72 p-3 space-y-2 text-[13px]"
-                              >
-                                <p>
-                                  <span className="font-semibold">Display text: </span>
-                                  {c.winSheetLinkText || "Open"}
-                                </p>
-                                <p className="break-all">
-                                  <span className="font-semibold">URL: </span>
-                                  {c.winSheetLink}
-                                </p>
-                              </HoverCardContent>
-                            </HoverCard>
-                          ) : (
-                            <span className={`text-[13px] ${t.textMuted}`}>—</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setWinSheetEditing(c.id);
-                              setWinSheetDraft({
-                                url: c.winSheetLink ?? "",
-                                text: c.winSheetLinkText ?? "",
-                              });
-                            }}
-                            className={`opacity-0 group-hover:opacity-100 transition-colors shrink-0 p-0.5 rounded ${t.hover}`}
-                            aria-label="Edit win sheet link"
-                          >
-                            <Pencil className={`h-3 w-3 ${t.textMuted}`} aria-hidden="true" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    {canSeeLeaderNotes && (
-                      <td
-                        className={`${tdBase} text-center`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLeaderNotesFor({ id: c.id, name: c.name });
-                          }}
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
-                            c.leaderNotesCount > 0
-                              ? dark
-                                ? "bg-violet-900/40 text-violet-400 hover:bg-violet-900/60"
-                                : "bg-violet-50 text-violet-700 hover:bg-violet-100"
-                              : dark
-                                ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
-                                : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
-                          }`}
-                          title={
-                            c.leaderNotesCount > 0
-                              ? `View ${c.leaderNotesCount} leader note${c.leaderNotesCount === 1 ? "" : "s"}`
-                              : "No leader notes yet"
-                          }
-                        >
-                          <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                          {c.leaderNotesCount}
-                        </button>
-                      </td>
-                    )}
-                      </>
-                    )}
-
-                    {/* Approved By */}
-                    <td
-                      className={`${tdBase} ${t.textSub} ${groupBorder}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {mode === "closed" || !canFinalize ? (
-                        cellValue(c, "approvedBy") || "—"
-                      ) : (
-                        <Listbox
-                          value={cellValue(c, "approvedBy")}
-                          onChange={(v) =>
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "approvedBy",
-                              "approvedBy",
-                              "Approved By",
-                              v,
-                            )
-                          }
-                          dark={dark}
-                          t={t}
-                          aria-label="Approved By"
-                          title={
-                            approvedByOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                          options={buildListboxOptions(
-                            approvedByOptions,
-                            cellValue(c, "approvedBy"),
-                            undefined,
-                            (name) => {
-                              const leader = leaders.find((l) => l.name === name);
-                              return leader ? teamRowTint(leader.team, dark) : undefined;
-                            },
-                          )}
-                        />
-                      )}
-                    </td>
-                    {/* Remarks */}
-                    <td
-                      className={`${tdBase} ${t.textSub}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {caseStatusEditId === c.id ? (
-                        <select
-                          autoFocus
-                          value={cellValue(c, "caseStatus")}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => setCaseStatusEditId(null)}
-                          onChange={(e) => {
-                            handleVarcharChange(
-                              c,
-                              "fee",
-                              "caseStatus",
-                              "caseStatus",
-                              "Remarks",
-                              e.target.value,
-                            );
-                            setCaseStatusEditId(null);
-                          }}
-                          className={`h-7 px-2 rounded-md border text-[13px] outline-none cursor-pointer ${t.inputBg}`}
-                          title={
-                            caseStatusOptions.length === 0
-                              ? "No options configured — add them in Settings"
-                              : undefined
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {(() => {
-                            const v = cellValue(c, "caseStatus");
-                            return (
-                              v &&
-                              !caseStatusOptions.some((o) => o.name === v) && (
-                                <option value={v}>{v}</option>
-                              )
-                            );
-                          })()}
-                          {caseStatusOptions
-                            .filter(
-                              (o) =>
-                                o.isActive ||
-                                o.name === cellValue(c, "caseStatus"),
-                            )
-                            .map((o) => (
-                              <option key={o.id} value={o.name}>
-                                {o.name}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setCaseStatusEditId(c.id); }}
-                          className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                          aria-label={`Edit Remarks: ${cellValue(c, "caseStatus") || "not set"}`}
-                        >
-                          <CaseStatusBadge value={cellValue(c, "caseStatus")} dark={dark} />
-                        </button>
-                      )}
-                    </td>
-
-                    {/* T16 */}
-                    {collapsedGroups.has("t16") ? (
-                      <td
-                        className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
-                        title="Minimized — expand T16 to edit"
-                      >
-                        {currency(c.t16FeeDue)}
-                      </td>
-                    ) : (
-                      <>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                        >
-                          <FeeAmountCell
-                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16Retro"}
-                            value={c.t16Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                            canEdit={canEditFeeDue} saveLabel="T16 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16Retro", draft: String(c.t16Retro) }); setFeeAmountError(null); }}
-                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                            onSave={handleFeeAmountSave}
-                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                          />
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${t.text}`}
-                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                        >
-                          <FeeAmountCell
-                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t16FeeDue"}
-                            value={c.t16FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                            canEdit={canEditFeeDue} saveLabel="T16 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
-                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t16FeeDue", draft: c.t16FeeDue != null ? String(c.t16FeeDue) : "" }); setFeeAmountError(null); }}
-                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                            onSave={handleFeeAmountSave}
-                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                          />
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${c.t16FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                        >
-                          {currency(c.t16FeeReceived)}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${c.t16Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t16Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
-                          title="Auto-calculated: Fee Due − Rec'd"
-                        >
-                          {pendingDisplay(c.t16Pending)}
-                        </td>
-                      </>
-                    )}
-                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                      <FeePaymentPanel
-                        caseId={c.id}
-                        feeType="t16"
-                        currentTotal={c.t16FeeReceived}
-                        mostRecentDate={c.t16FeeReceivedDate}
-                        canEdit={canEditFees}
-                        dark={dark}
-                        onAdded={(amount, receivedDate) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
-                          }))
-                        }
-                        onDeleted={(amount) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
-                          }))
-                        }
-                      />
-                    </td>
-
-                    {/* T2 */}
-                    {collapsedGroups.has("t2") ? (
-                      <td
-                        className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
-                        title="Minimized — expand T2 to edit"
-                      >
-                        {currency(c.t2FeeDue)}
-                      </td>
-                    ) : (
-                      <>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                        >
-                          <FeeAmountCell
-                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2Retro"}
-                            value={c.t2Retro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                            canEdit={canEditFeeDue} saveLabel="T2 retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2Retro", draft: String(c.t2Retro) }); setFeeAmountError(null); }}
-                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                            onSave={handleFeeAmountSave}
-                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                          />
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${t.text}`}
-                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                        >
-                          <FeeAmountCell
-                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "t2FeeDue"}
-                            value={c.t2FeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                            canEdit={canEditFeeDue} saveLabel="T2 fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
-                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "t2FeeDue", draft: c.t2FeeDue != null ? String(c.t2FeeDue) : "" }); setFeeAmountError(null); }}
-                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                            onSave={handleFeeAmountSave}
-                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                          />
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${c.t2FeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                        >
-                          {currency(c.t2FeeReceived)}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${c.t2Pending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.t2Pending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
-                          title="Auto-calculated: Fee Due − Rec'd"
-                        >
-                          {pendingDisplay(c.t2Pending)}
-                        </td>
-                      </>
-                    )}
-                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                      <FeePaymentPanel
-                        caseId={c.id}
-                        feeType="t2"
-                        currentTotal={c.t2FeeReceived}
-                        mostRecentDate={c.t2FeeReceivedDate}
-                        canEdit={canEditFees}
-                        dark={dark}
-                        onAdded={(amount, receivedDate) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
-                          }))
-                        }
-                        onDeleted={(amount) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
-                          }))
-                        }
-                      />
-                    </td>
-
-                    {/* AUX */}
-                    {collapsedGroups.has("aux") ? (
-                      <td
-                        className={`${tdBase} text-right tabular-nums ${t.textMuted} ${groupBorder}`}
-                        title="Minimized — expand AUX to edit"
-                      >
-                        {currency(c.auxFeeDue)}
-                      </td>
-                    ) : (
-                      <>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${t.text} ${groupBorder}`}
-                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                        >
-                          <FeeAmountCell
-                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxRetro"}
-                            value={c.auxRetro} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                            canEdit={canEditFeeDue} saveLabel="AUX retro" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted}
-                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxRetro", draft: String(c.auxRetro) }); setFeeAmountError(null); }}
-                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                            onSave={handleFeeAmountSave}
-                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                          />
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${t.text}`}
-                          onClick={canEditFeeDue ? (e) => e.stopPropagation() : undefined}
-                        >
-                          <FeeAmountCell
-                            active={canEditFeeDue && feeAmountEdit?.caseId === c.id && feeAmountEdit.field === "auxFeeDue"}
-                            value={c.auxFeeDue} draft={feeAmountEdit?.draft ?? ""} saving={feeAmountSaving} error={feeAmountError}
-                            canEdit={canEditFeeDue} saveLabel="AUX fee due" inputBg={t.inputBg} hoverCls={t.hover} textMuted={t.textMuted} allowExplicitZero
-                            onEdit={() => { setFeeAmountEdit({ caseId: c.id, field: "auxFeeDue", draft: c.auxFeeDue != null ? String(c.auxFeeDue) : "" }); setFeeAmountError(null); }}
-                            onDraftChange={(v) => setFeeAmountEdit((p) => p ? { ...p, draft: v } : p)}
-                            onSave={handleFeeAmountSave}
-                            onCancel={() => { setFeeAmountEdit(null); setFeeAmountError(null); }}
-                          />
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${c.auxFeeReceived > 0 ? "text-emerald-500 font-medium" : t.textMuted}`}
-                        >
-                          {currency(c.auxFeeReceived)}
-                        </td>
-                        <td
-                          className={`${tdBase} text-right tabular-nums ${c.auxPending > 0 ? (dark ? "text-amber-400" : "text-amber-600") : c.auxPending < 0 ? (dark ? "text-red-400" : "text-red-600") : t.textMuted}`}
-                          title="Auto-calculated: Fee Due − Rec'd"
-                        >
-                          {pendingDisplay(c.auxPending)}
-                        </td>
-                      </>
-                    )}
-                    <td className={`${tdBase} ${t.textSub}`} onClick={(e) => e.stopPropagation()}>
-                      <FeePaymentPanel
-                        caseId={c.id}
-                        feeType="aux"
-                        currentTotal={c.auxFeeReceived}
-                        mostRecentDate={c.auxFeeReceivedDate}
-                        canEdit={canEditFees}
-                        dark={dark}
-                        onAdded={(amount, receivedDate) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
-                          }))
-                        }
-                        onDeleted={(amount) =>
-                          setFeeOverrides((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
-                          }))
-                        }
-                      />
-                    </td>
-
-                    {/* Totals */}
-                    <td
-                      className={`${tdBase} text-right tabular-nums font-medium ${t.text} ${groupBorder}`}
-                    >
-                      {currency(c.totalRetroDue)}
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums font-semibold ${t.text}`}
-                    >
-                      {currency(c.expected)}
-                    </td>
-                    <td
-                      className={`${tdBase} text-right tabular-nums font-semibold ${c.paid > 0 ? "text-emerald-500" : t.textMuted}`}
-                    >
-                      {currency(c.paid)}
-                    </td>
-
-                    {/* Workflow */}
-                    {/* Next Follow-Up */}
-                    <td
-                      className={`${tdBase} ${t.textSub} ${groupBorder}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="date"
-                        value={cellValue(c, "nextFollowUpDate")}
-                        onChange={(e) =>
-                          handleVarcharChange(
-                            c,
-                            "fee",
-                            "nextFollowUpDate",
-                            "nextFollowUpDate",
-                            "Next Follow-Up",
-                            e.target.value,
-                          )
-                        }
-                        aria-label={`Next follow-up call date for ${c.name}`}
-                        className={`h-7 px-2 rounded-md border text-[13px] outline-none focus:ring-2 focus:ring-neutral-300 dark:focus:ring-neutral-600 ${t.inputBg}`}
-                      />
-                    </td>
-                    <td className={`${tdBase} ${t.textSub} max-w-65`}>
-                      {c.update && c.update !== "—" ? (
-                        <HoverCard openDelay={150} closeDelay={50}>
-                          <HoverCardTrigger asChild>
-                            <span className="block truncate">{c.update}</span>
-                          </HoverCardTrigger>
-                          {/* Portaled + collision-aware so a long update can't
-                          run off the viewport in windowed mode; capped to
-                          90vw so it always fits. */}
-                          <HoverCardContent
-                            align="start"
-                            collisionPadding={12}
-                            className="w-auto max-w-[min(28rem,90vw)] p-3 text-[14px] leading-relaxed whitespace-pre-wrap wrap-break-word"
-                          >
-                            {c.update}
-                          </HoverCardContent>
-                        </HoverCard>
-                      ) : (
-                        <span className="block truncate">{c.update}</span>
-                      )}
-                    </td>
-                    <td className={`${tdBase} text-center`}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setNotesFor({ id: c.id, name: c.name });
-                        }}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-semibold ${
-                          c.notesCount > 0
-                            ? dark
-                              ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
-                              : "bg-blue-50 text-blue-700 hover:bg-blue-100"
-                            : dark
-                              ? "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
-                              : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
-                        }`}
-                        title={
-                          c.notesCount > 0
-                            ? `View ${c.notesCount} log entr${c.notesCount === 1 ? "y" : "ies"}`
-                            : "No log entries yet"
-                        }
-                      >
-                        <MessageSquare className="h-3 w-3" aria-hidden="true" />
-                        {c.notesCount}
-                      </button>
-                    </td>
-                    {/* Closed On moved to the front (frozen) in "closed" mode —
-                        this trailing slot is Active-mode-only now. */}
-                    {!isClosedMode && (
-                      <td
-                        className={`${tdBase} text-right tabular-nums font-medium ${AGING_COLORS(c.approvalCategory, dark)}`}
-                      >
-                        {c.daysAfterApproval !== null ? (
-                          <span>
-                            {c.daysAfterApproval}d{" "}
-                            <span className="text-[11px] opacity-70">
-                              {c.approvalCategory}
-                            </span>
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    )}
-                  </tr>
+                    c={c}
+                    dark={dark}
+                    isClosedMode={isClosedMode}
+                    canSeeLeaderNotes={canSeeLeaderNotes}
+                    canFinalize={canFinalize}
+                    canEditFeeDue={canEditFeeDue}
+                    canEditFees={canEditFees}
+                    canEditFeesConf={canEditFeesConf}
+                    mode={mode}
+                    isSelected={selectedIds.has(c.id)}
+                    isRefreshing={rowRefreshing.has(c.id)}
+                    collapsedGroups={collapsedGroups}
+                    feesConfEditId={feesConfEditId}
+                    claimEditId={claimEditId}
+                    winSheetStatusEditId={winSheetStatusEditId}
+                    caseStatusEditId={caseStatusEditId}
+                    copiedDateId={copiedDateId}
+                    winSheet={{ winSheetEditing, setWinSheetEditing, winSheetDraft, setWinSheetDraft, winSheetSaving, winSheetError, setWinSheetError, handleWinSheetSave }}
+                    feeAmount={{ feeAmountEdit, setFeeAmountEdit, feeAmountSaving, feeAmountError, setFeeAmountError, handleFeeAmountSave }}
+                    onRowClick={() => setSelectedCaseId(c.id)}
+                    onToggleSelection={() => toggleRowSelection(c.id)}
+                    onRowRefresh={() => handleRowRefresh(c)}
+                    onVarcharChange={(target, field, rowKey, label, value) =>
+                      handleVarcharChange(c, target, field, rowKey, label, value)
+                    }
+                    setFeesConfEditId={setFeesConfEditId}
+                    setClaimEditId={setClaimEditId}
+                    setWinSheetStatusEditId={setWinSheetStatusEditId}
+                    setCaseStatusEditId={setCaseStatusEditId}
+                    setCopiedDateId={setCopiedDateId}
+                    copyDateTimerRef={copyDateTimerRef}
+                    cellValue={(key) => cellValue(c, key)}
+                    onReopenConfirm={() => setReopenConfirmCase(c)}
+                    onLeaderNotes={() => setLeaderNotesFor({ id: c.id, name: c.name })}
+                    onLogsClick={() => setNotesFor({ id: c.id, name: c.name })}
+                    onT16FeeAdded={(amount, receivedDate) =>
+                      setFeeOverrides((prev) => ({
+                        ...prev,
+                        [c.id]: { ...prev[c.id], t16FeeReceived: (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) + amount, t16FeeReceivedDate: receivedDate },
+                      }))
+                    }
+                    onT16FeeDeleted={(amount) =>
+                      setFeeOverrides((prev) => ({
+                        ...prev,
+                        [c.id]: { ...prev[c.id], t16FeeReceived: Math.max(0, (prev[c.id]?.t16FeeReceived ?? c.t16FeeReceived) - amount) },
+                      }))
+                    }
+                    onT2FeeAdded={(amount, receivedDate) =>
+                      setFeeOverrides((prev) => ({
+                        ...prev,
+                        [c.id]: { ...prev[c.id], t2FeeReceived: (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) + amount, t2FeeReceivedDate: receivedDate },
+                      }))
+                    }
+                    onT2FeeDeleted={(amount) =>
+                      setFeeOverrides((prev) => ({
+                        ...prev,
+                        [c.id]: { ...prev[c.id], t2FeeReceived: Math.max(0, (prev[c.id]?.t2FeeReceived ?? c.t2FeeReceived) - amount) },
+                      }))
+                    }
+                    onAuxFeeAdded={(amount, receivedDate) =>
+                      setFeeOverrides((prev) => ({
+                        ...prev,
+                        [c.id]: { ...prev[c.id], auxFeeReceived: (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) + amount, auxFeeReceivedDate: receivedDate },
+                      }))
+                    }
+                    onAuxFeeDeleted={(amount) =>
+                      setFeeOverrides((prev) => ({
+                        ...prev,
+                        [c.id]: { ...prev[c.id], auxFeeReceived: Math.max(0, (prev[c.id]?.auxFeeReceived ?? c.auxFeeReceived) - amount) },
+                      }))
+                    }
+                    options={{
+                      assigned: assignedOptions,
+                      approvedBy: approvedByOptions,
+                      feesConfirmation: feesConfirmationOptions,
+                      caseLevel: caseLevelOptions,
+                      claimType: claimTypeOptions,
+                      winSheetStatus: winSheetStatusOptions,
+                      caseStatus: caseStatusOptions,
+                    }}
+                    leaders={leaders}
+                    t={t}
+                    tdCls={{
+                      tdBase,
+                      groupBorder,
+                      rowBorder,
+                      rowHover,
+                      checkTd: stickyCheckTd,
+                      tdRefresh: stickyTdRefresh,
+                      tdClosedOn: stickyTdClosedOn,
+                      td1: stickyTd1,
+                      td2: stickyTd2,
+                      td3: stickyTd3,
+                    }}
+                  />
                 );
               })}
             </tbody>
