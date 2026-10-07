@@ -623,11 +623,16 @@ export const FeeRecordsTable = ({
   };
 
 
-  // Unique assignees for filter dropdown
+  // Unique assignees for filter dropdown. In server-paginated mode `cases` is
+  // only the current page, so derive from the admin-managed dropdown_options
+  // list instead — otherwise agents whose cases aren't on page 1 are invisible.
   const assignees = useMemo(() => {
+    if (serverPaginated) {
+      return assignedOptions.filter((o) => o.isActive).map((o) => o.name).sort();
+    }
     const set = new Set(cases.map((c) => c.assigned).filter((a) => a !== "—"));
     return Array.from(set).sort();
-  }, [cases]);
+  }, [cases, serverPaginated, assignedOptions]);
 
   // All PIF statuses for the filter dropdown — the full admin-configured
   // catalog (so every status is filterable even if no currently-loaded case
