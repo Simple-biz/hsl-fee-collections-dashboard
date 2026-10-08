@@ -421,6 +421,13 @@
       "when": 1791227896322,
       "tag": "0059_add_login_lockout_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791490399551,
+      "tag": "0060_add_casewell_id",
+      "breakpoints": true
     }
   ]
 }

@@ -670,6 +670,7 @@ export const userDetails = pgTable(
       .unique()
       .references(() => cases.clientId, { onDelete: "cascade" }),
     chronicleId: integer("chronicle_id").unique(),
+    casewellId: text("casewell_id").unique(),
 
     fullName: varchar("full_name", { length: 255 }),
     addressLine1: varchar("address_line_1", { length: 255 }),

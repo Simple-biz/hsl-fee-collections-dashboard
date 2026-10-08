@@ -152,6 +152,7 @@ export interface TeamMember {
 
 export interface UserDetails {
   chronicleId: number | null;
+  casewellId: string | null;
   fullName: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
