@@ -134,6 +134,7 @@ const caseWith = (id: number, name: string, nextFollowUpDate: string | null): Ca
   caseLink: null,
   winSheetLink: null,
   winSheetLinkText: null,
+  casewellId: null,
 });
 
 const CASES: CaseRow[] = [

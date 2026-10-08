@@ -154,6 +154,7 @@ const BASE_CASE: CaseRow = {
   caseLink: null,
   winSheetLink: null,
   winSheetLinkText: null,
+  casewellId: null,
 };
 
 // ── column-count helpers ──────────────────────────────────────────────────────

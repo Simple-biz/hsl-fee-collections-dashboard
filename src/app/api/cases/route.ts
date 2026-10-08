@@ -175,9 +175,10 @@ export const GET = async (req: NextRequest) => {
 
         caseLink: cases.caseLink,
 
-        // Chronicle id (from user_details) — powers the Chronicle link in the
-        // name column. one-to-one join, so it can't multiply rows.
+        // Chronicle / Casewell ids (from user_details) — power external links in
+        // the name column. one-to-one join, so it can't multiply rows.
         udChronicleId: userDetails.chronicleId,
+        udCasewellId: userDetails.casewellId,
       })
       .from(cases)
       .leftJoin(feeRecords, eq(feeRecords.caseId, cases.clientId))
@@ -280,8 +281,9 @@ export const GET = async (req: NextRequest) => {
         name: `${r.lastName}, ${r.firstName}`,
         // MyCase case URL (stored on import); makes the name a deep link.
         externalId: r.externalId ?? null,
-        // Chronicle client id → builds the Chronicle deep link in the name cell.
+        // Chronicle / Casewell client ids → build external deep links in the name cell.
         chronicleId: r.udChronicleId ?? null,
+        casewellId: r.udCasewellId ?? null,
         assigned: r.assignedTo || "—",
         level: r.levelWon || "—",
         claim: r.claimTypeLabel === "T2_T16" || r.claimTypeLabel === "CONCURRENT" ? "CONC" : r.claimTypeLabel || "—",
