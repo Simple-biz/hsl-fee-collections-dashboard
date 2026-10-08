@@ -77,26 +77,30 @@ export async function getClient(
 }
 
 /**
- * Resolve up to 200 Chronicle (legacy) client ids into Casewell case ids in
- * one round-trip. Returns a map from legacy_client_id → Casewell id.
- * Ids with no match are absent from the map.
+ * Resolve any number of Chronicle (legacy) client ids into Casewell case ids.
+ * Automatically chunks into ≤200-id batches (the API's per-call ceiling).
+ * Returns a map from legacy_client_id → Casewell id; unmatched ids are absent.
  */
 export async function getClientsByLegacyId(
   legacyIds: number[],
   signal?: AbortSignal,
 ): Promise<Map<number, string>> {
   if (legacyIds.length === 0) return new Map();
-  if (legacyIds.length > 200) throw new Error("getClientsByLegacyId: max 200 ids per call");
 
-  const params = new URLSearchParams({ ids: legacyIds.join(",") });
-  const list = await request<CasewellClientList>(
-    `/api/clients/by-legacy-id?${params}`,
-    signal,
-  );
-
+  const CHUNK_SIZE = 200;
   const map = new Map<number, string>();
-  for (const row of list.results) {
-    if (row.legacy_client_id != null) map.set(row.legacy_client_id, row.id);
+
+  for (let i = 0; i < legacyIds.length; i += CHUNK_SIZE) {
+    const chunk = legacyIds.slice(i, i + CHUNK_SIZE);
+    const params = new URLSearchParams({ ids: chunk.join(",") });
+    const list = await request<CasewellClientList>(
+      `/api/clients/by-legacy-id?${params}`,
+      signal,
+    );
+    for (const row of list.results) {
+      if (row.legacy_client_id != null) map.set(row.legacy_client_id, row.id);
+    }
   }
+
   return map;
 }
