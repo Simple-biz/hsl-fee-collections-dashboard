@@ -32,6 +32,8 @@ export interface CaseRow {
   externalId: string | null;
   // Chronicle client id (from user_details); null when not backfilled.
   chronicleId: number | null;
+  // Casewell case id (from user_details); null until set.
+  casewellId: string | null;
   assigned: string;
   level: string;
   claim: string;

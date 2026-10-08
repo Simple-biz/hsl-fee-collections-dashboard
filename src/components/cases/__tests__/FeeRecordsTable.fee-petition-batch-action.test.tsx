@@ -151,6 +151,7 @@ const BASE_CASE: CaseRow = {
   caseLink: null,
   winSheetLink: null,
   winSheetLinkText: null,
+  casewellId: null,
 };
 
 const SECOND_CASE: CaseRow = { ...BASE_CASE, id: 2, name: "Alvarez, Marco" };

@@ -19,7 +19,7 @@ import { ClaimTypeBadge } from "@/components/cases/ClaimTypeBadge";
 import { WinSheetStatusBadge } from "@/components/cases/WinSheetStatusBadge";
 import { CaseStatusBadge } from "@/components/cases/CaseStatusBadge";
 import { FeePetitionIndicator } from "@/components/cases/FeePetitionIndicator";
-import { buildMyCaseUrl } from "@/lib/import/case-link";
+import { buildMyCaseUrl, buildCasewellUrl } from "@/lib/import/case-link";
 import { buildListboxOptions } from "@/lib/listbox-options";
 import { teamRowTint } from "@/lib/team-colors";
 import { memberRowTint } from "@/lib/member-colors";
@@ -245,6 +245,21 @@ export function FeeRecordsTableRow({
                 className={`inline-flex items-center gap-0.5 hover:underline shrink-0 ${dark ? "text-blue-400" : "text-blue-600"}`}
               >
                 Win Sheet
+                <ExternalLink
+                  className="h-2.5 w-2.5"
+                  aria-hidden="true"
+                />
+              </a>
+            )}
+            {c.casewellId && (
+              <a
+                href={buildCasewellUrl(c.casewellId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`inline-flex items-center gap-0.5 hover:underline shrink-0 ${dark ? "text-violet-400" : "text-violet-600"}`}
+              >
+                Casewell
                 <ExternalLink
                   className="h-2.5 w-2.5"
                   aria-hidden="true"
