@@ -26,7 +26,7 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
 // ============================================================================
 
 export interface CasewellClientRow {
-  id: string;
+  id: number;
   claimant_name: string;
   ssn_last4: string | null;
   level: string | null;
@@ -57,7 +57,7 @@ interface ByLegacyIdResponse {
 }
 
 export interface CasewellClientDetail {
-  id: string;
+  id: number;
   claimant_name: string;
   ssn_last4: string | null;
   level: string | null;
