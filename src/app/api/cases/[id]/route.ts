@@ -142,6 +142,7 @@ export const GET = async (
         monthAssignedToAgent: feeRecords.monthAssignedToAgent,
         // user_details fields
         udChronicleId: userDetails.chronicleId,
+        udCasewellId: userDetails.casewellId,
         udFullName: userDetails.fullName,
         udAddressLine1: userDetails.addressLine1,
         udAddressLine2: userDetails.addressLine2,
@@ -304,6 +305,7 @@ export const GET = async (
       // User details
       userDetails: {
         chronicleId: row.udChronicleId ?? null,
+        casewellId: row.udCasewellId ?? null,
         fullName: row.udFullName || null,
         addressLine1: row.udAddressLine1 || null,
         addressLine2: row.udAddressLine2 || null,
@@ -546,6 +548,7 @@ export const PATCH = async (
       const UD_FIELD_MAP = {
         ssnLast4: "ssnLast4",
         chronicleId: "chronicleId",
+        casewellId: "casewellId",
       } as const;
 
       const udUpdates: Partial<typeof userDetails.$inferInsert> = {};

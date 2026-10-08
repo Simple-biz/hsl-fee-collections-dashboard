@@ -33,6 +33,13 @@ const MYCASE_BASE_URL = "https://rgdr.mycase.com/court_cases/";
 export const buildMyCaseUrl = (id: number | string): string =>
   `${MYCASE_BASE_URL}${id}`;
 
+// Casewell SSD case URLs look like https://casewell.simple.biz/cases/{id}
+export const CASEWELL_URL_RE = /casewell\.simple\.biz\/cases\/([^/?#]+)/i;
+
+/** Build a Casewell case URL from a Casewell case id. */
+export const buildCasewellUrl = (id: string): string =>
+  `https://casewell.simple.biz/cases/${id}`;
+
 // Chronicle client URLs look like
 //   https://app.chroniclelegal.com/dashboard/clients/12345
 // The path segment before /clients/ can vary, so allow any prefix.
