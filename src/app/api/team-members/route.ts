@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { teamMembers, feeRecords, feePetitions, notifications } from "@/lib/db/schema";
 import { eq, sql, count, sum, and } from "drizzle-orm";
-import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { requirePageAccess, guardStatus, sessionHasPageAccess } from "@/lib/auth-helpers";
 
 const postBodySchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -20,8 +20,10 @@ const patchBodySchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-// GET /api/team-members — list all team members with case stats
+// GET /api/team-members — list all team members
 // Auth-only: any authenticated user needs this for dropdowns (assigned-to, etc.)
+// Stats fields (cases, collected, activeCases, pifCases) are included only when
+// the caller has "team" page access — they are business-sensitive performance data.
 // Mutating operations (POST/PATCH/DELETE) still require the "team" page.
 export const GET = async () => {
   try {
@@ -30,6 +32,55 @@ export const GET = async () => {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
+    const canSeeStats = sessionHasPageAccess(session, "team");
+
+    if (canSeeStats) {
+      const rows = await db
+        .select({
+          id: teamMembers.id,
+          name: teamMembers.name,
+          role: teamMembers.role,
+          team: teamMembers.team,
+          isActive: teamMembers.isActive,
+          createdAt: teamMembers.createdAt,
+          caseCount: count(feeRecords.id),
+          totalCollected: sum(sql`${feeRecords.totalFeesPaid}::numeric`),
+          activeCases: count(
+            sql`CASE WHEN ${feeRecords.winSheetStatus} NOT IN ('paid_in_full', 'closed') THEN 1 END`,
+          ),
+          pifCases: count(
+            sql`CASE WHEN ${feeRecords.winSheetStatus} = 'paid_in_full' THEN 1 END`,
+          ),
+        })
+        .from(teamMembers)
+        .leftJoin(feeRecords, eq(feeRecords.assignedTo, teamMembers.name))
+        .groupBy(
+          teamMembers.id,
+          teamMembers.name,
+          teamMembers.role,
+          teamMembers.team,
+          teamMembers.isActive,
+          teamMembers.createdAt,
+        )
+        .orderBy(teamMembers.name);
+
+      const data = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        role: r.role,
+        team: r.team ?? null,
+        isActive: r.isActive,
+        createdAt: r.createdAt,
+        cases: Number(r.caseCount) || 0,
+        collected: Number(r.totalCollected) || 0,
+        activeCases: Number(r.activeCases) || 0,
+        pifCases: Number(r.pifCases) || 0,
+      }));
+
+      return NextResponse.json({ data });
+    }
+
+    // Lightweight path — no joins, no aggregates, no stats
     const rows = await db
       .select({
         id: teamMembers.id,
@@ -38,25 +89,8 @@ export const GET = async () => {
         team: teamMembers.team,
         isActive: teamMembers.isActive,
         createdAt: teamMembers.createdAt,
-        caseCount: count(feeRecords.id),
-        totalCollected: sum(sql`${feeRecords.totalFeesPaid}::numeric`),
-        activeCases: count(
-          sql`CASE WHEN ${feeRecords.winSheetStatus} NOT IN ('paid_in_full', 'closed') THEN 1 END`,
-        ),
-        pifCases: count(
-          sql`CASE WHEN ${feeRecords.winSheetStatus} = 'paid_in_full' THEN 1 END`,
-        ),
       })
       .from(teamMembers)
-      .leftJoin(feeRecords, eq(feeRecords.assignedTo, teamMembers.name))
-      .groupBy(
-        teamMembers.id,
-        teamMembers.name,
-        teamMembers.role,
-        teamMembers.team,
-        teamMembers.isActive,
-        teamMembers.createdAt,
-      )
       .orderBy(teamMembers.name);
 
     const data = rows.map((r) => ({
@@ -66,10 +100,6 @@ export const GET = async () => {
       team: r.team ?? null,
       isActive: r.isActive,
       createdAt: r.createdAt,
-      cases: Number(r.caseCount) || 0,
-      collected: Number(r.totalCollected) || 0,
-      activeCases: Number(r.activeCases) || 0,
-      pifCases: Number(r.pifCases) || 0,
     }));
 
     return NextResponse.json({ data });

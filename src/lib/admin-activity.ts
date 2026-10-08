@@ -10,6 +10,7 @@ export type AdminAction =
   | "user.activate"
   | "user.deactivate"
   | "user.password_reset"
+  | "user.unlock"
   | "user.access_update"
   | "backup.export"
   | "backup.restore";

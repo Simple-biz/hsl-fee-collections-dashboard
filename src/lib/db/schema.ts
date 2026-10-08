@@ -670,6 +670,7 @@ export const userDetails = pgTable(
       .unique()
       .references(() => cases.clientId, { onDelete: "cascade" }),
     chronicleId: integer("chronicle_id").unique(),
+    casewellId: text("casewell_id").unique(),
 
     fullName: varchar("full_name", { length: 255 }),
     addressLine1: varchar("address_line_1", { length: 255 }),
@@ -799,6 +800,8 @@ export const users = pgTable(
     isActive: boolean("is_active").notNull().default(true),
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

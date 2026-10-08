@@ -28,7 +28,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { themeClasses } from "@/lib/theme-classes";
-import { buildMyCaseUrl } from "@/lib/import/case-link";
+import { buildMyCaseUrl, buildCasewellUrl } from "@/lib/import/case-link";
 import { MyCaseDocumentsDialog } from "@/components/cases/MyCaseDocumentsDialog";
 import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import {
@@ -249,6 +249,7 @@ export default function CaseDetailSheet({
     claimTypeLabel: "",
     ssnLast4: "",
     chronicleId: "",
+    casewellId: "",
     externalId: "",
     t16Retro: "",
     t16FeeDue: "",
@@ -354,6 +355,7 @@ export default function CaseDetailSheet({
         claimTypeLabel: data.claim ?? "",
         ssnLast4: myCaseData?.ssnLast4 ?? "",
         chronicleId: data.userDetails?.chronicleId != null ? String(data.userDetails.chronicleId) : "",
+        casewellId: data.userDetails?.casewellId ?? "",
         externalId: data.externalId ?? "",
         t16Retro: data.t16Retro > 0 ? String(data.t16Retro) : "",
         t16FeeDue: (data.t16FeeDue ?? 0) > 0 ? String(data.t16FeeDue) : "",
@@ -407,6 +409,10 @@ export default function CaseDetailSheet({
       const n = Number(editValues.chronicleId);
       userDetailsFields.chronicleId = editValues.chronicleId && Number.isFinite(n) ? n : null;
     }
+
+    const origCasewell = data.userDetails?.casewellId ?? "";
+    if (editValues.casewellId !== origCasewell)
+      userDetailsFields.casewellId = editValues.casewellId || null;
 
     const feeFields: Record<string, number | string | null> = {};
     const feeNumFields = [
@@ -487,6 +493,10 @@ export default function CaseDetailSheet({
     ? (myCaseData?.chronicleLink ?? (data.userDetails?.chronicleId != null
         ? `https://app.chroniclelegal.com/dashboard/clients/${data.userDetails.chronicleId}`
         : null))
+    : null;
+
+  const casewellLink = data?.userDetails?.casewellId
+    ? buildCasewellUrl(data.userDetails.casewellId)
     : null;
 
   return (
@@ -620,6 +630,22 @@ export default function CaseDetailSheet({
                       )}
                     </div>
                   )}
+                  {(casewellLink || isEditing) && (
+                    <div className="mt-2">
+                      <p className={lbl}>Casewell ID</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editValues.casewellId}
+                          onChange={(e) => setEditValues((v) => ({ ...v, casewellId: e.target.value }))}
+                          placeholder="Casewell case ID"
+                          className={inp}
+                        />
+                      ) : (
+                        <p className={`${val} text-violet-500`}>{data?.userDetails?.casewellId ?? "—"}</p>
+                      )}
+                    </div>
+                  )}
                   {(myCaseData?.ssnLast4 || isEditing) && (
                     <div className="mt-2">
                       <p className={lbl}>SSN (last 4)</p>
@@ -666,6 +692,16 @@ export default function CaseDetailSheet({
                       className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-bold uppercase transition-colors ${dark ? "bg-sky-900/30 text-sky-400 hover:bg-sky-900/50" : "bg-sky-50 text-sky-600 hover:bg-sky-100"}`}
                     >
                       Chronicle <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                    </a>
+                  )}
+                  {casewellLink && (
+                    <a
+                      href={casewellLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-bold uppercase transition-colors ${dark ? "bg-violet-900/30 text-violet-400 hover:bg-violet-900/50" : "bg-violet-50 text-violet-600 hover:bg-violet-100"}`}
+                    >
+                      Casewell <ExternalLink aria-hidden="true" className="h-3 w-3" />
                     </a>
                   )}
                 </div>

@@ -51,8 +51,10 @@
  * GET  /api/team-members
  *   - useDashboard.ts hook (overview + master-fees — MEMBER-ACCESSIBLE)
  *   - TeamManagement.tsx (team page — lead+ only)
- *   GUARD: auth-only (any authenticated user). DO NOT add page restriction —
- *   this endpoint feeds member-facing dropdowns. (#489 regression post-mortem)
+ *   GUARD: auth-only for the base list (id/name/role/team/isActive).
+ *   Stats fields (cases/collected/activeCases/pifCases) require "team" page.
+ *   DO NOT restrict the base list to a non-member page key — dropdowns need it.
+ *   (#489 regression post-mortem, #550 field-scope fix)
  *
  * POST /api/team-members
  *   - TeamManagement.tsx (team page — lead+ only)
@@ -320,9 +322,66 @@ describe("#372 regression — team-members GET auth guard", () => {
     );
     const GET = await getTeamMembersGET();
     const res = await GET();
-    // 200 or 500 (db mock returns empty) — not 401/403
-    expect(res.status).not.toBe(401);
-    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #550 — GET /api/team-members stats field scope
+// Members see id/name/role/team/isActive only. Stats (cases/collected/
+// activeCases/pifCases) require the "team" page (#550).
+// ---------------------------------------------------------------------------
+describe("#550 — team-members GET field scope", () => {
+  const baseRow = { id: 1, name: "Alice", role: "member", team: null, isActive: true, createdAt: new Date() };
+
+  it("member without team page receives no stats fields", async () => {
+    mockAuth.mockResolvedValue(
+      makeSession("member", { pages: ["overview"], capabilities: ["case.update"] }),
+    );
+    // Lightweight path: select → from → orderBy (terminal)
+    const lightChain = { from: vi.fn(), orderBy: vi.fn().mockResolvedValue([baseRow]) };
+    lightChain.from.mockReturnValue(lightChain);
+    mockDb.select.mockReturnValueOnce(lightChain);
+
+    const GET = await getTeamMembersGET();
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const first = json.data?.[0];
+    expect(first).toBeDefined();
+    expect(first).not.toHaveProperty("cases");
+    expect(first).not.toHaveProperty("collected");
+    expect(first).not.toHaveProperty("activeCases");
+    expect(first).not.toHaveProperty("pifCases");
+  });
+
+  it("user with team page receives stats fields", async () => {
+    mockAuth.mockResolvedValue(
+      makeSession("lead", { pages: ["overview", "team"], capabilities: ["case.update"] }),
+    );
+    // Stats path: select → from → leftJoin → groupBy → orderBy (terminal)
+    const statsRow = { ...baseRow, caseCount: 5, totalCollected: "1000", activeCases: 3, pifCases: 2 };
+    const statsChain = {
+      from: vi.fn(),
+      leftJoin: vi.fn(),
+      groupBy: vi.fn(),
+      orderBy: vi.fn().mockResolvedValue([statsRow]),
+    };
+    statsChain.from.mockReturnValue(statsChain);
+    statsChain.leftJoin.mockReturnValue(statsChain);
+    statsChain.groupBy.mockReturnValue(statsChain);
+    mockDb.select.mockReturnValueOnce(statsChain);
+
+    const GET = await getTeamMembersGET();
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const first = json.data?.[0];
+    expect(first).toBeDefined();
+    expect(first).toHaveProperty("cases");
+    expect(first).toHaveProperty("collected");
+    expect(first).toHaveProperty("activeCases");
+    expect(first).toHaveProperty("pifCases");
   });
 });
 

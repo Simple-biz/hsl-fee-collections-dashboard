@@ -16,6 +16,7 @@ import {
   Check,
   ShieldCheck,
   Pencil,
+  LockOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +46,7 @@ import {
   updateUserRole,
   setUserActive,
   resetUserPassword,
+  unlockUser,
 } from "@/app/(dashboard)/admin/actions";
 
 export type AdminUser = {
@@ -55,6 +57,8 @@ export type AdminUser = {
   isActive: boolean;
   lastLoginAt: string | null;
   lastActivityAt: string | null;
+  failedLoginAttempts: number;
+  lockedUntil: string | null;
   createdAt: string;
 };
 
@@ -277,9 +281,16 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                       </Badge>
                     </td>
                     <td className={`${tdBase} text-center`}>
-                      <Badge variant={user.isActive ? "secondary" : "outline"}>
-                        {user.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="inline-flex flex-col items-center gap-1">
+                        <Badge variant={user.isActive ? "secondary" : "outline"}>
+                          {user.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {user.lockedUntil && new Date(user.lockedUntil) > new Date() && (
+                          <Badge variant="outline" className="text-[11px] text-amber-600 border-amber-400">
+                            Locked
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className={`${tdBase} ${t.textMuted}`}>
                       {formatRelative(user.lastLoginAt)}
@@ -330,6 +341,24 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                           <ShieldCheck className="h-3 w-3" aria-hidden="true" />
                           Access
                         </Button>
+                        {user.lockedUntil && new Date(user.lockedUntil) > new Date() && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              run(
+                                user.id,
+                                () => unlockUser({ userId: user.id }),
+                                `${user.email} unlocked`,
+                              )
+                            }
+                            disabled={rowBusy}
+                            className="h-7 text-[13px] text-amber-600 border-amber-400 hover:bg-amber-50"
+                          >
+                            <LockOpen className="h-3 w-3" aria-hidden="true" />
+                            Unlock
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

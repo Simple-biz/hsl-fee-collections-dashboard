@@ -19,6 +19,7 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
 vi.mock("@/lib/auth-helpers", () => ({
   requirePageAccess: vi.fn(),
+  requireCapability: vi.fn(),
   guardStatus: vi.fn((e: "Unauthenticated" | "Forbidden") => (e === "Unauthenticated" ? 401 : 403)),
   sessionHasPageAccess: vi.fn(),
   sessionHasCapability: vi.fn(),
@@ -42,12 +43,13 @@ vi.mock("@/lib/formatters", () => ({
 }));
 
 import { auth } from "@/auth";
-import { requirePageAccess } from "@/lib/auth-helpers";
+import { requirePageAccess, requireCapability } from "@/lib/auth-helpers";
 import { GET, POST } from "@/app/api/inbound-calls/route";
 import { PATCH, DELETE } from "@/app/api/inbound-calls/[id]/route";
 
 const mockAuth = vi.mocked(auth);
 const mockRequirePage = vi.mocked(requirePageAccess);
+const mockRequireCap = vi.mocked(requireCapability);
 
 const memberSession: Session = {
   user: {
@@ -71,6 +73,32 @@ const allowedSession: Session = {
     mustChangePassword: false,
     pages: ["inbound_calls"] as PageKey[],
     capabilities: [] as CapabilityKey[],
+  },
+  expires: "9999",
+};
+
+const pageOnlySession: Session = {
+  user: {
+    id: "4",
+    name: "PageOnly",
+    email: "pageonly@example.com",
+    role: "lead",
+    mustChangePassword: false,
+    pages: ["inbound_calls"] as PageKey[],
+    capabilities: [] as CapabilityKey[],
+  },
+  expires: "9999",
+};
+
+const deleteCapSession: Session = {
+  user: {
+    id: "5",
+    name: "Admin",
+    email: "admin@example.com",
+    role: "admin",
+    mustChangePassword: false,
+    pages: ["inbound_calls"] as PageKey[],
+    capabilities: ["inboundCalls.delete"] as CapabilityKey[],
   },
   expires: "9999",
 };
@@ -175,6 +203,14 @@ describe("PATCH /api/inbound-calls/[id]", () => {
   });
 });
 
+type CapGuardResult =
+  | { ok: true; session: Session }
+  | { ok: false; error: "Unauthenticated" | "Forbidden" };
+
+const setCapGuard = (result: CapGuardResult) => {
+  mockRequireCap.mockResolvedValue(result as Awaited<ReturnType<typeof requireCapability>>);
+};
+
 // ---- DELETE /api/inbound-calls/[id] ----
 
 describe("DELETE /api/inbound-calls/[id]", () => {
@@ -191,10 +227,20 @@ describe("DELETE /api/inbound-calls/[id]", () => {
     setGuard({ ok: false, error: "Forbidden" });
     const res = await DELETE(makeDeleteReq() as never, makeCtx("1") as never);
     expect(res.status).toBe(403);
+    expect(mockRequireCap).not.toHaveBeenCalled();
   });
 
-  it("200 — inbound_calls page access granted", async () => {
-    setGuard({ ok: true, session: allowedSession });
+  it("403 — has page access but lacks inboundCalls.delete capability", async () => {
+    setGuard({ ok: true, session: pageOnlySession });
+    setCapGuard({ ok: false, error: "Forbidden" });
+    const res = await DELETE(makeDeleteReq() as never, makeCtx("1") as never);
+    expect(res.status).toBe(403);
+    expect(mockRequireCap).toHaveBeenCalledWith("inboundCalls.delete");
+  });
+
+  it("200 — has page access and inboundCalls.delete capability", async () => {
+    setGuard({ ok: true, session: deleteCapSession });
+    setCapGuard({ ok: true, session: deleteCapSession });
     const res = await DELETE(makeDeleteReq() as never, makeCtx("1") as never);
     expect(res.status).toBe(200);
   });

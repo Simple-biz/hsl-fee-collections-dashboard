@@ -83,7 +83,7 @@ const chain = {
   leftJoin: vi.fn(),
   innerJoin: vi.fn(),
   groupBy: vi.fn(),
-  orderBy: vi.fn(),
+  orderBy: vi.fn().mockResolvedValue([]),
   limit: vi.fn().mockResolvedValue([]),
   offset: vi.fn().mockResolvedValue([]),
   execute: vi.fn().mockResolvedValue([]),
@@ -94,7 +94,7 @@ const chain = {
 };
 // Terminal methods must resolve to a Promise; everything else chains back.
 const TERMINAL_CHAIN_METHODS = new Set([
-  "limit", "offset", "execute", "onConflictDoUpdate", "returning",
+  "limit", "offset", "execute", "onConflictDoUpdate", "returning", "orderBy",
 ]);
 Object.keys(chain).forEach((k) => {
   const fn = chain[k as keyof typeof chain];

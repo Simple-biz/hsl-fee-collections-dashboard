@@ -34,6 +34,8 @@ export default async function AdminRoute() {
       role: users.role,
       isActive: users.isActive,
       lastLoginAt: users.lastLoginAt,
+      failedLoginAttempts: users.failedLoginAttempts,
+      lockedUntil: users.lockedUntil,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -66,6 +68,8 @@ export default async function AdminRoute() {
     role: r.role,
     isActive: r.isActive,
     lastLoginAt: r.lastLoginAt ? r.lastLoginAt.toISOString() : null,
+    failedLoginAttempts: r.failedLoginAttempts,
+    lockedUntil: r.lockedUntil ? r.lockedUntil.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
     lastActivityAt: lastActivityMap.get(r.name ?? "") ?? null,
   }));

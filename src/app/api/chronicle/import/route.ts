@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { cases, feeRecords, activityLog } from "@/lib/db/schema";
-import { requirePageAccess, guardStatus } from "@/lib/auth-helpers";
+import { requirePageAccess, requireCapability, guardStatus } from "@/lib/auth-helpers";
 import { logEvent, classifyError, correlationId } from "@/lib/telemetry";
 import {
   resolveDecisionOutcome,
@@ -96,6 +96,30 @@ export const POST = async (req: NextRequest) => {
     }
     const importCases = parsedBody.data.cases;
     const pdfFields: PdfFields | null = parsedBody.data.pdfFields ?? null;
+
+    const hasPiiFields =
+      pdfFields != null &&
+      (pdfFields.fullSsn != null ||
+        pdfFields.dob != null ||
+        pdfFields.email != null ||
+        pdfFields.phone != null ||
+        pdfFields.primaryDiagnosis != null ||
+        pdfFields.primaryDiagnosisCode != null ||
+        pdfFields.secondaryDiagnosis != null ||
+        pdfFields.secondaryDiagnosisCode != null ||
+        pdfFields.allegations != null ||
+        pdfFields.blindDli != null ||
+        pdfFields.dateLastInsured != null);
+
+    if (hasPiiFields) {
+      const piiGuard = await requireCapability("case.editPii");
+      if (!piiGuard.ok) {
+        return NextResponse.json(
+          { error: "Insufficient permissions to import PII fields" },
+          { status: 403 },
+        );
+      }
+    }
 
     const imported: { clientId: number; name: string }[] = [];
     const errors: { name: string; error: string }[] = [];
