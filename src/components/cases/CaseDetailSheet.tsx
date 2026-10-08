@@ -28,7 +28,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { themeClasses } from "@/lib/theme-classes";
-import { buildMyCaseUrl } from "@/lib/import/case-link";
+import { buildMyCaseUrl, buildCasewellUrl } from "@/lib/import/case-link";
 import { MyCaseDocumentsDialog } from "@/components/cases/MyCaseDocumentsDialog";
 import { FeesConfBadge } from "@/components/cases/FeesConfBadge";
 import {
@@ -496,7 +496,7 @@ export default function CaseDetailSheet({
     : null;
 
   const casewellLink = data?.userDetails?.casewellId
-    ? `https://casewell.simple.biz/cases/${data.userDetails.casewellId}`
+    ? buildCasewellUrl(data.userDetails.casewellId)
     : null;
 
   return (
