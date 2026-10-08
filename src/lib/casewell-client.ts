@@ -42,6 +42,20 @@ export interface CasewellClientList {
   next_cursor: string | null;
 }
 
+// Response shape for /api/clients/by-legacy-id — distinct from the general list.
+interface ByLegacyIdRow {
+  legacy_client_id: number;
+  client_id: number;
+  claimant_name: string;
+  resolved_via: string;
+  merged_at: string | null;
+}
+
+interface ByLegacyIdResponse {
+  items: ByLegacyIdRow[];
+  not_found: number[];
+}
+
 export interface CasewellClientDetail {
   id: string;
   claimant_name: string;
@@ -79,7 +93,11 @@ export async function getClient(
 /**
  * Resolve any number of Chronicle (legacy) client ids into Casewell case ids.
  * Automatically chunks into ≤200-id batches (the API's per-call ceiling).
- * Returns a map from legacy_client_id → Casewell id; unmatched ids are absent.
+ * Returns a map from legacy_client_id → Casewell id (as string); unmatched ids are absent.
+ *
+ * The by-legacy-id endpoint returns all matches in a single `items` array with no
+ * cursor pagination. If the response shape ever changes, we throw immediately so
+ * the assumption surfaces rather than silently dropping results.
  */
 export async function getClientsByLegacyId(
   legacyIds: number[],
@@ -93,12 +111,15 @@ export async function getClientsByLegacyId(
   for (let i = 0; i < legacyIds.length; i += CHUNK_SIZE) {
     const chunk = legacyIds.slice(i, i + CHUNK_SIZE);
     const params = new URLSearchParams({ ids: chunk.join(",") });
-    const list = await request<CasewellClientList>(
+    const res = await request<ByLegacyIdResponse>(
       `/api/clients/by-legacy-id?${params}`,
       signal,
     );
-    for (const row of list.results) {
-      if (row.legacy_client_id != null) map.set(row.legacy_client_id, row.id);
+    if (!Array.isArray(res.items)) {
+      throw new Error("Casewell by-legacy-id: unexpected response shape (missing items array)");
+    }
+    for (const row of res.items) {
+      map.set(row.legacy_client_id, String(row.client_id));
     }
   }
 
