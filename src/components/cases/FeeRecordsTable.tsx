@@ -481,9 +481,22 @@ export const FeeRecordsTable = ({
 
   // Unique assignees for filter dropdown
   const assignees = useMemo(() => {
+    // Use the admin-configured catalog when available so the full agent roster
+    // is always filterable — in server-paginated mode, `cases` only contains
+    // the current page and agents not on it would otherwise be invisible.
+    // Append any names from the current page that aren't in the catalog
+    // (e.g. an agent removed from the catalog but still assigned to old cases).
+    const catalog = assignedOptions.map((o) => o.name);
+    if (catalog.length > 0) {
+      const catalogSet = new Set(catalog);
+      const extras = Array.from(
+        new Set(cases.map((c) => c.assigned).filter((a) => a !== "—" && !catalogSet.has(a))),
+      ).sort();
+      return [...catalog, ...extras];
+    }
     const set = new Set(cases.map((c) => c.assigned).filter((a) => a !== "—"));
     return Array.from(set).sort();
-  }, [cases]);
+  }, [assignedOptions, cases]);
 
   // All PIF statuses for the filter dropdown — the full admin-configured
   // catalog (so every status is filterable even if no currently-loaded case
