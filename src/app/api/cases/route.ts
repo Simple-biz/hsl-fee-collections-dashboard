@@ -398,6 +398,11 @@ const createCaseSchema = z.object({
     (v) => (v === "" || v == null ? undefined : v),
     z.coerce.number().int().positive().optional(),
   ),
+  // Casewell case id (numeric string) → persisted to user_details.casewellId.
+  casewellId: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : String(v)),
+    z.string().regex(/^\d+$/).optional(),
+  ),
 });
 
 export const POST = async (req: NextRequest) => {
@@ -464,14 +469,17 @@ export const POST = async (req: NextRequest) => {
     // Fee Petitions" on Master Fees, and upsertFeePetition creates the
     // checklist row on the first edit as it does for every other case.
 
-    // Best-effort: persist the Chronicle id so the case deep-links to Chronicle.
+    // Best-effort: persist Chronicle/Casewell ids so the case deep-links correctly.
     // onConflictDoNothing guards the case_id unique key; the .catch swallows a
-    // chronicle_id unique collision (another case already owns it) so a bad id
-    // never fails an otherwise-successful case creation.
-    if (input.chronicleId != null) {
+    // unique collision on either id column so a bad id never fails case creation.
+    if (input.chronicleId != null || input.casewellId != null) {
       await db
         .insert(userDetails)
-        .values({ caseId: input.clientId, chronicleId: input.chronicleId })
+        .values({
+          caseId: input.clientId,
+          ...(input.chronicleId != null && { chronicleId: input.chronicleId }),
+          ...(input.casewellId != null && { casewellId: input.casewellId }),
+        })
         .onConflictDoNothing()
         .catch(() => null);
     }
