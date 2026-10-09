@@ -484,7 +484,14 @@ export const FeeRecordsTable = ({
   // list instead — otherwise agents whose cases aren't on page 1 are invisible.
   const assignees = useMemo(() => {
     if (serverPaginated) {
-      return assignedOptions.filter((o) => o.isActive).map((o) => o.name).sort();
+      // Active catalog entries first, then any names from the current page
+      // not in the catalog (covers agents removed from catalog with old cases).
+      const catalog = assignedOptions.filter((o) => o.isActive).map((o) => o.name);
+      const catalogSet = new Set(catalog);
+      const extras = Array.from(
+        new Set(cases.map((c) => c.assigned).filter((a) => a !== "—" && !catalogSet.has(a))),
+      ).sort();
+      return [...catalog, ...extras];
     }
     const set = new Set(cases.map((c) => c.assigned).filter((a) => a !== "—"));
     return Array.from(set).sort();
