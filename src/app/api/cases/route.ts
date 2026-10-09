@@ -496,7 +496,7 @@ export const POST = async (req: NextRequest) => {
           ...(input.chronicleId != null && { chronicleId: input.chronicleId }),
           ...(input.casewellId != null && { casewellId: input.casewellId }),
         })
-        .onConflictDoNothing()
+        .onConflictDoNothing({ target: userDetails.caseId })
         .catch(() => null);
     }
 
