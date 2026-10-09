@@ -187,13 +187,21 @@ if (allUpdates.length === 0) {
 // ─── Apply ────────────────────────────────────────────────────────────────────
 
 let applied = 0;
+let skipped = 0;
 for (const u of allUpdates) {
-  await db
-    .update(userDetails)
-    .set({ casewellId: u.casewellId })
-    .where(eq(userDetails.caseId, u.caseId));
-  applied++;
+  try {
+    await db
+      .update(userDetails)
+      .set({ casewellId: u.casewellId })
+      .where(eq(userDetails.caseId, u.caseId));
+    applied++;
+  } catch (err) {
+    skipped++;
+    console.warn(
+      `Skipped case_id=${u.caseId} chronicle_id=${u.chronicleId ?? "—"} name="${(u as { name?: string }).name ?? "—"}" casewellId=${u.casewellId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 }
 
-console.log(`Done. Updated ${applied} rows.`);
+console.log(`Done. Updated ${applied} rows, skipped ${skipped} rows.`);
 await client.end();

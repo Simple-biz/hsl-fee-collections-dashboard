@@ -163,7 +163,7 @@ export default function AddCaseModal({
   // a bare numeric id. Stores the extracted id as what the API persists.
   const onCasewellUrl = (value: string) => {
     const m = value.trim().match(CASEWELL_URL_RE);
-    const id = m ? m[1] : /^\d+$/.test(value.trim()) ? value.trim() : "";
+    const id = m && /^\d+$/.test(m[1]) ? m[1] : /^\d+$/.test(value.trim()) ? value.trim() : "";
     setForm((f) => ({ ...f, casewellUrl: value, casewellId: id }));
   };
 

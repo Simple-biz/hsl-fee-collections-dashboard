@@ -439,6 +439,22 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    // Casewell ID has a UNIQUE constraint on user_details — reject a collision
+    // with a clear 409 rather than silently swallowing it via onConflictDoNothing.
+    if (input.casewellId != null) {
+      const [casewellConflict] = await db
+        .select({ caseId: userDetails.caseId })
+        .from(userDetails)
+        .where(eq(userDetails.casewellId, input.casewellId))
+        .limit(1);
+      if (casewellConflict && casewellConflict.caseId !== input.clientId) {
+        return NextResponse.json(
+          { error: "That Casewell ID is already linked to another case." },
+          { status: 409 },
+        );
+      }
+    }
+
     // Insert the case then its fee record (FK references cases.client_id).
     // Not wrapped in a txn: the unique check above makes a partial insert
     // unlikely, and the fee record can be backfilled if the second write fails.
