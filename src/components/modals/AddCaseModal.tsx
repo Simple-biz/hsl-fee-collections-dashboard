@@ -324,8 +324,8 @@ export default function AddCaseModal({
                 )}
                 {caseLinkMissingAlj && (
                   <p className="mt-2 text-[13px] text-amber-600 dark:text-amber-400">
-                    No "v." separator found — ALJ wasn’t captured. Add it as
-                    "… v. ALJ NAME" or fill the ALJ fields below.
+                    No &quot;v.&quot; separator found — ALJ wasn’t captured. Add it as
+                    &quot;… v. ALJ NAME&quot; or fill the ALJ fields below.
                   </p>
                 )}
                 <p className={`mt-2 text-[13px] ${t.textMuted}`}>
