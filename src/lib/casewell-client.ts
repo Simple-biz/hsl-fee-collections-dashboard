@@ -38,8 +38,13 @@ export interface CasewellClientRow {
 }
 
 export interface CasewellClientList {
-  results: CasewellClientRow[];
+  items: CasewellClientRow[];
   next_cursor: string | null;
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  prev_cursor: string | null;
 }
 
 // Response shape for /api/clients/by-legacy-id — distinct from the general list.

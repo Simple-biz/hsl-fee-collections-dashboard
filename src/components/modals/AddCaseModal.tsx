@@ -7,6 +7,8 @@ import {
   parseCaseLink,
   extractMyCaseId,
   extractChronicleId,
+  buildCasewellUrl,
+  CASEWELL_URL_RE,
 } from "@/lib/import/case-link";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 
@@ -32,6 +34,9 @@ interface FormState {
   // `chronicleId` is the numeric id extracted from it (what the API persists).
   chronicleUrl: string;
   chronicleId: string;
+  // Casewell case id (numeric, stored as text). User pastes a full URL or bare id.
+  casewellUrl: string;
+  casewellId: string;
   aljFirstName: string;
   aljLastName: string;
   claimTypeLabel: string;
@@ -50,6 +55,8 @@ const EMPTY: FormState = {
   externalId: "",
   chronicleUrl: "",
   chronicleId: "",
+  casewellUrl: "",
+  casewellId: "",
   aljFirstName: "",
   aljLastName: "",
   claimTypeLabel: "",
@@ -150,6 +157,14 @@ export default function AddCaseModal({
       chronicleUrl: value,
       chronicleId: id ? String(id) : "",
     }));
+  };
+
+  // Paste a Casewell URL (e.g. https://casewell.simple.biz/cases/14105) or
+  // a bare numeric id. Stores the extracted id as what the API persists.
+  const onCasewellUrl = (value: string) => {
+    const m = value.trim().match(CASEWELL_URL_RE);
+    const id = m && /^\d+$/.test(m[1]) ? m[1] : /^\d+$/.test(value.trim()) ? value.trim() : "";
+    setForm((f) => ({ ...f, casewellUrl: value, casewellId: id }));
   };
 
   // Surfaced as a hint when a case link was entered but has no "v"/"vs"
@@ -309,14 +324,40 @@ export default function AddCaseModal({
                 )}
                 {caseLinkMissingAlj && (
                   <p className="mt-2 text-[13px] text-amber-600 dark:text-amber-400">
-                    No “v.” separator found — ALJ wasn’t captured. Add it as
-                    “… v. ALJ NAME” or fill the ALJ fields below.
+                    No &quot;v.&quot; separator found — ALJ wasn’t captured. Add it as
+                    &quot;… v. ALJ NAME&quot; or fill the ALJ fields below.
                   </p>
                 )}
                 <p className={`mt-2 text-[13px] ${t.textMuted}`}>
                   Fills Client ID, name, approval date, and ALJ below — all
                   editable.
                 </p>
+                <label className={`${lblCls} mt-3`}>Casewell Link</label>
+                <div className="relative">
+                  <input
+                    value={form.casewellUrl}
+                    onChange={(e) => onCasewellUrl(e.target.value)}
+                    placeholder="https://casewell.simple.biz/cases/14105"
+                    className={`${inputCls} pr-9`}
+                  />
+                  {form.casewellId && (
+                    <a
+                      href={buildCasewellUrl(form.casewellId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 ${t.textSub} hover:opacity-80`}
+                      title="Open in Casewell"
+                    >
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  )}
+                </div>
+                {form.casewellUrl.trim() !== "" && !form.casewellId && (
+                  <p className="mt-2 text-[13px] text-amber-600 dark:text-amber-400">
+                    Couldn’t read a Casewell case id from that — paste the full
+                    case URL or just the numeric id.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
