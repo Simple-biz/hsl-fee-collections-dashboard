@@ -29,6 +29,13 @@ export const api = {
   chronicle: {
     pull: () => request("/chronicle/pull", { method: "POST" }),
   },
+  casewell: {
+    pull: (casewellId: string) =>
+      request("/casewell/pull", {
+        method: "POST",
+        body: JSON.stringify({ casewellId }),
+      }),
+  },
   sync: {
     push: (caseIds?: number[]) =>
       request("/sync/push", {

@@ -30,6 +30,7 @@ import {
   TableProperties,
   PhoneIncoming,
   BookOpen,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { themeClasses } from "@/lib/theme-classes";
@@ -81,6 +82,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
       { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/reports", icon: FileText, label: "Reports" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
+      { path: "/casewell", icon: Layers, label: "Casewell Sync" },
       { path: "/notifications", icon: Bell, label: "Notifications" },
       { path: "/resources", icon: BookOpen, label: "Resources" },
     ],
@@ -557,6 +559,11 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
                       path: "/chronicle",
                       icon: Database,
                       label: "Chronicle Sync",
+                    },
+                    {
+                      path: "/casewell",
+                      icon: Layers,
+                      label: "Casewell Sync",
                     },
                     { path: "/reports", icon: FileText, label: "Reports" },
                   ]

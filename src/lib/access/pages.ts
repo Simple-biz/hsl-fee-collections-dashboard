@@ -12,6 +12,7 @@ export const PAGES = [
   { key: "fees_closed", label: "Fees Closed", path: "/fees-closed" },
   { key: "scoreboard", label: "Scoreboard", path: "/scoreboard" },
   { key: "chronicle", label: "Chronicle Sync", path: "/chronicle" },
+  { key: "casewell", label: "Casewell Sync", path: "/casewell" },
   { key: "fee_petitions", label: "Fee Petitions", path: "/fee-petitions" },
   { key: "overpaid_cases", label: "Overpaid Cases", path: "/overpaid-cases" },
   { key: "reports", label: "Reports", path: "/reports" },
