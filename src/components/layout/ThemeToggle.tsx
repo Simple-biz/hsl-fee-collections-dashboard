@@ -21,11 +21,12 @@ export const ThemeToggle = () => {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
+        aria-label="Toggle theme"
         className="h-8 w-8 rounded-md border flex items-center justify-center transition-colors
           border-neutral-200 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700
           dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
       >
-        <CurrentIcon className="h-4 w-4" />
+        <CurrentIcon className="h-4 w-4" aria-hidden="true" />
       </button>
 
       {open && (
@@ -51,7 +52,7 @@ export const ThemeToggle = () => {
                         : "text-neutral-500 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800"
                     }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                   {opt.label}
                 </button>
               );

@@ -125,7 +125,7 @@ export const Header = ({ dateRange, onDateRangeChange }: HeaderProps) => {
                 : t.outlineBtn
             }`}
           >
-            <CalendarDays className="h-3.5 w-3.5" />
+            <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden lg:inline">{dateLabel}</span>
           </button>
           {open && (

@@ -119,7 +119,7 @@ export function EditUserDialog({
             Cancel
           </Button>
           <Button onClick={save} disabled={saving || !dirty}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             Save
           </Button>
         </DialogFooter>

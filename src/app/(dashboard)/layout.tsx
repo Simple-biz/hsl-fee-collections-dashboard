@@ -69,9 +69,10 @@ function DashboardShell({ children }: { children: ReactNode }) {
         >
           <button
             onClick={() => setMobileSidebarOpen(true)}
+            aria-label="Open menu"
             className={`h-8 w-8 rounded-md flex items-center justify-center ${t.hover} ${t.textSub}`}
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
 
           <h1 className={`text-base font-bold ${t.text}`}>Collections Dashboard</h1>

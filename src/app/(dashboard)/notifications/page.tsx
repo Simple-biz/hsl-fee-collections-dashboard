@@ -531,7 +531,7 @@ export default function NotificationsPage() {
                 <div
                   className={`shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center ${colorClass}`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </div>
 
                 {/* Content */}
@@ -591,7 +591,7 @@ export default function NotificationsPage() {
                         href={`/cases/${n.caseId}`}
                         className={`text-[12px] font-medium flex items-center gap-0.5 ${dark ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
                       >
-                        View case <ChevronRight className="h-3 w-3" />
+                        View case <ChevronRight className="h-3 w-3" aria-hidden="true" />
                       </Link>
                     )}
                     {!n.isRead && !isLive && (
@@ -603,7 +603,7 @@ export default function NotificationsPage() {
                             : "text-neutral-500 hover:text-neutral-700"
                         }`}
                       >
-                        <Eye className="h-3 w-3" /> Mark read
+                        <Eye className="h-3 w-3" aria-hidden="true" /> Mark read
                       </button>
                     )}
                   </div>

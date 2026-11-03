@@ -63,13 +63,13 @@ export function LoginForm() {
           role="alert"
           className="flex items-center gap-2 text-sm text-destructive"
         >
-          <AlertCircle className="h-4 w-4 shrink-0" />
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}
 
       <Button type="submit" className="mt-2 w-full" disabled={disabled}>
-        {disabled && <Loader2 className="h-4 w-4 animate-spin" />}
+        {disabled && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {redirecting ? "Redirecting…" : isPending ? "Signing in…" : "Sign in"}
       </Button>
     </form>
