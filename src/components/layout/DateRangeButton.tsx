@@ -58,8 +58,11 @@ export function DateRangeButton({
       }, 0);
       return () => clearTimeout(timer);
     } else {
-      setFromDate("");
-      setToDate("");
+      const timer = setTimeout(() => {
+        setFromDate("");
+        setToDate("");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [dateRange]);
 
