@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { setNewPassword as submitNewPassword } from "./actions";
 
 export function ChangePasswordForm() {
-  const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +20,11 @@ export function ChangePasswordForm() {
       if (!result.ok) {
         setError(result.error);
       } else {
-        router.push("/login?changed=1");
+        // Hard reload so SessionProvider remounts and drops the invalidated
+        // session cookie — a soft Next.js navigation leaves it stuck on
+        // the now-invalidated session until NextAuth auto-refetches.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign("/login?changed=1");
       }
     } finally {
       setSubmitting(false);
