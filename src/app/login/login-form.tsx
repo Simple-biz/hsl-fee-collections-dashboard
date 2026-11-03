@@ -19,6 +19,9 @@ export function LoginForm() {
   // on the pre-login state.)
   const ok = state && "ok" in state && state.ok;
   useEffect(() => {
+    // Hard reload so SessionProvider remounts and picks up the new session
+    // cookie — a soft Next.js navigation leaves the sidebar in pre-login state.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     if (ok) window.location.assign("/");
   }, [ok]);
 
@@ -60,13 +63,13 @@ export function LoginForm() {
           role="alert"
           className="flex items-center gap-2 text-sm text-destructive"
         >
-          <AlertCircle className="h-4 w-4 shrink-0" />
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}
 
       <Button type="submit" className="mt-2 w-full" disabled={disabled}>
-        {disabled && <Loader2 className="h-4 w-4 animate-spin" />}
+        {disabled && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {redirecting ? "Redirecting…" : isPending ? "Signing in…" : "Sign in"}
       </Button>
     </form>

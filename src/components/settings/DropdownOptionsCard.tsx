@@ -232,7 +232,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
         className={`p-4 border-b ${t.borderLight} flex items-center justify-between`}
       >
         <h4 className={`text-xs font-bold ${t.text} flex items-center gap-2`}>
-          <ListChecks className="h-3.5 w-3.5" /> {label} Options
+          <ListChecks className="h-3.5 w-3.5" aria-hidden="true" /> {label} Options
         </h4>
         <span className={`text-[13px] ${t.textMuted}`}>
           {loading
@@ -253,7 +253,7 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
             role="alert"
             className={`flex items-center gap-2 rounded-md border p-2 text-xs ${dark ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}
           >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {error}
           </div>
         )}
@@ -281,9 +281,9 @@ export function DropdownOptionsCard({ category, label, description }: Props) {
             disabled={!newName.trim() || busyId !== null}
           >
             {busyId === "new" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
             ) : (
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             )}
             Add
           </Button>

@@ -20,6 +20,10 @@ export function ChangePasswordForm() {
       if (!result.ok) {
         setError(result.error);
       } else {
+        // Hard reload so SessionProvider remounts and drops the invalidated
+        // session cookie — a soft Next.js navigation leaves it stuck on
+        // the now-invalidated session until NextAuth auto-refetches.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign("/login?changed=1");
       }
     } finally {

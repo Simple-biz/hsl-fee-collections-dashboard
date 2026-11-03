@@ -13,7 +13,7 @@
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { isNotNull, isNull, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { userDetails, cases } from "../src/lib/db/schema";
 import { getClientsByLegacyId, searchClients } from "../src/lib/casewell-client";
 

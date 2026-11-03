@@ -62,6 +62,7 @@ export const StatCards = ({ stats, dateRange }: StatCardsProps) => {
       detail: stats.feesCollectedMTD > 0 ? "Collected this period" : "None yet this period",
       detailTone: stats.feesCollectedMTD > 0 ? "up" : "neutral",
       accent: "#059669",
+      href: "/fees-closed",
     },
     {
       icon: CalendarCheck,
@@ -82,6 +83,7 @@ export const StatCards = ({ stats, dateRange }: StatCardsProps) => {
         stats.syncErrors > 0 ? `${stats.syncErrors} error(s)` : "All clear",
       detailTone: stats.syncErrors > 0 ? "down" : "up",
       accent: "#0284c7",
+      href: "/master-fees",
     },
   ];
 

@@ -18,11 +18,7 @@ import {
 
 import { themeClasses } from "@/lib/theme-classes";
 import { buildMyCaseUrl } from "@/lib/import/case-link";
-import {
-  fmtFull,
-  fmtDate,
-  caseLevelLabel,
-} from "@/lib/formatters";
+import { caseLevelLabel } from "@/lib/formatters";
 import type { CaseRow, ApprovedByOption } from "@/types";
 import type { DropdownOptionsByCategory } from "@/hooks/useDashboard";
 import { useCapabilities } from "@/hooks/useCapabilities";
@@ -147,7 +143,7 @@ export const FeeRecordsTable = ({
 
   const searchParams = useSearchParams();
 
-  const assignedOptions = dropdownOptions.assigned_to ?? [];
+  const assignedOptions = useMemo(() => dropdownOptions.assigned_to ?? [], [dropdownOptions.assigned_to]);
   const feesConfirmationOptions = dropdownOptions.fees_confirmation ?? [];
   const caseStatusOptions = dropdownOptions.case_status ?? [];
   const caseLevelOptions = dropdownOptions.case_level ?? [];
@@ -428,12 +424,13 @@ export const FeeRecordsTable = ({
   useEffect(() => {
     const abortMap = patchAbortRef.current;
     const rowRefreshMap = rowRefreshAbortRef.current;
+    const timerRef = copyDateTimerRef;
     return () => {
       for (const ctrl of abortMap.values()) ctrl.abort();
       abortMap.clear();
       for (const ctrl of rowRefreshMap.values()) ctrl.abort();
       rowRefreshMap.clear();
-      if (copyDateTimerRef.current) clearTimeout(copyDateTimerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
