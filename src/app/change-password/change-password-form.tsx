@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { setNewPassword as submitNewPassword } from "./actions";
 
 export function ChangePasswordForm() {
+  const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function ChangePasswordForm() {
       if (!result.ok) {
         setError(result.error);
       } else {
-        window.location.assign("/login?changed=1");
+        router.push("/login?changed=1");
       }
     } finally {
       setSubmitting(false);
