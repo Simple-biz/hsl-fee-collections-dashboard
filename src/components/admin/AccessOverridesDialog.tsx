@@ -137,7 +137,7 @@ export function AccessOverridesDialog({
 
         {loading ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Loading…
           </div>
         ) : (
           <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
@@ -231,7 +231,7 @@ export function AccessOverridesDialog({
             Close
           </Button>
           <Button onClick={save} disabled={saving || loading || !dirty}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             Save Changes
           </Button>
         </DialogFooter>

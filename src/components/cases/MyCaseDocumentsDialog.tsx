@@ -143,7 +143,7 @@ export function MyCaseDocumentsDialog({
               role="alert"
               className={`p-4 flex items-start gap-2 text-sm ${dark ? "text-red-400" : "text-red-700"}`}
             >
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>{error}</span>
             </div>
           ) : filtered.length === 0 ? (

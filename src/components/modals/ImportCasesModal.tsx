@@ -622,7 +622,7 @@ export default function ImportCasesModal({
                 title="Truncate the cases table and import every row from the file"
               >
                 {busy === "replace" ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                 ) : null}
                 Replace All ({(preview?.rows.length ?? 0).toLocaleString()})
               </button>
