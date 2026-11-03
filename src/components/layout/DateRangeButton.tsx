@@ -24,7 +24,8 @@ const PRESETS = [
   { label: "All time", days: -2 },
 ];
 
-const toISO = (d: Date) => d.toISOString().split("T")[0];
+const toISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export function DateRangeButton({
   dateRange,
@@ -56,6 +57,9 @@ export function DateRangeButton({
         setToDate(dateRange.to);
       }, 0);
       return () => clearTimeout(timer);
+    } else {
+      setFromDate("");
+      setToDate("");
     }
   }, [dateRange]);
 
@@ -174,7 +178,7 @@ export function DateRangeButton({
             <div className="flex gap-2 px-2 mt-2">
               <button
                 onClick={applyCustom}
-                disabled={!fromDate || !toDate}
+                disabled={!fromDate || !toDate || fromDate > toDate}
                 className={`flex-1 h-7 rounded text-[13px] font-semibold ${t.ctaBtn} disabled:opacity-40`}
               >
                 Apply
