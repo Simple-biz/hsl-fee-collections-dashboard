@@ -19,6 +19,9 @@ export function LoginForm() {
   // on the pre-login state.)
   const ok = state && "ok" in state && state.ok;
   useEffect(() => {
+    // Hard reload so SessionProvider remounts and picks up the new session
+    // cookie — a soft Next.js navigation leaves the sidebar in pre-login state.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     if (ok) window.location.assign("/");
   }, [ok]);
 
