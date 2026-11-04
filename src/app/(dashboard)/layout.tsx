@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { DateRangeButton } from "@/components/layout/DateRangeButton";
 import { Toaster } from "@/components/ui/sonner";
 import { DateRangeProvider, useDateRange } from "@/lib/date-range-context";
 import { themeClasses } from "@/lib/theme-classes";
@@ -75,7 +76,15 @@ function DashboardShell({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
 
-          <h1 className={`text-base font-bold ${t.text}`}>Collections Dashboard</h1>
+          <h1 className={`flex-1 text-base font-bold ${t.text}`}>Collections Dashboard</h1>
+
+          <DateRangeButton
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            dark={dark}
+            t={t}
+            align="right"
+          />
         </div>
 
         <Header dateRange={dateRange} onDateRangeChange={setDateRange} />

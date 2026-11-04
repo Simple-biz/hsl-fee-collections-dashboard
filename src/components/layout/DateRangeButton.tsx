@@ -1,0 +1,203 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { CalendarDays } from "lucide-react";
+import type { themeClasses } from "@/lib/theme-classes";
+import type { DateRange } from "@/lib/date-range-context";
+
+type ThemeClasses = ReturnType<typeof themeClasses>;
+
+interface DateRangeButtonProps {
+  dateRange: DateRange | null;
+  onDateRangeChange: (range: DateRange | null) => void;
+  dark: boolean;
+  t: ThemeClasses;
+  align?: "left" | "right";
+}
+
+const PRESETS = [
+  { label: "Today", days: 0 },
+  { label: "Last 7 days", days: 7 },
+  { label: "Last 30 days", days: 30 },
+  { label: "Last 90 days", days: 90 },
+  { label: "This year", days: -1 },
+  { label: "All time", days: -2 },
+];
+
+const toISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export function DateRangeButton({
+  dateRange,
+  onDateRangeChange,
+  dark,
+  t,
+  align = "right",
+}: DateRangeButtonProps) {
+  const [open, setOpen] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const dateRangeRef = useRef(dateRange);
+  useEffect(() => {
+    dateRangeRef.current = dateRange;
+    if (dateRange) {
+      const timer = setTimeout(() => {
+        setFromDate(dateRange.from);
+        setToDate(dateRange.to);
+      }, 0);
+      return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(() => {
+        setFromDate("");
+        setToDate("");
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [dateRange]);
+
+  const applyPreset = (days: number) => {
+    const now = new Date();
+    if (days === -2) {
+      onDateRangeChange(null);
+      setFromDate("");
+      setToDate("");
+      setOpen(false);
+      return;
+    }
+    if (days === -1) {
+      const from = `${now.getFullYear()}-01-01`;
+      const to = toISO(now);
+      onDateRangeChange({ from, to });
+      setFromDate(from);
+      setToDate(to);
+      setOpen(false);
+      return;
+    }
+    if (days === 0) {
+      const today = toISO(now);
+      onDateRangeChange({ from: today, to: today });
+      setFromDate(today);
+      setToDate(today);
+      setOpen(false);
+      return;
+    }
+    const from = new Date(now);
+    from.setDate(from.getDate() - days);
+    onDateRangeChange({ from: toISO(from), to: toISO(now) });
+    setFromDate(toISO(from));
+    setToDate(toISO(now));
+    setOpen(false);
+  };
+
+  const applyCustom = () => {
+    if (fromDate && toDate) {
+      onDateRangeChange({ from: fromDate, to: toDate });
+      setOpen(false);
+    }
+  };
+
+  const clearRange = () => {
+    onDateRangeChange(null);
+    setFromDate("");
+    setToDate("");
+    setOpen(false);
+  };
+
+  const dateLabel = dateRange
+    ? `${new Date(dateRange.from + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(dateRange.to + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : "All time";
+
+  return (
+    <div className="relative" ref={dropRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label={`Date range: ${dateLabel}`}
+        className={`h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 ${
+          dateRange
+            ? dark
+              ? "border-indigo-700 bg-indigo-900/30 text-indigo-300"
+              : "border-indigo-300 bg-indigo-50 text-indigo-700"
+            : t.outlineBtn
+        }`}
+      >
+        <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="hidden lg:inline">{dateLabel}</span>
+      </button>
+      {open && (
+        <div
+          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-10 z-50 w-72 rounded-xl border shadow-xl ${dark ? "bg-neutral-900 border-neutral-700" : "bg-white border-neutral-200"}`}
+        >
+          <div className="p-2">
+            <p className={`px-2 py-1 text-[12px] font-semibold uppercase ${t.textMuted}`}>
+              Quick Select
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  onClick={() => applyPreset(p.days)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${dark ? "hover:bg-neutral-800 text-neutral-300" : "hover:bg-neutral-50 text-neutral-700"}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={`border-t ${t.borderLight} p-2`}>
+            <p className={`px-2 py-1 text-[12px] font-semibold uppercase ${t.textMuted}`}>
+              Custom Range
+            </p>
+            <div className="flex gap-2 px-2">
+              <div className="flex-1">
+                <label className={`text-[12px] ${t.textMuted}`}>From</label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className={`w-full h-7 px-2 rounded border text-[13px] outline-none ${t.inputBg}`}
+                />
+              </div>
+              <div className="flex-1">
+                <label className={`text-[12px] ${t.textMuted}`}>To</label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className={`w-full h-7 px-2 rounded border text-[13px] outline-none ${t.inputBg}`}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 px-2 mt-2">
+              <button
+                onClick={applyCustom}
+                disabled={!fromDate || !toDate || fromDate > toDate}
+                className={`flex-1 h-7 rounded text-[13px] font-semibold ${t.ctaBtn} disabled:opacity-40`}
+              >
+                Apply
+              </button>
+              {dateRange && (
+                <button
+                  onClick={clearRange}
+                  className={`h-7 px-3 rounded text-[13px] border ${t.outlineBtn}`}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
