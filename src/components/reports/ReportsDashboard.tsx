@@ -64,7 +64,13 @@ export function ReportsDashboard({ dark, t }: ReportsDashboardProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!dateRange) return;
+    if (!dateRange) {
+      const t = setTimeout(() => {
+        setData(null);
+        setError(null);
+      }, 0);
+      return () => clearTimeout(t);
+    }
     let cancelled = false;
     const controller = new AbortController();
 
@@ -96,6 +102,7 @@ export function ReportsDashboard({ dark, t }: ReportsDashboardProps) {
       cancelled = true;
       clearTimeout(timer);
       controller.abort();
+      setLoading(false);
     };
   }, [dateRange]);
 
