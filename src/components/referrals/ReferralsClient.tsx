@@ -70,13 +70,16 @@ export function ReferralsClient() {
       if ((e as Error).name === "AbortError") return;
       toast.error("Failed to load referrals");
     } finally {
-      setLoading(false);
+      if (fetchAbortRef.current === controller) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchReferrals("");
-    return () => { fetchAbortRef.current?.abort(); };
+    return () => {
+      fetchAbortRef.current?.abort();
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
   }, [fetchReferrals]);
 
   const onSearch = (value: string) => {
@@ -100,9 +103,9 @@ export function ReferralsClient() {
 
   // ── Tab derivation ───────────────────────────────────────────────────────
 
-  const noFeesRows = rows.filter((r) => !r.totalFeesPaid || Number(r.totalFeesPaid) === 0);
-  const partialRows = rows.filter((r) => Number(r.totalFeesPaid) > 0 && !r.pifReadyToClose);
   const paidRows = rows.filter((r) => r.pifReadyToClose === true);
+  const partialRows = rows.filter((r) => !r.pifReadyToClose && Number(r.totalFeesPaid) > 0);
+  const noFeesRows = rows.filter((r) => !r.pifReadyToClose && !(Number(r.totalFeesPaid) > 0));
   const displayRows =
     activeTab === "no-fees" ? noFeesRows : activeTab === "partial" ? partialRows : paidRows;
 
@@ -292,6 +295,13 @@ export function ReferralsClient() {
                 ? prev.map((r) => (r.caseId === row.caseId ? row : r))
                 : [row, ...prev];
             });
+            setActiveTab(
+              row.pifReadyToClose
+                ? "paid"
+                : Number(row.totalFeesPaid) > 0
+                  ? "partial"
+                  : "no-fees"
+            );
           }}
         />
       )}
@@ -330,8 +340,8 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
   }, []);
 
   const searchCases = async (q: string) => {
-    if (!q.trim()) { setCaseResults([]); return; }
     searchAbortRef.current?.abort();
+    if (!q.trim()) { setSearching(false); setCaseResults([]); return; }
     const controller = new AbortController();
     searchAbortRef.current = controller;
     setSearching(true);
@@ -383,8 +393,9 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
       if (!res.ok) throw new Error(json.error || `Failed (${res.status})`);
       toast.success(`${selectedCase!.name} added to referrals`);
       // The API returns the referrals row; we need the full display row.
-      // Fetch the single row by calling GET with the case name as search.
-      const refRow: ReferralRow = {
+      // Fetch the single row by calling GET with the case name as search so
+      // that totalFeesPaid / pifReadyToClose are accurate for tab placement.
+      const fallbackRow: ReferralRow = {
         caseId: selectedCase!.id,
         referredBy: referredBy.trim(),
         notes: notes.trim(),
@@ -398,6 +409,19 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
         totalFeesPaid: null,
         pifReadyToClose: null,
       };
+      let refRow: ReferralRow = fallbackRow;
+      try {
+        const refRes = await fetch(
+          `/api/referrals?search=${encodeURIComponent(selectedCase!.name)}`,
+        );
+        if (refRes.ok) {
+          const refJson = await refRes.json() as { data: ReferralRow[] };
+          const match = refJson.data?.find((r) => r.caseId === selectedCase!.id);
+          if (match) refRow = match;
+        }
+      } catch {
+        // silently use fallback
+      }
       onAdded(refRow);
       onClose();
     } catch (e) {

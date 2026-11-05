@@ -4,10 +4,16 @@ import { db } from "@/lib/db";
 import { cases, feeRecords, referrals } from "@/lib/db/schema";
 import { eq, ilike, desc, or, sql } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+import { auth } from "@/auth";
 
 // GET /api/referrals?search=&page=&limit=
 export const GET = async (req: NextRequest) => {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim() ?? "";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
