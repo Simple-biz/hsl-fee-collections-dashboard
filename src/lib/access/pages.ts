@@ -22,6 +22,7 @@ export const PAGES = [
   { key: "settings", label: "Settings", path: "/settings" },
   { key: "archive", label: "Archive", path: "/archive" },
   { key: "inbound_calls", label: "Inbound Calls", path: "/inbound-calls" },
+  { key: "referrals", label: "Referrals", path: "/referrals" },
 ] as const;
 
 export type PageKey = (typeof PAGES)[number]["key"];
