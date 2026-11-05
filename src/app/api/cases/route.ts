@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { cases, feeRecords, activityLog, leaderNotes, userDetails } from "@/lib/db/schema";
+import { cases, feeRecords, activityLog, leaderNotes, userDetails, referrals } from "@/lib/db/schema";
 import { eq, ilike, sql, desc, asc } from "drizzle-orm";
 import { requireCapability, guardStatus, sessionHasCapability } from "@/lib/auth-helpers";
 
@@ -403,6 +403,8 @@ const createCaseSchema = z.object({
     (v) => (v === "" || v == null ? undefined : String(v)),
     z.string().regex(/^\d+$/).optional(),
   ),
+  // Referrer name — when present, inserts a referrals row for this case.
+  referredBy: optionalText,
 });
 
 export const POST = async (req: NextRequest) => {
@@ -497,6 +499,15 @@ export const POST = async (req: NextRequest) => {
           ...(input.casewellId != null && { casewellId: input.casewellId }),
         })
         .onConflictDoNothing({ target: userDetails.caseId })
+        .catch(() => null);
+    }
+
+    // Best-effort: create a referral record if a referrer was supplied.
+    if (input.referredBy != null) {
+      await db
+        .insert(referrals)
+        .values({ caseId: input.clientId, referredBy: input.referredBy })
+        .onConflictDoNothing({ target: referrals.caseId })
         .catch(() => null);
     }
 

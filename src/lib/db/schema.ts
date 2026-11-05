@@ -753,6 +753,35 @@ export const mycaseNoticeDocuments = pgTable(
 // OVERPAID_CASES — Workflow tracking for cases where fees paid > fees expected
 // ============================================================================
 
+// ============================================================================
+// REFERRALS — Cases brought in by an external referrer.
+// One row per case (case_id UNIQUE). Added manually from the Referrals page or
+// at case-creation time via the AddCaseModal checkbox.
+// ============================================================================
+
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: integer("case_id")
+      .notNull()
+      .references(() => cases.clientId, { onDelete: "cascade" })
+      .unique(),
+    referredBy: varchar("referred_by", { length: 200 }).notNull(),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_referrals_case_id").on(table.caseId),
+    index("idx_referrals_created_at").on(table.createdAt),
+  ],
+);
+
 export const overpaidCases = pgTable(
   "overpaid_cases",
   {

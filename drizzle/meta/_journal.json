@@ -428,6 +428,13 @@
       "when": 1791490399551,
       "tag": "0060_add_casewell_id",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1762387200000,
+      "tag": "0061_add_referrals_table",
+      "breakpoints": true
     }
   ]
 }

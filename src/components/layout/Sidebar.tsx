@@ -30,6 +30,7 @@ import {
   TableProperties,
   PhoneIncoming,
   BookOpen,
+  Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { themeClasses } from "@/lib/theme-classes";
@@ -78,6 +79,7 @@ const NAV_ITEMS: { section: string; items: NavItem[] }[] = [
       { path: "/fee-petitions", icon: Gavel, label: "Fee Petitions" },
       { path: "/overpaid-cases", icon: TrendingDown, label: "Overpaid Cases" },
       { path: "/inbound-calls", icon: PhoneIncoming, label: "Inbound Calls" },
+      { path: "/referrals", icon: Share2, label: "Referrals" },
       { path: "/scoreboard", icon: Trophy, label: "Scoreboard" },
       { path: "/reports", icon: FileText, label: "Reports" },
       { path: "/chronicle", icon: Database, label: "Chronicle Sync" },
