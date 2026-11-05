@@ -5,7 +5,6 @@ import { db } from "@/lib/db";
 import { cases, feeRecords, referrals } from "@/lib/db/schema";
 import { eq, ilike, desc, or, sql } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
-import { auth } from "@/auth";
 
 // GET /api/referrals?search=&page=&limit=
 export const GET = async (req: NextRequest) => {
