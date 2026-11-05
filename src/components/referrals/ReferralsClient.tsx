@@ -9,6 +9,8 @@ import { fmtDate, fmtClaim } from "@/lib/formatters";
 import { removeReferral } from "@/app/(dashboard)/referrals/actions";
 import { toast } from "sonner";
 
+type PaymentTab = "no-fees" | "partial" | "paid";
+
 interface ReferralRow {
   caseId: number;
   referredBy: string;
@@ -20,6 +22,8 @@ interface ReferralRow {
   approvalDate: string | null;
   assignedTo: string | null;
   isClosed: boolean | null;
+  totalFeesPaid: string | null;
+  pifReadyToClose: boolean | null;
 }
 
 interface CaseSearchResult {
@@ -44,6 +48,7 @@ export function ReferralsClient() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<PaymentTab>("no-fees");
   const fetchAbortRef = useRef<AbortController | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -93,6 +98,20 @@ export function ReferralsClient() {
     setRows((prev) => prev.filter((r) => r.caseId !== caseId));
   };
 
+  // ── Tab derivation ───────────────────────────────────────────────────────
+
+  const noFeesRows = rows.filter((r) => !r.totalFeesPaid || Number(r.totalFeesPaid) === 0);
+  const partialRows = rows.filter((r) => Number(r.totalFeesPaid) > 0 && !r.pifReadyToClose);
+  const paidRows = rows.filter((r) => r.pifReadyToClose === true);
+  const displayRows =
+    activeTab === "no-fees" ? noFeesRows : activeTab === "partial" ? partialRows : paidRows;
+
+  const tabs: { key: PaymentTab; label: string; count: number }[] = [
+    { key: "no-fees", label: "No Fees", count: noFeesRows.length },
+    { key: "partial", label: "Partially Paid", count: partialRows.length },
+    { key: "paid", label: "Paid in Full", count: paidRows.length },
+  ];
+
   // ── Styles ───────────────────────────────────────────────────────────────
 
   const inputCls = `h-9 w-full px-3 rounded-md border text-sm outline-none ${t.inputBg}`;
@@ -140,6 +159,42 @@ export function ReferralsClient() {
         )}
       </div>
 
+      {/* Tab bar */}
+      {!loading && (
+        <div className={`flex gap-1 mb-3 p-1 rounded-lg ${dark ? "bg-white/5" : "bg-neutral-100"}`}>
+          {tabs.map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex-1 h-8 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                activeTab === key
+                  ? dark
+                    ? "bg-white/10 text-white"
+                    : "bg-white text-neutral-900 shadow-sm"
+                  : dark
+                    ? "text-neutral-400 hover:text-neutral-200"
+                    : "text-neutral-500 hover:text-neutral-700"
+              }`}
+            >
+              {label}
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  activeTab === key
+                    ? dark
+                      ? "bg-white/15 text-white"
+                      : "bg-neutral-200 text-neutral-700"
+                    : dark
+                      ? "bg-white/8 text-neutral-400"
+                      : "bg-neutral-200/60 text-neutral-500"
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Table */}
       <div className={`rounded-xl border overflow-hidden ${t.card}`}>
         {loading ? (
@@ -147,9 +202,15 @@ export function ReferralsClient() {
             <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
             Loading…
           </div>
-        ) : rows.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <div className={`py-16 text-center text-sm ${t.textMuted}`}>
-            {search ? `No referrals match "${search}".` : "No referrals yet."}
+            {search
+              ? `No referrals match "${search}".`
+              : activeTab === "no-fees"
+                ? "No cases without fees."
+                : activeTab === "partial"
+                  ? "No partially paid cases."
+                  : "No fully paid cases."}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -169,7 +230,7 @@ export function ReferralsClient() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, i) => {
+                {displayRows.map((row, i) => {
                   const name = `${row.lastName}, ${row.firstName}`;
                   return (
                     <tr
@@ -334,6 +395,8 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
         approvalDate: null,
         assignedTo: selectedCase!.assigned || null,
         isClosed: null,
+        totalFeesPaid: null,
+        pifReadyToClose: null,
       };
       onAdded(refRow);
       onClose();
