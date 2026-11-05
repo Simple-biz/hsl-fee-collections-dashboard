@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cases, feeRecords, referrals } from "@/lib/db/schema";
 import { eq, ilike, desc, or, sql } from "drizzle-orm";

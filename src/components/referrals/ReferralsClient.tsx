@@ -51,6 +51,7 @@ export function ReferralsClient() {
   const [activeTab, setActiveTab] = useState<PaymentTab>("no-fees");
   const fetchAbortRef = useRef<AbortController | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const cancelledRef = useRef(false);
 
   // ── Fetch referrals list ─────────────────────────────────────────────────
 
@@ -65,18 +66,22 @@ export function ReferralsClient() {
       const res = await fetch(`/api/referrals?${params}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const json = await res.json() as { data: ReferralRow[] };
-      setRows(json.data);
+      if (!cancelledRef.current) setRows(json.data);
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      toast.error("Failed to load referrals");
+      if (!cancelledRef.current) toast.error("Failed to load referrals");
     } finally {
-      if (fetchAbortRef.current === controller) setLoading(false);
+      if (!cancelledRef.current && fetchAbortRef.current === controller) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    cancelledRef.current = false;
     fetchReferrals("");
     return () => {
+      cancelledRef.current = true;
       fetchAbortRef.current?.abort();
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
@@ -353,9 +358,9 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const json = await res.json() as { data: CaseSearchResult[] };
       setCaseResults(json.data ?? []);
+      setSearching(false);
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-    } finally {
       setSearching(false);
     }
   };
@@ -392,9 +397,7 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `Failed (${res.status})`);
       toast.success(`${selectedCase!.name} added to referrals`);
-      // The API returns the referrals row; we need the full display row.
-      // Fetch the single row by calling GET with the case name as search so
-      // that totalFeesPaid / pifReadyToClose are accurate for tab placement.
+      // Build a fallback row in case the refetch fails.
       const fallbackRow: ReferralRow = {
         caseId: selectedCase!.id,
         referredBy: referredBy.trim(),
@@ -409,6 +412,7 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
         totalFeesPaid: null,
         pifReadyToClose: null,
       };
+      // Refetch the real row so approvalDate / isClosed reflect DB state.
       let refRow: ReferralRow = fallbackRow;
       try {
         const refRes = await fetch(
@@ -420,7 +424,7 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
           if (match) refRow = match;
         }
       } catch {
-        // silently use fallback
+        // Silently fall back to the optimistic row.
       }
       onAdded(refRow);
       onClose();
