@@ -64,7 +64,7 @@ export function ReferralsClient() {
     fetchAbortRef.current = controller;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "100" });
+      const params = new URLSearchParams({ limit: "500" });
       if (q) params.set("search", q);
       const res = await fetch(`/api/referrals?${params}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`Failed (${res.status})`);
@@ -157,7 +157,7 @@ export function ReferralsClient() {
 
   // ── Tab derivation ───────────────────────────────────────────────────────
 
-  const noFeesRows = rows.filter((r) => Number(r.totalFeesPaid ?? 0) === 0);
+  const noFeesRows = rows.filter((r) => !r.pifReadyToClose && Number(r.totalFeesPaid ?? 0) === 0);
   const partialRows = rows.filter((r) => !r.pifReadyToClose && Number(r.totalFeesPaid) > 0);
   const paidRows = rows.filter((r) => r.pifReadyToClose);
 
