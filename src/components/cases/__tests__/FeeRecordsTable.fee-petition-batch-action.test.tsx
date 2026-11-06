@@ -48,6 +48,10 @@ vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
   bulkMarkOverpaid: vi.fn(),
 }));
 
+vi.mock("@/app/(dashboard)/referrals/actions", () => ({
+  bulkAddToReferrals: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 vi.mock("@/components/cases/CaseDetailSheet", () => ({ default: () => null }));
 vi.mock("@/components/modals/ImportCasesModal", () => ({ default: () => null }));
 vi.mock("@/components/modals/AddCaseModal", () => ({ default: () => null }));

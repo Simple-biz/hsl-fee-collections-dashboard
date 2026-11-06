@@ -54,6 +54,10 @@ vi.mock("@/app/(dashboard)/master-fees/actions", () => ({
   bulkAddToFeePetitions: vi.fn(),
 }));
 
+vi.mock("@/app/(dashboard)/referrals/actions", () => ({
+  bulkAddToReferrals: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 // Modals/dialogs are conditionally rendered and have complex deps not relevant
 // to column structure.
 vi.mock("@/components/cases/CaseDetailSheet", () => ({ default: () => null }));

@@ -33,6 +33,7 @@ import { FeesClosedConfirmDialog } from "./FeesClosedConfirmDialog";
 import { BulkFeesClosedConfirmDialog } from "./BulkFeesClosedConfirmDialog";
 import { normalizeCaseLevel } from "@/lib/case-level-icons";
 import { AddToFeePetitionsConfirmDialog } from "./AddToFeePetitionsConfirmDialog";
+import { AddToReferralsConfirmDialog } from "./AddToReferralsConfirmDialog";
 import { useServerPaginatedFetch } from "@/hooks/useServerPaginatedFetch";
 import { useFeeRecordsFilters } from "@/hooks/useFeeRecordsFilters";
 import { useBulkActions } from "@/hooks/useBulkActions";
@@ -388,12 +389,21 @@ export const FeeRecordsTable = ({
     bulkFeePetitionError, setBulkFeePetitionError,
     feePetitionConfirmOpen, setFeePetitionConfirmOpen,
     feePetitionPending, setFeePetitionPending,
+    bulkReferralSaving,
+    bulkReferralError, setBulkReferralError,
+    referralConfirmOpen, setReferralConfirmOpen,
+    referralPendingIds, setReferralPendingIds,
     handleBulkReassign,
     handleBatchArchive,
     handleBatchFeesClosed,
     handleBatchMarkOverpaid,
     handleBatchAddToFeePetitions,
+    handleBatchAddToReferrals,
   } = useBulkActions({ selectedIds, setSelectedIds, setRowOverrides, mode });
+
+  // Incremented each time the referral dialog opens so the component remounts
+  // with a fresh useState(""), without needing a useEffect or render-phase setState.
+  const [referralDialogKey, setReferralDialogKey] = useState(0);
 
   // A per-row refresh snapshot must not outlive the next full-list refetch
   // (CSV import, Sheets/MyCase sync) — otherwise it would keep shadowing
@@ -1370,6 +1380,13 @@ export const FeeRecordsTable = ({
           bulkFeePetitionSaving={bulkFeePetitionSaving}
           setFeePetitionPending={setFeePetitionPending}
           setFeePetitionConfirmOpen={setFeePetitionConfirmOpen}
+          bulkReferralSaving={bulkReferralSaving}
+          referralConfirmOpen={referralConfirmOpen}
+          onOpenReferralConfirm={() => {
+            setReferralPendingIds(Array.from(selectedIds));
+            setReferralDialogKey((k) => k + 1);
+            setReferralConfirmOpen(true);
+          }}
           assignedOptions={assignedOptions} bulkReassignSaving={bulkReassignSaving}
           handleBulkReassign={handleBulkReassign}
           archiveConfirmOpen={archiveConfirmOpen} handleBatchArchive={handleBatchArchive}
@@ -1701,6 +1718,19 @@ export const FeeRecordsTable = ({
         onClose={() => {
           setFeePetitionConfirmOpen(false);
           setBulkFeePetitionError(null);
+        }}
+      />
+
+      <AddToReferralsConfirmDialog
+        key={referralDialogKey}
+        open={referralConfirmOpen}
+        count={referralPendingIds.length}
+        submitting={bulkReferralSaving}
+        error={bulkReferralError}
+        onConfirm={handleBatchAddToReferrals}
+        onClose={() => {
+          setReferralConfirmOpen(false);
+          setBulkReferralError(null);
         }}
       />
 

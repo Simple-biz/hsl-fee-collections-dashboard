@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { CaseRow } from "@/types";
 import { bulkMarkOverpaid } from "@/app/(dashboard)/overpaid-cases/actions";
 import { bulkReassign, bulkAddToFeePetitions } from "@/app/(dashboard)/master-fees/actions";
+import { bulkAddToReferrals } from "@/app/(dashboard)/referrals/actions";
 import { skippedClosedCasesMessage } from "@/lib/formatters";
 
 interface Params {
@@ -44,12 +45,22 @@ export interface BulkActionsState {
   feePetitionPending: { ids: number[]; selectedCount: number };
   setFeePetitionPending: (v: { ids: number[]; selectedCount: number }) => void;
 
+  // Referrals
+  bulkReferralSaving: boolean;
+  bulkReferralError: string | null;
+  setBulkReferralError: (v: string | null) => void;
+  referralConfirmOpen: boolean;
+  setReferralConfirmOpen: (v: boolean) => void;
+  referralPendingIds: number[];
+  setReferralPendingIds: (v: number[]) => void;
+
   // Handlers
   handleBulkReassign: (assignedTo: string) => Promise<void>;
   handleBatchArchive: () => void;
   handleBatchFeesClosed: () => void;
   handleBatchMarkOverpaid: () => Promise<void>;
   handleBatchAddToFeePetitions: () => Promise<void>;
+  handleBatchAddToReferrals: (referredBy: string) => Promise<void>;
 }
 
 // Encapsulates all bulk-operation state and handlers for FeeRecordsTable.
@@ -80,6 +91,11 @@ export function useBulkActions({
   const [bulkFeePetitionSaving, setBulkFeePetitionSaving] = useState(false);
   const [bulkFeePetitionError, setBulkFeePetitionError] = useState<string | null>(null);
   const [feePetitionConfirmOpen, setFeePetitionConfirmOpen] = useState(false);
+
+  const [bulkReferralSaving, setBulkReferralSaving] = useState(false);
+  const [bulkReferralError, setBulkReferralError] = useState<string | null>(null);
+  const [referralConfirmOpen, setReferralConfirmOpen] = useState(false);
+  const [referralPendingIds, setReferralPendingIds] = useState<number[]>([]);
   // Snapshot taken when the confirm dialog opens — the dialog must not read
   // live selection state because confirming clears the selection, and the
   // dialog is still mounted through its close animation.
@@ -178,6 +194,23 @@ export function useBulkActions({
     }
   };
 
+  const handleBatchAddToReferrals = async (referredBy: string) => {
+    const ids = referralPendingIds;
+    if (ids.length === 0 || bulkReferralSaving) return;
+    setBulkReferralSaving(true);
+    setBulkReferralError(null);
+    try {
+      const result = await bulkAddToReferrals({ caseIds: ids, referredBy });
+      if (!result.ok) throw new Error(result.error);
+      setSelectedIds(new Set());
+      setReferralConfirmOpen(false);
+    } catch (err) {
+      setBulkReferralError((err as Error).message);
+    } finally {
+      setBulkReferralSaving(false);
+    }
+  };
+
   return {
     archiveConfirmOpen,
     setArchiveConfirmOpen,
@@ -199,10 +232,18 @@ export function useBulkActions({
     setFeePetitionConfirmOpen,
     feePetitionPending,
     setFeePetitionPending,
+    bulkReferralSaving,
+    bulkReferralError,
+    setBulkReferralError,
+    referralConfirmOpen,
+    setReferralConfirmOpen,
+    referralPendingIds,
+    setReferralPendingIds,
     handleBulkReassign,
     handleBatchArchive,
     handleBatchFeesClosed,
     handleBatchMarkOverpaid,
     handleBatchAddToFeePetitions,
+    handleBatchAddToReferrals,
   };
 }

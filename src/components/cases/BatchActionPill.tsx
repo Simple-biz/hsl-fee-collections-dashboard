@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Plus, Archive, X, Receipt } from "lucide-react";
+import { Check, Loader2, Plus, Archive, X, Receipt, UserPlus } from "lucide-react";
 import type { ApprovedByOption } from "@/types";
 
 interface Props {
@@ -22,6 +22,9 @@ interface Props {
   assignedOptions: ApprovedByOption[];
   bulkReassignSaving: boolean;
   handleBulkReassign: (assignedTo: string) => Promise<void>;
+  bulkReferralSaving: boolean;
+  referralConfirmOpen: boolean;
+  onOpenReferralConfirm: () => void;
   archiveConfirmOpen: boolean;
   handleBatchArchive: () => void;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -33,6 +36,7 @@ export function BatchActionPill({
   bulkCloseConfirmOpen, handleBatchFeesClosed,
   bulkOverpaidSaving, handleBatchMarkOverpaid,
   feePetitionAddableIds, bulkFeePetitionSaving, setFeePetitionPending, setFeePetitionConfirmOpen,
+  bulkReferralSaving, referralConfirmOpen, onOpenReferralConfirm,
   assignedOptions, bulkReassignSaving, handleBulkReassign,
   archiveConfirmOpen, handleBatchArchive,
   setSelectedIds,
@@ -114,6 +118,18 @@ export function BatchActionPill({
               )}
           </button>
         )}
+        <button
+          onClick={onOpenReferralConfirm}
+          disabled={bulkReferralSaving || referralConfirmOpen}
+          className="h-7 px-3 rounded-full text-[13px] font-semibold flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white transition-colors disabled:opacity-50"
+        >
+          {bulkReferralSaving ? (
+            <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+          ) : (
+            <UserPlus aria-hidden="true" className="h-3 w-3" />
+          )}
+          Add to Referrals
+        </button>
         {isAdmin && assignedOptions.length > 0 && (
           <select
             value=""

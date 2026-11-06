@@ -45,6 +45,10 @@ interface FormState {
   officeWithJurisdiction: string;
   assignedTo: string;
   winSheetStatus: string;
+  // Referral fields — hasReferrer drives the checkbox; referredBy is sent to
+  // the API when non-empty, which creates a referrals row for this case.
+  hasReferrer: boolean;
+  referredBy: string;
 }
 
 const EMPTY: FormState = {
@@ -65,6 +69,8 @@ const EMPTY: FormState = {
   officeWithJurisdiction: "",
   assignedTo: "",
   winSheetStatus: "",
+  hasReferrer: false,
+  referredBy: "",
 };
 
 export default function AddCaseModal({
@@ -189,10 +195,15 @@ export default function AddCaseModal({
     setBusy(true);
     setError(null);
     try {
+      const payload = {
+        ...form,
+        // Only include referredBy when the checkbox is checked and the name is non-empty.
+        referredBy: form.hasReferrer && form.referredBy.trim() ? form.referredBy.trim() : undefined,
+      };
       const res = await fetch("/api/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `Failed (${res.status})`);
@@ -496,6 +507,38 @@ export default function AddCaseModal({
                   />
                 </div>
               </div>
+
+              {/* Referral */}
+              <div className={`mt-4 rounded-lg border p-3 ${t.borderLight} ${dark ? "bg-white/2" : "bg-neutral-50"}`}>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={form.hasReferrer}
+                    onChange={(e) => {
+                      setForm((f) => ({
+                        ...f,
+                        hasReferrer: e.target.checked,
+                        referredBy: e.target.checked ? f.referredBy : "",
+                      }));
+                    }}
+                    className="h-4 w-4 rounded accent-blue-600"
+                  />
+                  <span className={`text-sm font-medium ${t.text}`}>Case was referred</span>
+                </label>
+                {form.hasReferrer && (
+                  <div className="mt-3">
+                    <label className={lblCls}>Referred by</label>
+                    <input
+                      value={form.referredBy}
+                      onChange={(e) => set("referredBy", e.target.value)}
+                      placeholder="Referrer's name"
+                      className={inputCls}
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </div>
+
               <p className={`mt-4 text-[13px] ${t.textMuted}`}>
                 Fees and amounts start at zero — edit them from the case row
                 after creating it.
