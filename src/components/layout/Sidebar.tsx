@@ -257,7 +257,7 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
     router.push(`/cases/${id}`);
   };
   const isActive = (path: string) =>
-    path === "/" ? pathname === "/" : pathname.startsWith(path);
+    path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(path + "/");
 
   return (
     <>
