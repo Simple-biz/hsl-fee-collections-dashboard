@@ -14,11 +14,13 @@ const {
   mockBulkReassign,
   mockBulkMarkOverpaid,
   mockBulkAddToFeePetitions,
+  mockBulkAddToReferrals,
   mockSkippedClosedCasesMessage,
 } = vi.hoisted(() => ({
   mockBulkReassign: vi.fn(),
   mockBulkMarkOverpaid: vi.fn(),
   mockBulkAddToFeePetitions: vi.fn(),
+  mockBulkAddToReferrals: vi.fn(),
   mockSkippedClosedCasesMessage: vi.fn(() => "1 case skipped"),
 }));
 
@@ -29,6 +31,10 @@ vi.mock("@/app/(dashboard)/master-fees/actions", () => ({
 
 vi.mock("@/app/(dashboard)/overpaid-cases/actions", () => ({
   bulkMarkOverpaid: (...args: unknown[]) => mockBulkMarkOverpaid(...args),
+}));
+
+vi.mock("@/app/(dashboard)/referrals/actions", () => ({
+  bulkAddToReferrals: (...args: unknown[]) => mockBulkAddToReferrals(...args),
 }));
 
 vi.mock("@/lib/formatters", () => ({
