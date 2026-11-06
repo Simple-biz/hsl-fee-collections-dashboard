@@ -10,6 +10,7 @@ import { removeReferral } from "@/app/(dashboard)/referrals/actions";
 import { toast } from "sonner";
 
 type PaymentTab = "no-fees" | "partial" | "paid";
+type FeeFilter = "all" | "unpaid" | "paid";
 
 interface ReferralRow {
   caseId: number;
@@ -50,6 +51,7 @@ export function ReferralsClient() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<PaymentTab>("no-fees");
+  const [feeFilter, setFeeFilter] = useState<FeeFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [markPaidCaseId, setMarkPaidCaseId] = useState<number | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -167,8 +169,15 @@ export function ReferralsClient() {
     { key: "paid", label: "Paid in Full", count: paidRows.length },
   ];
 
-  const displayRows =
+  const tabRows =
     activeTab === "paid" ? paidRows : activeTab === "partial" ? partialRows : noFeesRows;
+
+  const displayRows =
+    feeFilter === "paid"
+      ? tabRows.filter((r) => r.paidAt != null)
+      : feeFilter === "unpaid"
+        ? tabRows.filter((r) => r.paidAt === null)
+        : tabRows;
 
   // ── Styles ───────────────────────────────────────────────────────────────
 
@@ -253,6 +262,37 @@ export function ReferralsClient() {
         </div>
       )}
 
+      {/* Referral fee filter */}
+      {!loading && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className={`text-[11px] font-semibold uppercase tracking-wider ${t.textMuted}`}>
+            Referral Fee
+          </span>
+          <div className={`flex gap-0.5 p-0.5 rounded-lg ${dark ? "bg-white/5" : "bg-neutral-100"}`}>
+            {(["all", "unpaid", "paid"] as FeeFilter[]).map((f) => {
+              const label = f === "all" ? "All" : f === "unpaid" ? "Unpaid" : "Paid";
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFeeFilter(f)}
+                  className={`h-6 px-3 rounded-md text-[11px] font-semibold transition-colors ${
+                    feeFilter === f
+                      ? dark
+                        ? "bg-white/10 text-white"
+                        : "bg-white text-neutral-900 shadow-sm"
+                      : dark
+                        ? "text-neutral-400 hover:text-neutral-200"
+                        : "text-neutral-500 hover:text-neutral-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className={`rounded-xl border overflow-hidden ${t.card}`}>
         {loading ? (
@@ -264,11 +304,15 @@ export function ReferralsClient() {
           <div className={`py-16 text-center text-sm ${t.textMuted}`}>
             {search
               ? `No referrals match "${search}".`
-              : activeTab === "no-fees"
-                ? "No cases without fees."
-                : activeTab === "partial"
-                  ? "No partially paid cases."
-                  : "No fully paid cases."}
+              : feeFilter === "paid"
+                ? "No referrals with a paid referral fee in this group."
+                : feeFilter === "unpaid"
+                  ? "No referrals with an unpaid referral fee in this group."
+                  : activeTab === "no-fees"
+                    ? "No cases without fees."
+                    : activeTab === "partial"
+                      ? "No partially paid cases."
+                      : "No fully paid cases."}
           </div>
         ) : (
           <div className="overflow-x-auto">
