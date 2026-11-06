@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { UserPlus, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -33,10 +33,6 @@ export function AddToReferralsConfirmDialog({
 }: AddToReferralsConfirmDialogProps) {
   const [referredBy, setReferredBy] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) setReferredBy("");
-  }, [open]);
 
   const handleOpenChange = (next: boolean) => {
     if (!next && !submitting) {

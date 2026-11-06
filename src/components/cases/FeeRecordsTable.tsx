@@ -401,6 +401,10 @@ export const FeeRecordsTable = ({
     handleBatchAddToReferrals,
   } = useBulkActions({ selectedIds, setSelectedIds, setRowOverrides, mode });
 
+  // Incremented each time the referral dialog opens so the component remounts
+  // with a fresh useState(""), without needing a useEffect or render-phase setState.
+  const [referralDialogKey, setReferralDialogKey] = useState(0);
+
   // A per-row refresh snapshot must not outlive the next full-list refetch
   // (CSV import, Sheets/MyCase sync) — otherwise it would keep shadowing
   // newer data for that case indefinitely, since it's spread last in the
@@ -1381,6 +1385,7 @@ export const FeeRecordsTable = ({
           referralConfirmOpen={referralConfirmOpen}
           onOpenReferralConfirm={() => {
             setReferralPendingIds(Array.from(selectedIds));
+            setReferralDialogKey((k) => k + 1);
             setReferralConfirmOpen(true);
           }}
           assignedOptions={assignedOptions} bulkReassignSaving={bulkReassignSaving}
@@ -1718,6 +1723,7 @@ export const FeeRecordsTable = ({
       />
 
       <AddToReferralsConfirmDialog
+        key={referralDialogKey}
         open={referralConfirmOpen}
         count={referralPendingIds.length}
         submitting={bulkReferralSaving}
