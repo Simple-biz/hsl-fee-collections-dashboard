@@ -95,8 +95,7 @@ export function ReferralsClient() {
 
   const switchTab = useCallback((tab: PaymentTab) => {
     setActiveTab(tab);
-    fetchReferrals(search, true);
-  }, [fetchReferrals, search]);
+  }, []);
 
   const onSearch = (value: string) => {
     setSearch(value);
