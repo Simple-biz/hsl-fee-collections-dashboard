@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cases, feeRecords, referrals } from "@/lib/db/schema";
-import { eq, ilike, desc, or, sql } from "drizzle-orm";
+import { eq, ilike, desc, or, sql, and, isNull, isNotNull } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
 
 const markPaidSchema = z.object({
@@ -22,6 +22,7 @@ export const GET = async (req: NextRequest) => {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim() ?? "";
+    const paidParam = searchParams.get("paid");
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "50", 10)));
     const offset = (page - 1) * limit;
@@ -47,15 +48,22 @@ export const GET = async (req: NextRequest) => {
       .innerJoin(cases, eq(cases.clientId, referrals.caseId))
       .leftJoin(feeRecords, eq(feeRecords.caseId, referrals.caseId))
       .where(
-        search
-          ? or(
-              ilike(cases.firstName, `%${search}%`),
-              ilike(cases.lastName, `%${search}%`),
-              ilike(referrals.referredBy, `%${search}%`),
-              sql`(${cases.firstName} || ' ' || ${cases.lastName}) ILIKE ${'%' + search + '%'}`,
-              sql`(${cases.lastName} || ', ' || ${cases.firstName}) ILIKE ${'%' + search + '%'}`,
-            )
-          : undefined,
+        and(
+          paidParam === "true"
+            ? isNotNull(referrals.paidAt)
+            : paidParam === "false"
+              ? isNull(referrals.paidAt)
+              : undefined,
+          search
+            ? or(
+                ilike(cases.firstName, `%${search}%`),
+                ilike(cases.lastName, `%${search}%`),
+                ilike(referrals.referredBy, `%${search}%`),
+                sql`(${cases.firstName} || ' ' || ${cases.lastName}) ILIKE ${'%' + search + '%'}`,
+                sql`(${cases.lastName} || ', ' || ${cases.firstName}) ILIKE ${'%' + search + '%'}`,
+              )
+            : undefined,
+        ),
       )
       .orderBy(desc(referrals.createdAt))
       .limit(limit)
