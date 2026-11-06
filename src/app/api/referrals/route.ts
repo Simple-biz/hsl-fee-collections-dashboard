@@ -6,6 +6,12 @@ import { cases, feeRecords, referrals } from "@/lib/db/schema";
 import { eq, ilike, desc, or, sql } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
 
+const markPaidSchema = z.object({
+  caseId: z.coerce.number().int().positive(),
+  paid: z.boolean(),
+  paymentAmount: z.coerce.number().positive().nullable().optional(),
+});
+
 // GET /api/referrals?search=&page=&limit=
 export const GET = async (req: NextRequest) => {
   try {
@@ -25,6 +31,8 @@ export const GET = async (req: NextRequest) => {
         caseId: referrals.caseId,
         referredBy: referrals.referredBy,
         notes: referrals.notes,
+        paidAt: referrals.paidAt,
+        paymentAmount: referrals.paymentAmount,
         createdAt: referrals.createdAt,
         firstName: cases.firstName,
         lastName: cases.lastName,
@@ -105,6 +113,49 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ data: row }, { status: 201 });
   } catch (error) {
     console.error("POST /api/referrals error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+};
+
+// PATCH /api/referrals — mark a referral paid or unpaid
+export const PATCH = async (req: NextRequest) => {
+  try {
+    const guard = await requireCapability("case.update");
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
+    }
+
+    const parsed = markPaidSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 },
+      );
+    }
+    const { caseId, paid, paymentAmount } = parsed.data;
+
+    const [existing] = await db
+      .select({ caseId: referrals.caseId })
+      .from(referrals)
+      .where(eq(referrals.caseId, caseId))
+      .limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: "Referral not found" }, { status: 404 });
+    }
+
+    const [row] = await db
+      .update(referrals)
+      .set({
+        paidAt: paid ? new Date() : null,
+        paymentAmount: paid && paymentAmount != null ? String(paymentAmount) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(referrals.caseId, caseId))
+      .returning();
+
+    return NextResponse.json({ data: row });
+  } catch (error) {
+    console.error("PATCH /api/referrals error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 };

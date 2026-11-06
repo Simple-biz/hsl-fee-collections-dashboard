@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
-import { Plus, Search, X, RefreshCw, UserPlus, Trash2 } from "lucide-react";
+import { Plus, Search, X, RefreshCw, UserPlus, Trash2, DollarSign, CheckCircle2 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDate, fmtClaim } from "@/lib/formatters";
 import { removeReferral } from "@/app/(dashboard)/referrals/actions";
@@ -15,6 +15,8 @@ interface ReferralRow {
   caseId: number;
   referredBy: string;
   notes: string;
+  paidAt: string | null;
+  paymentAmount: string | null;
   createdAt: string;
   firstName: string;
   lastName: string;
@@ -49,6 +51,7 @@ export function ReferralsClient() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<PaymentTab>("no-fees");
+  const [markPaidCaseId, setMarkPaidCaseId] = useState<number | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const cancelledRef = useRef(false);
@@ -104,6 +107,52 @@ export function ReferralsClient() {
     }
     toast.success("Removed from referrals");
     setRows((prev) => prev.filter((r) => r.caseId !== caseId));
+  };
+
+  // ── Mark paid / unpaid ───────────────────────────────────────────────────
+
+  const handleMarkPaid = async (caseId: number, amount: number | null) => {
+    const controller = new AbortController();
+    try {
+      const res = await fetch("/api/referrals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId, paid: true, paymentAmount: amount }),
+        signal: controller.signal,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `Failed (${res.status})`);
+      setRows((prev) =>
+        prev.map((r) =>
+          r.caseId === caseId
+            ? { ...r, paidAt: (json.data?.paidAt as string | null) ?? new Date().toISOString(), paymentAmount: amount != null ? String(amount) : null }
+            : r,
+        ),
+      );
+      setMarkPaidCaseId(null);
+      toast.success("Referral marked as paid");
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") toast.error((e as Error).message);
+    }
+  };
+
+  const handleMarkUnpaid = async (caseId: number) => {
+    if (!confirm("Mark this referral as unpaid?")) return;
+    try {
+      const res = await fetch("/api/referrals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId, paid: false }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `Failed (${res.status})`);
+      setRows((prev) =>
+        prev.map((r) => (r.caseId === caseId ? { ...r, paidAt: null, paymentAmount: null } : r)),
+      );
+      toast.success("Referral marked as unpaid");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   // ── Tab derivation ───────────────────────────────────────────────────────
@@ -225,7 +274,7 @@ export function ReferralsClient() {
             <table className="w-full text-sm">
               <thead>
                 <tr className={`border-b ${t.borderLight} ${dark ? "bg-white/4" : "bg-neutral-50"}`}>
-                  {["Referred By", "Case Name", "Claim", "Approval Date", "Assigned Agent", "Date Added", ""].map(
+                  {["Referred By", "Case Name", "Claim", "Approval Date", "Assigned Agent", "Date Added", "Referral Fee", ""].map(
                     (h) => (
                       <th
                         key={h}
@@ -268,15 +317,43 @@ export function ReferralsClient() {
                       <td className={`px-4 py-3 ${t.textSub} whitespace-nowrap`}>
                         {fmtDate(row.createdAt)}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {row.paidAt ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Paid{row.paymentAmount ? ` $${Number(row.paymentAmount).toLocaleString()}` : ""}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setMarkPaidCaseId(row.caseId)}
+                            className={`h-6 px-2 rounded text-[11px] font-semibold flex items-center gap-1 border ${dark ? "border-white/15 text-neutral-300 hover:bg-white/8" : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"} transition-colors`}
+                            title="Mark referral fee as paid"
+                          >
+                            <DollarSign className="h-3 w-3" aria-hidden="true" />
+                            Mark Paid
+                          </button>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleRemove(row.caseId, name)}
-                          className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} text-red-500 hover:text-red-600`}
-                          aria-label={`Remove ${name} from referrals`}
-                          title="Remove from referrals"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {row.paidAt && (
+                            <button
+                              onClick={() => handleMarkUnpaid(row.caseId)}
+                              className={`h-7 px-2 rounded-md text-[11px] font-medium ${t.hover} ${t.textSub}`}
+                              title="Undo payment"
+                            >
+                              Undo
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemove(row.caseId, name)}
+                            className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} text-red-500 hover:text-red-600`}
+                            aria-label={`Remove ${name} from referrals`}
+                            title="Remove from referrals"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -286,6 +363,15 @@ export function ReferralsClient() {
           </div>
         )}
       </div>
+
+      {/* Mark Paid dialog */}
+      {markPaidCaseId != null && (
+        <MarkPaidDialog
+          dark={dark}
+          onClose={() => setMarkPaidCaseId(null)}
+          onConfirm={(amount) => handleMarkPaid(markPaidCaseId, amount)}
+        />
+      )}
 
       {/* Add Referral modal */}
       {addOpen && (
@@ -310,6 +396,75 @@ export function ReferralsClient() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Mark Paid dialog ───────────────────────────────────────────────────────
+
+interface MarkPaidDialogProps {
+  dark: boolean;
+  onClose: () => void;
+  onConfirm: (amount: number | null) => void;
+}
+
+function MarkPaidDialog({ dark, onClose, onConfirm }: MarkPaidDialogProps) {
+  const t = themeClasses(dark);
+  const [amount, setAmount] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = amount.trim() ? parseFloat(amount.trim()) : null;
+    if (parsed != null && (isNaN(parsed) || parsed <= 0)) return;
+    onConfirm(parsed);
+  };
+
+  const inputCls = `h-9 w-full px-3 rounded-md border text-sm outline-none ${t.inputBg}`;
+  const lblCls = `block text-[12px] font-semibold uppercase tracking-wider mb-1 ${t.textMuted}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <form
+        className={`relative w-full max-w-sm rounded-xl border ${t.card} mx-4 p-5 space-y-4`}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+      >
+        <h3 className={`text-sm font-bold ${t.text}`}>Mark Referral as Paid</h3>
+        <div>
+          <label className={lblCls}>Payment Amount (optional)</label>
+          <div className="relative">
+            <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${t.textMuted}`}>$</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className={`${inputCls} pl-6`}
+              autoFocus
+            />
+          </div>
+          <p className={`mt-1 text-[11px] ${t.textMuted}`}>Leave blank if amount is unknown.</p>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`h-8 px-3 rounded-md border text-xs font-medium ${t.outlineBtn}`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={`h-8 px-4 rounded-md text-xs font-semibold flex items-center gap-1.5 ${t.ctaBtn}`}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Mark Paid
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -402,6 +557,8 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
         caseId: selectedCase!.id,
         referredBy: referredBy.trim(),
         notes: notes.trim(),
+        paidAt: null,
+        paymentAmount: null,
         createdAt: new Date().toISOString(),
         firstName: selectedCase!.name.split(", ")[1] ?? "",
         lastName: selectedCase!.name.split(", ")[0] ?? "",

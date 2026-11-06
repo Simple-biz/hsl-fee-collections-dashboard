@@ -769,6 +769,8 @@ export const referrals = pgTable(
       .unique(),
     referredBy: varchar("referred_by", { length: 200 }).notNull(),
     notes: text("notes").notNull().default(""),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paymentAmount: decimal("payment_amount", { precision: 10, scale: 2 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
