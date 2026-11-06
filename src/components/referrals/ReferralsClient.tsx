@@ -52,6 +52,7 @@ export function ReferralsClient() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<PaymentTab>("no-fees");
   const [feeFilter, setFeeFilter] = useState<FeeFilter>("all");
+
   const [addOpen, setAddOpen] = useState(false);
   const [markPaidCaseId, setMarkPaidCaseId] = useState<number | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -60,11 +61,11 @@ export function ReferralsClient() {
 
   // ── Fetch referrals list ─────────────────────────────────────────────────
 
-  const fetchReferrals = useCallback(async (q: string) => {
+  const fetchReferrals = useCallback(async (q: string, silent = false) => {
     fetchAbortRef.current?.abort();
     const controller = new AbortController();
     fetchAbortRef.current = controller;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "500" });
       if (q) params.set("search", q);
@@ -74,9 +75,9 @@ export function ReferralsClient() {
       if (!cancelledRef.current) setRows(json.data);
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      if (!cancelledRef.current) toast.error("Failed to load referrals");
+      if (!cancelledRef.current && !silent) toast.error("Failed to load referrals");
     } finally {
-      if (!cancelledRef.current && fetchAbortRef.current === controller) {
+      if (!cancelledRef.current && fetchAbortRef.current === controller && !silent) {
         setLoading(false);
       }
     }
@@ -91,6 +92,10 @@ export function ReferralsClient() {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
   }, [fetchReferrals]);
+
+  const switchTab = useCallback((tab: PaymentTab) => {
+    setActiveTab(tab);
+  }, []);
 
   const onSearch = (value: string) => {
     setSearch(value);
@@ -234,7 +239,7 @@ export function ReferralsClient() {
           {tabs.map(({ key, label, count }) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key)}
+              onClick={() => switchTab(key)}
               className={`flex-1 h-8 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
                 activeTab === key
                   ? dark

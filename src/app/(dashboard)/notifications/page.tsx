@@ -22,6 +22,7 @@ import {
   Eye,
   Activity,
   Trophy,
+  Handshake,
 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
 import { PaymentsTab } from "@/components/notifications/PaymentsTab";
@@ -32,6 +33,7 @@ import { NewCasesTab } from "@/components/notifications/NewCasesTab";
 import { CallsBacklogTab } from "@/components/notifications/CallsBacklogTab";
 import { FollowUpsTab } from "@/components/notifications/FollowUpsTab";
 import { ScoreboardStandingsTab } from "@/components/notifications/ScoreboardStandingsTab";
+import { ReferralsTab } from "@/components/notifications/ReferralsTab";
 
 // ============================================================================
 // Types
@@ -51,7 +53,7 @@ interface Notification {
 }
 
 type FilterType = "all" | Notification["type"];
-type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases" | "calls_backlog" | "follow_ups" | "scoreboard_standings";
+type PageTab = "notifications" | "payments" | "fee_petition_approved" | "closed_cases" | "recent_activity" | "new_cases" | "calls_backlog" | "follow_ups" | "scoreboard_standings" | "referrals";
 
 const TYPE_META: Record<
   Notification["type"],
@@ -117,6 +119,7 @@ const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "calls_backlog",          label: "Calls",          icon: PhoneCall },
   { key: "follow_ups",             label: "Follow-Ups",     icon: CalendarClock },
   { key: "scoreboard_standings",   label: "Standings",      icon: Trophy },
+  { key: "referrals",              label: "Referrals",      icon: Handshake },
 ];
 
 // ============================================================================
@@ -368,6 +371,9 @@ export default function NotificationsPage() {
 
       {/* Scoreboard Standings tab */}
       {contentTab === "scoreboard_standings" && <ScoreboardStandingsTab dark={dark} t={t} />}
+
+      {/* Referrals tab */}
+      {contentTab === "referrals" && <ReferralsTab dark={dark} t={t} />}
 
       {/* Notifications tab */}
       {contentTab === "notifications" && <>
