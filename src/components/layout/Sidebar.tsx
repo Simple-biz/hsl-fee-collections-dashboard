@@ -256,8 +256,11 @@ export const Sidebar = ({ open, onToggle, onMobileClose }: SidebarProps) => {
     closeSearch();
     router.push(`/cases/${id}`);
   };
-  const isActive = (path: string) =>
-    path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(path + "/");
+  const allNavPaths = NAV_ITEMS.flatMap((g) => g.items.map((i) => i.path));
+  const longestMatch = allNavPaths
+    .filter((p) => (p === "/" ? pathname === "/" : pathname === p || pathname.startsWith(p + "/")))
+    .reduce<string | null>((best, p) => (best === null || p.length > best.length ? p : best), null);
+  const isActive = (path: string) => path === longestMatch;
 
   return (
     <>
