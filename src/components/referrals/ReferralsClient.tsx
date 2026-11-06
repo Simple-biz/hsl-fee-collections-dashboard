@@ -163,21 +163,23 @@ export function ReferralsClient() {
   const partialRows = rows.filter((r) => !r.pifReadyToClose && Number(r.totalFeesPaid) > 0);
   const paidRows = rows.filter((r) => r.pifReadyToClose);
 
+  const applyFeeFilter = (rs: ReferralRow[]) =>
+    feeFilter === "paid"
+      ? rs.filter((r) => r.paidAt != null)
+      : feeFilter === "unpaid"
+        ? rs.filter((r) => r.paidAt === null)
+        : rs;
+
   const tabs: { key: PaymentTab; label: string; count: number }[] = [
-    { key: "no-fees", label: "No Fees", count: noFeesRows.length },
-    { key: "partial", label: "Partially Paid", count: partialRows.length },
-    { key: "paid", label: "Paid in Full", count: paidRows.length },
+    { key: "no-fees", label: "No Fees", count: applyFeeFilter(noFeesRows).length },
+    { key: "partial", label: "Partially Paid", count: applyFeeFilter(partialRows).length },
+    { key: "paid", label: "Paid in Full", count: applyFeeFilter(paidRows).length },
   ];
 
   const tabRows =
     activeTab === "paid" ? paidRows : activeTab === "partial" ? partialRows : noFeesRows;
 
-  const displayRows =
-    feeFilter === "paid"
-      ? tabRows.filter((r) => r.paidAt != null)
-      : feeFilter === "unpaid"
-        ? tabRows.filter((r) => r.paidAt === null)
-        : tabRows;
+  const displayRows = applyFeeFilter(tabRows);
 
   // ── Styles ───────────────────────────────────────────────────────────────
 
