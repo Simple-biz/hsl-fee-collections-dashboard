@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 import { Plus, Search, X, RefreshCw, UserPlus, Trash2, DollarSign, CheckCircle2 } from "lucide-react";
 import { themeClasses } from "@/lib/theme-classes";
-import { fmtDate, fmtClaim } from "@/lib/formatters";
+import { fmtDate, fmtDateLong, fmtClaim } from "@/lib/formatters";
 import { removeReferral } from "@/app/(dashboard)/referrals/actions";
 import { toast } from "sonner";
 
@@ -367,7 +367,7 @@ export function ReferralsClient() {
                         {row.assignedTo || "—"}
                       </td>
                       <td className={`px-4 py-3 ${t.textSub} whitespace-nowrap`}>
-                        {fmtDate(row.createdAt)}
+                        {fmtDateLong(row.createdAt)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {row.paidAt ? (
