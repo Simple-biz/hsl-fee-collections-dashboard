@@ -527,7 +527,7 @@ export default function AddCaseModal({
                 </label>
                 {form.hasReferrer && (
                   <div className="mt-3">
-                    <label className={lblCls}>Referred by</label>
+                    <label className={lblCls}>Referral Source</label>
                     <input
                       value={form.referredBy}
                       onChange={(e) => set("referredBy", e.target.value)}

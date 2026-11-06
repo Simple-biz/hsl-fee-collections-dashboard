@@ -69,7 +69,7 @@ export function AddToReferralsConfirmDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label htmlFor="referred-by">Referred by</Label>
+            <Label htmlFor="referred-by">Referral Source</Label>
             <Input
               id="referred-by"
               ref={inputRef}

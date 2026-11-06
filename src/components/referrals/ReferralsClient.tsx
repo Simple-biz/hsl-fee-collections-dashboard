@@ -223,7 +223,7 @@ export function ReferralsClient({ paid = false }: { paid?: boolean }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className={`border-b ${t.borderLight} ${dark ? "bg-white/4" : "bg-neutral-50"}`}>
-                  {["Referred By", "Case Name", "Claim", "Approval Date", "Assigned Agent", "Date Added", "Referral Fee", ""].map(
+                  {["Referral Source", "Case Name", "Claim", "Approval Date", "Assigned Agent", "Date Added", "Referral Fee", ""].map(
                     (h) => (
                       <th
                         key={h}
@@ -622,9 +622,9 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
             )}
           </div>
 
-          {/* Referred by */}
+          {/* Referral source */}
           <div>
-            <label className={lblCls}>Referred by *</label>
+            <label className={lblCls}>Referral Source *</label>
             <input
               value={referredBy}
               onChange={(e) => setReferredBy(e.target.value)}
