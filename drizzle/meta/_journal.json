@@ -435,6 +435,13 @@
       "when": 1762387200000,
       "tag": "0061_add_referrals_table",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793987605916,
+      "tag": "0062_add_referral_payment_tracking",
+      "breakpoints": true
     }
   ]
 }

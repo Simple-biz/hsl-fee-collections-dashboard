@@ -3,8 +3,14 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cases, feeRecords, referrals } from "@/lib/db/schema";
-import { eq, ilike, desc, or, sql } from "drizzle-orm";
+import { eq, ilike, desc, or, sql, and, isNull, isNotNull, gt } from "drizzle-orm";
 import { requireCapability, guardStatus } from "@/lib/auth-helpers";
+
+const markPaidSchema = z.object({
+  caseId: z.coerce.number().int().positive(),
+  paid: z.boolean(),
+  paymentAmount: z.coerce.number().positive().nullable().optional(),
+});
 
 // GET /api/referrals?search=&page=&limit=
 export const GET = async (req: NextRequest) => {
@@ -16,8 +22,10 @@ export const GET = async (req: NextRequest) => {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim() ?? "";
+    const paidParam = searchParams.get("paid");
+    const needsPayment = searchParams.get("needsPayment") === "true";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "50", 10)));
+    const limit = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") ?? "50", 10)));
     const offset = (page - 1) * limit;
 
     const rows = await db
@@ -25,6 +33,8 @@ export const GET = async (req: NextRequest) => {
         caseId: referrals.caseId,
         referredBy: referrals.referredBy,
         notes: referrals.notes,
+        paidAt: referrals.paidAt,
+        paymentAmount: referrals.paymentAmount,
         createdAt: referrals.createdAt,
         firstName: cases.firstName,
         lastName: cases.lastName,
@@ -39,15 +49,30 @@ export const GET = async (req: NextRequest) => {
       .innerJoin(cases, eq(cases.clientId, referrals.caseId))
       .leftJoin(feeRecords, eq(feeRecords.caseId, referrals.caseId))
       .where(
-        search
-          ? or(
-              ilike(cases.firstName, `%${search}%`),
-              ilike(cases.lastName, `%${search}%`),
-              ilike(referrals.referredBy, `%${search}%`),
-              sql`(${cases.firstName} || ' ' || ${cases.lastName}) ILIKE ${'%' + search + '%'}`,
-              sql`(${cases.lastName} || ', ' || ${cases.firstName}) ILIKE ${'%' + search + '%'}`,
-            )
-          : undefined,
+        and(
+          needsPayment
+            ? and(
+                isNull(referrals.paidAt),
+                or(
+                  eq(feeRecords.pifReadyToClose, true),
+                  gt(feeRecords.totalFeesPaid, "0"),
+                ),
+              )
+            : paidParam === "true"
+              ? isNotNull(referrals.paidAt)
+              : paidParam === "false"
+                ? isNull(referrals.paidAt)
+                : undefined,
+          search
+            ? or(
+                ilike(cases.firstName, `%${search}%`),
+                ilike(cases.lastName, `%${search}%`),
+                ilike(referrals.referredBy, `%${search}%`),
+                sql`(${cases.firstName} || ' ' || ${cases.lastName}) ILIKE ${'%' + search + '%'}`,
+                sql`(${cases.lastName} || ', ' || ${cases.firstName}) ILIKE ${'%' + search + '%'}`,
+              )
+            : undefined,
+        ),
       )
       .orderBy(desc(referrals.createdAt))
       .limit(limit)
@@ -105,6 +130,49 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ data: row }, { status: 201 });
   } catch (error) {
     console.error("POST /api/referrals error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+};
+
+// PATCH /api/referrals — mark a referral paid or unpaid
+export const PATCH = async (req: NextRequest) => {
+  try {
+    const guard = await requireCapability("case.update");
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guardStatus(guard.error) });
+    }
+
+    const parsed = markPaidSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 },
+      );
+    }
+    const { caseId, paid, paymentAmount } = parsed.data;
+
+    const [existing] = await db
+      .select({ caseId: referrals.caseId })
+      .from(referrals)
+      .where(eq(referrals.caseId, caseId))
+      .limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: "Referral not found" }, { status: 404 });
+    }
+
+    const [row] = await db
+      .update(referrals)
+      .set({
+        paidAt: paid ? new Date() : null,
+        paymentAmount: paid && paymentAmount != null ? String(paymentAmount) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(referrals.caseId, caseId))
+      .returning();
+
+    return NextResponse.json({ data: row });
+  } catch (error) {
+    console.error("PATCH /api/referrals error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 };
