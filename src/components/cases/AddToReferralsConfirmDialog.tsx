@@ -57,12 +57,12 @@ export function AddToReferralsConfirmDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            Add {count === 1 ? "1 case" : `${count} cases`} to Referrals?
+            Add {count === 1 ? "1 case" : `${count} cases`} to Atty Referrals?
           </DialogTitle>
           <DialogDescription>
             {count === 1
-              ? "This case will appear on the Referrals page."
-              : `These ${count} cases will appear on the Referrals page.`}{" "}
+              ? "This case will appear on the Atty Referrals page."
+              : `These ${count} cases will appear on the Atty Referrals page.`}{" "}
             If a case is already there its referrer name will be updated.
           </DialogDescription>
         </DialogHeader>
