@@ -138,7 +138,7 @@ export function ReferralsTab({ dark, t }: ReferralsTabProps) {
         <div className="flex flex-col items-center justify-center py-16">
           <Handshake className={`h-8 w-8 ${t.textMuted} mb-3`} aria-hidden="true" />
           <p className={`text-sm font-medium ${t.text}`}>All referral fees are settled</p>
-          <p className={`text-xs ${t.textMuted} mt-1`}>Referrals that receive fees will appear here until marked paid.</p>
+          <p className={`text-xs ${t.textMuted} mt-1`}>Atty Referrals that receive fees will appear here until marked paid.</p>
         </div>
       )}
 
