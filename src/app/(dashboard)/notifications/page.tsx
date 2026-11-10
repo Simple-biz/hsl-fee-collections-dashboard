@@ -119,7 +119,7 @@ const PAGE_TABS: { key: PageTab; label: string; icon: React.ElementType }[] = [
   { key: "calls_backlog",          label: "Calls",          icon: PhoneCall },
   { key: "follow_ups",             label: "Follow-Ups",     icon: CalendarClock },
   { key: "scoreboard_standings",   label: "Standings",      icon: Trophy },
-  { key: "referrals",              label: "Referrals",      icon: Handshake },
+  { key: "referrals",              label: "Atty Referrals", icon: Handshake },
 ];
 
 // ============================================================================
