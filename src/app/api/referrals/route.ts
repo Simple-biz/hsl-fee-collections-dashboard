@@ -38,6 +38,7 @@ export const GET = async (req: NextRequest) => {
         createdAt: referrals.createdAt,
         firstName: cases.firstName,
         lastName: cases.lastName,
+        externalId: cases.externalId,
         claimTypeLabel: cases.claimTypeLabel,
         approvalDate: cases.approvalDate,
         assignedTo: feeRecords.assignedTo,

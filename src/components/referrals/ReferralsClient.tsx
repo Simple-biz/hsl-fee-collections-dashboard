@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 import { Plus, Search, X, RefreshCw, UserPlus, Trash2, DollarSign, CheckCircle2 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
+import { buildMyCaseUrl } from "@/lib/import/case-link";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDate, fmtDateLong, fmtClaim } from "@/lib/formatters";
 import { removeReferral } from "@/app/(dashboard)/referrals/actions";
@@ -23,6 +23,7 @@ interface ReferralRow {
   createdAt: string;
   firstName: string;
   lastName: string;
+  externalId: string | null;
   claimTypeLabel: string | null;
   approvalDate: string | null;
   assignedTo: string | null;
@@ -354,12 +355,14 @@ export function ReferralsClient() {
                         {row.referredBy}
                       </td>
                       <td className={`px-4 py-3 ${t.text} whitespace-nowrap`}>
-                        <Link
-                          href={`/cases/${row.caseId}`}
+                        <a
+                          href={row.externalId || buildMyCaseUrl(row.caseId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className={`hover:underline ${t.text}`}
                         >
                           {name}
-                        </Link>
+                        </a>
                         {row.isClosed && (
                           <span className={`ml-1.5 text-[10px] font-semibold uppercase tracking-wide ${t.textMuted}`}>
                             Closed
@@ -628,6 +631,7 @@ function AddReferralModal({ dark, onClose, onAdded }: AddReferralModalProps) {
         approvalDate: null,
         assignedTo: selectedCase!.assigned || null,
         isClosed: null,
+        externalId: null,
         totalFeesPaid: null,
         pifReadyToClose: null,
       };
