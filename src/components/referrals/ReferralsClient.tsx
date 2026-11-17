@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 import { Plus, Search, X, RefreshCw, UserPlus, Trash2, DollarSign, CheckCircle2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { themeClasses } from "@/lib/theme-classes";
 import { fmtDate, fmtDateLong, fmtClaim } from "@/lib/formatters";
 import { removeReferral } from "@/app/(dashboard)/referrals/actions";
@@ -38,6 +39,8 @@ interface CaseSearchResult {
 }
 
 export function ReferralsClient() {
+  const { data: session } = useSession();
+  const canRemove = session?.user?.role !== "member";
   const { resolvedTheme } = useTheme();
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -350,7 +353,12 @@ export function ReferralsClient() {
                         {row.referredBy}
                       </td>
                       <td className={`px-4 py-3 ${t.text} whitespace-nowrap`}>
-                        {name}
+                        <a
+                          href={`/cases/${row.caseId}`}
+                          className={`hover:underline ${t.text}`}
+                        >
+                          {name}
+                        </a>
                         {row.isClosed && (
                           <span className={`ml-1.5 text-[10px] font-semibold uppercase tracking-wide ${t.textMuted}`}>
                             Closed
@@ -397,14 +405,16 @@ export function ReferralsClient() {
                               Undo
                             </button>
                           )}
-                          <button
-                            onClick={() => handleRemove(row.caseId, name)}
-                            className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} text-red-500 hover:text-red-600`}
-                            aria-label={`Remove ${name} from referrals`}
-                            title="Remove from referrals"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          </button>
+                          {canRemove && (
+                            <button
+                              onClick={() => handleRemove(row.caseId, name)}
+                              className={`h-7 w-7 rounded-md flex items-center justify-center ${t.hover} text-red-500 hover:text-red-600`}
+                              aria-label={`Remove ${name} from referrals`}
+                              title="Remove from referrals"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
