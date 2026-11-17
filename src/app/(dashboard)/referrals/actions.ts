@@ -46,6 +46,7 @@ export async function removeReferral(input: {
   try {
     const guard = await requireCapability("case.update");
     if (!guard.ok) return { ok: false, error: "You don't have permission to remove referrals." };
+    if (guard.session.user.role === "member") return { ok: false, error: "You don't have permission to remove referrals." };
     if (!Number.isFinite(input.caseId)) return { ok: false, error: "Invalid case ID" };
 
     await db.delete(referrals).where(eq(referrals.caseId, input.caseId));
