@@ -719,7 +719,7 @@ export const OverpaidCases = () => {
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = ["Case", "MyCase Title", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "PIF", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
+      const headers = ["Case", "MyCase Title", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Overpaid Status", "Notice Sent", "Notice Received", "Notes", "Checks Cleared", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
@@ -1224,7 +1224,7 @@ export const OverpaidCases = () => {
                     Overpaid Amount {sortIcon("overpaidAmount")}
                   </button>
                 </th>
-                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg} min-w-28`}>PIF</th>
+                <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg} min-w-28`}>Overpaid Status</th>
                 <th
                   aria-sort={ariaSortFor("noticeSent")}
                   className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
