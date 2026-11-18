@@ -516,6 +516,7 @@ export const FeeRecordsTable = ({
     const extras = Array.from(
       new Set(
         cases
+          .filter((c) => !c.markedOverpaid)
           .map((c) => c.feesConfirmation)
           .filter((v): v is string => v != null && !catalogSet.has(v)),
       ),

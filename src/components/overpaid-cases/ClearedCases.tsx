@@ -235,7 +235,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
         const json = await res.json();
         all = json.data || [];
       }
-      const headers = ["Case", "MyCase Title", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "PIF", "Notice Received", "Notes", "Cleared On", "Last Updated"];
+      const headers = ["Case", "MyCase Title", "Assigned To", "Region", "Fees Received", "Overpaid Amount", "Overpaid Status", "Notice Received", "Notes", "Cleared On", "Last Updated"];
       const escape = (v: string) => {
         const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
         return `"${safe.replace(/"/g, '""')}"`;
@@ -611,7 +611,7 @@ export const ClearedCases = ({ dark, t, refreshToken, onRestored }: Props) => {
                       Overpaid Amount {sortIcon("overpaidAmount")}
                     </button>
                   </th>
-                  <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>PIF</th>
+                  <th className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}>Overpaid Status</th>
                   <th
                     aria-sort={sortKey === "opLtrDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                     className={`${thBase} ${t.textSub} text-left sticky top-0 z-20 ${stickyHeaderBg}`}
