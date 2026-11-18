@@ -743,11 +743,11 @@ export const FeeRecordsTable = ({
   );
 
   // Does the batch pill have anything to offer this user? "Add to Fee Petitions"
-  // is open to all staff on the active table; Archive is admin-only. A member on
-  // Fees Closed has neither, so the pill is suppressed to avoid a floating bar
-  // that says only "N selected" with nothing to click.
+  // is open to all staff on the active table; Archive is admin-only. "Add to
+  // Referrals" is available in all modes, so the pill is always shown when rows
+  // are selected — the comment about "nothing to click" no longer applies.
   const canAddToFeePetitions = mode !== "closed";
-  const hasBatchActions = canAddToFeePetitions || isAdmin;
+  const hasBatchActions = canAddToFeePetitions || isAdmin || mode === "closed";
 
 
   // ── Pagination ────────────────────────────────────────────────────────────
