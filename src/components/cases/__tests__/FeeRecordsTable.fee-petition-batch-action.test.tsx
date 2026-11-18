@@ -318,14 +318,13 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
     expect(addButton()).toBeNull();
   });
 
-  // "Add to Fee Petitions" is the only non-admin batch action. On Fees Closed
-  // it is suppressed (the section excludes closed cases), so a member selecting
-  // rows there gets no pill at all — not a floating bar saying "1 selected"
-  // with nothing to do.
-  it("shows no batch pill at all for a member on the Fees Closed table", () => {
+  // "Add to Referrals" is available in all modes, so the pill is shown even
+  // for a member on Fees Closed (closed cases can be added to Atty Referrals).
+  it("shows the batch pill for a member on the Fees Closed table (Add to Referrals is available)", () => {
     mockRole("member");
     renderAndSelect([BASE_CASE], "closed");
-    expect(screen.queryByText("1 selected")).toBeNull();
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    expect(screen.getByText("Add to Referrals")).toBeTruthy();
   });
 
   it("still shows the pill for a member on the active table", () => {
