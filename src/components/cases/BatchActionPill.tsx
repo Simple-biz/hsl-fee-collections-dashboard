@@ -68,7 +68,7 @@ export function BatchActionPill({
             Fees Closed
           </button>
         )}
-        {isAdmin && canFinalize && (
+        {canFinalize && (
           <button
             onClick={handleBatchMarkOverpaid}
             disabled={bulkOverpaidSaving}
