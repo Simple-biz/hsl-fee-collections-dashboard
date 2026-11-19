@@ -208,12 +208,12 @@ describe("FeeRecordsTable — Add to Fee Petitions batch action", () => {
     expect(screen.queryByRole("button", { name: /Add to Overpaid Cases/ })).toBeNull();
   });
 
-  it("is available to a lead, without the admin-only actions", () => {
+  it("is available to a lead, with overpaid but without admin-only actions", () => {
     mockRole("lead");
     renderAndSelect([BASE_CASE]);
     expect(addButton()).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add to Overpaid Cases/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Archive$/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Add to Overpaid Cases/ })).toBeNull();
   });
 
   it("is available to an admin alongside the admin-only actions", () => {
